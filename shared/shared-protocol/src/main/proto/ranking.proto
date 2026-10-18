@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_package = "dev.kage.protocol";
+option java_multiple_files = true;
+
+import "character.proto";
+
+// ADR-057 (Accepted 2026-10-18) — Bia Anh Danh (bảng xếp hạng). Dải Ranking 1200–1299; 1200/1201 là
+// GetPvpRating (arena.proto) từ Phase 8. CHỈ THÊM, protocolVersion không tăng.
+
+enum LeaderboardKind {
+  LEADERBOARD_KIND_UNSPECIFIED = 0; // protobuf enum bắt buộc có giá trị 0 — KHÔNG dùng cho bảng thật.
+  LEADERBOARD_KIND_REALM = 1;        // cảnh giới: cấp giảm dần, rồi EXP, rồi id tăng dần
+  LEADERBOARD_KIND_ARENA = 2;        // Elo đấu trường — chỉ người đã đánh ít nhất một trận
+  LEADERBOARD_KIND_COMBAT_POWER = 3; // Lực Chiến (ADR-056)
+}
+
+// Command: Client -> Server (OPCODE_GET_LEADERBOARD_REQUEST = 1202).
+message GetLeaderboardRequest {
+  LeaderboardKind kind = 1;
+}
+
+message LeaderboardEntry {
+  int32 rank = 1;
+  int64 character_id = 2;
+  string name = 3;
+  Faction faction = 4;
+  int32 level = 5;
+  int64 value = 6; // EXP / Elo / Lực Chiến tuỳ kind
+}
+
+// Response: Server -> Client (OPCODE_GET_LEADERBOARD_RESPONSE = 1203). Bảng có thể trễ tới 60 giây
+// (server cache) — computed_at_epoch_ms cho client nói ra điều đó.
+message GetLeaderboardResponse {
+  LeaderboardKind kind = 1;
+  repeated LeaderboardEntry entries = 2;
+  int32 own_rank = 3;  // 0 = chưa có mặt trên bảng (vd chưa đánh trận đấu trường nào)
+  int64 own_value = 4;
+  int64 computed_at_epoch_ms = 5;
+}

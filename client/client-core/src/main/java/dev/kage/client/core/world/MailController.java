@@ -345,7 +345,9 @@ final class MailController {
             SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_GOLD_AMOUNT, "mail.error.bad_gold",
             SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_ATTACHMENT, "mail.error.invalid_attachment",
             SendMailOutcome.SEND_MAIL_OUTCOME_SUBJECT_TOO_LONG, "mail.error.subject_too_long",
-            SendMailOutcome.SEND_MAIL_OUTCOME_BODY_TOO_LONG, "mail.error.body_too_long");
+            SendMailOutcome.SEND_MAIL_OUTCOME_BODY_TOO_LONG, "mail.error.body_too_long",
+            // ADR-058 — khoá đã dùng nghĩa là lá thư ĐÃ đi rồi: nói "đã gửi", không phải lỗi.
+            SendMailOutcome.SEND_MAIL_OUTCOME_DUPLICATE_REQUEST, "mail.notice.sent");
 
     private static final Map<ClaimMailOutcome, String> CLAIM_MESSAGE_KEYS = Map.of(
             ClaimMailOutcome.CLAIM_MAIL_OUTCOME_OK, "mail.notice.claimed",

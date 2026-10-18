@@ -3,6 +3,7 @@ package dev.kage.mail.application;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
+import dev.kage.mail.domain.IdempotencyKeyReusedException;
 import dev.kage.mail.domain.Mail;
 import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.MailAttachmentDraft;
@@ -62,6 +63,16 @@ public final class SendMailUseCase {
      *     không thư, không vàng, không vật phẩm — và {@link SendResult#mail()} rỗng
      */
     public SendResult execute(MailDraft draft) {
+        return execute(draft, "");
+    }
+
+    /**
+     * Như {@link #execute(MailDraft)}, kèm khoá chống gửi trùng của người chơi (ADR-058).
+     *
+     * @param idempotencyKey khoá ADR-025/ADR-058; rỗng = không chống trùng. Ghi TRONG transaction, ngay
+     *     sau khoá túi đồ người gửi và TRƯỚC khi trừ vàng/đồ — trùng thì rollback trọn.
+     */
+    public SendResult execute(MailDraft draft, String idempotencyKey) {
         Optional<MailContentViolation> violation = draft.validate();
         if (violation.isPresent()) {
             return SendResult.rejected(toOutcome(violation.get()));
@@ -74,13 +85,15 @@ public final class SendMailUseCase {
         AtomicReference<Mail> resultHolder = new AtomicReference<Mail>();
         try {
             tx.inTransaction((Transaction t) -> {
-                escrowFromSender(t, draft);
+                escrowFromSender(t, draft, idempotencyKey);
                 Mail sent = ports.repositoryPort().send(t, newMail);
                 auditIfEscrowed(t, draft, sent);
                 resultHolder.set(sent);
             });
         } catch (SendMailAbortedException e) {
             return SendResult.rejected(e.outcome());
+        } catch (IdempotencyKeyReusedException e) {
+            return SendResult.rejected(SendOutcome.DUPLICATE_REQUEST);
         }
         return new SendResult(SendOutcome.OK, Optional.of(resultHolder.get()));
     }
@@ -90,14 +103,16 @@ public final class SendMailUseCase {
      * đang ở giữa transaction, "return sớm" sẽ COMMIT phần đã trừ (cùng cái bẫy mà
      * {@link ClaimMailUseCase} đã chú thích).
      */
-    private void escrowFromSender(Transaction t, MailDraft draft) {
+    private void escrowFromSender(Transaction t, MailDraft draft, String idempotencyKey) {
         Long senderId = draft.senderId();
         if (senderId == null) {
+            recordKeyIfAny(t, idempotencyKey);
             return;
         }
         // Khoá túi đồ người gửi ĐẦU TIÊN, trước vàng — thứ tự khoá chung (DATABASE.md §5.1).
         // Đây là lời gọi DB đầu tiên của transaction gửi thư.
         ports.inventoryGatewayPort().lockInventory(t, senderId);
+        recordKeyIfAny(t, idempotencyKey);
         if (draft.goldAmount() > 0 && !ports.goldPort().deductGold(t, senderId, draft.goldAmount())) {
             throw new SendMailAbortedException(SendOutcome.INSUFFICIENT_GOLD);
         }
@@ -114,6 +129,12 @@ public final class SendMailUseCase {
      * Chỉ ghi audit khi thật sự có tài sản rời khỏi túi ai đó — DATABASE.md §5 yêu cầu audit cho
      * "mail-item"/gold, còn thư chào hỏi rỗng thì ghi vào đây chỉ làm loãng bảng {@code audit_log}.
      */
+    private void recordKeyIfAny(Transaction t, String idempotencyKey) {
+        if (!idempotencyKey.isEmpty()) {
+            ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
+        }
+    }
+
     private void auditIfEscrowed(Transaction t, MailDraft draft, Mail sent) {
         if (draft.senderId() == null || !sent.hasReward()) {
             return;
@@ -159,6 +180,8 @@ public final class SendMailUseCase {
         /** Tiêu đề/nội dung chứa ký tự không lưu được ({@code U+0000}). */
         INVALID_TEXT,
         /** Hộp thư người nhận đã có {@link #MAILBOX_CAPACITY} thư (2026-10-17). */
-        MAILBOX_FULL
+        MAILBOX_FULL,
+        /** {@code idempotency_key} đã dùng (ADR-058) — lá thư đó đã được gửi trước đó. */
+        DUPLICATE_REQUEST
     }
 }

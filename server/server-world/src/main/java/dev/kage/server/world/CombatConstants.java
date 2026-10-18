@@ -167,6 +167,58 @@ final class CombatConstants {
             // Lôi: "đơn mục tiêu, xuyên giáp" — chính xác cao + đòn bạo kích nặng hơn.
             Element.LOI, new PassiveBonus(0, 0, 0, 0, 0.03f, 0f, 0f, 0.2f));
 
+    // Hệ số Lực Chiến — GDD §5, placeholder (chỉ để HIỂN THỊ/XẾP HẠNG, không bao giờ tính damage).
+    private static final double CP_PER_HP = 1.0;
+    private static final double CP_PER_CHI = 0.5;
+    private static final double CP_PER_OFFENSE = 3.5;
+    private static final double CP_PER_DEFENSE = 3.0;
+    private static final double CP_PER_CRIT_POINT = 2.0;
+    private static final double CP_PER_DODGE_POINT = 1.5;
+    private static final double CP_PER_HIT_POINT = 0.5;
+    private static final double CP_PER_LEVEL = 50.0;
+    private static final float PERMILLE = 1000f;
+    private static final float PERCENT = 100f;
+
+    /**
+     * Bảng chỉ số + Lực Chiến (ADR-056) từ chỉ số nền + trang bị — CÙNG phép cộng {@code applyBonusTo}
+     * của World (ATK/DEF/RES cộng bonus trang bị, máu tối đa qua {@link #characterMaxHp}).
+     */
+    static CharacterStatSheet statSheet(CharacterBaseStats base, EquipmentBonusSnapshot bonus, int maxChi) {
+        CombatStats derived = deriveCombatStats(base);
+        int maxHp = characterMaxHp(base.level(), bonus.hp());
+        int atk = derived.atk() + bonus.atk();
+        int def = derived.def() + bonus.def();
+        int res = derived.res() + bonus.res();
+        // Lực Chiến GDD §5: HP + Chi×0,5 + (ATK+SKILL)×3,5 + (DEF+RES)×3 + CRIT%×100×2 + DODGE%×100×1,5
+        // + HIT%×100×0,5 + ATK_SPEED_bonus%×100×1,5 (chưa có bonus tốc đánh ⇒ 0) + Level×50. Làm tròn xuống.
+        double power = maxHp * CP_PER_HP
+                + maxChi * CP_PER_CHI
+                + (atk + derived.skillDmg()) * CP_PER_OFFENSE
+                + (def + res) * CP_PER_DEFENSE
+                + derived.critPercent() * PERCENT * CP_PER_CRIT_POINT
+                + derived.dodgePercent() * PERCENT * CP_PER_DODGE_POINT
+                + derived.hitPercent() * PERCENT * CP_PER_HIT_POINT
+                + Math.max(1, base.level()) * CP_PER_LEVEL;
+        return new CharacterStatSheet(
+                base.level(),
+                base.str(),
+                base.agi(),
+                base.intelligence(),
+                base.vit(),
+                maxHp,
+                bonus.hp(),
+                maxChi,
+                atk,
+                derived.skillDmg(),
+                def,
+                res,
+                Math.round(derived.hitPercent() * PERMILLE),
+                Math.round(derived.dodgePercent() * PERMILLE),
+                Math.round(derived.critPercent() * PERMILLE),
+                Math.round(derived.critDamageMultiplier() * PERCENT),
+                (long) Math.floor(power));
+    }
+
     /**
      * Derive ATK/SKILL_DMG/DEF/RES/HIT%/DODGE%/CRIT% từ STR/AGI/INT/VIT (GAME-DESIGN-DOCUMENT.md
      * §5, bảng "Công thức derive"), cộng thêm bonus passive tĩnh theo hệ phái ({@link #FACTION_PASSIVES}).

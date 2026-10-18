@@ -299,6 +299,10 @@ final class QuestCoordinator implements WindowFlow {
      */
     private void showRewards(ClaimQuestRewardResponse response) {
         feedback.showSelfNotice("quest.notice.claimed", FloatingCombatText.LEVEL_UP);
+        if (response.getGoldGranted() > 0L) {
+            feedback.showSelfText(
+                    format("quest.notice.gold_reward", response.getGoldGranted()), FloatingCombatText.DAMAGE_DEALT);
+        }
         for (ItemRewardView item : response.getItemsGrantedList()) {
             feedback.showSelfText(
                     item.getItemTemplateCode() + " x" + item.getQuantity(), FloatingCombatText.DAMAGE_DEALT);

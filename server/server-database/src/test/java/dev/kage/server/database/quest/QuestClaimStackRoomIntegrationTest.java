@@ -174,7 +174,8 @@ class QuestClaimStackRoomIntegrationTest {
                 new PostgresQuestExpAdapter(),
                 new PostgresQuestInventoryGrantAdapter(),
                 new PostgresQuestAuditAdapter(),
-                new PostgresQuestIdempotencyAdapter());
+                new PostgresQuestIdempotencyAdapter(),
+                new PostgresQuestGoldAdapter());
         TransactionRunner tx = new JdbcQuestTransactionRunner(dataSource);
         return new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, tx);
     }

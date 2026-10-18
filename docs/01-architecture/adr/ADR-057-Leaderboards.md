@@ -1,4 +1,4 @@
-# ADR-057: Bảng xếp hạng (Bia Anh Danh) — 3 bảng top 50, opcode 1200/1201, server cache 60 giây
+# ADR-057: Bảng xếp hạng (Bia Anh Danh) — 3 bảng top 50, opcode 1202/1203, server cache 60 giây
 
 | | |
 |---|---|
@@ -17,15 +17,15 @@ tự hỏi được số của mình (`GetPvpRatingRequest`). Không có chỗ n
 
 ## Decision
 
-1. **Opcode** (`ranking.proto` mới, dải 1200): `OPCODE_GET_LEADERBOARD_REQUEST = 1200`,
-   `OPCODE_LEADERBOARD_RESPONSE = 1201`. Chỉ thêm, `protocolVersion` không tăng.
+1. **Opcode** (`ranking.proto` mới, dải 1200): `OPCODE_GET_LEADERBOARD_REQUEST = 1202`,
+   `OPCODE_GET_LEADERBOARD_RESPONSE = 1203` (1200/1201 là `GetPvpRating`). Chỉ thêm, `protocolVersion` không tăng.
    ```proto
    enum LeaderboardKind { LEADERBOARD_KIND_UNSPECIFIED = 0; LEADERBOARD_KIND_REALM = 1;
                           LEADERBOARD_KIND_ARENA = 2; LEADERBOARD_KIND_COMBAT_POWER = 3; }
    message GetLeaderboardRequest { LeaderboardKind kind = 1; }
    message LeaderboardEntry { int32 rank = 1; int64 character_id = 2; string name = 3;
                               Faction faction = 4; int32 level = 5; int64 value = 6; }
-   message LeaderboardResponse { LeaderboardKind kind = 1; repeated LeaderboardEntry entries = 2;
+   message GetLeaderboardResponse { LeaderboardKind kind = 1; repeated LeaderboardEntry entries = 2;
                                  int32 own_rank = 3;   // 0 = ngoài top
                                  int64 own_value = 4; int64 computed_at_epoch_ms = 5; }
    ```
@@ -70,7 +70,7 @@ tự hỏi được số của mình (`GetPvpRatingRequest`). Không có chỗ n
 
 | # | Quyết định |
 |---|---|
-| 1 | `ranking.proto`, opcode 1200/1201 |
+| 1 | `ranking.proto`, opcode 1202/1203 |
 | 2 | 3 bảng top 50, hoà thì id nhỏ trước |
 | 3 | Cache 60 s ở gateway, làm mới lười, khoá theo loại |
 | 4 | V60 chỉ thêm index |
@@ -85,5 +85,5 @@ Không.
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành — đang làm (lô 15, 2026-10-18).
+1. ✅ Thi hành (2026-10-18). ⚠️ Opcode thật là **1202/1203** (1200/1201 đã thuộc `GetPvpRating` từ Phase 8 — bản nháp ghi nhầm). Cache: `LeaderboardCache` (một bản mỗi bộ facade, khoá theo loại bảng). Panel `ReportPanel` phím L.
 2. ⏳ Kiểm sống với vài nhân vật thật trên DB dev.

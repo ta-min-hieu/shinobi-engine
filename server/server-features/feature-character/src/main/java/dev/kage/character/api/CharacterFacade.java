@@ -142,6 +142,11 @@ public final class CharacterFacade {
         return characterPort.findByName(normalized);
     }
 
+    /** Mọi nhân vật theo thứ hạng cảnh giới — cho Bia Anh Danh (ADR-057); gateway cache 60 s. */
+    public List<Character> listAllByRealm() {
+        return characterPort.listAllByRealm();
+    }
+
     /** Tra nhân vật theo ID — dùng để hiển thị tên (danh sách bạn bè, người gửi thư/chat riêng). */
     public Optional<Character> findById(long characterId) {
         return characterPort.findById(characterId);

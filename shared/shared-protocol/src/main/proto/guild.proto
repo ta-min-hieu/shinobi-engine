@@ -156,3 +156,21 @@ message GetMyGuildResponse {
   string guild_name = 3;
   bool is_leader = 4;
 }
+
+// ADR-059 (Accepted 2026-10-18) — "bang của bạn vừa đổi". CHỈ THÊM, protocolVersion không tăng. Client nói
+// một câu theo lý do rồi tự hỏi lại GetMyGuild/ListGuildMembers.
+enum GuildChangeReason {
+  GUILD_CHANGE_REASON_UNSPECIFIED = 0;
+  GUILD_CHANGE_REASON_MEMBER_JOINED = 1;
+  GUILD_CHANGE_REASON_MEMBER_LEFT = 2;
+  GUILD_CHANGE_REASON_MEMBER_KICKED = 3;
+  GUILD_CHANGE_REASON_YOU_WERE_KICKED = 4;
+  GUILD_CHANGE_REASON_DISBANDED = 5;
+  GUILD_CHANGE_REASON_YOU_WERE_ACCEPTED = 6;
+}
+
+// Event: Server -> Client (OPCODE_GUILD_CHANGED_EVENT = 720).
+message GuildChangedEvent {
+  GuildChangeReason reason = 1;
+  int64 subject_character_id = 2;
+}

@@ -89,6 +89,9 @@ class TownElderDialogueTreeTest {
                         "pill_run",
                         "proving",
                         "breakthrough",
+                        // ADR-055 — nhiệm vụ ngày đứng CUỐI, ngay trước `end`: `end` lùi một chỗ là CÓ
+                        // CHỦ ĐÍCH (`option_index` là VỊ TRÍ), ghim lại ngay tại đây.
+                        "daily_duty",
                         "end");
         assertThat(node("about_realm").textKey()).isEqualTo("dialogue.town_elder.about_realm");
         assertThat(node("about_elder").textKey()).isEqualTo("dialogue.town_elder.about_elder");

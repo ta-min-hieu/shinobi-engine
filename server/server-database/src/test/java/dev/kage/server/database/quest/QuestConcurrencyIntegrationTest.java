@@ -285,7 +285,8 @@ class QuestConcurrencyIntegrationTest {
                 new PostgresQuestExpAdapter(),
                 new PostgresQuestInventoryGrantAdapter(),
                 new PostgresQuestAuditAdapter(),
-                new PostgresQuestIdempotencyAdapter());
+                new PostgresQuestIdempotencyAdapter(),
+                new PostgresQuestGoldAdapter());
         return new ClaimQuestRewardUseCase(
                 new PostgresQuestProgressAdapter(dataSource),
                 new PostgresQuestTemplateAdapter(dataSource),

@@ -12,9 +12,17 @@ import java.util.OptionalLong;
  * kiểu này nói thẳng ra rằng "không có quest tiên quyết" là trạng thái HỢP LỆ, không phải thiếu dữ
  * liệu.
  */
-public record QuestTemplate(long id, String scriptRef, OptionalLong prerequisiteQuestId) {
+public record QuestTemplate(long id, String scriptRef, OptionalLong prerequisiteQuestId, RepeatPolicy repeatPolicy) {
+
+    /** Quest một lần — hình dạng trước ADR-055, giữ cho mọi chỗ dựng quest chính tuyến. */
+    public QuestTemplate(long id, String scriptRef, OptionalLong prerequisiteQuestId) {
+        this(id, scriptRef, prerequisiteQuestId, RepeatPolicy.ONCE);
+    }
 
     public QuestTemplate {
+        if (repeatPolicy == null) {
+            throw new IllegalArgumentException("repeatPolicy không được null");
+        }
         if (id <= 0) {
             throw new IllegalArgumentException("id phải > 0: " + id);
         }
@@ -27,6 +35,11 @@ public record QuestTemplate(long id, String scriptRef, OptionalLong prerequisite
         if (prerequisiteQuestId.isPresent() && prerequisiteQuestId.getAsLong() == id) {
             throw new IllegalArgumentException("quest không thể là tiên quyết của chính nó: " + id);
         }
+    }
+
+    /** Nhiệm vụ ngày (ADR-055). */
+    public boolean isDaily() {
+        return repeatPolicy == RepeatPolicy.DAILY;
     }
 
     /** Quest KHÔNG có điều kiện mở khoá — đường thường gặp nhất, và là hành vi trước ADR-044. */

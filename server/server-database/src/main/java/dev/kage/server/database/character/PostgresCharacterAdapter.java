@@ -88,6 +88,12 @@ public final class PostgresCharacterAdapter implements CharacterPort {
               FROM character WHERE name = ?
             """;
 
+    // Bia Anh Danh (ADR-057) — index V60 (level DESC, exp DESC, id).
+    private static final String LIST_ALL_BY_REALM = """
+            SELECT id, account_id, realm_id, name, faction, level, exp, rebirth_count, created_at
+              FROM character ORDER BY level DESC, exp DESC, id ASC
+            """;
+
     private static final String FIND_BY_ID = """
             SELECT id, account_id, realm_id, name, faction, level, exp, rebirth_count, created_at
               FROM character WHERE id = ?
@@ -163,6 +169,11 @@ public final class PostgresCharacterAdapter implements CharacterPort {
     @Override
     public Optional<Character> findById(long characterId) {
         return JdbcOperations.queryOne(dataSource, FIND_BY_ID, PostgresCharacterAdapter::mapRow, characterId);
+    }
+
+    @Override
+    public List<Character> listAllByRealm() {
+        return JdbcOperations.query(dataSource, LIST_ALL_BY_REALM, PostgresCharacterAdapter::mapRow);
     }
 
     @Override

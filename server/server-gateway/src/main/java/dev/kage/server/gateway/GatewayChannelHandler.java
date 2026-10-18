@@ -142,7 +142,11 @@ import dev.kage.protocol.Faction;
 import dev.kage.protocol.FriendOfflineEvent;
 import dev.kage.protocol.FriendOnlineEvent;
 import dev.kage.protocol.FriendView;
+import dev.kage.protocol.GetCharacterStatsRequest;
+import dev.kage.protocol.GetCharacterStatsResponse;
 import dev.kage.protocol.GetItemCatalogRequest;
+import dev.kage.protocol.GetLeaderboardRequest;
+import dev.kage.protocol.GetLeaderboardResponse;
 import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyGuildResponse;
 import dev.kage.protocol.GetMyPartyRequest;
@@ -165,6 +169,8 @@ import dev.kage.protocol.KickGuildMemberResponse;
 import dev.kage.protocol.KickPartyMemberCommand;
 import dev.kage.protocol.KickPartyMemberOutcome;
 import dev.kage.protocol.KickPartyMemberResponse;
+import dev.kage.protocol.LeaderboardEntry;
+import dev.kage.protocol.LeaderboardKind;
 import dev.kage.protocol.LeaveGuildCommand;
 import dev.kage.protocol.LeaveGuildOutcome;
 import dev.kage.protocol.LeaveGuildResponse;
@@ -263,6 +269,7 @@ import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.pvp.application.GetPvpRatingUseCase;
 import dev.kage.quest.api.QuestFacade;
+import dev.kage.server.world.CharacterStatSheet;
 import dev.kage.server.world.EquipmentBonusSnapshot;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
@@ -438,6 +445,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, this::handleGetItemCatalogRequest),
             Map.entry(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, this::handleListQuestsRequest),
             Map.entry(Opcode.OPCODE_ABANDON_QUEST_COMMAND_VALUE, this::handleAbandonQuestCommand),
+            Map.entry(Opcode.OPCODE_GET_CHARACTER_STATS_REQUEST_VALUE, this::handleGetCharacterStatsRequest),
+            Map.entry(Opcode.OPCODE_GET_LEADERBOARD_REQUEST_VALUE, this::handleGetLeaderboardRequest),
             Map.entry(Opcode.OPCODE_LIST_SHOP_ITEMS_REQUEST_VALUE, this::handleListShopItemsRequest),
             Map.entry(Opcode.OPCODE_BUY_ITEM_COMMAND_VALUE, this::handleBuyItemCommand),
             Map.entry(Opcode.OPCODE_SELL_ITEM_COMMAND_VALUE, this::handleSellItemCommand),
@@ -1706,6 +1715,116 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 response.build().toByteArray());
     }
 
+    /** ADR-056 — bảng nhân vật: chỉ số nền + trang bị đọc từ DB, công thức của server-world. */
+    private void handleGetCharacterStatsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        GetCharacterStatsRequest.parser().parseFrom(payload); // không field — parse để chắc payload hợp lệ
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        executeBlocking(ctx, sequenceId, () -> {
+            CharacterStatSheet sheet = statSheetOf(characterId);
+            GetCharacterStatsResponse response = GetCharacterStatsResponse.newBuilder()
+                    .setLevel(sheet.level())
+                    .setStrength(sheet.strength())
+                    .setAgility(sheet.agility())
+                    .setIntelligence(sheet.intelligence())
+                    .setVitality(sheet.vitality())
+                    .setMaxHp(sheet.maxHp())
+                    .setEquipmentBonusHp(sheet.equipmentBonusHp())
+                    .setMaxChi(sheet.maxChi())
+                    .setAttack(sheet.attack())
+                    .setSkillDamage(sheet.skillDamage())
+                    .setDefense(sheet.defense())
+                    .setResistance(sheet.resistance())
+                    .setHitPermille(sheet.hitPermille())
+                    .setDodgePermille(sheet.dodgePermille())
+                    .setCritPermille(sheet.critPermille())
+                    .setCritDamagePercent(sheet.critDamagePercent())
+                    .setCombatPower(sheet.combatPower())
+                    .build();
+            send(ctx, Opcode.OPCODE_GET_CHARACTER_STATS_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        });
+    }
+
+    /** Chỉ số nền + trang bị HIỆN TẠI trong DB — cùng {@link CharacterLoadout} mà attach dùng. Chạm DB. */
+    private CharacterStatSheet statSheetOf(long characterId) {
+        CharacterLoadout loadout = CharacterLoadout.load(characterFacade, worldGateway.registry(), characterId);
+        return WorldFacade.statSheet(loadout.baseStats(), loadout.equipmentBonus());
+    }
+
+    /** ADR-057 — Bia Anh Danh: bảng dùng chung cả server, cache 60 s ({@link LeaderboardCache}). */
+    private void handleGetLeaderboardRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        GetLeaderboardRequest request = GetLeaderboardRequest.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        LeaderboardCache.Kind kind =
+                switch (request.getKind()) {
+                    case LEADERBOARD_KIND_ARENA -> LeaderboardCache.Kind.ARENA;
+                    case LEADERBOARD_KIND_COMBAT_POWER -> LeaderboardCache.Kind.COMBAT_POWER;
+                    // UNSPECIFIED/lạ (client mới hơn server) ⇒ bảng cảnh giới, không lỗi.
+                    default -> LeaderboardCache.Kind.REALM;
+                };
+        executeBlocking(ctx, sequenceId, () -> {
+            LeaderboardCache cache =
+                    LeaderboardCache.shared(characterFacade, pvpFacade, character -> statSheetOf(character.id())
+                            .combatPower());
+            LeaderboardCache.Board board = cache.board(kind);
+            GetLeaderboardResponse.Builder response = GetLeaderboardResponse.newBuilder()
+                    .setKind(toProtoLeaderboardKind(kind))
+                    .setComputedAtEpochMs(board.computedAt().toEpochMilli());
+            int shown = Math.min(board.rows().size(), LeaderboardCache.TOP_SIZE);
+            for (int i = 0; i < shown; i++) {
+                LeaderboardCache.Row row = board.rows().get(i);
+                response.addEntries(LeaderboardEntry.newBuilder()
+                        .setRank(row.rank())
+                        .setCharacterId(row.characterId())
+                        .setName(row.name())
+                        .setFaction(toProtoFaction(row.faction()))
+                        .setLevel(row.level())
+                        .setValue(row.value()));
+            }
+            LeaderboardCache.Row own = board.byCharacterId().get(characterId);
+            if (own != null) {
+                response.setOwnRank(own.rank()).setOwnValue(own.value());
+            }
+            send(
+                    ctx,
+                    Opcode.OPCODE_GET_LEADERBOARD_RESPONSE_VALUE,
+                    sequenceId,
+                    response.build().toByteArray());
+        });
+    }
+
+    private static LeaderboardKind toProtoLeaderboardKind(LeaderboardCache.Kind kind) {
+        return switch (kind) {
+            case REALM -> LeaderboardKind.LEADERBOARD_KIND_REALM;
+            case ARENA -> LeaderboardKind.LEADERBOARD_KIND_ARENA;
+            case COMBAT_POWER -> LeaderboardKind.LEADERBOARD_KIND_COMBAT_POWER;
+        };
+    }
+
+    /** ADR-059 — người nhận event nhóm/bang; dựng mỗi lần (rẻ, không trạng thái). */
+    private MembershipNotices membershipNotices() {
+        return new MembershipNotices(worldGateway.registry());
+    }
+
+    private List<Long> partyMemberIds(long characterId) {
+        return MembershipNotices.ids(partyFacade.listMembers(characterId), PartyFacade.MemberView::characterId);
+    }
+
+    private List<Long> guildMemberIds(long characterId) {
+        return MembershipNotices.ids(guildFacade.listMembers(characterId), GuildFacade.MemberView::characterId);
+    }
+
     /** ADR-054 — bỏ quest đang làm; chạm DB nên chạy trên authExecutor. */
     private void handleAbandonQuestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
@@ -2068,7 +2187,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 questFacade.claimReward(characterId, command.getQuestCode(), command.getIdempotencyKey());
         ClaimQuestRewardResponse.Builder responseBuilder = ClaimQuestRewardResponse.newBuilder()
                 .setOutcome(toProtoOutcome(result.outcome()))
-                .setExpGranted(result.expGranted());
+                .setExpGranted(result.expGranted())
+                .setGoldGranted(result.goldGranted());
         for (QuestFacade.ItemReward item : result.itemsGranted()) {
             responseBuilder.addItemsGranted(ItemRewardView.newBuilder()
                     .setItemTemplateCode(item.itemTemplateCode())
@@ -2476,7 +2596,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleApproveGuildJoinRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, ApproveGuildJoinRequestCommand command) {
+        List<Long> before = guildMemberIds(characterId);
         GuildFacade.ApproveResult result = guildFacade.approveJoinRequest(command.getRequestId(), characterId);
+        if (result == GuildFacade.ApproveResult.OK) {
+            membershipNotices().guildMembershipChanged(characterId, before, guildMemberIds(characterId));
+        }
         if (result == GuildFacade.ApproveResult.GUILD_FULL) {
             // Trần thành viên bang (quyết định chủ dự án 2026-10-11) — cùng đường ErrorResponse.
             sendError(ctx, sequenceId, 409, "error.guild_full");
@@ -2538,8 +2662,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleLeaveGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        List<Long> before = guildMemberIds(characterId);
+        GuildFacade.LeaveResult result = guildFacade.leaveGuild(characterId);
+        if (result == GuildFacade.LeaveResult.OK) {
+            membershipNotices()
+                    .guildMembershipChanged(characterId, before, MembershipNotices.without(before, characterId));
+        }
         LeaveGuildOutcome outcome =
-                switch (guildFacade.leaveGuild(characterId)) {
+                switch (result) {
                     case OK -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_OK;
                     case NOT_IN_GUILD -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_NOT_IN_GUILD;
                     case LEADER_CANNOT_LEAVE -> LeaveGuildOutcome.LEAVE_GUILD_OUTCOME_LEADER_CANNOT_LEAVE;
@@ -2562,7 +2692,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleDisbandGuildBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        DisbandGuildOutcome outcome = guildFacade.disbandGuild(characterId) == GuildFacade.DisbandResult.OK
+        List<Long> before = guildMemberIds(characterId);
+        boolean disbanded = guildFacade.disbandGuild(characterId) == GuildFacade.DisbandResult.OK;
+        if (disbanded) {
+            membershipNotices().guildDisbanded(characterId, before);
+        }
+        DisbandGuildOutcome outcome = disbanded
                 ? DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_OK
                 : DisbandGuildOutcome.DISBAND_GUILD_OUTCOME_NOT_LEADER;
         DisbandGuildResponse response =
@@ -2592,8 +2727,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_KICK_GUILD_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
+        List<Long> before = guildMemberIds(characterId);
         GuildFacade.KickResult result =
                 guildFacade.kickMember(characterId, target.get().id());
+        if (result == GuildFacade.KickResult.OK) {
+            membershipNotices().guildKick(characterId, target.get().id(), before);
+        }
         KickGuildMemberOutcome outcome =
                 switch (result) {
                     case OK -> KickGuildMemberOutcome.KICK_GUILD_MEMBER_OUTCOME_OK;
@@ -2796,6 +2935,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleAcceptPartyInviteBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, AcceptPartyInviteCommand command) {
         PartyFacade.AcceptResult result = partyFacade.acceptInvite(command.getInviteId(), characterId);
+        if (result == PartyFacade.AcceptResult.OK) {
+            List<Long> after = partyMemberIds(characterId);
+            membershipNotices()
+                    .partyMembershipChanged(characterId, MembershipNotices.without(after, characterId), after);
+        }
         AcceptPartyInviteOutcome outcome =
                 switch (result) {
                     case OK -> AcceptPartyInviteOutcome.ACCEPT_PARTY_INVITE_OUTCOME_OK;
@@ -2844,9 +2988,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     }
 
     private void handleLeavePartyBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
-        LeavePartyOutcome outcome = partyFacade.leaveParty(characterId) == PartyFacade.LeaveResult.OK
-                ? LeavePartyOutcome.LEAVE_PARTY_OUTCOME_OK
-                : LeavePartyOutcome.LEAVE_PARTY_OUTCOME_NOT_IN_PARTY;
+        List<Long> before = partyMemberIds(characterId);
+        boolean left = partyFacade.leaveParty(characterId) == PartyFacade.LeaveResult.OK;
+        if (left) {
+            membershipNotices()
+                    .partyMembershipChanged(characterId, before, MembershipNotices.without(before, characterId));
+        }
+        LeavePartyOutcome outcome =
+                left ? LeavePartyOutcome.LEAVE_PARTY_OUTCOME_OK : LeavePartyOutcome.LEAVE_PARTY_OUTCOME_NOT_IN_PARTY;
         LeavePartyResponse response =
                 LeavePartyResponse.newBuilder().setOutcome(outcome).build();
         send(ctx, Opcode.OPCODE_LEAVE_PARTY_RESPONSE_VALUE, sequenceId, response.toByteArray());
@@ -2874,8 +3023,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_KICK_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
+        List<Long> before = partyMemberIds(characterId);
         PartyFacade.KickResult result =
                 partyFacade.kickMember(characterId, target.get().id());
+        if (result == PartyFacade.KickResult.OK) {
+            membershipNotices().partyKick(characterId, target.get().id(), before);
+        }
         KickPartyMemberOutcome outcome =
                 switch (result) {
                     case OK -> KickPartyMemberOutcome.KICK_PARTY_MEMBER_OUTCOME_OK;
@@ -3575,6 +3728,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
+        // ADR-058: khoá rỗng = client cũ (không chống trùng); có khoá thì phải đúng định dạng.
+        if (!command.getIdempotencyKey().isEmpty()
+                && rejectMalformedIdempotencyKey(ctx, sequenceId, command.getIdempotencyKey())) {
+            return;
+        }
         executeBlocking(ctx, sequenceId, () -> handleSendMailBlocking(ctx, sequenceId, characterId, command));
     }
 
@@ -3601,7 +3759,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // characterId lấy từ SESSION (không phải packet) — nên senderId KHÔNG BAO GIỜ null ở đường
         // này, và ký quỹ vàng/vật phẩm trong SendMailUseCase luôn chạy. Đường "thư hệ thống miễn
         // ký quỹ" chỉ với tới được từ code server.
-        MailFacade.SendOutcome outcome = mailFacade.sendMail(request);
+        MailFacade.SendOutcome outcome = mailFacade.sendMail(request, command.getIdempotencyKey());
         if (rejectSendMailAsError(ctx, sequenceId, outcome.result())) {
             return;
         }
@@ -3649,7 +3807,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             MailFacade.SendResult.INVALID_GOLD_AMOUNT, SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_GOLD_AMOUNT,
             MailFacade.SendResult.INVALID_ATTACHMENT, SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_ATTACHMENT,
             MailFacade.SendResult.SUBJECT_TOO_LONG, SendMailOutcome.SEND_MAIL_OUTCOME_SUBJECT_TOO_LONG,
-            MailFacade.SendResult.BODY_TOO_LONG, SendMailOutcome.SEND_MAIL_OUTCOME_BODY_TOO_LONG);
+            MailFacade.SendResult.BODY_TOO_LONG, SendMailOutcome.SEND_MAIL_OUTCOME_BODY_TOO_LONG,
+            MailFacade.SendResult.DUPLICATE_REQUEST, SendMailOutcome.SEND_MAIL_OUTCOME_DUPLICATE_REQUEST);
 
     private static SendMailOutcome toProtoOutcome(MailFacade.SendResult result) {
         return SEND_MAIL_OUTCOME_MAPPING.get(result);
@@ -4403,7 +4562,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         try {
-            partyFacade.handOverLeadership(characterId, registry::isOnline);
+            partyFacade.handOverLeadership(characterId, registry::isOnline).ifPresent(newLeader -> membershipNotices()
+                    .partyLeaderChanged(newLeader, partyMemberIds(newLeader)));
         } catch (RuntimeException e) {
             LOG.warn("Chuyển quyền trưởng nhóm lúc ngắt kết nối thất bại: characterId={}", characterId, e);
         }

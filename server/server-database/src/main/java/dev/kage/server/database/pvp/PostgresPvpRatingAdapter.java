@@ -6,6 +6,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import javax.sql.DataSource;
@@ -30,6 +31,12 @@ import dev.kage.server.database.JdbcTransactionRunner;
  * hoàn toàn, không cần chứng minh riêng nó có xảy ra hay không.
  */
 public final class PostgresPvpRatingAdapter implements PvpRatingPort {
+
+    // Bia Anh Danh (ADR-057) — index V60 (rating DESC).
+    private static final String LIST_ALL_BY_RATING = """
+            SELECT character_id, rating, wins, losses, updated_at FROM pvp_rating
+             ORDER BY rating DESC, character_id ASC
+            """;
 
     private static final String FIND_BY_CHARACTER_ID = """
             SELECT character_id, rating, wins, losses, updated_at FROM pvp_rating WHERE character_id = ?
@@ -72,6 +79,11 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
 
     public PostgresPvpRatingAdapter(DataSource dataSource) {
         this.dataSource = dataSource;
+    }
+
+    @Override
+    public List<PvpRating> listAllByRating() {
+        return JdbcOperations.query(dataSource, LIST_ALL_BY_RATING, PostgresPvpRatingAdapter::mapRating);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package dev.kage.quest.domain;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -65,6 +66,26 @@ public interface QuestProgressPort {
         // độ. Fake/anonymous class không đi qua ProcessQuestEventUseCase thì không bao giờ tới đây;
         // adapter thật bắt buộc override (QuestIntegrationTest gác).
         throw new UnsupportedOperationException("saveIfUnchanged chưa được hiện thực ở " + getClass());
+    }
+
+    /**
+     * Nhiệm vụ ngày (ADR-055 D2): xoá dòng {@code CLAIMED} lĩnh TRƯỚC {@code resetAt} để nhận lại được.
+     * Compare-and-delete — hai lệnh nhận song song: một xoá, một thấy 0 dòng, rồi {@link #insertIfAbsent}
+     * phán quyết như thường.
+     *
+     * @return {@code true} nếu đã xoá một dòng
+     */
+    default boolean deleteClaimedBefore(Transaction tx, long characterId, long questTemplateId, Instant resetAt) {
+        throw new UnsupportedOperationException("deleteClaimedBefore chưa được hiện thực ở " + getClass());
+    }
+
+    /**
+     * Nhật ký như {@link #listLog(long)} nhưng BỎ dòng nhiệm vụ ngày đã lĩnh trước {@code dailyResetAt}
+     * (ADR-055 D2 — hôm qua đã lĩnh thì hôm nay là "chưa nhận"). Mặc định = {@link #listLog(long)} cho
+     * fake không có khái niệm nhiệm vụ ngày.
+     */
+    default List<QuestLogEntry> listLog(long characterId, Instant dailyResetAt) {
+        return listLog(characterId);
     }
 
     /**

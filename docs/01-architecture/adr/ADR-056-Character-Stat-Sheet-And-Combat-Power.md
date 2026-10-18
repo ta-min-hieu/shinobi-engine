@@ -21,10 +21,10 @@
 ## Decision
 
 1. **Opcode trong dải Character**: `OPCODE_GET_CHARACTER_STATS_REQUEST = 210`,
-   `OPCODE_CHARACTER_STATS_RESPONSE = 211` (character.proto). Chỉ thêm — `protocolVersion` không tăng.
+   `OPCODE_GET_CHARACTER_STATS_RESPONSE = 211` (character.proto). Chỉ thêm — `protocolVersion` không tăng.
    ```proto
    message GetCharacterStatsRequest {}
-   message CharacterStatsResponse {
+   message GetCharacterStatsResponse {
      int32 level = 1;
      int32 strength = 2; int32 agility = 3; int32 intelligence = 4; int32 vitality = 5;
      int32 max_hp = 6;
@@ -90,5 +90,5 @@ Không.
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành — đang làm (lô 15, 2026-10-18).
+1. ✅ Thi hành (2026-10-18). `CharacterStatSheetTest`; panel chung `ReportPanel` (phím C).
 2. ⏳ Kiểm sống: mở bảng, mặc/gỡ một món, số đổi đúng.

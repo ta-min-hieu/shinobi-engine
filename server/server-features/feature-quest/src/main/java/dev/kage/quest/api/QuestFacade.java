@@ -156,7 +156,7 @@ public final class QuestFacade {
         List<ItemReward> items = result.itemsGranted().stream()
                 .map(item -> new ItemReward(item.itemTemplateCode(), item.quantity()))
                 .toList();
-        return new ClaimResult(outcome, result.expGranted(), items);
+        return new ClaimResult(outcome, result.expGranted(), result.goldGranted(), items);
     }
 
     /**
@@ -218,7 +218,7 @@ public final class QuestFacade {
     public record ItemReward(String itemTemplateCode, int quantity) {}
 
     /** Kết quả lĩnh thưởng — EXP và vật phẩm chỉ khác rỗng khi {@code outcome == OK}. */
-    public record ClaimResult(ClaimOutcome outcome, long expGranted, List<ItemReward> itemsGranted) {
+    public record ClaimResult(ClaimOutcome outcome, long expGranted, long goldGranted, List<ItemReward> itemsGranted) {
         /** Chép phòng thủ danh sách vật phẩm. */
         public ClaimResult {
             itemsGranted = List.copyOf(itemsGranted);

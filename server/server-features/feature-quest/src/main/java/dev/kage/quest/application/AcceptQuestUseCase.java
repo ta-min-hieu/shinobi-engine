@@ -1,5 +1,9 @@
 package dev.kage.quest.application;
 
+import java.time.Clock;
+import java.time.Instant;
+
+import dev.kage.quest.domain.DailyReset;
 import dev.kage.quest.domain.QuestProgress;
 import dev.kage.quest.domain.QuestProgressPort;
 import dev.kage.quest.domain.QuestStatus;
@@ -14,18 +18,34 @@ public final class AcceptQuestUseCase {
     private final QuestProgressPort progressPort;
     private final QuestTemplatePort templatePort;
     private final TransactionRunner tx;
+    private final Clock clock;
     private final QuestScriptRunner scriptRunner = new QuestScriptRunner();
 
     public AcceptQuestUseCase(QuestProgressPort progressPort, QuestTemplatePort templatePort, TransactionRunner tx) {
+        this(progressPort, templatePort, tx, Clock.systemUTC());
+    }
+
+    /** {@code clock} để test đứng được hai bên mốc 0h của nhiệm vụ ngày (ADR-055). */
+    public AcceptQuestUseCase(
+            QuestProgressPort progressPort, QuestTemplatePort templatePort, TransactionRunner tx, Clock clock) {
         this.progressPort = progressPort;
         this.templatePort = templatePort;
         this.tx = tx;
+        this.clock = clock;
     }
 
     public AcceptResult execute(long characterId, String questCode) {
         QuestTemplate template = templatePort.findByCode(questCode).orElse(null);
         if (template == null) {
             return AcceptResult.QUEST_NOT_FOUND;
+        }
+        if (template.isDaily()) {
+            // ADR-055 D2 — lượt lĩnh của HÔM QUA không chặn lượt nhận hôm nay. Xoá có điều kiện, tách
+            // transaction riêng: chạy đua với một lệnh nhận khác thì insertIfAbsent bên dưới vẫn là
+            // trọng tài duy nhất.
+            Instant resetAt = DailyReset.startOfDay(clock.instant());
+            tx.inTransaction(
+                    (Transaction t) -> progressPort.deleteClaimedBefore(t, characterId, template.id(), resetAt));
         }
         if (progressPort.find(characterId, template.id()).isPresent()) {
             return AcceptResult.ALREADY_ACCEPTED;

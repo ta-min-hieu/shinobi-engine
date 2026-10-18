@@ -1,9 +1,11 @@
 package dev.kage.quest.application;
 
+import java.time.Clock;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import dev.kage.quest.domain.DailyReset;
 import dev.kage.quest.domain.QuestLogEntry;
 import dev.kage.quest.domain.QuestProgressPort;
 
@@ -19,14 +21,21 @@ import dev.kage.quest.domain.QuestProgressPort;
 public final class ListQuestsUseCase {
 
     private final QuestProgressPort progressPort;
+    private final Clock clock;
 
     public ListQuestsUseCase(QuestProgressPort progressPort) {
-        this.progressPort = progressPort;
+        this(progressPort, Clock.systemUTC());
     }
 
-    /** GỒM CẢ quest đã {@code CLAIMED} — xem {@link QuestProgressPort#listLog} vì sao không lọc. */
+    /** {@code clock} để test đứng được hai bên mốc 0h của nhiệm vụ ngày (ADR-055). */
+    public ListQuestsUseCase(QuestProgressPort progressPort, Clock clock) {
+        this.progressPort = progressPort;
+        this.clock = clock;
+    }
+
+    /** Nhiệm vụ ngày đã lĩnh trước 0h hôm nay KHÔNG có mặt — với người chơi đó là "chưa nhận" (ADR-055). */
     public List<QuestLogEntry> execute(long characterId) {
-        return progressPort.listLog(characterId);
+        return progressPort.listLog(characterId, DailyReset.startOfDay(clock.instant()));
     }
 
     /**

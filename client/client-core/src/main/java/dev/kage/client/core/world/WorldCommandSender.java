@@ -3,6 +3,7 @@ package dev.kage.client.core.world;
 import java.io.IOException;
 import java.util.List;
 
+import com.google.protobuf.MessageLite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -173,6 +174,15 @@ final class WorldCommandSender implements SessionRecovery.Link {
                 command.toByteArray(),
                 "SelectDialogueOptionCommand");
         return sequenceId;
+    }
+
+    /**
+     * Gửi một yêu cầu CHỈ ĐỌC (bảng nhân vật 210 — ADR-056, Bia Anh Danh 1202 — ADR-057). Một hàm chung
+     * thay vì một hàm mỗi gói: lớp này chạm trần độ phức tạp PMD tính cho CẢ LỚP (80), và hai gói này
+     * không có gì riêng ngoài opcode + message.
+     */
+    void sendReadRequest(int opcode, MessageLite request) {
+        send(opcode, request.toByteArray(), request.getClass().getSimpleName());
     }
 
     /** Bỏ nhiệm vụ đang làm (opcode 612, ADR-054) — chỉ ý định; server tự kiểm trạng thái. */
@@ -592,8 +602,9 @@ final class WorldCommandSender implements SessionRecovery.Link {
      *
      * @param draft đã qua {@code MailController.compose} — độ dài và số vàng đã hợp lệ ở mức client.
      */
-    void sendMail(MailController.Draft draft) {
+    void sendMail(MailController.Draft draft, String idempotencyKey) {
         SendMailCommand command = SendMailCommand.newBuilder()
+                .setIdempotencyKey(idempotencyKey)
                 .setRecipientName(draft.recipientName())
                 .setSubject(draft.subject())
                 .setBody(draft.body())

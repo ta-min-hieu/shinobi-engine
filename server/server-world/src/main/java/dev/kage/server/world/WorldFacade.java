@@ -658,6 +658,14 @@ public final class WorldFacade {
         return CombatConstants.characterMaxHp(level, bonus.hp());
     }
 
+    /**
+     * Bảng chỉ số + Lực Chiến (ADR-056) — hàm THUẦN, gọi được từ bất kỳ luồng nào (không đọc ECS).
+     * Linh Lực tối đa là hằng số của World ({@code SkillConstants.CHARACTER_MAX_CHI}).
+     */
+    public static CharacterStatSheet statSheet(CharacterBaseStats baseStats, EquipmentBonusSnapshot bonus) {
+        return CombatConstants.statSheet(baseStats, bonus, SkillConstants.CHARACTER_MAX_CHI);
+    }
+
     /** GAMEPLAY.md §10 — chat kênh Khu vực, cần {@code aoiTracker} nên phải qua tick thread. */
     public void enqueueAreaChatMessage(long characterId, String senderName, String body) {
         inbox.add(new WorldCommand.AreaChatMessageCommand(characterId, senderName, body));

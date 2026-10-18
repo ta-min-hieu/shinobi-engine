@@ -242,6 +242,9 @@ public final class WorldScreen implements GameScreen {
     /** Vòng đời nhiệm vụ: nhận → hoàn thành → lĩnh thưởng — xem {@link QuestCoordinator}. */
     private final QuestCoordinator quests;
 
+    /** Bảng nhân vật (phím C, ADR-056) + Bia Anh Danh (phím L, ADR-057) — xem {@link ReportWindows}. */
+    private final ReportWindows reports;
+
     /**
      * Catalog vật phẩm (ADR-035, 509/510) — DỮ LIỆU NỀN không có cửa sổ riêng, mọi giao diện đụng
      * vật phẩm tra vào đây để hiện tên thay vì "Vật phẩm #7". Xem {@link ItemCatalogCoordinator}.
@@ -317,6 +320,7 @@ public final class WorldScreen implements GameScreen {
 
         // SAU combatFeedback: quests mượn nó để báo khi hoàn thành/lĩnh thưởng.
         this.quests = new QuestCoordinator(combatHud, questLogPanel, sender, combatFeedback);
+        this.reports = ReportWindows.create(combatHud.skin(), sender, localCharacterId);
         this.dialogue = new DialogueCoordinator(dialoguePanel, sender, quests);
         this.chat = new ChatCoordinator(chatPanel, sender);
         // SAU chat: cả ba coordinator dưới đây mượn nhật ký chat/chữ nổi làm chỗ báo lý do thất bại.
@@ -469,6 +473,8 @@ public final class WorldScreen implements GameScreen {
         panels.register(itemCatalog);
         panels.register(gold);
         panels.register(questLogPanel, quests);
+        panels.register(reports.characterSheetPanel(), reports.characterSheet());
+        panels.register(reports.leaderboardPanel(), reports.leaderboard());
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
         panels.register(friendPanel, friends);
@@ -480,6 +486,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(shopPanel, shop);
         panels.register(tradePanel, trade);
         panels.register(chatPanel, chat);
+        panels.register(new MembershipNoticeCoordinator(chat, party, guild));
         panels.register(worldChange);
         panels.register(dungeon);
         panels.register(connection);
@@ -507,6 +514,8 @@ public final class WorldScreen implements GameScreen {
         chatPanel.setCanOpen(panels::noneOpen);
         duelPanel.setCanOpen(panels::noneOpen);
         questLogPanel.setCanOpen(panels::noneOpen);
+        reports.characterSheetPanel().setCanOpen(panels::noneOpen);
+        reports.leaderboardPanel().setCanOpen(panels::noneOpen);
         // Nút Bán sống trong túi đồ (chỉ ở đó mới có inventory_item.id THẬT mà SellItemCommand đòi)
         // nhưng lệnh Bán thuộc về cửa hàng (nó giữ khoá idempotency của ADR-025). Hai luồng không
         // biết nhau; chỗ này nối chúng lại.

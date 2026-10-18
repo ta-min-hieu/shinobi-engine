@@ -115,6 +115,7 @@ public final class ClaimQuestRewardUseCase {
             case NONE ->
                 ClaimResult.ok(
                         effects.expGranted(),
+                        effects.goldGranted(),
                         effects.itemGrants().stream()
                                 .map(g -> new ClaimResult.ItemReward(g.itemTemplateCode(), g.quantity()))
                                 .toList());
@@ -170,6 +171,9 @@ public final class ClaimQuestRewardUseCase {
      */
     private void grantRewards(Transaction t, long characterId, QuestScriptRunner.HookEffects effects) {
         rewardPorts.expPort().grantExp(t, characterId, effects.expGranted());
+        if (effects.goldGranted() > 0L) {
+            rewardPorts.goldPort().creditGold(t, characterId, effects.goldGranted());
+        }
         for (QuestScriptRunner.ItemGrant itemGrant : effects.itemGrants()) {
             boolean granted = rewardPorts
                     .inventoryGrantPort()
@@ -240,11 +244,16 @@ public final class ClaimQuestRewardUseCase {
                     .append('}');
         }
         items.append(']');
-        return "{\"questCode\":\"%s\",\"expGranted\":%d,\"itemCount\":%d,\"items\":%s}"
-                .formatted(questCode, effects.expGranted(), effects.itemGrants().size(), items);
+        return "{\"questCode\":\"%s\",\"expGranted\":%d,\"goldGranted\":%d,\"itemCount\":%d,\"items\":%s}"
+                .formatted(
+                        questCode,
+                        effects.expGranted(),
+                        effects.goldGranted(),
+                        effects.itemGrants().size(),
+                        items);
     }
 
-    public record ClaimResult(Outcome outcome, long expGranted, List<ItemReward> itemsGranted) {
+    public record ClaimResult(Outcome outcome, long expGranted, long goldGranted, List<ItemReward> itemsGranted) {
         public ClaimResult {
             itemsGranted = List.copyOf(itemsGranted);
         }
@@ -263,32 +272,32 @@ public final class ClaimQuestRewardUseCase {
 
         public record ItemReward(String itemTemplateCode, int quantity) {}
 
-        static ClaimResult ok(long expGranted, List<ItemReward> items) {
-            return new ClaimResult(Outcome.OK, expGranted, items);
+        static ClaimResult ok(long expGranted, long goldGranted, List<ItemReward> items) {
+            return new ClaimResult(Outcome.OK, expGranted, goldGranted, items);
         }
 
         static ClaimResult notFound() {
-            return new ClaimResult(Outcome.QUEST_NOT_FOUND, 0, List.of());
+            return new ClaimResult(Outcome.QUEST_NOT_FOUND, 0, 0, List.of());
         }
 
         static ClaimResult notAccepted() {
-            return new ClaimResult(Outcome.NOT_ACCEPTED, 0, List.of());
+            return new ClaimResult(Outcome.NOT_ACCEPTED, 0, 0, List.of());
         }
 
         static ClaimResult notCompletedYet() {
-            return new ClaimResult(Outcome.NOT_COMPLETED_YET, 0, List.of());
+            return new ClaimResult(Outcome.NOT_COMPLETED_YET, 0, 0, List.of());
         }
 
         static ClaimResult duplicateRequest() {
-            return new ClaimResult(Outcome.DUPLICATE_REQUEST, 0, List.of());
+            return new ClaimResult(Outcome.DUPLICATE_REQUEST, 0, 0, List.of());
         }
 
         static ClaimResult scriptError() {
-            return new ClaimResult(Outcome.SCRIPT_ERROR, 0, List.of());
+            return new ClaimResult(Outcome.SCRIPT_ERROR, 0, 0, List.of());
         }
 
         static ClaimResult inventoryFull() {
-            return new ClaimResult(Outcome.INVENTORY_FULL, 0, List.of());
+            return new ClaimResult(Outcome.INVENTORY_FULL, 0, 0, List.of());
         }
     }
 }

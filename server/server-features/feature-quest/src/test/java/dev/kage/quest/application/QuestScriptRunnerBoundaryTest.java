@@ -56,7 +56,13 @@ class QuestScriptRunnerBoundaryTest {
                 "give_exp_null",
                 "give_exp_no_arguments",
                 "give_exp_beyond_long",
-                "give_exp_sum_overflows"
+                "give_exp_sum_overflows",
+                "give_gold_zero",
+                "give_gold_negative",
+                "give_gold_over_cap",
+                "give_gold_fraction",
+                "give_gold_numeric_string",
+                "give_gold_no_arguments"
             })
     void shouldFailTheScript_whenAClaimCallbackGetsAnOutOfDomainArgument(String caseName) {
         QuestScriptRunner.HookEffects effects = runner.runClaim(BOUNDARY_SCRIPT_REF, progressFor(caseName));
@@ -95,11 +101,26 @@ class QuestScriptRunnerBoundaryTest {
      */
     @ParameterizedTest(name = "on_claim: {0} hợp lệ")
     @ValueSource(
-            strings = {"give_item_max_int", "give_item_whole_double", "give_item_same_code_twice", "give_exp_zero"})
+            strings = {
+                "give_item_max_int",
+                "give_item_whole_double",
+                "give_item_same_code_twice",
+                "give_exp_zero",
+                "give_gold_cap"
+            })
     void shouldAcceptValuesInsideTheDomain(String caseName) {
         QuestScriptRunner.HookEffects effects = runner.runClaim(BOUNDARY_SCRIPT_REF, progressFor(caseName));
 
         assertThat(effects.scriptFailed()).as("nhánh %s", caseName).isFalse();
+    }
+
+    /** Hai lần {@code give_gold} cộng dồn (ADR-055) — tổng đi vào một lần ghi vàng. */
+    @Test
+    void shouldSumGoldAcrossCalls() {
+        QuestScriptRunner.HookEffects effects = runner.runClaim(BOUNDARY_SCRIPT_REF, progressFor("give_gold_twice"));
+
+        assertThat(effects.scriptFailed()).isFalse();
+        assertThat(effects.goldGranted()).isEqualTo(50L);
     }
 
     /** Hai lần trao cùng mã KHÔNG bị cộng dồn ở tầng script — không có phép cộng {@code int} nào để tràn. */

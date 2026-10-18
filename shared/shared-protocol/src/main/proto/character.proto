@@ -145,3 +145,34 @@ message GoldChangedEvent {
   int64 delta = 2;  // chênh lệch của chính lần này (âm = tiêu); thuần để client hiện "-500"
   string reason_key = 3; // vd "gold.reason.buy_item" — i18n key, KHÔNG phải câu tiếng Việt cứng
 }
+
+// -----------------------------------------------------------------------------------------------
+// ADR-056 (Accepted 2026-10-18) — bảng nhân vật + Lực Chiến. CHỈ THÊM, protocolVersion không tăng.
+// Số do SERVER tính từ chỉ số nền + trang bị (không gồm buff tạm thời); client chỉ định dạng.
+// Tỉ lệ đi bằng PHẦN NGHÌN nguyên (không float) để hai client không bao giờ làm tròn khác nhau.
+// -----------------------------------------------------------------------------------------------
+
+// Command: Client -> Server (OPCODE_GET_CHARACTER_STATS_REQUEST = 210). characterId từ session.
+message GetCharacterStatsRequest {
+}
+
+// Response: Server -> Client (OPCODE_GET_CHARACTER_STATS_RESPONSE = 211).
+message GetCharacterStatsResponse {
+  int32 level = 1;
+  int32 strength = 2;
+  int32 agility = 3;
+  int32 intelligence = 4;
+  int32 vitality = 5;
+  int32 max_hp = 6;
+  int32 attack = 7;
+  int32 skill_damage = 8;
+  int32 defense = 9;
+  int32 resistance = 10;
+  int32 hit_permille = 11;
+  int32 dodge_permille = 12;
+  int32 crit_permille = 13;
+  int32 crit_damage_percent = 14;
+  int64 combat_power = 15;
+  int32 equipment_bonus_hp = 16; // phần máu tối đa đến từ trang bị
+  int32 max_chi = 17;
+}

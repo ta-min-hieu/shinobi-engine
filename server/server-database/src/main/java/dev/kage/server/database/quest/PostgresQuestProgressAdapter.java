@@ -74,7 +74,14 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
               FROM character_quest_progress p
               JOIN quest_template t ON t.id = p.quest_template_id
              WHERE p.character_id = ?
+               AND NOT (t.repeat_policy = 'DAILY' AND p.status = 'CLAIMED' AND p.updated_at < ?)
              ORDER BY t.code
+            """;
+
+    // Nhiệm vụ ngày (ADR-055 D2): lượt lĩnh của hôm qua không chặn lượt nhận hôm nay.
+    private static final String DELETE_CLAIMED_BEFORE = """
+            DELETE FROM character_quest_progress
+             WHERE character_id = ? AND quest_template_id = ? AND status = 'CLAIMED' AND updated_at < ?
             """;
 
     /**
@@ -109,13 +116,28 @@ public final class PostgresQuestProgressAdapter implements QuestProgressPort {
                 questTemplateId);
     }
 
+    /** Không lọc nhiệm vụ ngày (mốc ở thuở epoch) — lối cũ, dùng {@link #listLog(long, Instant)}. */
     @Override
     public List<QuestLogEntry> listLog(long characterId) {
+        return listLog(characterId, Instant.EPOCH);
+    }
+
+    @Override
+    public List<QuestLogEntry> listLog(long characterId, Instant dailyResetAt) {
         return JdbcOperations.query(
                 dataSource,
                 LIST_LOG,
                 rs -> new QuestLogEntry(rs.getString("quest_code"), QuestStatus.valueOf(rs.getString("status"))),
-                characterId);
+                characterId,
+                Timestamp.from(dailyResetAt));
+    }
+
+    @Override
+    public boolean deleteClaimedBefore(Transaction tx, long characterId, long questTemplateId, Instant resetAt) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        return JdbcOperations.update(
+                        connection, DELETE_CLAIMED_BEFORE, characterId, questTemplateId, Timestamp.from(resetAt))
+                == 1;
     }
 
     @Override

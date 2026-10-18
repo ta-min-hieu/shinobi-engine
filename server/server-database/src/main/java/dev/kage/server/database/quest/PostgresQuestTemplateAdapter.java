@@ -10,13 +10,14 @@ import javax.sql.DataSource;
 
 import dev.kage.quest.domain.QuestTemplate;
 import dev.kage.quest.domain.QuestTemplatePort;
+import dev.kage.quest.domain.RepeatPolicy;
 import dev.kage.server.database.JdbcOperations;
 
 /** Hiện thực {@link QuestTemplatePort} trên PostgreSQL — đọc thuần, {@code quest_template} là config tĩnh. */
 public final class PostgresQuestTemplateAdapter implements QuestTemplatePort {
 
     private static final String FIND_BY_CODE = """
-            SELECT id, script_ref, prerequisite_quest_id FROM quest_template WHERE code = ?
+            SELECT id, script_ref, prerequisite_quest_id, repeat_policy FROM quest_template WHERE code = ?
             """;
 
     private static final String LIST_ALL_SCRIPT_REFS = """
@@ -49,7 +50,8 @@ public final class PostgresQuestTemplateAdapter implements QuestTemplatePort {
         return new QuestTemplate(
                 rs.getLong("id"),
                 rs.getString("script_ref"),
-                noPrerequisite ? OptionalLong.empty() : OptionalLong.of(prerequisite));
+                noPrerequisite ? OptionalLong.empty() : OptionalLong.of(prerequisite),
+                RepeatPolicy.valueOf(rs.getString("repeat_policy")));
     }
 
     @Override

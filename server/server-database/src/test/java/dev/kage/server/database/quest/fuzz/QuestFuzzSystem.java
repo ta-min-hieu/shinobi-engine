@@ -17,6 +17,7 @@ import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
 import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
+import dev.kage.server.database.quest.PostgresQuestGoldAdapter;
 import dev.kage.server.database.quest.PostgresQuestIdempotencyAdapter;
 import dev.kage.server.database.quest.PostgresQuestInventoryGrantAdapter;
 import dev.kage.server.database.quest.PostgresQuestItemTakeAdapter;
@@ -43,7 +44,8 @@ record QuestFuzzSystem(QuestFacade quest, DialogueFacade dialogue, GrantExperien
                 new PostgresQuestExpAdapter(),
                 new PostgresQuestInventoryGrantAdapter(),
                 auditPort,
-                new PostgresQuestIdempotencyAdapter());
+                new PostgresQuestIdempotencyAdapter(),
+                new PostgresQuestGoldAdapter());
         QuestFacade questFacade = new QuestFacade(
                 new AcceptQuestUseCase(progressPort, templatePort, transactionRunner),
                 new ProcessQuestEventUseCase(

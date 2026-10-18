@@ -450,6 +450,13 @@
         <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
     </Match>
 
+    <!-- ReportPanel.stage() — cùng lý do QuestLogPanel ngay dưới (Bảng nhân vật/Bia Anh Danh, ADR-056/057):
+         WorldScreen phải đưa đúng instance Stage vào InputMultiplexer. -->
+    <Match>
+        <Class name="dev.kage.client.core.ui.hud.ReportPanel"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
     <!-- QuestLogPanel.stage() — lần thứ chín cùng một lý do (CombatHud, DialoguePanel, ChatPanel,
          PartyPanel, FriendPanel, GuildPanel, DuelPanel, FactionPanel, MailPanel ngay trên):
          WorldScreen phải đưa đúng instance Stage đó vào InputMultiplexer để đặt thứ tự nuốt input,

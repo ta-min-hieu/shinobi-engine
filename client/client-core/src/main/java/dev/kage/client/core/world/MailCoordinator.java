@@ -3,6 +3,7 @@ package dev.kage.client.core.world;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.BooleanSupplier;
 
 import com.badlogic.gdx.utils.I18NBundle;
@@ -42,6 +43,9 @@ import dev.kage.protocol.wire.PacketCodec;
  * ngoài quyền của client.
  */
 final class MailCoordinator implements WindowFlow {
+
+    /** Xem {@link #sendKey()}. */
+    private String pendingSendKey = "";
 
     private final MailController controller = new MailController();
     private final MailPanel panel;
@@ -144,11 +148,24 @@ final class MailCoordinator implements WindowFlow {
     }
 
     /**
+     * Khoá chống trùng của lần GỬI đang treo (ADR-058) — giữ nguyên khi bấm Gửi lại trong lúc chưa có
+     * kết luận, sinh mới sau khi server trả lời (cùng hình dạng khoá lĩnh thư của {@link MailController}).
+     */
+    private String sendKey() {
+        if (pendingSendKey.isEmpty()) {
+            pendingSendKey = UUID.randomUUID().toString();
+        }
+        return pendingSendKey;
+    }
+
+    /**
      * Gửi thư xong. Dọn khung soạn CHỈ khi server nói OK — dọn cả khi hỏng là bắt người chơi gõ lại
      * từ đầu một lá thư mà lỗi duy nhất là gõ nhầm một chữ trong tên người nhận.
      */
     private void onSendSettled(SendMailOutcome outcome) {
-        if (outcome == SendMailOutcome.SEND_MAIL_OUTCOME_OK) {
+        pendingSendKey = "";
+        if (outcome == SendMailOutcome.SEND_MAIL_OUTCOME_OK
+                || outcome == SendMailOutcome.SEND_MAIL_OUTCOME_DUPLICATE_REQUEST) {
             panel.clearComposer();
         }
         settle(MailController.sendMessageKey(outcome));
@@ -213,7 +230,7 @@ final class MailCoordinator implements WindowFlow {
         MailController.ComposeResult result =
                 controller.compose(composed.recipient(), composed.subject(), composed.body(), composed.gold());
         switch (result) {
-            case MailController.ComposeResult.Send valid -> sender.sendMail(valid.draft());
+            case MailController.ComposeResult.Send valid -> sender.sendMail(valid.draft(), sendKey());
             case MailController.ComposeResult.Reject reject -> panel.setStatus(text(reject.messageKey()));
             case MailController.ComposeResult.Nothing ignored -> {
                 // Chưa gõ gì cả — không gửi, không mắng.

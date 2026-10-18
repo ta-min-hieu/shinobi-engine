@@ -1,7 +1,10 @@
 package dev.kage.pvp.api;
 
+import java.util.List;
+
 import dev.kage.pvp.application.GetPvpRatingUseCase;
 import dev.kage.pvp.application.RecordDuelResultUseCase;
+import dev.kage.pvp.domain.PvpRating;
 import dev.kage.pvp.domain.PvpRatingPort;
 
 /**
@@ -14,11 +17,18 @@ public final class PvpFacade {
 
     private final RecordDuelResultUseCase recordDuelResultUseCase;
     private final GetPvpRatingUseCase getPvpRatingUseCase;
+    private final PvpRatingPort port;
 
     /** Dựng ở composition root. */
     public PvpFacade(PvpRatingPort port) {
         this.recordDuelResultUseCase = new RecordDuelResultUseCase(port);
         this.getPvpRatingUseCase = new GetPvpRatingUseCase(port);
+        this.port = port;
+    }
+
+    /** Mọi người đã đánh ít nhất một trận, Elo giảm dần — cho Bia Anh Danh (ADR-057); gateway cache 60 s. */
+    public List<PvpRating> listAllByRating() {
+        return port.listAllByRating();
     }
 
     /** Chốt kết quả 1 trận Arena vừa xong (hạ gục hoặc bỏ cuộc) — trả rating mới của cả 2. */

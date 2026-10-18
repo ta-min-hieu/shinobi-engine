@@ -78,6 +78,9 @@ if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS") {
             { label_key: "dialogue.option.ask_pill_run", action: "pill_run" },
             { label_key: "dialogue.option.ask_proving", action: "proving" },
             { label_key: "dialogue.option.ask_breakthrough", action: "breakthrough" },
+            // Nhiệm vụ ngày (ADR-055, STORY §7) — đứng CUỐI, sau mọi nhánh chính tuyến, ngay trước "bye":
+            // `bye` lùi một chỗ là CÓ CHỦ ĐÍCH (option_index là VỊ TRÍ), ghim ở TownElderDialogueTreeTest.
+            { label_key: "dialogue.option.ask_daily_duty", action: "daily_duty" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
     },
@@ -324,6 +327,18 @@ if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS") {
         options: [
             { label_key: "dialogue.option.accept_quest_confront_steward",
               action: "accept_quest:confront_the_steward" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // NHIỆM VỤ NGÀY (ADR-055) — STORY §7 "công việc tông môn", §8 quy tắc 5: có lý do tường thuật,
+    // không cốt truyện riêng, được phép hài nhẹ. Không nhắc gì vượt nhịp arc 1.
+    daily_duty: {
+        text_key: "dialogue.town_elder.daily_duty",
+        options: [
+            { label_key: "dialogue.option.accept_quest_daily_dummy_drill", action: "accept_quest:daily_dummy_drill" },
+            { label_key: "dialogue.option.accept_quest_daily_mountain_patrol", action: "accept_quest:daily_mountain_patrol" },
+            { label_key: "dialogue.option.accept_quest_daily_water_duty", action: "accept_quest:daily_water_duty" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]

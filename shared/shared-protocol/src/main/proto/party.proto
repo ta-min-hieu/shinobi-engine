@@ -144,3 +144,20 @@ message GetMyPartyResponse {
   int64 party_id = 2; // chỉ có ý nghĩa khi in_party = true
   bool is_leader = 3;
 }
+
+// ADR-059 (Accepted 2026-10-18) — "nhóm của bạn vừa đổi". CHỈ THÊM, protocolVersion không tăng. Event là
+// lời nhắc dữ liệu đã cũ: client nói một câu theo lý do rồi tự hỏi lại GetMyParty/ListPartyMembers.
+enum PartyChangeReason {
+  PARTY_CHANGE_REASON_UNSPECIFIED = 0;
+  PARTY_CHANGE_REASON_MEMBER_JOINED = 1;
+  PARTY_CHANGE_REASON_MEMBER_LEFT = 2;
+  PARTY_CHANGE_REASON_MEMBER_KICKED = 3;
+  PARTY_CHANGE_REASON_YOU_WERE_KICKED = 4;
+  PARTY_CHANGE_REASON_LEADER_CHANGED = 5;
+}
+
+// Event: Server -> Client (OPCODE_PARTY_CHANGED_EVENT = 1318). subject = người vào/rời/bị kick/lên trưởng nhóm.
+message PartyChangedEvent {
+  PartyChangeReason reason = 1;
+  int64 subject_character_id = 2;
+}

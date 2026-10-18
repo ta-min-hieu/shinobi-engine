@@ -58,6 +58,15 @@
             give_exp_null() { ctx.give_exp(10); ctx.give_exp(null); },
             give_exp_no_arguments() { ctx.give_exp(10); ctx.give_exp(); },
             give_exp_beyond_long() { ctx.give_exp(10); ctx.give_exp(1e19); },
+            // ----- give_gold (ADR-055): 1..1.000.000 mỗi lần gọi -----
+            give_gold_zero() { ctx.give_gold(10); ctx.give_gold(0); },
+            give_gold_negative() { ctx.give_gold(10); ctx.give_gold(-5); },
+            give_gold_over_cap() { ctx.give_gold(10); ctx.give_gold(1000001); },
+            give_gold_fraction() { ctx.give_gold(10); ctx.give_gold(1.5); },
+            give_gold_numeric_string() { ctx.give_gold(10); ctx.give_gold("5"); },
+            give_gold_no_arguments() { ctx.give_gold(10); ctx.give_gold(); },
+            give_gold_cap() { ctx.give_gold(1000000); },
+            give_gold_twice() { ctx.give_gold(30); ctx.give_gold(20); },
             // 2^62 hai lần = 2^63, vừa quá Long.MAX_VALUE — từng lần thì hợp lệ, TỔNG mới tràn.
             give_exp_sum_overflows() { ctx.give_exp(4611686018427387904); ctx.give_exp(4611686018427387904); },
             give_exp_zero() { ctx.give_exp(10); ctx.give_exp(0); },

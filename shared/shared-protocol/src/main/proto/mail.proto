@@ -26,6 +26,8 @@ message SendMailCommand {
   string body = 3;
   int64 gold_amount = 4;
   repeated MailAttachmentView attachments = 5;
+  // ADR-058 (2026-10-18) — chống gửi trùng (ADR-025). Rỗng = client cũ: gửi như trước, không chống trùng.
+  string idempotency_key = 6;
 }
 
 // Giá trị 3-8 THÊM 2026-08-28 (chỉ thêm, không đổi/xoá 0-2 — NETWORK.md §6). Trước đó 4 trong 6
@@ -41,6 +43,8 @@ enum SendMailOutcome {
   SEND_MAIL_OUTCOME_INVALID_ATTACHMENT = 6;    // quantity <= 0 hoặc item_template_id <= 0
   SEND_MAIL_OUTCOME_SUBJECT_TOO_LONG = 7;      // vượt VARCHAR(64) của cột mail.subject (V13)
   SEND_MAIL_OUTCOME_BODY_TOO_LONG = 8;         // vượt VARCHAR(1024) của cột mail.body (V13)
+  // ADR-058 (2026-10-18, chỉ thêm): idempotency_key đã dùng — lá thư đó ĐÃ được gửi, không gửi lần hai.
+  SEND_MAIL_OUTCOME_DUPLICATE_REQUEST = 9;
 }
 
 // Response: Server -> Client (OPCODE_SEND_MAIL_RESPONSE).

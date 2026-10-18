@@ -351,3 +351,14 @@ Gác bởi `QuestScriptRunnerBoundaryTest` (fixture `test_fixture_boundary.js`, 
 nên không chen giữa một lần `on_event`. Đồ đã `take_item` KHÔNG hoàn. Mã quest từ client được kiểm dạng
 (`[a-z0-9_]{1,32}`) TRƯỚC khi chạm DB — fuzz opcode thấy U+0000 làm Postgres ném 500.
 `QuestFacade` nay nhận `QuestLogUseCases(list, abandon)` để giữ constructor 4 tham số.
+
+## Nhiệm vụ ngày + `ctx.give_gold` (ADR-055, 2026-10-18)
+
+`quest_template.repeat_policy` (V59) ONCE/DAILY. Làm mới LƯỜI: dòng DAILY đã CLAIMED có `updated_at` trước
+0h giờ VN (`DailyReset`, múi giờ hằng số — container chạy UTC) bị `listLog(characterId, resetAt)` bỏ qua và
+bị `AcceptQuestUseCase` xoá (`deleteClaimedBefore`, compare-and-delete) trước khi nhận. `Clock` tiêm được
+vào Accept/ListQuests để test hai bên mốc 0h. `ctx.give_gold(n)` chỉ ở `on_claim`, `1 ≤ n ≤ 1.000.000`,
+cộng dồn; ghi qua `QuestGoldPort` → `GoldLedger` (phát `GoldChangedEvent`) trong CÙNG transaction lĩnh.
+`QuestRewardPorts` 4 tham số cũ = không trao vàng (`QuestGoldPort.UNSUPPORTED`, ném nếu script gọi).
+Ba script ngày: `daily_dummy_drill`, `daily_mountain_patrol`, `daily_water_duty` (STORY §7).
+

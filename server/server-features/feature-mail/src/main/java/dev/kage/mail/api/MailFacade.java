@@ -40,6 +40,11 @@ public final class MailFacade {
      * {@code recipientId} vẫn do gateway xác nhận tồn tại trước khi gọi.
      */
     public SendOutcome sendMail(SendMailRequest request) {
+        return sendMail(request, "");
+    }
+
+    /** Như {@link #sendMail(SendMailRequest)} kèm khoá chống trùng của người chơi (ADR-058). */
+    public SendOutcome sendMail(SendMailRequest request, String idempotencyKey) {
         List<MailAttachmentDraft> draftAttachments = request.attachments().stream()
                 .map(a -> new MailAttachmentDraft(a.itemTemplateId(), a.quantity()))
                 .toList();
@@ -50,7 +55,7 @@ public final class MailFacade {
                 request.body(),
                 request.goldAmount(),
                 draftAttachments);
-        SendMailUseCase.SendResult result = sendMailUseCase.execute(draft);
+        SendMailUseCase.SendResult result = sendMailUseCase.execute(draft, idempotencyKey);
         return new SendOutcome(
                 toSendResult(result.outcome()), result.mail().map(Mail::id).orElse(0L));
     }
@@ -117,7 +122,9 @@ public final class MailFacade {
          */
         INVALID_TEXT,
         /** Hộp thư người nhận đã đầy — gateway trả {@code ErrorResponse} {@code error.mailbox_full}. */
-        MAILBOX_FULL
+        MAILBOX_FULL,
+        /** Khoá chống trùng đã dùng (ADR-058) — lá thư đó ĐÃ gửi. */
+        DUPLICATE_REQUEST
     }
 
     /** Kết quả lĩnh đồ/vàng đính kèm. */

@@ -135,7 +135,8 @@ class AbandonQuestIntegrationTest {
                 new PostgresQuestExpAdapter(),
                 new PostgresQuestInventoryGrantAdapter(),
                 auditPort,
-                new PostgresQuestIdempotencyAdapter());
+                new PostgresQuestIdempotencyAdapter(),
+                new PostgresQuestGoldAdapter());
         return new QuestFacade(
                 new AcceptQuestUseCase(progressPort, templatePort, tx),
                 new ProcessQuestEventUseCase(progressPort, new PostgresQuestItemTakeAdapter(), auditPort, tx),

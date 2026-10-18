@@ -1,11 +1,20 @@
 package dev.kage.pvp.domain;
 
+import java.util.List;
 import java.util.Optional;
 
 /** Port — DB-agnostic (Điều 23). Implementation thật ({@code PostgresPvpRatingAdapter}) ở server-database. */
 public interface PvpRatingPort {
 
     Optional<PvpRating> findByCharacterId(long characterId);
+
+    /**
+     * Mọi dòng rating theo Elo giảm dần, id tăng dần (ADR-057). Chỉ người ĐÃ đánh ít nhất một trận mới
+     * có dòng. Mặc định rỗng cho fake.
+     */
+    default List<PvpRating> listAllByRating() {
+        return List.of();
+    }
 
     /**
      * Đọc rating HIỆN TẠI của cả 2 người, đưa cho {@code computer} tính rating mới, rồi ghi CẢ 2

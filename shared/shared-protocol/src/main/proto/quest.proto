@@ -99,6 +99,9 @@ message ClaimQuestRewardResponse {
   ClaimQuestRewardOutcome outcome = 1;
   int64 exp_granted = 2;
   repeated ItemRewardView items_granted = 3;
+  // ADR-055 (2026-10-18) — vàng thưởng (`ctx.give_gold`). Chỉ thêm, protocolVersion không tăng; số dư
+  // mới vẫn tới bằng GoldChangedEvent (209), field này chỉ để client nói "+N linh thạch".
+  int64 gold_granted = 4;
 }
 
 // -----------------------------------------------------------------------------------------------

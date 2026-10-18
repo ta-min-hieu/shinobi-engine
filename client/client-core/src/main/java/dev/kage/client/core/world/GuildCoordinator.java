@@ -209,7 +209,7 @@ final class GuildCoordinator implements WindowFlow {
      * CÓ CHỦ ĐÍCH: chính cái "mình là gì" mới là thứ đang đi hỏi. Hai request thừa trả về danh sách
      * rỗng, rẻ hơn nhiều so với một client tự tin sai.
      */
-    private void refresh() {
+    void refresh() {
         sender.requestMyGuild();
         sender.requestGuildMembers();
         sender.requestPendingGuildJoinRequests();

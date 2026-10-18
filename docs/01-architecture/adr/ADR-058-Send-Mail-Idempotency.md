@@ -18,7 +18,7 @@ tự gửi lại khi mạng chậm là trừ hai lần và tạo hai thư. `Clai
 ## Decision
 
 1. `mail.proto`: `SendMailCommand.idempotency_key = 6` (string) và
-   `SEND_MAIL_OUTCOME_DUPLICATE_REQUEST = 10`. Chỉ thêm — `protocolVersion` không tăng.
+   `SEND_MAIL_OUTCOME_DUPLICATE_REQUEST = 9`. Chỉ thêm — `protocolVersion` không tăng.
 2. Server ghi khoá bằng `IdempotencyPort` sẵn có của feature-mail, TRONG transaction gửi, NGAY SAU khoá
    túi đồ người gửi (thứ tự khoá DATABASE.md §5.1) và TRƯỚC khi trừ vàng/đồ. Khoá trùng ⇒ rollback trọn,
    trả `DUPLICATE_REQUEST`, không thư nào được tạo.
@@ -47,7 +47,7 @@ tự gửi lại khi mạng chậm là trừ hai lần và tạo hai thư. `Clai
 
 | # | Quyết định |
 |---|---|
-| 1 | Field 6 + outcome 10, chỉ thêm |
+| 1 | Field 6 + outcome 9, chỉ thêm |
 | 2 | Ghi khoá sau khoá túi đồ, trước trừ tài sản |
 | 3 | Khoá rỗng = hành vi cũ |
 
@@ -61,4 +61,4 @@ Không.
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành — đang làm (lô 15, 2026-10-18).
+1. ✅ Thi hành (2026-10-18) — outcome thật là **9** (bản nháp ghi 10; 9 còn trống). `SendMailIdempotencyIntegrationTest` (Postgres thật: cùng khoá ⇒ một thư, vàng trừ một lần; khoá rỗng vẫn gửi). Client giữ khoá tới khi có trả lời (`MailCoordinator#sendKey`).

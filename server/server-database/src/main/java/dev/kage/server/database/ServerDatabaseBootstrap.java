@@ -113,6 +113,7 @@ import dev.kage.server.database.pvp.PostgresPvpRatingAdapter;
 import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
 import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
+import dev.kage.server.database.quest.PostgresQuestGoldAdapter;
 import dev.kage.server.database.quest.PostgresQuestIdempotencyAdapter;
 import dev.kage.server.database.quest.PostgresQuestInventoryGrantAdapter;
 import dev.kage.server.database.quest.PostgresQuestItemTakeAdapter;
@@ -366,7 +367,8 @@ public final class ServerDatabaseBootstrap {
         AcceptQuestUseCase acceptQuestUseCase = new AcceptQuestUseCase(progressPort, templatePort, transactionRunner);
         ProcessQuestEventUseCase processQuestEventUseCase = new ProcessQuestEventUseCase(
                 progressPort, new PostgresQuestItemTakeAdapter(), auditPort, transactionRunner);
-        QuestRewardPorts rewardPorts = new QuestRewardPorts(expPort, inventoryGrantPort, auditPort, idempotencyPort);
+        QuestRewardPorts rewardPorts = new QuestRewardPorts(
+                expPort, inventoryGrantPort, auditPort, idempotencyPort, new PostgresQuestGoldAdapter());
         ClaimQuestRewardUseCase claimQuestRewardUseCase =
                 new ClaimQuestRewardUseCase(progressPort, templatePort, rewardPorts, transactionRunner);
         return new QuestFacade(

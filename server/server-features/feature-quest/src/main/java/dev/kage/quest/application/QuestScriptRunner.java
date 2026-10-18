@@ -41,6 +41,9 @@ final class QuestScriptRunner {
     // Script không đổi lúc chạy — cache theo scriptRef, cùng lý do GetDialogueNodeUseCase.
     private final Map<String, String> scriptSourceCache = new ConcurrentHashMap<>();
 
+    /** Trần một lần {@code ctx.give_gold} (ADR-055 D4). */
+    static final long MAX_GOLD_PER_CALL = 1_000_000L;
+
     private static final String ON_EVENT_HOOK = "on_event";
     private static final String ON_ACCEPT_HOOK = "on_accept";
     private static final String ON_CLAIM_HOOK = "on_claim";
@@ -60,6 +63,7 @@ final class QuestScriptRunner {
             String progressJson,
             boolean completed,
             long expGranted,
+            long goldGranted,
             List<ItemGrant> itemGrants,
             List<ItemTake> itemTakes,
             boolean scriptFailed) {}
@@ -103,6 +107,7 @@ final class QuestScriptRunner {
         String progressJson;
         boolean completed;
         long expGranted;
+        long goldGranted;
         final List<ItemGrant> itemGrants = new ArrayList<>();
         final List<ItemTake> itemTakes = new ArrayList<>();
     }
@@ -126,6 +131,7 @@ final class QuestScriptRunner {
                 effects.progressJson(),
                 effects.completed(),
                 effects.expGranted(),
+                effects.goldGranted(),
                 effects.itemGrants(),
                 effects.itemTakes(),
                 true);
@@ -198,7 +204,13 @@ final class QuestScriptRunner {
         List<ItemGrant> itemGrants = List.copyOf(effects.itemGrants);
         List<ItemTake> itemTakes = List.copyOf(effects.itemTakes);
         return new HookEffects(
-                resultProgressJson, effects.completed, effects.expGranted, itemGrants, itemTakes, scriptFailed);
+                resultProgressJson,
+                effects.completed,
+                effects.expGranted,
+                effects.goldGranted,
+                itemGrants,
+                itemTakes,
+                scriptFailed);
     }
 
     /**
@@ -223,6 +235,10 @@ final class QuestScriptRunner {
                 effects.itemGrants.add(new ItemGrant(args[0].asString(), args[1].asInt()));
                 return null;
             });
+            ctx.put("give_gold", (ProxyExecutable) args -> {
+                effects.goldGranted = Math.addExact(effects.goldGranted, requireGoldInRange(args[0].asLong()));
+                return null;
+            });
         } else {
             ctx.put("save_progress", (ProxyExecutable) args -> {
                 effects.progressJson = requireProgressJson(args[0].asString());
@@ -240,6 +256,18 @@ final class QuestScriptRunner {
             });
         }
         return ctx;
+    }
+
+    /**
+     * {@code ctx.give_gold(n)} (ADR-055 D4) chỉ nhận {@code 1 ≤ n ≤ MAX_GOLD_PER_CALL}. Số âm là TRỪ vàng,
+     * số 0 là lời gọi vô nghĩa (cùng luật biên {@code give_item} 2026-10-10), trần trên chặn một script
+     * gõ nhầm thành máy in vàng. Ném từ callback ⇒ lỗi script, không trao gì.
+     */
+    private static long requireGoldInRange(long amount) {
+        if (amount < 1L || amount > MAX_GOLD_PER_CALL) {
+            throw new IllegalArgumentException("give_gold cần 1.." + MAX_GOLD_PER_CALL + ": " + amount);
+        }
+        return amount;
     }
 
     /**

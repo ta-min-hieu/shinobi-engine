@@ -134,5 +134,10 @@ record QuestFuzzSpec(
                     .reportingTo(TOWN_ELDER),
             quest("foundation_breakthrough")
                     .killing("foundation_warden", 1, CounterKind.FLAG, "endured")
-                    .reportingTo(TOWN_ELDER));
+                    .reportingTo(TOWN_ELDER),
+            // ADR-055 — nhiệm vụ ngày, không tiên quyết. Trong một lượt fuzz (vài giây) không qua 0h,
+            // nên mô hình "CLAIMED là cuối" vẫn đúng.
+            quest("daily_dummy_drill").killing("training_dummy", 5, CounterKind.COUNT, FELLED),
+            quest("daily_mountain_patrol").killing("wandering_bandit", 3, CounterKind.COUNT, FELLED),
+            quest("daily_water_duty").askingFirst(SENIOR_SISTER).reportingTo(TOWN_ELDER));
 }

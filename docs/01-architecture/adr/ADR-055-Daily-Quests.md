@@ -96,5 +96,5 @@ Không.
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành — đang làm (lô 15, 2026-10-18).
+1. ✅ Thi hành (2026-10-18). `DailyQuestIntegrationTest` (Postgres thật: vàng vào túi, cùng ngày không nhận lại, qua 0h nhận lại; quest ONCE không bao giờ làm mới), `QuestScriptRunnerBoundaryTest` (biên `give_gold`). Cap vàng: dùng lại `error.gold_cap_reached` 409 sẵn có của gateway thay cho outcome mới (D5 thu hẹp lúc thi hành — không cần `GOLD_CAP_REACHED`).
 2. ⏳ Playtest số thưởng; kiểm sống qua mốc 0h.

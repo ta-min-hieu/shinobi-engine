@@ -47,6 +47,14 @@ public interface CharacterPort {
     Optional<Character> findById(long characterId);
 
     /**
+     * MỌI nhân vật theo thứ hạng cảnh giới (ADR-057): cấp giảm dần, EXP giảm dần, id tăng dần (người
+     * tới trước giữ hạng khi bằng nhau). Mặc định rỗng cho fake không cần bảng xếp hạng.
+     */
+    default List<Character> listAllByRealm() {
+        return List.of();
+    }
+
+    /**
      * Tạo nhân vật mới + ghi {@code idempotencyKey} trong CÙNG transaction (ADR-025) — key đã dùng
      * trước đó phải khiến adapter ném lỗi (unique constraint), KHÔNG tạo nhân vật lần 2.
      */
