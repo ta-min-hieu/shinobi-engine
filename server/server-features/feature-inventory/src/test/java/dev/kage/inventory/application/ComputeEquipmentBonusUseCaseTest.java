@@ -14,6 +14,7 @@ import dev.kage.inventory.domain.Equipment;
 import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.inventory.domain.GemPort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemSet;
@@ -192,5 +193,58 @@ class ComputeEquipmentBonusUseCaseTest {
             assertThat(set.wornPieces()).isEqualTo(2);
             assertThat(set.totalPieces()).isEqualTo(3);
         });
+    }
+
+    @Test
+    void shouldAddGemBonus_whenOnlySomeEquippedItemsAreSocketed() {
+        // Kiểm sống 2026-10-21: khảm ngọc vào áo trong khi vẫn mặc vũ khí CHƯA khảm ⇒ tra ngọc của vũ khí
+        // ra null, và Map.copyOf (đúng loại adapter Postgres trả) ném NPE ở get(null) ⇒ nhân vật không
+        // vào world được nữa. Fake ở đây phải dùng Map bất biến như adapter thật thì mới tái hiện được.
+        ItemStack armor = new ItemStack(1L, 100L, 1, 0);
+        ItemStack weapon = new ItemStack(2L, 200L, 1, 0);
+        InventoryPort inventoryPort = fakeInventoryPort(List.of(armor, weapon));
+        EquipmentPort equipmentPort =
+                fakeEquipmentPort(Map.of(EquipmentSlotType.ARMOR, 1L, EquipmentSlotType.WEAPON, 2L));
+        ItemTemplatePort itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> Optional.empty());
+        GemPort gems = new FixedGemPort(Map.of(900L, new EquipmentBonus(0, 0, 0, 15)), Map.of(1L, 900L));
+        ComputeEquipmentBonusUseCase useCase =
+                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort, gems);
+
+        assertThat(useCase.execute(CHARACTER_ID)).isEqualTo(new EquipmentBonus(0, 0, 0, 15));
+    }
+
+    /** Ngọc cố định, trả Map BẤT BIẾN như {@code PostgresGemAdapter.gemBonuses}. */
+    private record FixedGemPort(Map<Long, EquipmentBonus> bonuses, Map<Long, Long> sockets) implements GemPort {
+
+        /** {@code Map.copyOf} — đúng loại Map bất biến (get(null) ném NPE) mà adapter thật trả. */
+        FixedGemPort {
+            bonuses = Map.copyOf(bonuses);
+            sockets = Map.copyOf(sockets);
+        }
+
+        @Override
+        public Map<Long, EquipmentBonus> gemBonuses() {
+            return bonuses;
+        }
+
+        @Override
+        public Map<Long, Long> socketsOf(long characterId) {
+            return sockets;
+        }
+
+        @Override
+        public int lockFailures(Transaction tx, long characterId) {
+            return 0;
+        }
+
+        @Override
+        public void setFailures(Transaction tx, long characterId, int failures) {
+            // test chỉ đọc chỉ số, không khảm
+        }
+
+        @Override
+        public void socket(Transaction tx, long inventoryItemId, long gemItemTemplateId) {
+            throw new UnsupportedOperationException("Test này chỉ đọc chỉ số");
+        }
     }
 }

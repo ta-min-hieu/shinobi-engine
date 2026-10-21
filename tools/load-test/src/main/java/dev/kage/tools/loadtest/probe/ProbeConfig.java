@@ -67,7 +67,8 @@ public record ProbeConfig(
         PartyPlan party,
         TradePlan trade,
         EdgePlan edge,
-        ProgressionPlan progression) {
+        ProgressionPlan progression,
+        EconomyPlan economy) {
 
     /**
      * Danh sách mã trang bị BẤT BIẾN — record không tự copy, mà lệnh gọi có thể truyền list sống
@@ -178,6 +179,44 @@ public record ProbeConfig(
     }
 
     /**
+     * Kế hoạch kinh tế của lô 16 — chạy SAU khi đi bộ (xem {@link EconomyScenario}).
+     *
+     * @param depositItems món gửi kho, {@code code} hoặc {@code code:soLuong}
+     * @param withdrawItems món rút kho, {@code code} hoặc {@code code:soLuong}
+     * @param socketGems lượt khảm, mỗi phần tử {@code maTrangBi:maNgoc}
+     * @param setTitle mã thành tựu cần đeo làm danh hiệu; rỗng = không đổi
+     * @param listOnMarket dòng treo phường thị, mỗi phần tử {@code ma:giaTong}
+     * @param buyFromMarket mã món cần mua dòng rẻ nhất ở phường thị
+     */
+    public record EconomyPlan(
+            List<String> depositItems,
+            List<String> withdrawItems,
+            List<String> socketGems,
+            String setTitle,
+            List<String> listOnMarket,
+            List<String> buyFromMarket) {
+
+        /** Danh sách bất biến — record không tự copy, mà lệnh gọi có thể truyền list sống. */
+        public EconomyPlan {
+            depositItems = List.copyOf(depositItems);
+            withdrawItems = List.copyOf(withdrawItems);
+            socketGems = List.copyOf(socketGems);
+            listOnMarket = List.copyOf(listOnMarket);
+            buyFromMarket = List.copyOf(buyFromMarket);
+        }
+
+        /** {@code true} khi có ít nhất một bước cần chạy. */
+        public boolean isRequested() {
+            return !depositItems.isEmpty()
+                    || !withdrawItems.isEmpty()
+                    || !socketGems.isEmpty()
+                    || !setTitle.isEmpty()
+                    || !listOnMarket.isEmpty()
+                    || !buyFromMarket.isEmpty();
+        }
+    }
+
+    /**
      * Kế hoạch tiến triển nhân vật của lô 17 — chạy TRƯỚC khi đi bộ (xem {@link ProgressionScenario}).
      *
      * @param selectFaction tên hệ cần đổi sang ({@code hoa}, {@code thuy}...); rỗng = không đổi
@@ -265,7 +304,18 @@ public record ProbeConfig(
                         raw.flag("tradeReport", false)),
                 edgePlan(raw),
                 new ProgressionPlan(
-                        raw.text("selectFaction", ""), raw.list("upgradeSkills"), raw.number("donateToGuild", 0L)));
+                        raw.text("selectFaction", ""), raw.list("upgradeSkills"), raw.number("donateToGuild", 0L)),
+                economyPlan(raw));
+    }
+
+    private static EconomyPlan economyPlan(CommandLineArguments raw) {
+        return new EconomyPlan(
+                raw.list("depositItems"),
+                raw.list("withdrawItems"),
+                raw.list("socketGems"),
+                raw.text("setTitle", ""),
+                raw.list("listOnMarket"),
+                raw.list("buyFromMarket"));
     }
 
     private static EdgePlan edgePlan(CommandLineArguments raw) {

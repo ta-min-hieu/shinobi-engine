@@ -166,6 +166,10 @@ public final class GameProbe {
         if (config.moveToX().isPresent()) {
             walkTo(connection, observation, session, config.moveToX().getAsDouble());
         }
+        // Kinh tế SAU khi đi bộ: kho chỉ mở cạnh người giữ kho, nên vị trí đứng là một phần phép đo.
+        if (config.economy().isRequested()) {
+            new EconomyScenario(connection, session).run(config.economy());
+        }
         edge.sendChat(config.edge());
         if (!config.enterDungeon().isEmpty()) {
             new DungeonScenario(connection, session).run(config.enterDungeon());

@@ -63,7 +63,8 @@ final class SocialEventLine {
         String body = event.getBody();
         long lineBreaks = body.chars().filter(ch -> ch == '\n' || ch == '\r').count();
         return "channel=" + event.getChannel().name() + " sender=" + event.getSenderId() + " name="
-                + event.getSenderName() + " lineBreaks=" + lineBreaks + " body='"
+                + event.getSenderName() + " title='" + event.getSenderTitleKey() + "' lineBreaks=" + lineBreaks
+                + " body='"
                 + body.replace('\n', '⏎').replace('\r', '⏎') + "'";
     }
 }

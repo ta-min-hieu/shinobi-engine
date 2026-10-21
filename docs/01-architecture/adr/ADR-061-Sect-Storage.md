@@ -83,4 +83,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-18 (lô 16).
-2. ⏳ Kiểm sống: gửi một món ở Tô Vân Nhi, đi xa thử rút (phải bị từ chối), quay lại rút.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--depositItems/--withdrawItems`): đứng x=40 ⇒ `TOO_FAR`; đi tới x=2 (cạnh Tô Vân Nhi) ⇒ gửi OK (kho 1/40), rút OK (kho 0/40).

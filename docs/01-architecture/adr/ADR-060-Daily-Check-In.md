@@ -81,5 +81,5 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-18 (lô 16).
-2. ⏳ Kiểm sống: vào world ⇒ thư "Điểm danh" ngày 1; vào lại ⇒ không thư mới.
+2. ✅ Kiểm sống 2026-10-21: Kagemaru vào world ~15 lần trong ngày, chỉ có ĐÚNG MỘT thư "Điểm danh" (100 linh thạch); tanthua44 cũng một. Bộ đếm `CHECK_IN` = 1.
 3. Chủ dự án chỉnh bảng quà bằng SQL khi có số đo kinh tế.

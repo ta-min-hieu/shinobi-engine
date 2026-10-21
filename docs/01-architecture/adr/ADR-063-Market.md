@@ -90,4 +90,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-18 (lô 16).
-2. ⏳ Kiểm sống bằng hai tài khoản: treo → bên kia mua → vàng người bán tăng `giá − 5%`.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--listOnMarket/--buyFromMarket`): Kagemaru treo Hộ Thủ Tạp Dịch giá 500; tanthua44 mua ⇒ người mua −500, người bán +475 (500 − 5%), dòng `SOLD`. Sự kiện 1014 cho người bán chưa thấy: hai nhân vật cùng tài khoản nên phiên người bán bị đá (`logged_in_elsewhere`) — cần hai tài khoản.

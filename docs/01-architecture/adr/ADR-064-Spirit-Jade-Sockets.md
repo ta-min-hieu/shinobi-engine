@@ -85,4 +85,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-18 (lô 16).
-2. ⏳ Kiểm sống: mua ngọc ở trưởng lão, khảm vào vũ khí đang mặc, bảng nhân vật (C) thấy công tăng.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--socketGems`) — và **tìm ra lỗi nặng, đã vá**: khảm thành công một món trong khi vẫn mặc món chưa khảm ⇒ `ComputeEquipmentBonusUseCase.gemBonusOf` gọi `get(null)` trên Map bất biến ⇒ NPE ⇒ nhân vật **không vào world được nữa** (`error.select_character_failed`), vàng đã trừ. Test cũ dùng `GemPort.NONE` nên không bắt được; nay có test với Map bất biến như adapter thật. Sau vá: máu tối đa 296 → 311 (ngọc Mộc áo) → 326 (ngọc Mộc kiếm); khảm đè ô đã có ngọc giữ 326 (D2). Bảo hiểm 3 lần hỏng chưa đo sống (cần nhiều ngọc).

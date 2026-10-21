@@ -171,7 +171,9 @@ public final class ComputeEquipmentBonusUseCase {
         int res = 0;
         int hp = 0;
         for (long itemId : equipment.slots().values()) {
-            EquipmentBonus gem = bonuses.get(sockets.get(itemId));
+            // Món chưa khảm không có khoá trong `sockets`; bonuses là Map bất biến nên get(null) ném NPE.
+            Long gemTemplateId = sockets.get(itemId);
+            EquipmentBonus gem = gemTemplateId == null ? null : bonuses.get(gemTemplateId);
             if (gem != null) {
                 atk += gem.bonusAtk();
                 def += gem.bonusDef();

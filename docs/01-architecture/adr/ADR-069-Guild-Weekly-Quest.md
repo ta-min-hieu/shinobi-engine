@@ -57,4 +57,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-21 (lô 17).
-2. 🟡 Kiểm sống một phần 2026-10-21: sau khi vào bang, mỗi quái hạ được cộng đúng vào `guild_weekly_progress` (tuần bắt đầu thứ Hai 2026-10-19). Bước `kills = 299` ⇒ thư 2.000 CHƯA chạy.
+2. ✅ Kiểm sống 2026-10-21: mỗi quái hạ được cộng vào `guild_weekly_progress` (tuần bắt đầu thứ Hai 2026-10-19); đặt `kills = 299` rồi hạ một con ⇒ 300, `completed_at` ghi, thư "Nhiệm vụ bang tuần" 2.000 + sự kiện 720; hạ thêm ⇒ không thư thứ hai.

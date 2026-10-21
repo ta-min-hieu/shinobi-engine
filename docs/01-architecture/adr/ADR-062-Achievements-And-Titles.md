@@ -81,4 +81,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-18 (lô 16).
-2. ⏳ Kiểm sống: hạ 10 quái ⇒ dòng "Đạt thành tựu"; đeo danh hiệu ⇒ chat hiện `[Danh hiệu] Tên` ở client kia.
+2. ✅ Kiểm sống 2026-10-21: lần vào world đầu mở hồi tố `level_10` + `level_30` (2 sự kiện 1704); quái thứ 10 ⇒ `slayer_10` + 1704. `--setTitle=duel_10` ⇒ NOT_UNLOCKED; `slayer_10` ⇒ OK, và tin chat world mang `sender_title_key='title.slayer_10'`. Chưa nhìn dòng `[Danh hiệu] Tên` bằng client có giao diện.
