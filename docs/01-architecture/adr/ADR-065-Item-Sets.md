@@ -65,4 +65,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-21 (lô 17).
-2. ⏳ Kiểm sống: mặc 2 món Tạp Dịch, bảng nhân vật (C) hiện "Bộ Tạp Dịch 2/6" và sinh lực +5.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (đo máu tối đa, chưa nhìn bảng C): `tanthua44` gỡ 5 món Genin rồi mặc lại từng món ⇒ 134 → 164 → 174 → 180 → 190 → 206; mốc 2 món (+10) và 6 món (+10) khớp từng bước.

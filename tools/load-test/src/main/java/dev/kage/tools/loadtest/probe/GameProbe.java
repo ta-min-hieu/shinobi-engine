@@ -158,6 +158,9 @@ public final class GameProbe {
         if (!config.equipItemCodes().isEmpty()) {
             new EquipScenario(connection, session).run(config.equipItemCodes());
         }
+        if (config.progression().isRequested()) {
+            new ProgressionScenario(connection, session).run(config.progression());
+        }
         SessionEdgeScenario edge = new SessionEdgeScenario(connection, session);
         edge.runBeforeWalking(config.edge());
         if (config.moveToX().isPresent()) {

@@ -59,5 +59,5 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-21 (lô 17).
-2. ⏳ Kiểm sống bằng gameProbe: mặc Mộc Phi Kiếm, đo pos_x sau 2 giây giữ phím (≈12 m thay vì 10 m).
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe: mặc Mộc Phi Kiếm ⇒ opcode 310; đi 28 m trong 4,74 s ≈ 5,9 m/s (gốc 5, +20% = 6). Ghi chú: mặc linh thú cũng phát lại 310 (không đổi tốc độ, vô hại).
 3. ⏳ Art: model/hiệu ứng phi kiếm dưới chân (chủ dự án).

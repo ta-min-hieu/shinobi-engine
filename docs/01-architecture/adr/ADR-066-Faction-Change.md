@@ -65,4 +65,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-21 (lô 17).
-2. ⏳ Kiểm sống: nhân vật Lv≥10 đổi 3 lần, lần ba bị từ chối khi không có đan.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--selectFaction`): Kagemaru Lv40 HOA→LOI miễn phí; LOI→LOI `error.faction_unchanged`; →HOA không đan `error.faction_change_pill_required`; có 1 đan ⇒ thành công, đan mất, `faction_changes = 2`. Lỗi về qua ErrorResponse (opcode 5), không qua `error_key` của 207 — đúng như client đang đọc.

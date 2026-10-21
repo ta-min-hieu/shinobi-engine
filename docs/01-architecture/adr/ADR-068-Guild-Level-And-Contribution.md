@@ -67,4 +67,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-21 (lô 17).
-2. ⏳ Kiểm sống: góp 10.000 ⇒ bang lên cấp 2, sĩ số tối đa 60; Bia Anh Danh thẻ Bang hội có bang.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--donateToGuild`): góp 1.000 ⇒ exp bang 1.000/10.000, cống hiến 1.000; góp thêm 9.000 ⇒ cấp 2, sĩ số tối đa 60, sự kiện 720. Thẻ Bang ở Bia Anh Danh chưa nhìn bằng client.

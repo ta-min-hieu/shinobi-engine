@@ -57,4 +57,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-21 (lô 17).
-2. ⏳ Kiểm sống: hạ quái, tiến độ tăng trong cửa sổ Bang; đặt `kills = 299` bằng SQL rồi hạ một con ⇒ thư 2.000.
+2. 🟡 Kiểm sống một phần 2026-10-21: sau khi vào bang, mỗi quái hạ được cộng đúng vào `guild_weekly_progress` (tuần bắt đầu thứ Hai 2026-10-19). Bước `kills = 299` ⇒ thư 2.000 CHƯA chạy.

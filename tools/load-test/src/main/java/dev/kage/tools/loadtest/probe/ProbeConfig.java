@@ -66,7 +66,8 @@ public record ProbeConfig(
         DuelPlan duel,
         PartyPlan party,
         TradePlan trade,
-        EdgePlan edge) {
+        EdgePlan edge,
+        ProgressionPlan progression) {
 
     /**
      * Danh sách mã trang bị BẤT BIẾN — record không tự copy, mà lệnh gọi có thể truyền list sống
@@ -176,6 +177,26 @@ public record ProbeConfig(
         }
     }
 
+    /**
+     * Kế hoạch tiến triển nhân vật của lô 17 — chạy TRƯỚC khi đi bộ (xem {@link ProgressionScenario}).
+     *
+     * @param selectFaction tên hệ cần đổi sang ({@code hoa}, {@code thuy}...); rỗng = không đổi
+     * @param upgradeSkills mã chiêu cần nâng bậc, theo thứ tự, mỗi phần tử một điểm; rỗng = không nâng
+     * @param donateToGuild số vàng góp cho bang; 0 = không góp
+     */
+    public record ProgressionPlan(String selectFaction, List<String> upgradeSkills, long donateToGuild) {
+
+        /** Danh sách chiêu bất biến — record không tự copy, mà lệnh gọi có thể truyền list sống. */
+        public ProgressionPlan {
+            upgradeSkills = List.copyOf(upgradeSkills);
+        }
+
+        /** {@code true} khi có ít nhất một bước cần chạy. */
+        public boolean isRequested() {
+            return !selectFaction.isEmpty() || !upgradeSkills.isEmpty() || donateToGuild > 0;
+        }
+    }
+
     /** Giá trị {@code attackTarget} nghĩa là "không đánh, chỉ quan sát". */
     public static final String ATTACK_TARGET_NONE = "none";
 
@@ -242,7 +263,9 @@ public record ProbeConfig(
                         raw.flag("tradeAccept", false),
                         raw.integer("tradeWaitSeconds", DEFAULT_PARTY_WAIT_SECONDS),
                         raw.flag("tradeReport", false)),
-                edgePlan(raw));
+                edgePlan(raw),
+                new ProgressionPlan(
+                        raw.text("selectFaction", ""), raw.list("upgradeSkills"), raw.number("donateToGuild", 0L)));
     }
 
     private static EdgePlan edgePlan(CommandLineArguments raw) {

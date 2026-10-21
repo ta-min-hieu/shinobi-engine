@@ -70,4 +70,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-21 (lô 17).
-2. ⏳ Kiểm sống: `/gm event exp 2 10`, giết một quái, vạch EXP tăng gấp đôi; client thấy dòng sự kiện.
+2. ✅ Kiểm sống 2026-10-21: `/gm event exp 2 5` ⇒ opcode 309 + dòng hệ thống; cùng loài `wandering_bandit` 35 → 70 EXP. Sự kiện rơi đồ x2 chưa đo (xác suất, cần nhiều lượt).

@@ -59,5 +59,5 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-21 (lô 17).
-2. ⏳ Kiểm sống: mua Linh Hồ, mặc, hạ vài quái, bảng nhân vật thấy linh thú lên cấp.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe: mặc Linh Hồ ⇒ máu tối đa +10; mỗi lần chủ nhận EXP thì `pet_state.exp` cộng đúng bằng (kể cả x2 sự kiện); 140 EXP ⇒ lên cấp 2 kèm dòng song ngữ.
 3. ⏳ Art: model linh thú (chủ dự án).

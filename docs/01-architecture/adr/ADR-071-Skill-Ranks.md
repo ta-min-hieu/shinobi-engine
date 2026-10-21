@@ -60,4 +60,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-21 (lô 17).
-2. ⏳ Kiểm sống: nâng chiêu 1 lên bậc 3, đánh quái, sát thương ≈ +20%.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--upgradeSkills`): `fireball` 1/5 đánh 48 ⇒ 5/5 đánh 68 (×1,4); điểm 20 → 16; chiêu Lv50 ⇒ LEVEL_TOO_LOW; bậc 6 ⇒ MAX_RANK; đổi sang LOI có lại 20/20, về HOA lấy lại 5/5 (D3).
