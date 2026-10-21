@@ -176,6 +176,16 @@ message GetCharacterStatsResponse {
   int32 equipment_bonus_hp = 16; // phần máu tối đa đến từ trang bị
   int32 max_chi = 17;
   repeated ItemSetProgressView item_sets = 18; // ADR-065 — bộ pháp khí đang mặc ít nhất một món
+  PetView pet = 19;               // ADR-072 — chỉ có khi đang mặc linh thú
+  int32 move_speed_percent = 20;  // ADR-070 — tốc độ cộng thêm của phi kiếm
+}
+
+// ADR-072 — linh thú đang mặc.
+message PetView {
+  int64 item_template_id = 1; // tên hiển thị tra qua catalog vật phẩm
+  int32 level = 2;
+  int64 exp_into_level = 3;
+  int64 exp_to_next = 4;      // 0 = cấp tối đa
 }
 
 // ADR-065 — một bộ pháp khí trên bảng nhân vật. Chỉ số thưởng ĐÃ nằm trong các tổng ở trên.

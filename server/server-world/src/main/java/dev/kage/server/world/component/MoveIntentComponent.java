@@ -11,4 +11,7 @@ import dev.kage.engine.ecs.Component;
  */
 public final class MoveIntentComponent implements Component {
     public float dirX;
+
+    /** Hệ số tốc độ của phi kiếm đang mặc (ADR-070) — 1 = không có. Đặt lại mỗi lần áp chỉ số trang bị. */
+    public float speedMultiplier = 1f;
 }

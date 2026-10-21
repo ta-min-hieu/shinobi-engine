@@ -5,6 +5,7 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.inventory.domain.EnhancementTable;
+import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.IdempotencyKeyReusedException;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.ItemStack;
@@ -77,11 +78,16 @@ public final class EnhanceItemUseCase {
         return resultHolder.get();
     }
 
-    /** Món không còn template (dữ liệu hỏng) cũng coi là không phải trang bị — không có gì để cường hoá. */
+    /**
+     * Món không còn template (dữ liệu hỏng) cũng coi là không phải trang bị — không có gì để cường hoá. Phi kiếm
+     * (ADR-070, không có chỉ số) và linh thú (ADR-072, lên cấp bằng EXP) cũng không vào lò.
+     */
     private boolean isEquipment(ItemStack item) {
         return ports.itemTemplatePort()
                 .findById(item.itemTemplateId())
-                .map(template -> template.equipSlot() != null)
+                .map(template -> template.equipSlot() != null
+                        && template.equipSlot() != EquipmentSlotType.MOUNT
+                        && template.equipSlot() != EquipmentSlotType.PET)
                 .orElse(false);
     }
 

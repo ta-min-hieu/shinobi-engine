@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -47,6 +48,7 @@ import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.MoveIntentComponent;
 import dev.kage.server.world.component.NpcComponent;
 import dev.kage.server.world.component.SkillCooldownComponent;
+import dev.kage.server.world.component.SkillRankComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
 
@@ -81,6 +83,8 @@ public final class WorldFacade {
     private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<VelocityComponent> VELOCITY = ComponentMapper.getFor(VelocityComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
+    private static final ComponentMapper<SkillRankComponent> SKILL_RANK =
+            ComponentMapper.getFor(SkillRankComponent.class);
     private static final ComponentMapper<MonsterComponent> MONSTER = ComponentMapper.getFor(MonsterComponent.class);
     private static final ComponentMapper<BossAiComponent> BOSS_AI = ComponentMapper.getFor(BossAiComponent.class);
     private static final ComponentMapper<SkillCooldownComponent> SKILL_COOLDOWN =
@@ -723,6 +727,23 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.ChangeCharacterElementCommand(characterId, element));
     }
 
+    /** ADR-071 — bậc chiêu mới có hiệu lực ngay (nâng bậc, đổi linh căn). */
+    public void enqueueSkillRanks(long characterId, SkillRankSnapshot ranks) {
+        inbox.add(new WorldCommand.SetSkillRanksCommand(characterId, ranks));
+    }
+
+    /** ADR-071 — chiêu của một linh căn theo thứ tự ô, cho gateway kiểm lệnh nâng bậc. Hàm thuần. */
+    public static List<FactionSkillSlot> skillsOf(Element element) {
+        List<FactionSkillSlot> skills = new ArrayList<>();
+        for (SkillDefinition definition : SkillRegistry.BY_CODE.values()) {
+            if (definition.faction() == element) {
+                skills.add(new FactionSkillSlot(definition.code(), definition.slotIndex(), definition.requiredLevel()));
+            }
+        }
+        skills.sort(Comparator.comparingInt(FactionSkillSlot::slotIndex));
+        return skills;
+    }
+
     /**
      * Spawn boss theo MÃ LOÀI (ADR-048 D6) — gọi bởi {@code DungeonInstanceRegistry} ngay sau khi
      * tạo dungeon World mới. World chính KHÔNG tự gọi hàm này (giữ đúng ranh giới: server-world
@@ -933,6 +954,7 @@ public final class WorldFacade {
                 case WorldCommand.RaiseCharacterLevelCommand c -> handleRaiseCharacterLevel(c.characterId(), c.level());
                 case WorldCommand.ChangeCharacterElementCommand c ->
                     handleChangeCharacterElement(c.characterId(), c.element());
+                case WorldCommand.SetSkillRanksCommand c -> handleSetSkillRanks(c.characterId(), c.ranks());
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c.bossCode());
                 case WorldCommand.InboxBarrierCommand c -> c.onReached().run();
             }
@@ -970,6 +992,7 @@ public final class WorldFacade {
         entity.add(new TargetComponent());
         entity.add(new AttackCooldownComponent());
         entity.add(newSkillCooldown(entry.characterId()));
+        entity.add(skillRanksOf(entry));
         entity.add(new StatusEffectComponent());
         CharacterLevelComponent levelComponent = new CharacterLevelComponent();
         levelComponent.level = entry.baseStats().level();
@@ -979,9 +1002,7 @@ public final class WorldFacade {
         chi.current = SkillConstants.CHARACTER_MAX_CHI; // placeholder — chưa nối character_stat.current_chi DB
         chi.max = SkillConstants.CHARACTER_MAX_CHI;
         entity.add(chi);
-
         addRecoveryComponents(entity);
-
         entitiesByCharacterId.put(entry.characterId(), entity);
         aoiDirty = true; // thực thể mới — xem syncAoiIfDirty
         baseStatsByCharacterId.put(entry.characterId(), entry.baseStats());
@@ -1052,7 +1073,9 @@ public final class WorldFacade {
             // dùng, shared/CLAUDE.md). Server Authority: không tin client dù client cũ/hack còn gửi
             // dirY khác 0. clampDirection vẫn nhận đủ 2 tham số để tái dùng nguyên logic chuẩn hoá.
             float[] direction = clampDirection(intent.dirX(), 0f);
-            float speed = WorldConstants.MOVE_SPEED_MPS * StatusEffects.moveSpeedMultiplier(STATUS_EFFECT.get(entity));
+            float speed = WorldConstants.MOVE_SPEED_MPS
+                    * MOVE_INTENT.get(entity).speedMultiplier
+                    * StatusEffects.moveSpeedMultiplier(STATUS_EFFECT.get(entity));
             velocity.x = direction[0] * speed;
             velocity.y = direction[1] * speed;
         }
@@ -1299,6 +1322,25 @@ public final class WorldFacade {
      * nó từ chính component: thứ nằm TRÊN chỉ số derive của hệ cũ là bonus trang bị
      * ({@link #applyBonusTo} luôn ghi {@code derive + bonus}), rồi đặt lên chỉ số derive của hệ mới.
      */
+    private void handleSetSkillRanks(long characterId, SkillRankSnapshot ranks) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        if (entity != null) {
+            copyRanks(ranks, SKILL_RANK.get(entity));
+        }
+    }
+
+    private static SkillRankComponent skillRanksOf(CharacterEntry entry) {
+        SkillRankComponent ranks = new SkillRankComponent();
+        copyRanks(entry.skillRanks(), ranks);
+        return ranks;
+    }
+
+    private static void copyRanks(SkillRankSnapshot from, SkillRankComponent to) {
+        for (int slot = 0; slot < to.ranks.length; slot++) {
+            to.ranks[slot] = from.rankOf(slot);
+        }
+    }
+
     private void handleChangeCharacterElement(long characterId, Element element) {
         KEntity entity = entitiesByCharacterId.get(characterId);
         CharacterBaseStats baseStats = baseStatsByCharacterId.get(characterId);
@@ -1337,6 +1379,7 @@ public final class WorldFacade {
         combatStats.atk = derived.atk() + bonus.atk();
         combatStats.def = derived.def() + bonus.def();
         combatStats.res = derived.res() + bonus.res();
+        MOVE_INTENT.get(entity).speedMultiplier = bonus.moveSpeedMultiplier();
         applyMaxHpBonus(entity, bonus.hp());
     }
 

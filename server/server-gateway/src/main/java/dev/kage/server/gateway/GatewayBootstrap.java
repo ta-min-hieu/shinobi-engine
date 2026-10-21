@@ -120,6 +120,7 @@ public final class GatewayBootstrap {
                                 amount * facades.progression().gameEvents().multiplier(GameEventKind.EXP)),
                 metricsContext.networkMetrics());
         wireGoldChangeNotifications(databaseBootstrap, characterRegistry);
+        characterRegistry.skillRanks.bind(databaseBootstrap.wireSkillRankFacade());
         WorldContext worldContext = startWorld(
                 characterRegistry, databaseBootstrap, metricsContext.meterRegistry(), endpoints.metricsPort());
         MainWorldChannelRegistry mainWorldChannels = worldContext.mainWorldChannels();
@@ -316,6 +317,13 @@ public final class GatewayBootstrap {
         // Cùng lý do: "đồng đội cùng World" chỉ tra được khi mọi bảng định tuyến đã có.
         characterRegistry.shareKillRewardsThrough(
                 KillRewardSharing.of(facades.contentFacades().socialFacades().partyFacade(), worldGateway));
+        WorldRouteLookup routes = WorldRouteLookup.of(worldGateway);
+        characterRegistry.pets.bind(
+                facades.inventoryFacade(),
+                facades.progression().gameEvents(),
+                id -> routes.find(id)
+                        .ifPresent(world -> world.applyEquipmentBonus(id, characterRegistry.equipmentBonusOf(id))),
+                (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
         characterRegistry.guildProgress.bind(
                 facades.progression().guildProgression(),
                 facades.contentFacades().socialFacades().mailFacade(),

@@ -39,9 +39,11 @@ final class CharacterLocomotionSystem extends IteratingKSystem {
         StatusEffectComponent status = STATUS_EFFECT.get(entity);
         HealthComponent health = HEALTH.get(entity);
         boolean incapacitated = StatusEffects.isStunned(status) || (health != null && health.isDead());
-        float speed = WorldConstants.MOVE_SPEED_MPS * StatusEffects.moveSpeedMultiplier(status);
+        MoveIntentComponent intent = MOVE_INTENT.get(entity);
+        float speed =
+                WorldConstants.MOVE_SPEED_MPS * intent.speedMultiplier * StatusEffects.moveSpeedMultiplier(status);
         // ADR-033: người chơi chỉ di chuyển ngang — trục y luôn 0, cùng luật với handleMoveIntent.
-        velocity.x = incapacitated ? 0f : MOVE_INTENT.get(entity).dirX * speed;
+        velocity.x = incapacitated ? 0f : intent.dirX * speed;
         velocity.y = 0f;
     }
 }

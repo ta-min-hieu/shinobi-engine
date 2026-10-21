@@ -22,6 +22,7 @@ import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.MoveIntentComponent;
 import dev.kage.server.world.component.NpcComponent;
 import dev.kage.server.world.component.SkillCooldownComponent;
+import dev.kage.server.world.component.SkillRankComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.TargetComponent;
 
@@ -53,6 +54,7 @@ final class WorldComponentTypes {
             MoveIntentComponent.class,
             NpcComponent.class,
             SkillCooldownComponent.class,
+            SkillRankComponent.class,
             StatusEffectComponent.class,
             TargetComponent.class);
 

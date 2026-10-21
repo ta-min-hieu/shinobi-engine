@@ -396,7 +396,7 @@ final class WorldFuzzRun {
         }
         elements.put(id, element);
         focus.remove(id);
-        CharacterEntry entry = new CharacterEntry(id, spawnX, 0f, stats, randomBonus());
+        CharacterEntry entry = new CharacterEntry(id, spawnX, 0f, stats, randomBonus(), SkillRankSnapshot.NONE);
         log(id, "attach(" + entry + ")");
         sink.onSessionStarted(id);
         world.attachCharacter(entry);

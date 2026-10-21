@@ -118,6 +118,29 @@ class CharacterStatusMovementTest {
         world.stop();
     }
 
+    /** ADR-070 — phi kiếm +35% ⇒ ~6,75 m/s thay vì 5 m/s; và nó sống qua lần áp lại chỉ số trang bị. */
+    @Test
+    void flyingSwordShouldSpeedUpRunning_untilItIsTakenOff() {
+        world.start();
+        world.attachCharacter(new CharacterEntry(
+                1L, 0f, 0f, HOA_STATS, new EquipmentBonusSnapshot(0, 0, 0, 0, 35), SkillRankSnapshot.NONE));
+        positionOf(1L);
+        world.enqueueMoveCommand(1L, 1, 1f, 0f);
+
+        sleepQuietly(300);
+        float from = positionOf(1L);
+        sleepQuietly(1000);
+        float mounted = positionOf(1L) - from;
+        world.applyEquipmentBonus(1L, EquipmentBonusSnapshot.NONE);
+        sleepQuietly(300);
+        float plainFrom = positionOf(1L);
+        sleepQuietly(1000);
+        float plain = positionOf(1L) - plainFrom;
+
+        assertThat(mounted).isGreaterThan(6f);
+        assertThat(plain).isLessThan(5.6f);
+    }
+
     @Test
     void shouldStopARunningCharacter_whenItIsStunnedMidRun() {
         world.allowPlayerVersusPlayer();

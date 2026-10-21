@@ -1,0 +1,176 @@
+package dev.kage.server.database.inventory;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.time.Duration;
+import java.util.UUID;
+
+import javax.sql.DataSource;
+
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
+import dev.kage.account.domain.Account;
+import dev.kage.character.domain.Character;
+import dev.kage.character.domain.Faction;
+import dev.kage.character.domain.NewCharacter;
+import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
+import dev.kage.inventory.application.EquipItemUseCase;
+import dev.kage.inventory.application.StorageUseCase;
+import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.inventory.domain.PetProgress;
+import dev.kage.server.database.DatabaseConfig;
+import dev.kage.server.database.FlywayMigrator;
+import dev.kage.server.database.PostgresDataSourceFactory;
+import dev.kage.server.database.account.JdbcAccountTransactionRunner;
+import dev.kage.server.database.account.PostgresAccountAdapter;
+import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
+import dev.kage.server.database.character.PostgresCharacterAdapter;
+
+/** ADR-070/072 trên Postgres thật — tốc độ phi kiếm, EXP + cấp linh thú, chỉ số linh thú theo cấp, chặn kho. */
+@Testcontainers
+class CompanionIntegrationTest {
+
+    private static final int POSTGRES_PORT = 5432;
+    private static final int ANY_LEVEL = 100;
+    private static final String TEMPLATE_ID = "SELECT id FROM item_template WHERE code = ?";
+    private static final String INSERT_ITEM = """
+            INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
+            VALUES (?, ?, 1, 0, 0) RETURNING id
+            """;
+
+    @Container
+    static final PostgreSQLContainer POSTGRES =
+            new PostgreSQLContainer(DockerImageName.parse("postgres:17")).withStartupTimeout(Duration.ofMinutes(2));
+
+    static DataSource dataSource;
+
+    // volatile: @BeforeAll ghi ở luồng JUnit, test đọc từ luồng khác (SpotBugs AT).
+    static volatile long accountId;
+
+    @BeforeAll
+    static void migrate() {
+        dataSource = PostgresDataSourceFactory.create(new DatabaseConfig(
+                POSTGRES.getHost(),
+                POSTGRES.getMappedPort(POSTGRES_PORT),
+                POSTGRES.getDatabaseName(),
+                POSTGRES.getUsername(),
+                POSTGRES.getPassword()));
+        FlywayMigrator.migrate(dataSource);
+        Account[] holder = new Account[1];
+        new JdbcAccountTransactionRunner(dataSource)
+                .inTransaction(tx -> holder[0] = new PostgresAccountAdapter().findOrCreate(tx, "companiontester"));
+        accountId = holder[0].id();
+    }
+
+    @Test
+    void wornFlyingSwordShouldGiveItsSpeed_andNothingElse() {
+        long characterId = createFreshCharacter("MountA");
+        long sword = query(INSERT_ITEM, characterId, query(TEMPLATE_ID, "jade_flying_sword"));
+
+        assertThat(bonuses().moveSpeedPercent(characterId)).isZero();
+        equip(characterId, sword, EquipmentSlotType.MOUNT);
+
+        assertThat(bonuses().moveSpeedPercent(characterId)).isEqualTo(35);
+        assertThat(bonuses().execute(characterId).bonusAtk()).isZero();
+        assertThat(bonuses().execute(characterId).bonusHp()).isZero();
+    }
+
+    @Test
+    void wornPetShouldLevelFromExp_andScaleItsStatsByPetLevel() {
+        long characterId = createFreshCharacter("PetA");
+        long fox = query(INSERT_ITEM, characterId, query(TEMPLATE_ID, "spirit_fox"));
+        CompanionPortUnderTest companions = new CompanionPortUnderTest();
+
+        assertThat(companions.adapter.grantPetExp(characterId, 500L))
+                .as("chưa mặc")
+                .isEmpty();
+        equip(characterId, fox, EquipmentSlotType.PET);
+        int atkAtLevelOne = bonuses().execute(characterId).bonusAtk();
+        PetProgress progress = companions.adapter.grantPetExp(characterId, 350L).orElseThrow();
+
+        assertThat(progress.level()).isEqualTo(3);
+        assertThat(progress.leveledUp()).isTrue();
+        assertThat(companions.adapter.equippedPet(characterId).orElseThrow().level())
+                .isEqualTo(3);
+        assertThat(atkAtLevelOne).isEqualTo(3);
+        assertThat(bonuses().execute(characterId).bonusHp())
+                .as("10 máu gốc × (1 + 10% × 2)")
+                .isEqualTo(12);
+        assertThat(storage().deposit(characterId, fox, 1).outcome())
+                .as("linh thú đã có cấp không vào kho (sẽ mất cấp)")
+                .isIn(StorageUseCase.Outcome.SOCKETED, StorageUseCase.Outcome.EQUIPPED);
+    }
+
+    /** Gói adapter cho dễ đọc. */
+    private static final class CompanionPortUnderTest {
+        final PostgresCompanionAdapter adapter = new PostgresCompanionAdapter(dataSource);
+    }
+
+    private static ComputeEquipmentBonusUseCase bonuses() {
+        return new ComputeEquipmentBonusUseCase(
+                        new PostgresEquipmentAdapter(dataSource),
+                        new PostgresInventoryAdapter(dataSource),
+                        new PostgresItemTemplateAdapter(dataSource),
+                        new PostgresGemAdapter(dataSource))
+                .withCompanions(new PostgresCompanionAdapter(dataSource));
+    }
+
+    private static StorageUseCase storage() {
+        return new StorageUseCase(
+                new StorageUseCase.Ports(
+                        new PostgresInventoryAdapter(dataSource),
+                        new PostgresEquipmentAdapter(dataSource),
+                        new PostgresItemTemplateAdapter(dataSource),
+                        new PostgresInventoryTradeOfferAdapter()),
+                new PostgresStorageAdapter(dataSource),
+                new PostgresAuditAdapter(),
+                new JdbcInventoryTransactionRunner(dataSource));
+    }
+
+    private static void equip(long characterId, long itemId, EquipmentSlotType slot) {
+        assertThat(new EquipItemUseCase(
+                                new PostgresInventoryAdapter(dataSource),
+                                new PostgresItemTemplateAdapter(dataSource),
+                                new PostgresEquipmentAdapter(dataSource),
+                                new JdbcInventoryTransactionRunner(dataSource))
+                        .execute(characterId, itemId, slot, ANY_LEVEL))
+                .isEqualTo(EquipItemUseCase.EquipItemResult.OK);
+    }
+
+    private static long createFreshCharacter(String name) {
+        Character[] holder = new Character[1];
+        new JdbcCharacterTransactionRunner(dataSource)
+                .inTransaction(tx -> holder[0] = new PostgresCharacterAdapter(dataSource)
+                        .create(
+                                tx,
+                                new NewCharacter(
+                                        accountId,
+                                        name,
+                                        Faction.HOA,
+                                        UUID.randomUUID().toString())));
+        return holder[0].id();
+    }
+
+    private static long query(String sql, Object... params) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(sql)) {
+            for (int i = 0; i < params.length; i++) {
+                statement.setObject(i + 1, params[i]);
+            }
+            try (ResultSet rs = statement.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : 0L;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Lỗi test-only: " + sql, e);
+        }
+    }
+}

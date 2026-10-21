@@ -76,6 +76,8 @@ enum Opcode {
   // ADR-067 — sự kiện nhân đôi EXP/rơi đồ đang chạy (cả server). Gửi lúc vào world nếu có và mỗi lần
   // ADMIN bật/tắt. Chỉ thêm, protocolVersion không tăng.
   OPCODE_GAME_EVENTS_CHANGED_EVENT = 309;
+  // ADR-070 — tốc độ phi kiếm của CHÍNH mình (dự đoán di chuyển). Gửi lúc vào world + sau mỗi lần mặc/gỡ đồ.
+  OPCODE_MOVE_SPEED_CHANGED_EVENT = 310;
 
   // --- Combat / Skill (400-499) ---
   OPCODE_SET_TARGET_COMMAND = 400;
@@ -89,6 +91,11 @@ enum Opcode {
   // ADR-046 — HP của một entity vừa đổi mà KHÔNG do đòn đánh nào (hồi máu ngoài chiến đấu,
   // vùng an toàn, đan dược, quái về tới điểm spawn). Xem combat.proto HealthChangedEvent.
   OPCODE_HEALTH_CHANGED_EVENT = 408;
+  // ADR-071 — điểm công pháp: liệt kê bậc chiêu + nâng một bậc. Chỉ thêm, protocolVersion không tăng.
+  OPCODE_LIST_SKILL_RANKS_REQUEST = 409;
+  OPCODE_LIST_SKILL_RANKS_RESPONSE = 410;
+  OPCODE_UPGRADE_SKILL_COMMAND = 411;
+  OPCODE_UPGRADE_SKILL_RESPONSE = 412;
 
   // --- Inventory / Equipment (500-599) ---
   OPCODE_ITEM_GRANTED_EVENT = 500;

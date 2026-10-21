@@ -98,7 +98,12 @@ class ContentReferenceIntegrationTest {
             "spirit_jade_water",
             "spirit_jade_wood",
             // Lô 17 (2026-10-21) — Tẩy Căn Đan (ADR-066) lên trước art.
-            "faction_change_pill");
+            "faction_change_pill",
+            // ADR-070/072 — phi kiếm + linh thú lên trước art.
+            "wooden_flying_sword",
+            "jade_flying_sword",
+            "spirit_fox",
+            "spirit_turtle");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

@@ -144,3 +144,45 @@ message HealthChangedEvent {
   int32 current_hp = 2;
   int32 max_hp = 3;
 }
+
+// ---- ADR-071 — điểm công pháp ----
+
+// Request: Client -> Server (OPCODE_LIST_SKILL_RANKS_REQUEST = 409). Không field — characterId từ session.
+message ListSkillRanksRequest {}
+
+// Một chiêu của linh căn hiện tại.
+message SkillRankView {
+  string skill_code = 1;
+  int32 slot_index = 2;
+  int32 rank = 3;            // 1..max_rank
+  int32 max_rank = 4;
+  int32 required_level = 5;
+  bool unlocked = 6;         // đủ cấp mở chiêu
+}
+
+// Response: Server -> Client (OPCODE_LIST_SKILL_RANKS_RESPONSE = 410).
+message ListSkillRanksResponse {
+  repeated SkillRankView skills = 1;
+  int32 points_total = 2;
+  int32 points_available = 3;
+}
+
+// Command: Client -> Server (OPCODE_UPGRADE_SKILL_COMMAND = 411). Server kiểm linh căn, cấp, bậc, điểm.
+message UpgradeSkillCommand {
+  string skill_code = 1;
+}
+
+enum UpgradeSkillOutcome {
+  UPGRADE_SKILL_OUTCOME_UNSPECIFIED = 0;
+  UPGRADE_SKILL_OUTCOME_OK = 1;
+  UPGRADE_SKILL_OUTCOME_UNKNOWN_SKILL = 2;
+  UPGRADE_SKILL_OUTCOME_LEVEL_TOO_LOW = 3;
+  UPGRADE_SKILL_OUTCOME_MAX_RANK = 4;
+  UPGRADE_SKILL_OUTCOME_NO_POINTS = 5;
+}
+
+// Response: Server -> Client (OPCODE_UPGRADE_SKILL_RESPONSE = 412). sheet luôn là trạng thái MỚI NHẤT.
+message UpgradeSkillResponse {
+  UpgradeSkillOutcome outcome = 1;
+  ListSkillRanksResponse sheet = 2;
+}

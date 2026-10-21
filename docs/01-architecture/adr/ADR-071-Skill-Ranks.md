@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | ✅ **Accepted** (2026-10-21) — chủ dự án chọn "Điểm công pháp" trong lượt hỏi lô 17 (AskUserQuestion; mô tả kèm: mỗi tầng cảnh giới cho điểm; nâng cấp công pháp bằng điểm; phím K). Câu hỏi mở theo khuyến nghị. AI soạn văn bản sau khi được chọn. |
+| Status | ✅ **Accepted** (2026-10-21) — chủ dự án chọn "Điểm công pháp" trong lượt hỏi lô 17 (AskUserQuestion; mô tả kèm: mỗi tầng cảnh giới cho điểm; nâng cấp công pháp bằng điểm; phím K — khi làm thì K đã thuộc Luận Kiếm nên dùng R). Câu hỏi mở theo khuyến nghị. AI soạn văn bản sau khi được chọn. |
 | Date | 2026-10-21 |
 | Deciders | Chủ dự án quyết; AI soạn |
 | Related | [GDD §5](../../13-game-design/GAME-DESIGN-DOCUMENT.md) ("Điểm công pháp từ cảnh giới + nhiệm vụ — không mua bằng tiền thật") · [ADR-066](ADR-066-Faction-Change.md) |
@@ -27,7 +27,7 @@ từ `SkillRegistry` của server-world (gateway hỏi `WorldFacade.skillsOf`). 
 **D5 — Giao thức, chỉ thêm**: 409/410 `ListSkillRanksRequest/Response`, 411/412 `UpgradeSkillCommand/Response`.
 World nhận bậc qua `CharacterEntry` (mọi đường attach) và `enqueueSkillRanks` sau khi nâng.
 
-**D6 — Client**: cửa sổ "Công pháp" phím **K** — 4 dòng chiêu kèm bậc và nút "Nâng".
+**D6 — Client**: cửa sổ "Công pháp" phím **R** (K đã là phím Luận Kiếm) — 4 dòng chiêu kèm bậc và nút "Nâng".
 
 ## Alternatives Considered
 

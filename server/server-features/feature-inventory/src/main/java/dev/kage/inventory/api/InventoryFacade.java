@@ -2,6 +2,7 @@ package dev.kage.inventory.api;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Supplier;
@@ -23,6 +24,7 @@ import dev.kage.inventory.domain.InventorySnapshot;
 import dev.kage.inventory.domain.ItemCatalog;
 import dev.kage.inventory.domain.ItemSetProgress;
 import dev.kage.inventory.domain.ItemStack;
+import dev.kage.inventory.domain.PetProgress;
 import dev.kage.inventory.domain.StoredItem;
 
 /**
@@ -174,6 +176,21 @@ public final class InventoryFacade {
      */
     public EquipmentBonus computeEquipmentBonus(long characterId) {
         return computeEquipmentBonusUseCase.execute(characterId);
+    }
+
+    /** Phần trăm tốc độ phi kiếm đang mặc (ADR-070) — chỉ đọc. */
+    public int moveSpeedPercent(long characterId) {
+        return computeEquipmentBonusUseCase.moveSpeedPercent(characterId);
+    }
+
+    /** Linh thú đang mặc nhận EXP như chủ nhân (ADR-072); rỗng nếu không mặc con nào. */
+    public Optional<PetProgress> grantPetExp(long characterId, long amount) {
+        return computeEquipmentBonusUseCase.companions().grantPetExp(characterId, amount);
+    }
+
+    /** Linh thú đang mặc và tiến độ của nó (ADR-072) — chỉ đọc. */
+    public Optional<PetProgress> equippedPet(long characterId) {
+        return computeEquipmentBonusUseCase.companions().equippedPet(characterId);
     }
 
     /** Bộ pháp khí đang mặc ít nhất một món (ADR-065) — chỉ đọc, cho bảng nhân vật. */

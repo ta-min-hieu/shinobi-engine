@@ -11,6 +11,7 @@ import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.CharacterEntry;
 import dev.kage.server.world.Element;
 import dev.kage.server.world.EquipmentBonusSnapshot;
+import dev.kage.server.world.SkillRankSnapshot;
 import dev.kage.server.world.WorldFacade;
 
 /**
@@ -31,7 +32,18 @@ import dev.kage.server.world.WorldFacade;
  * @param baseStats chỉ số nền (STR/AGI/INT/VIT, hệ, cấp)
  * @param equipmentBonus tổng chỉ số trang bị đang mặc, đã tính cường hoá
  */
-record CharacterLoadout(CharacterBaseStats baseStats, EquipmentBonusSnapshot equipmentBonus) {
+record CharacterLoadout(
+        CharacterBaseStats baseStats, EquipmentBonusSnapshot equipmentBonus, SkillRankSnapshot skillRanks) {
+
+    /** Không kèm bậc chiêu — đường chọn nhân vật tự nạp bậc ngay sau (xem {@link #withSkillRanks}). */
+    CharacterLoadout(CharacterBaseStats baseStats, EquipmentBonusSnapshot equipmentBonus) {
+        this(baseStats, equipmentBonus, SkillRankSnapshot.NONE);
+    }
+
+    /** Bản kèm bậc chiêu (ADR-071). */
+    CharacterLoadout withSkillRanks(SkillRankSnapshot ranks) {
+        return new CharacterLoadout(baseStats, equipmentBonus, ranks);
+    }
 
     /**
      * Đọc chỉ số nền và trang bị hiện tại từ DB. Chạm DB — chỉ gọi trên Virtual Thread
@@ -47,7 +59,10 @@ record CharacterLoadout(CharacterBaseStats baseStats, EquipmentBonusSnapshot equ
         int level = character.map(Character::level).orElse(1);
         CharacterBaseStats baseStats =
                 new CharacterBaseStats(stats.str(), stats.agi(), stats.intelligence(), stats.vit(), element, level);
-        return new CharacterLoadout(baseStats, registry.equipmentBonusOf(characterId));
+        return new CharacterLoadout(
+                baseStats,
+                registry.equipmentBonusOf(characterId),
+                registry.skillRanks.snapshotFor(characterId, element));
     }
 
     /**
@@ -68,13 +83,14 @@ record CharacterLoadout(CharacterBaseStats baseStats, EquipmentBonusSnapshot equ
      * Bản dịch {@code feature-inventory} → {@code server-world} (ADR-036 D2): server-world không
      * biết feature nào tồn tại (Điều 23), nên bản dịch phải nằm ở gateway — và chỉ MỘT bản.
      */
-    static EquipmentBonusSnapshot snapshotOf(EquipmentBonus bonus) {
-        return new EquipmentBonusSnapshot(bonus.bonusAtk(), bonus.bonusDef(), bonus.bonusRes(), bonus.bonusHp());
+    static EquipmentBonusSnapshot snapshotOf(EquipmentBonus bonus, int moveSpeedPercent) {
+        return new EquipmentBonusSnapshot(
+                bonus.bonusAtk(), bonus.bonusDef(), bonus.bonusRes(), bonus.bonusHp(), moveSpeedPercent);
     }
 
     /** Lệnh attach KÈM trang bị tại {@code at} — mọi đường vào World đi qua đây. */
     CharacterEntry entryAt(long characterId, PositionSnapshot at) {
-        return new CharacterEntry(characterId, at.x(), at.y(), baseStats, equipmentBonus);
+        return new CharacterEntry(characterId, at.x(), at.y(), baseStats, equipmentBonus, skillRanks);
     }
 
     /** Máu tối đa hiệu lực — cũng là máu lúc vào World mới (attach luôn cho máu đầy). */

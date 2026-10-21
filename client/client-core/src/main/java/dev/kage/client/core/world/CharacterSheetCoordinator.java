@@ -13,6 +13,7 @@ import dev.kage.protocol.GetCharacterStatsRequest;
 import dev.kage.protocol.GetCharacterStatsResponse;
 import dev.kage.protocol.ItemSetProgressView;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.PetView;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -26,11 +27,13 @@ final class CharacterSheetCoordinator implements WindowFlow {
 
     private final ReportPanel panel;
     private final WorldCommandSender sender;
+    private final ItemCatalogCoordinator itemCatalog;
     private final I18NBundle i18n = KageI18n.load();
 
-    CharacterSheetCoordinator(ReportPanel panel, WorldCommandSender sender) {
+    CharacterSheetCoordinator(ReportPanel panel, WorldCommandSender sender, ItemCatalogCoordinator itemCatalog) {
         this.panel = panel;
         this.sender = sender;
+        this.itemCatalog = itemCatalog;
         panel.setOnRefresh(this::request);
         panel.setStatus(text("charsheet.hint.open"));
     }
@@ -81,6 +84,12 @@ final class CharacterSheetCoordinator implements WindowFlow {
         rows.add(row(
                 format("charsheet.row.accuracy", percent(stats.getHitPermille()), percent(stats.getDodgePermille()))));
         rows.add(row(format("charsheet.row.crit", percent(stats.getCritPermille()), stats.getCritDamagePercent())));
+        if (stats.getMoveSpeedPercent() > 0) {
+            rows.add(row(format("charsheet.row.move_speed", stats.getMoveSpeedPercent())));
+        }
+        if (stats.hasPet()) {
+            rows.add(row(petLine(stats.getPet())));
+        }
         for (ItemSetProgressView set : stats.getItemSetsList()) {
             rows.add(row(format(
                     "charsheet.row.item_set",
@@ -93,6 +102,17 @@ final class CharacterSheetCoordinator implements WindowFlow {
                     set.getBonusHp())));
         }
         return rows;
+    }
+
+    /** ADR-072 — tên linh thú tra qua catalog (server chỉ gửi id mẫu). */
+    private String petLine(PetView pet) {
+        String name = itemCatalog
+                .nameKey(pet.getItemTemplateId())
+                .map(this::text)
+                .orElseGet(() -> "#" + pet.getItemTemplateId());
+        return pet.getExpToNext() == 0
+                ? format("charsheet.row.pet_max", name, pet.getLevel())
+                : format("charsheet.row.pet", name, pet.getLevel(), pet.getExpIntoLevel(), pet.getExpToNext());
     }
 
     private static ReportPanel.Row row(String text) {

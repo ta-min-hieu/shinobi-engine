@@ -100,6 +100,12 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-069 — lượt hạ quái vào nhiệm vụ bang tuần; ADR-068 — báo bang lên cấp. */
     final GuildProgressHooks guildProgress = GuildProgressHooks.unbound();
 
+    /** ADR-072 — linh thú đang mặc nhận EXP cùng chủ nhân. */
+    final PetHooks pets = new PetHooks();
+
+    /** ADR-071 — bậc chiêu cho mọi đường attach ({@link CharacterLoadout}). */
+    final SkillRankSource skillRanks = new SkillRankSource();
+
     ConnectedCharacterRegistry(
             InventoryFacade inventoryFacade,
             QuestFacade questFacade,
@@ -619,6 +625,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
             return;
         }
         sendExperience(killerCharacterId, experienceGrant.grantExperience(killerCharacterId, reward));
+        pets.onExperience(killerCharacterId, reward);
     }
 
     /**
@@ -697,7 +704,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      * trên EventLoop.
      */
     EquipmentBonusSnapshot equipmentBonusOf(long characterId) {
-        return CharacterLoadout.snapshotOf(inventoryFacade.computeEquipmentBonus(characterId));
+        return CharacterLoadout.snapshotOf(
+                inventoryFacade.computeEquipmentBonus(characterId), inventoryFacade.moveSpeedPercent(characterId));
     }
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {

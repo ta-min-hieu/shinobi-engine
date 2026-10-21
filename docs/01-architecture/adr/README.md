@@ -101,6 +101,9 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-067](ADR-067-Double-Events.md) | Sự kiện nhân đôi EXP/rơi đồ — `/gm event` (ADMIN), sống qua khởi động lại (V69, opcode 309) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD §8 sự kiện bật/tắt không deploy |
 | [ADR-068](ADR-068-Guild-Level-And-Contribution.md) | Cấp bang 1–5 + cống hiến — góp linh thạch bội số 1.000 (sink), sĩ số 50+10/cấp, thẻ Bang hội ở Bia Anh Danh (V70, opcode 721/722) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | Bang không có gì để cùng cày; GDD §7 cấp bang |
 | [ADR-069](ADR-069-Guild-Weekly-Quest.md) | Nhiệm vụ bang tuần — cả bang hạ 300 yêu thú/tuần, thưởng thư 2.000 mỗi thành viên + 5.000 kinh nghiệm bang (V70) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD §7/§8 nhiệm vụ bang hợp tác |
+| [ADR-070](ADR-070-Flying-Sword-Mount.md) | Phi kiếm — ô trang bị MOUNT, chỉ +% tốc độ (V71, opcode 310, `EQUIPMENT_SLOT_MOUNT`) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD §5 phi kiếm chỉ tốc độ |
+| [ADR-071](ADR-071-Skill-Ranks.md) | Điểm công pháp — cấp/2 điểm, bậc chiêu 1–5 (+10%/bậc), cửa sổ phím R (V72, opcode 409–412) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD §5 điểm công pháp |
+| [ADR-072](ADR-072-Spirit-Pets.md) | Linh thú bản đầu — ô trang bị PET, cấp 1–30 theo EXP chủ nhân, chỉ số +10%/cấp (V71, `pet_state`) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD §5 linh thú |
 ---
 
 ## ADR cần tạo (chưa viết)

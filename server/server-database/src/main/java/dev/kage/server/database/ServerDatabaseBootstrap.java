@@ -13,12 +13,14 @@ import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.achievement.api.AchievementFacade;
 import dev.kage.achievement.application.AchievementUseCase;
 import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.api.SkillRankFacade;
 import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.application.SelectFactionUseCase;
+import dev.kage.character.application.SkillRankUseCase;
 import dev.kage.chat.api.ChatFacade;
 import dev.kage.chat.application.SendChatMessageUseCase;
 import dev.kage.checkin.api.CheckInFacade;
@@ -104,6 +106,7 @@ import dev.kage.server.database.achievement.PostgresAchievementAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.character.PostgresFactionChangeAdapter;
+import dev.kage.server.database.character.PostgresSkillRankAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.chat.PostgresChatMuteAdapter;
 import dev.kage.server.database.checkin.PostgresCheckInAdapter;
@@ -117,6 +120,7 @@ import dev.kage.server.database.guild.PostgresGuildAdapter;
 import dev.kage.server.database.guild.PostgresGuildProgressionAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
+import dev.kage.server.database.inventory.PostgresCompanionAdapter;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
 import dev.kage.server.database.inventory.PostgresEquipmentAdapter;
 import dev.kage.server.database.inventory.PostgresGemAdapter;
@@ -272,9 +276,8 @@ public final class ServerDatabaseBootstrap {
         UnequipItemUseCase unequipItemUseCase =
                 new UnequipItemUseCase(equipmentPort, transactionRunner).guardedBy(inventoryPort);
         PostgresGemAdapter gemPort = new PostgresGemAdapter(dataSource);
-        ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase = new ComputeEquipmentBonusUseCase(
-                        equipmentPort, inventoryPort, itemTemplatePort, gemPort)
-                .withItemSets(new PostgresItemSetAdapter(dataSource));
+        ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase =
+                equipmentBonus(equipmentPort, inventoryPort, itemTemplatePort, gemPort);
         EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
         EnhancePorts enhancePorts = new EnhancePorts(
@@ -537,10 +540,27 @@ public final class ServerDatabaseBootstrap {
         return new ChatFacade(new SendChatMessageUseCase(auditPort), new PostgresChatMuteAdapter(dataSource));
     }
 
+    /** ADR-071 — điểm công pháp (bậc chiêu). */
+    public SkillRankFacade wireSkillRankFacade() {
+        return new SkillRankFacade(new SkillRankUseCase(
+                new PostgresSkillRankAdapter(dataSource), new JdbcCharacterTransactionRunner(dataSource)));
+    }
+
     /** ADR-068/069 — cấp bang, cống hiến, nhiệm vụ tuần. */
     public GuildProgressionFacade wireGuildProgressionFacade() {
         return new GuildProgressionFacade(
                 new GuildProgressionUseCase(new PostgresGuildProgressionAdapter(dataSource), Clock.systemUTC()));
+    }
+
+    /** Chỉ số trang bị kèm Linh Ngọc, bộ pháp khí (ADR-065), phi kiếm + linh thú (ADR-070/072). */
+    private ComputeEquipmentBonusUseCase equipmentBonus(
+            PostgresEquipmentAdapter equipmentPort,
+            PostgresInventoryAdapter inventoryPort,
+            PostgresItemTemplateAdapter itemTemplatePort,
+            PostgresGemAdapter gemPort) {
+        return new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort, gemPort)
+                .withItemSets(new PostgresItemSetAdapter(dataSource))
+                .withCompanions(new PostgresCompanionAdapter(dataSource));
     }
 
     /** Rơi đồ có audit (2026-10-11) và số lượt roll theo sự kiện nhân đôi (ADR-067). */

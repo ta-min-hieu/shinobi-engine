@@ -122,7 +122,8 @@ class WorldSimulationRegressionTest {
         sink.onSessionStarted(2L);
         CharacterBaseStats sureHitter = new CharacterBaseStats(1, 100, 1, 1, Element.HOA, 1);
         CharacterBaseStats neverDodges = new CharacterBaseStats(1, 0, 1, 1, Element.HOA, 1);
-        world.attachCharacter(new CharacterEntry(1L, 0f, 0f, neverDodges, new EquipmentBonusSnapshot(0, 0, 0, 1000)));
+        world.attachCharacter(new CharacterEntry(
+                1L, 0f, 0f, neverDodges, new EquipmentBonusSnapshot(0, 0, 0, 1000), SkillRankSnapshot.NONE));
         world.attachCharacter(CharacterEntry.withoutEquipment(2L, 1f, 0f, sureHitter));
         world.setTarget(2L, 1L);
         world.attack(2L);

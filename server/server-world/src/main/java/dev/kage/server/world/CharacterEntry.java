@@ -16,11 +16,17 @@ package dev.kage.server.world;
  *     attach của gateway đều truyền bonus thật từ 2026-09-29
  */
 public record CharacterEntry(
-        long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats, EquipmentBonusSnapshot bonus) {
+        long characterId,
+        float spawnX,
+        float spawnY,
+        CharacterBaseStats baseStats,
+        EquipmentBonusSnapshot bonus,
+        SkillRankSnapshot skillRanks) {
 
     /** Vào world KHÔNG kèm chỉ số trang bị — chỉ cho test. */
     public static CharacterEntry withoutEquipment(
             long characterId, float spawnX, float spawnY, CharacterBaseStats baseStats) {
-        return new CharacterEntry(characterId, spawnX, spawnY, baseStats, EquipmentBonusSnapshot.NONE);
+        return new CharacterEntry(
+                characterId, spawnX, spawnY, baseStats, EquipmentBonusSnapshot.NONE, SkillRankSnapshot.NONE);
     }
 }

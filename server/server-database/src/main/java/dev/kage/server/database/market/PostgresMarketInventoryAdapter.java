@@ -21,7 +21,8 @@ public final class PostgresMarketInventoryAdapter implements MarketInventoryPort
     private static final String SELECT_FOR_UPDATE = "SELECT ii.item_template_id, ii.quantity, ii.enhance_level, "
             + TradeOfferedQuantity.OF_II
             + " AS offered, EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = ii.id) AS equipped,"
-            + " EXISTS (SELECT 1 FROM item_socket s WHERE s.inventory_item_id = ii.id) AS socketed"
+            + " (EXISTS (SELECT 1 FROM item_socket s WHERE s.inventory_item_id = ii.id)"
+            + " OR EXISTS (SELECT 1 FROM pet_state p WHERE p.inventory_item_id = ii.id)) AS socketed"
             + " FROM inventory_item ii WHERE ii.id = ? AND ii.character_id = ? FOR UPDATE OF ii";
 
     private static final String DECREMENT = "UPDATE inventory_item SET quantity = quantity - ? WHERE id = ?";

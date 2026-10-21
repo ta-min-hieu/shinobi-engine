@@ -34,7 +34,12 @@ import dev.kage.server.database.JdbcOperations;
 public final class PostgresInventoryAdapter implements InventoryPort {
 
     /** ADR-064 D5 — món đang khảm Linh Ngọc. */
-    private static final String IS_SOCKETED = "SELECT COUNT(*) FROM item_socket WHERE inventory_item_id = ?";
+    // ADR-072 D3 — linh thú đã có cấp (dòng pet_state) chịu cùng luật với món đã khảm: đường dời bằng xoá/tạo dòng
+    // sẽ làm mất nó.
+    private static final String IS_SOCKETED = """
+            SELECT (SELECT COUNT(*) FROM item_socket WHERE inventory_item_id = ?)
+                 + (SELECT COUNT(*) FROM pet_state WHERE inventory_item_id = ?)
+            """;
 
     // Sức chứa túi đồ — PLACEHOLDER, GDD chưa chốt (cùng tinh thần STARTING_STAT ở
     // PostgresCharacterAdapter). Chưa đọc từ character (level/VIP...) — lát cắt sau nếu cần.
@@ -205,7 +210,8 @@ public final class PostgresInventoryAdapter implements InventoryPort {
 
     @Override
     public boolean isSocketed(Transaction tx, long itemId) {
-        return JdbcOperations.queryOne(((JdbcTransaction) tx).connection(), IS_SOCKETED, rs -> rs.getInt(1), itemId)
+        return JdbcOperations.queryOne(
+                                ((JdbcTransaction) tx).connection(), IS_SOCKETED, rs -> rs.getInt(1), itemId, itemId)
                         .orElse(0)
                 > 0;
     }

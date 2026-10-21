@@ -168,3 +168,9 @@ message GameEventView {
 message GameEventsChangedEvent {
   repeated GameEventView events = 1;
 }
+
+// Event: Server -> Client (OPCODE_MOVE_SPEED_CHANGED_EVENT = 310). ADR-070 — phần trăm tốc độ cộng thêm của phi
+// kiếm đang mặc (0 = không có). Server vẫn là bên quyết vị trí; con số này chỉ để client dự đoán đúng.
+message MoveSpeedChangedEvent {
+  int32 move_speed_percent = 1;
+}

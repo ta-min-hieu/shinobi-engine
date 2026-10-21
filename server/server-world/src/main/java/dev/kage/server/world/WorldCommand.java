@@ -122,6 +122,9 @@ sealed interface WorldCommand {
      */
     record ChangeCharacterElementCommand(long characterId, Element element) implements WorldCommand {}
 
+    /** ADR-071 — bậc chiêu theo ô của linh căn hiện tại vừa đổi (nâng bậc, đổi linh căn). */
+    record SetSkillRanksCommand(long characterId, SkillRankSnapshot ranks) implements WorldCommand {}
+
     /**
      * Mốc chặn hàng đợi — không đổi gì trong ECS, chỉ gọi {@code onReached} khi tick thread đã xử lý
      * xong mọi lệnh xếp TRƯỚC nó. Xem {@link WorldFacade#inboxBarrier()}. Mang callback chứ không

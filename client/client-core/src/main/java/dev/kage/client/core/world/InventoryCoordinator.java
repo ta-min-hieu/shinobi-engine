@@ -2,6 +2,7 @@ package dev.kage.client.core.world;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BooleanSupplier;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
@@ -52,7 +53,10 @@ final class InventoryCoordinator implements WindowFlow {
      */
     record DataSources(ItemCatalogCoordinator itemCatalog, GoldCoordinator gold, ChatCoordinator notices) {}
 
-    /** 7 slot trang bị THẬT — loại {@code EQUIPMENT_SLOT_UNSPECIFIED} (sentinel, không dùng cho lệnh thật). */
+    /**
+     * 9 slot trang bị THẬT (7 gốc + phi kiếm ADR-070, linh thú ADR-072) — loại
+     * {@code EQUIPMENT_SLOT_UNSPECIFIED} (sentinel, không dùng cho lệnh thật).
+     */
     private static final List<EquipmentSlot> REAL_SLOTS = List.of(
             EquipmentSlot.EQUIPMENT_SLOT_WEAPON,
             EquipmentSlot.EQUIPMENT_SLOT_ARMOR,
@@ -60,7 +64,9 @@ final class InventoryCoordinator implements WindowFlow {
             EquipmentSlot.EQUIPMENT_SLOT_GLOVE,
             EquipmentSlot.EQUIPMENT_SLOT_BOOT,
             EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_1,
-            EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_2);
+            EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_2,
+            EquipmentSlot.EQUIPMENT_SLOT_MOUNT,
+            EquipmentSlot.EQUIPMENT_SLOT_PET);
 
     private final InventoryController controller = new InventoryController();
     private final InventoryPanel panel;
@@ -519,18 +525,21 @@ final class InventoryCoordinator implements WindowFlow {
         return hidden <= 0 ? "" : format("inventory.list.truncated", hidden);
     }
 
+    /** Bảng tra thay switch (trần CyclomaticComplexity của PMD từ khi có 9 ô). */
+    private static final Map<EquipmentSlot, String> SLOT_NAME_KEYS = Map.of(
+            EquipmentSlot.EQUIPMENT_SLOT_WEAPON, "equipment.slot.weapon",
+            EquipmentSlot.EQUIPMENT_SLOT_ARMOR, "equipment.slot.armor",
+            EquipmentSlot.EQUIPMENT_SLOT_HELMET, "equipment.slot.helmet",
+            EquipmentSlot.EQUIPMENT_SLOT_GLOVE, "equipment.slot.glove",
+            EquipmentSlot.EQUIPMENT_SLOT_BOOT, "equipment.slot.boot",
+            EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_1, "equipment.slot.accessory_1",
+            EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_2, "equipment.slot.accessory_2",
+            EquipmentSlot.EQUIPMENT_SLOT_MOUNT, "equipment.slot.mount",
+            EquipmentSlot.EQUIPMENT_SLOT_PET, "equipment.slot.pet");
+
     private static String slotNameKey(EquipmentSlot slot) {
-        return switch (slot) {
-            case EQUIPMENT_SLOT_WEAPON -> "equipment.slot.weapon";
-            case EQUIPMENT_SLOT_ARMOR -> "equipment.slot.armor";
-            case EQUIPMENT_SLOT_HELMET -> "equipment.slot.helmet";
-            case EQUIPMENT_SLOT_GLOVE -> "equipment.slot.glove";
-            case EQUIPMENT_SLOT_BOOT -> "equipment.slot.boot";
-            case EQUIPMENT_SLOT_ACCESSORY_1 -> "equipment.slot.accessory_1";
-            case EQUIPMENT_SLOT_ACCESSORY_2 -> "equipment.slot.accessory_2";
-            // UNSPECIFIED/UNRECOGNIZED không xuất hiện ở đây — REAL_SLOTS đã lọc trước.
-            default -> "inventory.error.unknown";
-        };
+        // UNSPECIFIED/UNRECOGNIZED không xuất hiện ở đây — REAL_SLOTS đã lọc trước.
+        return SLOT_NAME_KEYS.getOrDefault(slot, "inventory.error.unknown");
     }
 
     private String goldText() {

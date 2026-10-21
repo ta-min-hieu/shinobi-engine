@@ -42,4 +42,7 @@ final class SkillConstants {
     static final int ULTIMATE_REQUIRED_LEVEL = 50;
 
     private SkillConstants() {}
+
+    /** ADR-071 — mỗi bậc chiêu trên 1 tăng con số chiêu thức chừng này (khớp {@code SkillRankPolicy}). */
+    static final double SKILL_RANK_BONUS_PER_RANK = 0.10;
 }

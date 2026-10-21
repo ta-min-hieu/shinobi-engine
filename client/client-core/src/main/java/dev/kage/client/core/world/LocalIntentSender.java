@@ -32,6 +32,9 @@ final class LocalIntentSender {
 
     private final LocalIntentContext context;
 
+    /** ADR-070 — hệ số tốc độ phi kiếm theo lời server (1 = không có); chỉ để dự đoán. */
+    private float speedMultiplier = 1f;
+
     /** Hướng đi gửi lần cuối — chỉ gửi lại khi ĐỔI, không phải mỗi tick (60 gói/giây là vô nghĩa). */
     private float lastSentDirX;
 
@@ -79,6 +82,11 @@ final class LocalIntentSender {
         lastSentDirX = 0f;
     }
 
+    /** ADR-070 D4 — server vừa báo tốc độ phi kiếm (phần trăm cộng thêm). */
+    void onMoveSpeedPercent(int percent) {
+        speedMultiplier = 1f + Math.max(0, percent) / 100f;
+    }
+
     /** Gọi mỗi tick cố định từ {@code WorldScreen#fixedUpdate}. */
     void tick(float fixedDeltaTime) {
         updateMovement();
@@ -111,7 +119,7 @@ final class LocalIntentSender {
         }
 
         VelocityComponent velocity = VELOCITY.get(context.localPlayer());
-        velocity.x = dirX * WorldConstants.MOVE_SPEED_MPS;
+        velocity.x = dirX * WorldConstants.MOVE_SPEED_MPS * speedMultiplier;
         velocity.y = 0f;
 
         if (dirX != lastSentDirX) {

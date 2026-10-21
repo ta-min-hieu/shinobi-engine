@@ -31,6 +31,7 @@ import dev.kage.server.world.component.CombatRecencyComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.SkillCooldownComponent;
+import dev.kage.server.world.component.SkillRankComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
 import dev.kage.server.world.component.StatusEffectType;
 
@@ -84,6 +85,9 @@ final class SkillSystem extends IteratingKSystem {
     /** Gộp tham số 1 lần cast ĐÃ resolve xong mục tiêu — tránh vượt giới hạn 4 tham số/method. */
     private record CastContext(
             SkillDefinition definition, long casterId, long targetId, KEntity caster, KEntity target) {}
+
+    private static final ComponentMapper<SkillRankComponent> SKILL_RANK =
+            ComponentMapper.getFor(SkillRankComponent.class);
 
     private static final ComponentMapper<CombatRecencyComponent> RECENCY =
             ComponentMapper.getFor(CombatRecencyComponent.class);
@@ -198,7 +202,7 @@ final class SkillSystem extends IteratingKSystem {
             return;
         }
         consumeCooldownAndChi(caster, definition);
-        applyScriptEffect(ctx, casterStats, scriptEffect.get());
+        applyScriptEffect(ctx, casterStats, ranked(scriptEffect.get(), caster, definition));
     }
 
     /**
@@ -281,6 +285,23 @@ final class SkillSystem extends IteratingKSystem {
             return null;
         }
         return new CastContext(definition, casterId, resolvedTargetId, caster, target);
+    }
+
+    /**
+     * ADR-071 — bậc chiêu nhân con số sát thương/hồi máu/khiên (+10% mỗi bậc trên 1). Buff/debuff giữ nguyên:
+     * độ lớn của chúng là phần trăm chỉ số, nhân thêm là đổi luật cân bằng khác hẳn. Quái không có bậc.
+     */
+    private static ScriptEffect ranked(ScriptEffect effect, KEntity caster, SkillDefinition definition) {
+        if (!SKILL_RANK.has(caster) || "buff".equals(effect.effect()) || "debuff".equals(effect.effect())) {
+            return effect;
+        }
+        int rank = SKILL_RANK.get(caster).ranks[definition.slotIndex()];
+        if (rank <= 1) {
+            return effect;
+        }
+        double factor = 1.0 + SkillConstants.SKILL_RANK_BONUS_PER_RANK * (rank - 1);
+        return new ScriptEffect(
+                effect.effect(), effect.value() * factor, effect.stat(), effect.duration(), effect.armorPierce());
     }
 
     private void applyScriptEffect(

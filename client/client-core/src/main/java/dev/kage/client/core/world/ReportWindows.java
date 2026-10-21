@@ -11,7 +11,7 @@ import dev.kage.client.core.ui.theme.KageSkin;
 /**
  * Sáu cửa sổ dựng từ {@link ReportPanel}: Bảng nhân vật (phím C, ADR-056), Bia Anh Danh (phím L, ADR-057),
  * kho đồ tông môn (không phím — mở qua hội thoại, ADR-061), Thành tựu (phím U, ADR-062) và phường thị (phím
- * O, ADR-063), khảm Linh Ngọc (phím V, ADR-064). Gom lại để
+ * O, ADR-063), khảm Linh Ngọc (phím V, ADR-064), Công pháp (phím R, ADR-071). Gom lại để
  * constructor {@code WorldScreen} không vượt trần {@code MethodLength}.
  */
 record ReportWindows(
@@ -26,7 +26,9 @@ record ReportWindows(
         ReportPanel marketPanel,
         MarketCoordinator market,
         ReportPanel gemPanel,
-        GemCoordinator gems) {
+        GemCoordinator gems,
+        ReportPanel skillRankPanel,
+        SkillRankCoordinator skillRanks) {
 
     /**
      * Luồng nền các cửa sổ này mượn: catalog vật phẩm (tên món), nhật ký chat (báo mở thành tựu, đã bán), và
@@ -44,9 +46,11 @@ record ReportWindows(
         ReportPanel achievementPanel = new ReportPanel(skin, "achievement.title", Input.Keys.U, List.of());
         ReportPanel marketPanel = new ReportPanel(skin, "market.title", Input.Keys.O, MarketCoordinator.TAB_KEYS);
         ReportPanel gemPanel = new ReportPanel(skin, "gem.title", Input.Keys.V, List.of());
+        // Phím R — công pháp (ADR-071 D6; K đã là của Luận Kiếm).
+        ReportPanel skillRankPanel = new ReportPanel(skin, "skillrank.title", Input.Keys.R, List.of());
         return new ReportWindows(
                 sheetPanel,
-                new CharacterSheetCoordinator(sheetPanel, sender),
+                new CharacterSheetCoordinator(sheetPanel, sender, feeds.itemCatalog()),
                 boardPanel,
                 new LeaderboardCoordinator(boardPanel, sender, localCharacterId),
                 storagePanel,
@@ -56,7 +60,9 @@ record ReportWindows(
                 marketPanel,
                 new MarketCoordinator(marketPanel, sender, feeds),
                 gemPanel,
-                new GemCoordinator(gemPanel, sender, feeds));
+                new GemCoordinator(gemPanel, sender, feeds),
+                skillRankPanel,
+                new SkillRankCoordinator(skillRankPanel, sender));
     }
 
     /** Cổng phím CHUNG của các cửa sổ mở bằng phím ({@code PanelHub#noneOpen}); kho đồ không có phím. */
@@ -66,5 +72,6 @@ record ReportWindows(
         achievementPanel.setCanOpen(noneOpen);
         marketPanel.setCanOpen(noneOpen);
         gemPanel.setCanOpen(noneOpen);
+        skillRankPanel.setCanOpen(noneOpen);
     }
 }

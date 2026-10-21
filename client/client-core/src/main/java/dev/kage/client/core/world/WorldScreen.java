@@ -478,6 +478,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(reports.achievementPanel(), reports.achievements());
         panels.register(reports.marketPanel(), reports.market());
         panels.register(reports.gemPanel(), reports.gems());
+        panels.register(reports.skillRankPanel(), reports.skillRanks());
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
         panels.register(friendPanel, friends);
@@ -491,6 +492,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(chatPanel, chat);
         panels.register(new MembershipNoticeCoordinator(chat, party, guild));
         panels.register(new GameEventNoticeCoordinator(chat));
+        panels.register(new MoveSpeedCoordinator(intents::onMoveSpeedPercent));
         panels.register(worldChange);
         panels.register(dungeon);
         panels.register(connection);

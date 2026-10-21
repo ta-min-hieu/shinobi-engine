@@ -38,10 +38,12 @@ import dev.kage.character.application.DuplicateCharacterNameException;
 import dev.kage.character.application.FactionChangePillRequiredException;
 import dev.kage.character.application.FactionSelectionLevelTooLowException;
 import dev.kage.character.application.FactionUnchangedException;
+import dev.kage.character.application.SkillRankUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.character.domain.SkillRankPolicy;
 import dev.kage.chat.api.ChatFacade;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.domain.DialogueNode;
@@ -218,16 +220,20 @@ import dev.kage.protocol.ListQuestsRequest;
 import dev.kage.protocol.ListQuestsResponse;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
+import dev.kage.protocol.ListSkillRanksRequest;
+import dev.kage.protocol.ListSkillRanksResponse;
 import dev.kage.protocol.ListStorageRequest;
 import dev.kage.protocol.MailAttachmentView;
 import dev.kage.protocol.MailView;
 import dev.kage.protocol.MoveCommand;
+import dev.kage.protocol.MoveSpeedChangedEvent;
 import dev.kage.protocol.NewMailEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PartyMemberView;
 import dev.kage.protocol.PendingFriendRequestView;
 import dev.kage.protocol.PendingGuildJoinRequestView;
 import dev.kage.protocol.PendingPartyInviteView;
+import dev.kage.protocol.PetView;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.QuestStatusChangedEvent;
@@ -272,6 +278,7 @@ import dev.kage.protocol.SetTradeOfferCommand;
 import dev.kage.protocol.SetTradeOfferOutcome;
 import dev.kage.protocol.SetTradeOfferResponse;
 import dev.kage.protocol.ShopListingView;
+import dev.kage.protocol.SkillRankView;
 import dev.kage.protocol.SocketGemCommand;
 import dev.kage.protocol.SocketGemOutcome;
 import dev.kage.protocol.SocketGemResponse;
@@ -284,6 +291,9 @@ import dev.kage.protocol.TradeRequestedEvent;
 import dev.kage.protocol.TradeUpdatedEvent;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
+import dev.kage.protocol.UpgradeSkillCommand;
+import dev.kage.protocol.UpgradeSkillOutcome;
+import dev.kage.protocol.UpgradeSkillResponse;
 import dev.kage.protocol.UseItemCommand;
 import dev.kage.protocol.UseItemResponse;
 import dev.kage.protocol.UseSkillCommand;
@@ -294,8 +304,11 @@ import dev.kage.protocol.wire.ProtocolVersion;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.pvp.application.GetPvpRatingUseCase;
 import dev.kage.quest.api.QuestFacade;
+import dev.kage.server.world.CharacterBaseStats;
 import dev.kage.server.world.CharacterStatSheet;
+import dev.kage.server.world.Element;
 import dev.kage.server.world.EquipmentBonusSnapshot;
+import dev.kage.server.world.SkillRankSnapshot;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.trade.api.TradeFacade;
@@ -491,6 +504,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_SOCKET_GEM_COMMAND_VALUE, this::handleSocketGemCommand),
             Map.entry(Opcode.OPCODE_CREATE_LISTING_COMMAND_VALUE, this::handleCreateListingCommand),
             Map.entry(Opcode.OPCODE_DONATE_TO_GUILD_COMMAND_VALUE, this::handleDonateToGuildCommand),
+            Map.entry(Opcode.OPCODE_LIST_SKILL_RANKS_REQUEST_VALUE, this::handleListSkillRanksRequest),
+            Map.entry(Opcode.OPCODE_UPGRADE_SKILL_COMMAND_VALUE, this::handleUpgradeSkillCommand),
             Map.entry(Opcode.OPCODE_BUY_LISTING_COMMAND_VALUE, this::handleBuyListingCommand),
             Map.entry(Opcode.OPCODE_CANCEL_LISTING_COMMAND_VALUE, this::handleCancelListingCommand),
             Map.entry(Opcode.OPCODE_SET_ACTIVE_TITLE_COMMAND_VALUE, this::handleSetActiveTitleCommand),
@@ -1062,8 +1077,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // gửi CÙNG một lệnh world. Tách làm hai lệnh (attach rồi applyEquipmentBonus) để lại một
         // tick mà entity đã ở trong world với chỉ số NỀN: đo thật 2026-09-18, đăng nhập cạnh quái
         // ăn 37 sát thương trên thanh máu 100 thay vì 27 trên thanh 206.
-        CharacterLoadout loadout = new CharacterLoadout(
-                CharacterLoadout.baseStatsOf(character, stats), currentEquipmentBonus(characterId));
+        CharacterBaseStats loadoutBase = CharacterLoadout.baseStatsOf(character, stats);
+        CharacterLoadout loadout = new CharacterLoadout(loadoutBase, currentEquipmentBonus(characterId))
+                .withSkillRanks(worldGateway.registry().skillRanks.snapshotFor(characterId, loadoutBase.element()));
         SelectCharacterResponse response = enterWorldResponse(loadout, spawn);
         if (!isLiveOnThisConnection(characterId)) {
             // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
@@ -1188,9 +1204,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private int applyEquipmentBonusAndComputeMaxHp(long characterId) {
         EquipmentBonusSnapshot bonus = currentEquipmentBonus(characterId);
         currentWorldFacadeIfPresent(characterId).ifPresent(facade -> facade.applyEquipmentBonus(characterId, bonus));
+        sendMoveSpeed(characterId, bonus.moveSpeedPercent());
         // Máu tối đa nay theo cấp (dòng 65(d)) — đọc cấp đã ghi DB; đã ở Virtual Thread sau lời gọi DB.
         int level = characterFacade.findById(characterId).map(Character::level).orElse(1);
         return WorldFacade.characterMaxHp(level, bonus);
+    }
+
+    /** ADR-070 D4 — tốc độ phi kiếm cho dự đoán di chuyển của client. */
+    private void sendMoveSpeed(long characterId, int moveSpeedPercent) {
+        worldGateway
+                .registry()
+                .sendToCharacterIfOnline(
+                        characterId,
+                        Opcode.OPCODE_MOVE_SPEED_CHANGED_EVENT_VALUE,
+                        0,
+                        MoveSpeedChangedEvent.newBuilder()
+                                .setMoveSpeedPercent(moveSpeedPercent)
+                                .build()
+                                .toByteArray());
     }
 
     /**
@@ -1203,7 +1234,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * {@code authExecutor} (Virtual Thread), không bao giờ trên EventLoop.
      */
     private EquipmentBonusSnapshot currentEquipmentBonus(long characterId) {
-        return CharacterLoadout.snapshotOf(inventoryFacade.computeEquipmentBonus(characterId));
+        return CharacterLoadout.snapshotOf(
+                inventoryFacade.computeEquipmentBonus(characterId), inventoryFacade.moveSpeedPercent(characterId));
     }
 
     /**
@@ -1217,6 +1249,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void sendInitialSelfState(long characterId) {
         // amount=0 = chỉ đọc trạng thái hiện tại, không cộng gì (xem GrantExperienceUseCase).
         worldGateway.registry().sendExperience(characterId, characterFacade.grantExperience(characterId, 0L));
+        sendMoveSpeed(characterId, inventoryFacade.moveSpeedPercent(characterId));
         // ADR-067 — sự kiện nhân đôi đang chạy (nếu có) để client hiện banner ngay từ đầu.
         List<dev.kage.gm.domain.GameEvent> events = gameEvents.active();
         if (!events.isEmpty()) {
@@ -1272,8 +1305,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // phép) cũng có hiệu lực ngay, không chờ đăng nhập lại — trước lệnh ngoại hình, để không tick
             // nào người khác thấy hệ mới mà world còn tính hệ cũ.
             dev.kage.server.world.Element element = FactionMapping.toElement(toDomainFaction(request.getFaction()));
+            SkillRankSnapshot newRanks = worldGateway.registry().skillRanks.snapshotFor(characterId, element);
             currentWorldFacadeIfPresent(characterId).ifPresent(facade -> {
                 facade.enqueueCharacterElement(characterId, element);
+                facade.enqueueSkillRanks(characterId, newRanks);
                 facade.enqueueAppearanceChanged(characterId);
             });
             SelectFactionResponse response =
@@ -1790,6 +1825,68 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return response.build();
     }
 
+    /** ADR-071 — cửa sổ Công pháp. Cấp + linh căn đọc từ DB, không từ gói. */
+    private void handleListSkillRanksRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListSkillRanksRequest.parser().parseFrom(payload);
+        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_LIST_SKILL_RANKS_RESPONSE_VALUE, this::skillRankSheet);
+    }
+
+    private void handleUpgradeSkillCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        UpgradeSkillCommand command = UpgradeSkillCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_UPGRADE_SKILL_RESPONSE_VALUE,
+                characterId -> upgradeSkill(characterId, command.getSkillCode()));
+    }
+
+    private UpgradeSkillResponse upgradeSkill(long characterId, String skillCode) {
+        Optional<Character> character = characterFacade.findById(characterId);
+        int level = character.map(Character::level).orElse(1);
+        Element element =
+                character.map(c -> FactionMapping.toElement(c.faction())).orElse(Element.NONE);
+        SkillRankSource ranks = worldGateway.registry().skillRanks;
+        SkillRankUseCase.Outcome outcome =
+                ranks.facade().upgrade(characterId, skillCode, level, SkillRankSource.factionSkills(element));
+        if (outcome == SkillRankUseCase.Outcome.OK) {
+            // Hiệu lực ngay trong World đang đứng — không chờ đăng nhập lại.
+            SkillRankSnapshot snapshot = ranks.snapshotFor(characterId, element);
+            currentWorldFacadeIfPresent(characterId).ifPresent(world -> world.enqueueSkillRanks(characterId, snapshot));
+        }
+        return UpgradeSkillResponse.newBuilder()
+                .setOutcome(UpgradeSkillOutcome.valueOf("UPGRADE_SKILL_OUTCOME_" + outcome.name()))
+                .setSheet(skillRankSheet(characterId))
+                .build();
+    }
+
+    private ListSkillRanksResponse skillRankSheet(long characterId) {
+        Optional<Character> character = characterFacade.findById(characterId);
+        int level = character.map(Character::level).orElse(1);
+        Element element =
+                character.map(c -> FactionMapping.toElement(c.faction())).orElse(Element.NONE);
+        SkillRankUseCase.Sheet sheet = worldGateway
+                .registry()
+                .skillRanks
+                .facade()
+                .sheet(characterId, level, SkillRankSource.factionSkills(element));
+        ListSkillRanksResponse.Builder response = ListSkillRanksResponse.newBuilder()
+                .setPointsTotal(sheet.pointsTotal())
+                .setPointsAvailable(sheet.pointsAvailable());
+        int slot = 0;
+        for (SkillRankUseCase.SkillRankView skill : sheet.skills()) {
+            response.addSkills(SkillRankView.newBuilder()
+                    .setSkillCode(skill.code())
+                    .setSlotIndex(slot++)
+                    .setRank(skill.rank())
+                    .setMaxRank(SkillRankPolicy.MAX_RANK)
+                    .setRequiredLevel(skill.requiredLevel())
+                    .setUnlocked(level >= skill.requiredLevel()));
+        }
+        return response.build();
+    }
+
     /** ADR-063 — bảng tin phường thị. */
     private void handleListMarketRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
@@ -2024,7 +2121,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         executeBlocking(ctx, sequenceId, () -> {
             CharacterStatSheet sheet = statSheetOf(characterId);
-            GetCharacterStatsResponse response = GetCharacterStatsResponse.newBuilder()
+            GetCharacterStatsResponse.Builder response = GetCharacterStatsResponse.newBuilder()
                     .setLevel(sheet.level())
                     .setStrength(sheet.strength())
                     .setAgility(sheet.agility())
@@ -2043,8 +2140,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setCritDamagePercent(sheet.critDamagePercent())
                     .setCombatPower(sheet.combatPower())
                     .addAllItemSets(itemSetViews(characterId))
-                    .build();
-            send(ctx, Opcode.OPCODE_GET_CHARACTER_STATS_RESPONSE_VALUE, sequenceId, response.toByteArray());
+                    .setMoveSpeedPercent(inventoryFacade.moveSpeedPercent(characterId));
+            inventoryFacade
+                    .equippedPet(characterId)
+                    .ifPresent(pet -> response.setPet(PetView.newBuilder()
+                            .setItemTemplateId(pet.itemTemplateId())
+                            .setLevel(pet.level())
+                            .setExpIntoLevel(pet.expIntoLevel())
+                            .setExpToNext(pet.expToNext())));
+            send(
+                    ctx,
+                    Opcode.OPCODE_GET_CHARACTER_STATS_RESPONSE_VALUE,
+                    sequenceId,
+                    response.build().toByteArray());
         });
     }
 
@@ -4541,7 +4649,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             EquipmentSlot.EQUIPMENT_SLOT_GLOVE, EquipmentSlotType.GLOVE,
             EquipmentSlot.EQUIPMENT_SLOT_BOOT, EquipmentSlotType.BOOT,
             EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_1, EquipmentSlotType.ACCESSORY_1,
-            EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_2, EquipmentSlotType.ACCESSORY_2);
+            EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_2, EquipmentSlotType.ACCESSORY_2,
+            EquipmentSlot.EQUIPMENT_SLOT_MOUNT, EquipmentSlotType.MOUNT,
+            EquipmentSlot.EQUIPMENT_SLOT_PET, EquipmentSlotType.PET);
 
     /** {@code null} nếu client gửi giá trị enum không hợp lệ (VD {@code UNSPECIFIED}/{@code UNRECOGNIZED}). */
     private static EquipmentSlotType toDomainSlot(EquipmentSlot slot) {
