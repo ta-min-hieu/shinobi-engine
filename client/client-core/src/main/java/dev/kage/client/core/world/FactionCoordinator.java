@@ -194,7 +194,7 @@ final class FactionCoordinator implements WindowFlow {
 
     /** Nói ra lời mời đúng MỘT lần, ngay khi nó vừa trở nên đúng. */
     private void announceIfNewlyEligible() {
-        if (announcedEligible || !controller.canOffer()) {
+        if (announcedEligible || !controller.shouldAnnounce()) {
             return;
         }
         announcedEligible = true;

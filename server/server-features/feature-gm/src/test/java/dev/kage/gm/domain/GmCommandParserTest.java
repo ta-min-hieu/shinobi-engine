@@ -53,7 +53,14 @@ class GmCommandParserTest {
                 "/gm goto A B",
                 "/gm teleport A",
                 "/gm setlevel A 99",
-                "/gm announce"
+                "/gm announce",
+                "/gm event",
+                "/gm event gold 2 60",
+                "/gm event exp 1 60",
+                "/gm event exp 6 60",
+                "/gm event exp 2 0",
+                "/gm event exp 2",
+                "/gm event drop on"
             })
     void shouldRejectOutOfDomainOrUnknown(String line) {
         assertThat(GmCommandParser.parse(line)).isInstanceOf(GmCommandParser.Parsed.Invalid.class);
@@ -64,6 +71,15 @@ class GmCommandParserTest {
         assertThat(GmRole.ADMIN.atLeast(GmRole.GM)).isTrue();
         assertThat(GmRole.GM.atLeast(GmRole.ADMIN)).isFalse();
         assertThat(new GmCommand.Gold("A", 1).requiredRole()).isEqualTo(GmRole.ADMIN);
+    }
+
+    @Test
+    void eventShouldParseStartAndStop_andNeedAdmin() {
+        assertThat(ok("/gm event EXP 2 60")).isEqualTo(new GmCommand.Event(GameEventKind.EXP, 2, 60));
+        GmCommand stop = ok("/gm event drop off");
+        assertThat(stop).isEqualTo(new GmCommand.Event(GameEventKind.DROP, 0, 0));
+        assertThat(((GmCommand.Event) stop).stops()).isTrue();
+        assertThat(stop.requiredRole()).isEqualTo(GmRole.ADMIN);
     }
 
     private static GmCommand ok(String line) {

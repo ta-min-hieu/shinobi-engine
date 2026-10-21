@@ -21,6 +21,7 @@ import dev.kage.inventory.domain.EquipmentBonus;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.InventorySnapshot;
 import dev.kage.inventory.domain.ItemCatalog;
+import dev.kage.inventory.domain.ItemSetProgress;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.StoredItem;
 
@@ -173,6 +174,11 @@ public final class InventoryFacade {
      */
     public EquipmentBonus computeEquipmentBonus(long characterId) {
         return computeEquipmentBonusUseCase.execute(characterId);
+    }
+
+    /** Bộ pháp khí đang mặc ít nhất một món (ADR-065) — chỉ đọc, cho bảng nhân vật. */
+    public List<ItemSetProgress> itemSetProgress(long characterId) {
+        return computeEquipmentBonusUseCase.itemSetProgress(characterId);
     }
 
     /**

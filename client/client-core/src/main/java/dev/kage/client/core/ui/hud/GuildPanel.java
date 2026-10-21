@@ -105,6 +105,7 @@ public final class GuildPanel implements HudWindow {
     private final Table panel;
     private final Label statusLabel;
     private final Label headerLabel;
+    private final Label progressLabel;
     private final Table joinForm;
     private final TextField nameField;
     private final Table guildSection;
@@ -121,6 +122,7 @@ public final class GuildPanel implements HudWindow {
     private LongConsumer onReject;
     private Runnable onLeave;
     private Runnable onDisband;
+    private Runnable onDonate;
     private Runnable onOpened;
 
     /**
@@ -139,6 +141,8 @@ public final class GuildPanel implements HudWindow {
         this.stage = new Stage(new ScreenViewport(), new SpriteBatch());
 
         this.headerLabel = new Label("", skin.labelStyle);
+        this.progressLabel = new Label("", skin.labelStyle);
+        progressLabel.setWrap(true);
         this.statusLabel = new Label("", skin.labelStyle);
         statusLabel.setWrap(true);
         statusLabel.setColor(SECTION_COLOR);
@@ -220,6 +224,7 @@ public final class GuildPanel implements HudWindow {
 
     private Table buildGuildSection() {
         Table section = new Table();
+        section.add(progressLabel).width(PANEL_WIDTH_PX).left().padBottom(6f).row();
         section.add(sectionTitle("guild.section.members"))
                 .width(PANEL_WIDTH_PX)
                 .left()
@@ -234,6 +239,9 @@ public final class GuildPanel implements HudWindow {
         Table footer = new Table();
         footer.add(leaveButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
         footer.add(disbandButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
+        footer.add(actionButton("guild.action.donate", () -> fire(onDonate)))
+                .width(ROW_BUTTON_WIDTH_PX)
+                .padRight(6f);
         footer.add(actionButton("guild.action.refresh", () -> fire(onOpened))).width(ROW_BUTTON_WIDTH_PX);
         section.add(footer).width(PANEL_WIDTH_PX).left().padTop(10f).row();
         // Cách ĐÓNG phải nằm ngay trên cửa sổ, cùng lý do PartyPanel/FriendPanel đã có dòng này:
@@ -393,6 +401,16 @@ public final class GuildPanel implements HudWindow {
 
     public void setOnLeave(Runnable listener) {
         this.onLeave = listener;
+    }
+
+    /** ADR-068 — nút "Góp" (một bậc linh thạch). */
+    public void setOnDonate(Runnable listener) {
+        this.onDonate = listener;
+    }
+
+    /** ADR-068/069 — cấp bang, cống hiến, nhiệm vụ tuần; chuỗi ĐÃ dịch. */
+    public void setProgress(String text) {
+        progressLabel.setText(text);
     }
 
     public void setOnDisband(Runnable listener) {

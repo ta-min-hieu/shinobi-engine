@@ -128,6 +128,7 @@ message GuildMemberView {
   string name = 2;
   bool is_leader = 3;
   bool online = 4;
+  int64 contribution = 5; // ADR-068 — điểm cống hiến
 }
 
 message ListGuildMembersResponse {
@@ -155,6 +156,7 @@ message GetMyGuildResponse {
   int64 guild_id = 2; // chỉ có ý nghĩa khi in_guild = true
   string guild_name = 3;
   bool is_leader = 4;
+  GuildProgressView progress = 5; // ADR-068/069 — chỉ có khi in_guild = true
 }
 
 // ADR-059 (Accepted 2026-10-18) — "bang của bạn vừa đổi". CHỈ THÊM, protocolVersion không tăng. Client nói
@@ -167,10 +169,45 @@ enum GuildChangeReason {
   GUILD_CHANGE_REASON_YOU_WERE_KICKED = 4;
   GUILD_CHANGE_REASON_DISBANDED = 5;
   GUILD_CHANGE_REASON_YOU_WERE_ACCEPTED = 6;
+  GUILD_CHANGE_REASON_LEVEL_UP = 7;                // ADR-068 — bang vừa lên cấp
+  GUILD_CHANGE_REASON_WEEKLY_QUEST_COMPLETED = 8;  // ADR-069 — thưởng đã gửi qua thư
 }
 
 // Event: Server -> Client (OPCODE_GUILD_CHANGED_EVENT = 720).
 message GuildChangedEvent {
   GuildChangeReason reason = 1;
   int64 subject_character_id = 2;
+}
+
+// ADR-068/069 — cấp bang, cống hiến của chính người hỏi, nhiệm vụ tuần.
+message GuildProgressView {
+  int32 level = 1;
+  int64 exp = 2;
+  int64 exp_for_next_level = 3; // tổng kinh nghiệm cần cho cấp kế; 0 = đã tối đa
+  int32 max_members = 4;
+  int64 my_contribution = 5;
+  int32 weekly_kills = 6;
+  int32 weekly_target = 7;
+  bool weekly_completed = 8;
+}
+
+// Command: Client -> Server (OPCODE_DONATE_TO_GUILD_COMMAND = 721). Bội số 1.000, tối đa 100.000.
+message DonateToGuildCommand {
+  int64 amount = 1;
+  string idempotency_key = 2; // UUID (ADR-025)
+}
+
+enum DonateToGuildOutcome {
+  DONATE_TO_GUILD_OUTCOME_UNSPECIFIED = 0;
+  DONATE_TO_GUILD_OUTCOME_OK = 1;
+  DONATE_TO_GUILD_OUTCOME_NOT_IN_GUILD = 2;
+  DONATE_TO_GUILD_OUTCOME_INSUFFICIENT_GOLD = 3;
+  DONATE_TO_GUILD_OUTCOME_INVALID_AMOUNT = 4;
+  DONATE_TO_GUILD_OUTCOME_DUPLICATE_REQUEST = 5;
+}
+
+// Response: Server -> Client (OPCODE_DONATE_TO_GUILD_RESPONSE = 722). progress chỉ có khi OK.
+message DonateToGuildResponse {
+  DonateToGuildOutcome outcome = 1;
+  GuildProgressView progress = 2;
 }

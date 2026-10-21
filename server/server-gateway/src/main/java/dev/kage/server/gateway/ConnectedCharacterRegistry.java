@@ -97,6 +97,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      */
     final AchievementHooks achievements = AchievementHooks.unbound();
 
+    /** ADR-069 — lượt hạ quái vào nhiệm vụ bang tuần; ADR-068 — báo bang lên cấp. */
+    final GuildProgressHooks guildProgress = GuildProgressHooks.unbound();
+
     ConnectedCharacterRegistry(
             InventoryFacade inventoryFacade,
             QuestFacade questFacade,
@@ -585,6 +588,12 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 killerCharacterId,
                 monsterCode,
                 () -> achievements.onMonsterKilled(killerCharacterId));
+        // Nhiệm vụ bang tuần (ADR-069) — việc phụ, bước riêng cùng lý do thành tựu.
+        lootExecutor.dispatch(
+                KillRewardDispatcher.Step.GUILD_WEEKLY,
+                killerCharacterId,
+                monsterCode,
+                () -> guildProgress.onMonsterKilled(killerCharacterId));
         // Phần của ĐỒNG ĐỘI (2026-10-11) — một việc RIÊNG, sau ba việc của người hạ: tra nhóm chạm DB,
         // và nó hỏng thì phần của người ra đòn cuối ở trên không được suy suyển.
         lootExecutor.dispatch(

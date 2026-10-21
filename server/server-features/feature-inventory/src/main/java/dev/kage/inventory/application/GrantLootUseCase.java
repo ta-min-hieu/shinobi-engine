@@ -3,6 +3,7 @@ package dev.kage.inventory.application;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.IntSupplier;
 
 import dev.kage.inventory.domain.AuditPort;
 import dev.kage.inventory.domain.DropTableEntry;
@@ -29,6 +30,7 @@ public final class GrantLootUseCase {
     private final ItemTemplatePort itemTemplatePort;
     private final TransactionRunner tx;
     private final AuditPort auditPort;
+    private final IntSupplier rollCount;
 
     /** Bản KHÔNG ghi audit — cho test chỉ quan tâm tới túi đồ. Production dùng {@link #auditedBy}. */
     public GrantLootUseCase(
@@ -41,14 +43,24 @@ public final class GrantLootUseCase {
         this.itemTemplatePort = itemTemplatePort;
         this.tx = tx;
         this.auditPort = NO_AUDIT;
+        this.rollCount = GrantLootUseCase::oneRoll;
     }
 
-    private GrantLootUseCase(GrantLootUseCase source, AuditPort auditPort) {
+    private GrantLootUseCase(GrantLootUseCase source, AuditPort auditPort, IntSupplier rollCount) {
         this.dropTablePort = source.dropTablePort;
         this.inventoryPort = source.inventoryPort;
         this.itemTemplatePort = source.itemTemplatePort;
         this.tx = source.tx;
         this.auditPort = auditPort;
+        this.rollCount = rollCount;
+    }
+
+    /**
+     * Số lượt roll bảng rơi cho MỖI con quái (ADR-067 — sự kiện nhân đôi rơi đồ). Hỏi lại mỗi lần giết;
+     * module này không biết sự kiện là gì, chỉ biết một con số {@code >= 1}.
+     */
+    public GrantLootUseCase withRollCount(IntSupplier count) {
+        return new GrantLootUseCase(this, auditPort, count);
     }
 
     /**
@@ -60,13 +72,18 @@ public final class GrantLootUseCase {
      * tham số constructor thứ năm: constructor đã chạm trần 4 tham số của Checkstyle.
      */
     public GrantLootUseCase auditedBy(AuditPort port) {
-        return new GrantLootUseCase(this, port);
+        return new GrantLootUseCase(this, port, rollCount);
     }
 
     /** {@code audit_log.action} của một chồng đồ rơi. */
     public static final String AUDIT_ACTION = "LOOT_GRANT";
 
     private static final AuditPort NO_AUDIT = (transaction, characterId, action, detailJson) -> {};
+
+    /** Mặc định: một lượt roll mỗi con quái. */
+    private static int oneRoll() {
+        return 1;
+    }
 
     /**
      * Roll bảng rơi rồi cộng vào túi người hạ gục.
@@ -82,7 +99,10 @@ public final class GrantLootUseCase {
      */
     public List<ItemStack> execute(long characterId, String dropTableCode) {
         List<DropTableEntry> entries = dropTablePort.findEntries(dropTableCode);
-        List<ItemStack> drops = LootRoller.roll(entries);
+        List<ItemStack> drops = new ArrayList<>(LootRoller.roll(entries));
+        for (int extra = rollCount.getAsInt() - 1; extra > 0; extra--) {
+            drops.addAll(LootRoller.roll(entries));
+        }
         if (drops.isEmpty()) {
             return List.of();
         }

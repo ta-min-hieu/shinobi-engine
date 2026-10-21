@@ -52,6 +52,8 @@ public final class PostgresGuildAdapter implements GuildPort {
             SELECT id, name, leader_character_id, created_at FROM guild WHERE id = ?
             """;
 
+    private static final String LEVEL_OF = "SELECT level FROM guild WHERE id = ?";
+
     private static final String FIND_MEMBERSHIP = """
             SELECT guild_id, character_id, role, joined_at FROM guild_member WHERE character_id = ?
             """;
@@ -136,6 +138,12 @@ public final class PostgresGuildAdapter implements GuildPort {
     @Override
     public Optional<Guild> findById(long guildId) {
         return JdbcOperations.queryOne(dataSource, FIND_BY_ID, PostgresGuildAdapter::mapGuild, guildId);
+    }
+
+    @Override
+    public int levelOf(long guildId) {
+        return JdbcOperations.queryOne(dataSource, LEVEL_OF, rs -> rs.getInt(1), guildId)
+                .orElse(1);
     }
 
     @Override

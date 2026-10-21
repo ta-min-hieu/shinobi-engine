@@ -25,13 +25,14 @@ import dev.kage.protocol.wire.PacketCodec;
 final class LeaderboardCoordinator implements WindowFlow {
 
     /** Thứ tự tab trong {@link ReportPanel} — khớp danh sách khoá truyền vào constructor của panel. */
-    static final List<String> TAB_KEYS =
-            List.of("leaderboard.tab.realm", "leaderboard.tab.arena", "leaderboard.tab.combat_power");
+    static final List<String> TAB_KEYS = List.of(
+            "leaderboard.tab.realm", "leaderboard.tab.arena", "leaderboard.tab.combat_power", "leaderboard.tab.guild");
 
     private static final List<LeaderboardKind> TAB_KINDS = List.of(
             LeaderboardKind.LEADERBOARD_KIND_REALM,
             LeaderboardKind.LEADERBOARD_KIND_ARENA,
-            LeaderboardKind.LEADERBOARD_KIND_COMBAT_POWER);
+            LeaderboardKind.LEADERBOARD_KIND_COMBAT_POWER,
+            LeaderboardKind.LEADERBOARD_KIND_GUILD);
 
     private static final String FACTION_PREFIX = "FACTION_";
 
@@ -98,13 +99,20 @@ final class LeaderboardCoordinator implements WindowFlow {
         }
         for (LeaderboardEntry entry : response.getEntriesList()) {
             boolean own = entry.getCharacterId() == localCharacterId;
-            String line = format(
-                    "leaderboard.row",
-                    entry.getRank(),
-                    entry.getName(),
-                    factionLabel(entry.getFaction()),
-                    realmLabel(entry.getLevel()),
-                    valueLabel(response.getKind(), entry.getValue()));
+            String line = response.getKind() == LeaderboardKind.LEADERBOARD_KIND_GUILD
+                    ? format(
+                            "leaderboard.row.guild",
+                            entry.getRank(),
+                            entry.getName(),
+                            entry.getLevel(),
+                            entry.getValue())
+                    : format(
+                            "leaderboard.row",
+                            entry.getRank(),
+                            entry.getName(),
+                            factionLabel(entry.getFaction()),
+                            realmLabel(entry.getLevel()),
+                            valueLabel(response.getKind(), entry.getValue()));
             rows.add(new ReportPanel.Row(own ? "▶ " + line : line, own));
         }
         return rows;

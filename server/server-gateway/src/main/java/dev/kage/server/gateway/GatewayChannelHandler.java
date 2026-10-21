@@ -1,6 +1,7 @@
 package dev.kage.server.gateway;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -34,7 +35,9 @@ import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CharacterLimitExceededException;
 import dev.kage.character.application.CharacterNotFoundException;
 import dev.kage.character.application.DuplicateCharacterNameException;
+import dev.kage.character.application.FactionChangePillRequiredException;
 import dev.kage.character.application.FactionSelectionLevelTooLowException;
+import dev.kage.character.application.FactionUnchangedException;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.IdempotencyKeyReusedException;
@@ -45,6 +48,9 @@ import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.dialogue.domain.DialogueOption;
 import dev.kage.friend.api.FriendFacade;
 import dev.kage.guild.api.GuildFacade;
+import dev.kage.guild.api.GuildProgressionFacade;
+import dev.kage.guild.domain.DonationOutcome;
+import dev.kage.guild.domain.GuildProgressionPort;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.application.SocketGemUseCase;
 import dev.kage.inventory.application.UseItemUseCase;
@@ -52,6 +58,7 @@ import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.GemPolicy;
 import dev.kage.inventory.domain.InventorySnapshot;
 import dev.kage.inventory.domain.ItemCatalog;
+import dev.kage.inventory.domain.ItemSetProgress;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemUseEffect;
 import dev.kage.mail.api.MailFacade;
@@ -124,6 +131,9 @@ import dev.kage.protocol.DialogueOptionView;
 import dev.kage.protocol.DisbandGuildCommand;
 import dev.kage.protocol.DisbandGuildOutcome;
 import dev.kage.protocol.DisbandGuildResponse;
+import dev.kage.protocol.DonateToGuildCommand;
+import dev.kage.protocol.DonateToGuildOutcome;
+import dev.kage.protocol.DonateToGuildResponse;
 import dev.kage.protocol.DuelChallengeDeclinedEvent;
 import dev.kage.protocol.DuelChallengeReceivedEvent;
 import dev.kage.protocol.DuelStartedEvent;
@@ -168,6 +178,7 @@ import dev.kage.protocol.InvitePartyMemberOutcome;
 import dev.kage.protocol.InvitePartyMemberResponse;
 import dev.kage.protocol.ItemCatalogResponse;
 import dev.kage.protocol.ItemRewardView;
+import dev.kage.protocol.ItemSetProgressView;
 import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.KickGuildMemberCommand;
 import dev.kage.protocol.KickGuildMemberOutcome;
@@ -376,6 +387,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final CharacterFacade characterFacade;
     // ADR-052 — quyền + audit GM; trần lệnh GM riêng theo kết nối (D8: 5 lệnh / 10 giây).
     private final dev.kage.gm.api.GmFacade gmFacade;
+    private final dev.kage.gm.api.GameEventFacade gameEvents;
+    private final GuildProgressionFacade guildProgression;
     private final dev.kage.checkin.api.CheckInFacade checkInFacade;
     private final RateLimiter gmRateLimiter = new RateLimiter(5, java.time.Duration.ofSeconds(10));
     private final InventoryFacade inventoryFacade;
@@ -477,6 +490,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LIST_MARKET_REQUEST_VALUE, this::handleListMarketRequest),
             Map.entry(Opcode.OPCODE_SOCKET_GEM_COMMAND_VALUE, this::handleSocketGemCommand),
             Map.entry(Opcode.OPCODE_CREATE_LISTING_COMMAND_VALUE, this::handleCreateListingCommand),
+            Map.entry(Opcode.OPCODE_DONATE_TO_GUILD_COMMAND_VALUE, this::handleDonateToGuildCommand),
             Map.entry(Opcode.OPCODE_BUY_LISTING_COMMAND_VALUE, this::handleBuyListingCommand),
             Map.entry(Opcode.OPCODE_CANCEL_LISTING_COMMAND_VALUE, this::handleCancelListingCommand),
             Map.entry(Opcode.OPCODE_SET_ACTIVE_TITLE_COMMAND_VALUE, this::handleSetActiveTitleCommand),
@@ -552,6 +566,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.characterFacade = facades.characterFacade();
         this.gmFacade = facades.gmFacade();
         this.checkInFacade = facades.progression().checkInFacade();
+        this.gameEvents = facades.progression().gameEvents();
+        this.guildProgression = facades.progression().guildProgression();
         this.inventoryFacade = facades.inventoryFacade();
         this.shopFacade = facades.contentFacades().shopFacade();
         this.dialogueFacade = facades.contentFacades().dialogueFacade();
@@ -1201,6 +1217,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void sendInitialSelfState(long characterId) {
         // amount=0 = chỉ đọc trạng thái hiện tại, không cộng gì (xem GrantExperienceUseCase).
         worldGateway.registry().sendExperience(characterId, characterFacade.grantExperience(characterId, 0L));
+        // ADR-067 — sự kiện nhân đôi đang chạy (nếu có) để client hiện banner ngay từ đầu.
+        List<dev.kage.gm.domain.GameEvent> events = gameEvents.active();
+        if (!events.isEmpty()) {
+            worldGateway
+                    .registry()
+                    .sendToCharacterIfOnline(
+                            characterId,
+                            Opcode.OPCODE_GAME_EVENTS_CHANGED_EVENT_VALUE,
+                            0,
+                            GameEventNotices.of(events).toByteArray());
+        }
         // delta=0: đây là ĐỒNG BỘ số dư, không phải một lần vàng đổi. Mọi lần đổi THẬT tự phát từ
         // GoldLedger (server-database) qua GoldChangeListener, không đi qua đây.
         worldGateway
@@ -1258,6 +1285,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         } catch (FactionSelectionLevelTooLowException e) {
             LOG.warn("Chọn hệ phái thất bại: chưa đủ cấp", e);
             sendError(ctx, sequenceId, 400, "error.level_too_low");
+        } catch (FactionUnchangedException e) {
+            sendError(ctx, sequenceId, 400, "error.faction_unchanged");
+        } catch (FactionChangePillRequiredException e) {
+            sendError(ctx, sequenceId, 400, "error.faction_change_pill_required");
         } catch (RuntimeException e) {
             LOG.error("Chọn hệ phái thất bại: lỗi không mong đợi", e);
             sendError(ctx, sequenceId, 500, "error.select_faction_failed");
@@ -1730,6 +1761,35 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .build();
     }
 
+    /** ADR-068 — góp linh thạch cho bang. Trừ vàng ⇒ khoá chống trùng bắt buộc. */
+    private void handleDonateToGuildCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        DonateToGuildCommand command = DonateToGuildCommand.parseFrom(payload);
+        if (rejectMalformedIdempotencyKey(ctx, header.sequenceId(), command.getIdempotencyKey())) {
+            return;
+        }
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_DONATE_TO_GUILD_RESPONSE_VALUE,
+                characterId -> donateToGuild(characterId, command));
+    }
+
+    private DonateToGuildResponse donateToGuild(long characterId, DonateToGuildCommand command) {
+        GuildProgressionPort.Donation donation =
+                guildProgression.donate(characterId, command.getAmount(), command.getIdempotencyKey());
+        DonateToGuildResponse.Builder response = DonateToGuildResponse.newBuilder()
+                .setOutcome(DonateToGuildOutcome.valueOf(
+                        "DONATE_TO_GUILD_OUTCOME_" + donation.outcome().name()));
+        if (donation.outcome() == DonationOutcome.OK) {
+            guildProgression.standingOf(characterId).map(GuildProgressViews::of).ifPresent(response::setProgress);
+            if (donation.leveledUp()) {
+                worldGateway.registry().guildProgress.announceLevelUp(donation.guildId());
+            }
+        }
+        return response.build();
+    }
+
     /** ADR-063 — bảng tin phường thị. */
     private void handleListMarketRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
@@ -1982,9 +2042,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setCritPermille(sheet.critPermille())
                     .setCritDamagePercent(sheet.critDamagePercent())
                     .setCombatPower(sheet.combatPower())
+                    .addAllItemSets(itemSetViews(characterId))
                     .build();
             send(ctx, Opcode.OPCODE_GET_CHARACTER_STATS_RESPONSE_VALUE, sequenceId, response.toByteArray());
         });
+    }
+
+    /** ADR-065 — bộ pháp khí đang mặc; thưởng đã nằm trong các tổng của bảng. Chạm DB. */
+    private List<ItemSetProgressView> itemSetViews(long characterId) {
+        List<ItemSetProgressView> views = new ArrayList<>();
+        for (ItemSetProgress set : inventoryFacade.itemSetProgress(characterId)) {
+            views.add(ItemSetProgressView.newBuilder()
+                    .setNameKey(set.nameKey())
+                    .setWornPieces(set.wornPieces())
+                    .setTotalPieces(set.totalPieces())
+                    .setBonusAtk(set.activeBonus().bonusAtk())
+                    .setBonusDef(set.activeBonus().bonusDef())
+                    .setBonusRes(set.activeBonus().bonusRes())
+                    .setBonusHp(set.activeBonus().bonusHp())
+                    .build());
+        }
+        return views;
     }
 
     /** Chỉ số nền + trang bị HIỆN TẠI trong DB — cùng {@link CharacterLoadout} mà attach dùng. Chạm DB. */
@@ -2007,13 +2085,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 switch (request.getKind()) {
                     case LEADERBOARD_KIND_ARENA -> LeaderboardCache.Kind.ARENA;
                     case LEADERBOARD_KIND_COMBAT_POWER -> LeaderboardCache.Kind.COMBAT_POWER;
+                    case LEADERBOARD_KIND_GUILD -> LeaderboardCache.Kind.GUILD;
                     // UNSPECIFIED/lạ (client mới hơn server) ⇒ bảng cảnh giới, không lỗi.
                     default -> LeaderboardCache.Kind.REALM;
                 };
         executeBlocking(ctx, sequenceId, () -> {
-            LeaderboardCache cache =
-                    LeaderboardCache.shared(characterFacade, pvpFacade, character -> statSheetOf(character.id())
-                            .combatPower());
+            LeaderboardCache cache = LeaderboardCache.shared(new LeaderboardCache.Sources(
+                    characterFacade,
+                    pvpFacade,
+                    character -> statSheetOf(character.id()).combatPower(),
+                    guildProgression::rankGuilds));
             LeaderboardCache.Board board = cache.board(kind);
             GetLeaderboardResponse.Builder response = GetLeaderboardResponse.newBuilder()
                     .setKind(toProtoLeaderboardKind(kind))
@@ -2046,6 +2127,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case REALM -> LeaderboardKind.LEADERBOARD_KIND_REALM;
             case ARENA -> LeaderboardKind.LEADERBOARD_KIND_ARENA;
             case COMBAT_POWER -> LeaderboardKind.LEADERBOARD_KIND_COMBAT_POWER;
+            case GUILD -> LeaderboardKind.LEADERBOARD_KIND_GUILD;
         };
     }
 
@@ -2084,7 +2166,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         targetId -> CharacterLoadout.load(characterFacade, worldGateway.registry(), targetId)
                                 .maxHp(),
                         new MainWorldRelocation(
-                                worldGateway.mainWorldChannels(), worldGateway.registry(), characterFacade)::move),
+                                worldGateway.mainWorldChannels(), worldGateway.registry(), characterFacade)::move,
+                        gameEvents),
                 GmConfig.current(),
                 java.time.Clock.systemUTC());
     }
@@ -3042,6 +3125,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListGuildMembersBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
         ListGuildMembersResponse.Builder responseBuilder = ListGuildMembersResponse.newBuilder();
+        // ADR-068 — cống hiến: một câu cho cả bang, không N+1.
+        Map<Long, Long> contributions = guildProgression
+                .standingOf(characterId)
+                .map(standing -> guildProgression.contributionsOf(standing.guildId()))
+                .orElse(Map.of());
         for (GuildFacade.MemberView member : guildFacade.listMembers(characterId)) {
             // findById chạm DB mỗi thành viên — chấp nhận N+1 ở quy mô 1 bang MVP (vài chục),
             // cùng lý do ListFriendsResponse.
@@ -3054,6 +3142,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setName(name)
                     .setIsLeader(member.isLeader())
                     .setOnline(worldGateway.registry().isOnline(member.characterId()))
+                    .setContribution(contributions.getOrDefault(member.characterId(), 0L))
                     .build());
         }
         send(
@@ -3119,6 +3208,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .setGuildId(guild.guildId())
                 .setGuildName(guild.guildName())
                 .setIsLeader(guild.isLeader()));
+        if (myGuild.isPresent()) {
+            guildProgression
+                    .standingOf(characterId)
+                    .map(GuildProgressViews::of)
+                    .ifPresent(responseBuilder::setProgress);
+        }
         send(
                 ctx,
                 Opcode.OPCODE_GET_MY_GUILD_RESPONSE_VALUE,

@@ -22,7 +22,9 @@ import dev.kage.character.domain.Character;
 import dev.kage.chat.api.ChatFacade;
 import dev.kage.chat.domain.ChatMessage;
 import dev.kage.chat.domain.ProfanityFilter;
+import dev.kage.gm.api.GameEventFacade;
 import dev.kage.gm.api.GmFacade;
+import dev.kage.gm.domain.GameEvent;
 import dev.kage.gm.domain.GmAuditEntry;
 import dev.kage.gm.domain.GmCommand;
 import dev.kage.gm.domain.GmCommandParser;
@@ -74,7 +76,8 @@ final class GmCommandRouter {
             ConnectedCharacterRegistry registry,
             LongFunction<Optional<WorldFacade>> worldOf,
             LongToIntFunction maxHpOf,
-            Relocator relocator) {}
+            Relocator relocator,
+            GameEventFacade events) {}
 
     /** Dời một nhân vật tới chỗ người khác đứng trong world chính — {@link MainWorldRelocation#move}. */
     @FunctionalInterface
@@ -210,12 +213,13 @@ final class GmCommandRouter {
             case GmCommand.Summon _ -> relocate(target.orElseThrow().id(), actor.characterId(), ticket);
             case GmCommand.Give give -> give(target.orElseThrow(), give.itemCode(), give.quantity(), ticket);
             case GmCommand.Gold gold -> gold(target.orElseThrow(), gold.amount(), ticket);
+            case GmCommand.Event event -> event(event, ticket);
         };
     }
 
     private static String help(GmFacade.AuditTicket ticket) {
         ticket.finish(GmOutcome.OK, "{}");
-        return "GM: help who inspect kick mute unmute announce heal goto summon | ADMIN: give gold";
+        return "GM: help who inspect kick mute unmute announce heal goto summon | ADMIN: give gold event";
     }
 
     private String who(Character target, GmFacade.AuditTicket ticket) {
@@ -330,6 +334,30 @@ final class GmCommandRouter {
             case NOT_IN_MAIN_WORLD -> "Both characters must be online in the main world";
             case NO_POSITION -> "Position of " + anchorId + " not known yet, try again";
         };
+    }
+
+    /** ADR-067 — bật/tắt sự kiện nhân đôi rồi báo cho MỌI người đang online (cả khi tắt: banner phải tắt). */
+    private String event(GmCommand.Event command, GmFacade.AuditTicket ticket) {
+        String reply;
+        if (command.stops()) {
+            boolean wasActive = deps.events().stop(command.kind());
+            ticket.finish(wasActive ? GmOutcome.OK : GmOutcome.REJECTED, "{}");
+            reply = wasActive ? "Stopped " + command.kind() + " event" : "No " + command.kind() + " event running";
+        } else {
+            GameEvent started = deps.events()
+                    .start(
+                            command.kind(),
+                            command.multiplier(),
+                            Duration.ofMinutes(command.minutes()),
+                            ticket.auditId());
+            ticket.finish(GmOutcome.OK, "{\"endsAt\":\"" + started.endsAt() + "\"}");
+            reply = "Started " + command.kind() + " x" + command.multiplier() + " until " + started.endsAt();
+        }
+        deps.registry()
+                .broadcastToAll(
+                        Opcode.OPCODE_GAME_EVENTS_CHANGED_EVENT_VALUE,
+                        GameEventNotices.of(deps.events().active()).toByteArray());
+        return reply;
     }
 
     private String give(Character target, String itemCode, int quantity, GmFacade.AuditTicket ticket) {

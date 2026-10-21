@@ -100,7 +100,8 @@ class GmCommandRouterDatabaseTest {
                 (mover, anchor) -> {
                     RELOCATIONS.add(new long[] {mover, anchor});
                     return MainWorldRelocation.Outcome.OK;
-                });
+                },
+                facades.progression().gameEvents());
     }
 
     @Test
@@ -180,6 +181,29 @@ class GmCommandRouterDatabaseTest {
                 .singleElement()
                 .asString()
                 .startsWith("id=" + gm.id());
+    }
+
+    /** ADR-067 — chỉ ADMIN bật được sự kiện; bật thì hệ số đổi và có dòng game_event, tắt thì về 1. */
+    @Test
+    void eventShouldNeedAdmin_andChangeTheMultiplierUntilStopped() {
+        Character gm = newCharacter();
+        Character admin = newCharacter();
+        grant(gm.accountId(), "GM");
+        grant(admin.accountId(), "ADMIN");
+
+        List<String> denied = router(true).execute(actor(gm, LOOPBACK), "/gm event exp 2 30");
+        List<String> started = router(true).execute(actor(admin, LOOPBACK), "/gm event exp 2 30");
+        int during = deps.events().multiplier(dev.kage.gm.domain.GameEventKind.EXP);
+        long rows = count("SELECT COUNT(*) FROM game_event WHERE kind = 'EXP' AND multiplier = 2");
+        List<String> stopped = router(true).execute(actor(admin, LOOPBACK), "/gm event exp off");
+
+        assertThat(denied).singleElement().asString().startsWith("Denied");
+        assertThat(started).singleElement().asString().startsWith("Started EXP x2");
+        assertThat(during).isEqualTo(2);
+        assertThat(rows).isEqualTo(1L);
+        assertThat(stopped).singleElement().asString().startsWith("Stopped");
+        assertThat(deps.events().multiplier(dev.kage.gm.domain.GameEventKind.EXP))
+                .isEqualTo(1);
     }
 
     /** goto dời CHÍNH GM tới mục tiêu, summon dời MỤC TIÊU tới GM — đúng chiều, và có dòng audit OK. */

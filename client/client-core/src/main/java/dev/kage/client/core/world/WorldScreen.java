@@ -490,6 +490,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(tradePanel, trade);
         panels.register(chatPanel, chat);
         panels.register(new MembershipNoticeCoordinator(chat, party, guild));
+        panels.register(new GameEventNoticeCoordinator(chat));
         panels.register(worldChange);
         panels.register(dungeon);
         panels.register(connection);

@@ -14,6 +14,7 @@ import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.Faction;
+import dev.kage.character.domain.FactionChangePort;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.character.domain.Transaction;
@@ -147,5 +148,92 @@ class SelectFactionUseCaseTest {
         SelectFactionUseCase useCase = new SelectFactionUseCase(port);
 
         assertThatThrownBy(() -> useCase.execute(999L, Faction.THUY)).isInstanceOf(CharacterNotFoundException.class);
+    }
+
+    // ---- ADR-066: lần đầu + lần hai (dưới Lv30) miễn phí, sau đó tốn Tẩy Căn Đan ----
+
+    /** Port đổi linh căn ghi hệ qua FakeCharacterPort, có số đan cho trước. */
+    private static final class FakeChangePort implements FactionChangePort {
+        private final FakeCharacterPort characters;
+        private int changes;
+        private int pills;
+        private int pillsUsed;
+
+        FakeChangePort(FakeCharacterPort characters, int changes, int pills) {
+            this.characters = characters;
+            this.changes = changes;
+            this.pills = pills;
+        }
+
+        @Override
+        public void lockInventory(Transaction tx, long characterId) {}
+
+        @Override
+        public int lockChangeCount(Transaction tx, long characterId) {
+            return changes;
+        }
+
+        @Override
+        public boolean takePill(Transaction tx, long characterId) {
+            if (pills == 0) {
+                return false;
+            }
+            pills--;
+            pillsUsed++;
+            return true;
+        }
+
+        @Override
+        public void recordChange(Transaction tx, long characterId, Faction faction, boolean pillUsed) {
+            characters.updateFaction(characterId, faction);
+            changes++;
+        }
+    }
+
+    private static SelectFactionUseCase useCase(FakeCharacterPort port, FakeChangePort changes) {
+        return new SelectFactionUseCase(port, changes, action -> action.accept(null));
+    }
+
+    @Test
+    void secondChangeIsFree_belowLevelThirty() {
+        FakeCharacterPort port = new FakeCharacterPort(characterAtLevel(29));
+        FakeChangePort changes = new FakeChangePort(port, 1, 0);
+
+        useCase(port, changes).execute(1L, Faction.THO);
+
+        assertThat(port.findById(1L).orElseThrow().faction()).isEqualTo(Faction.THO);
+        assertThat(changes.pillsUsed).isZero();
+    }
+
+    @Test
+    void secondChangeAtLevelThirtyCostsAPill() {
+        FakeCharacterPort port = new FakeCharacterPort(characterAtLevel(30));
+        FakeChangePort changes = new FakeChangePort(port, 1, 2);
+
+        useCase(port, changes).execute(1L, Faction.THO);
+
+        assertThat(changes.pillsUsed).isEqualTo(1);
+        assertThat(port.findById(1L).orElseThrow().faction()).isEqualTo(Faction.THO);
+    }
+
+    @Test
+    void thirdChangeWithoutAPillIsRefused_andNothingChanges() {
+        FakeCharacterPort port = new FakeCharacterPort(characterAtLevel(12));
+        FakeChangePort changes = new FakeChangePort(port, 2, 0);
+
+        assertThatThrownBy(() -> useCase(port, changes).execute(1L, Faction.THO))
+                .isInstanceOf(FactionChangePillRequiredException.class);
+        assertThat(port.findById(1L).orElseThrow().faction()).isEqualTo(Faction.HOA);
+        assertThat(changes.changes).isEqualTo(2);
+    }
+
+    @Test
+    void choosingTheCurrentFactionIsRefused_withoutSpendingAnything() {
+        FakeCharacterPort port = new FakeCharacterPort(characterAtLevel(40));
+        FakeChangePort changes = new FakeChangePort(port, 5, 1);
+
+        assertThatThrownBy(() -> useCase(port, changes).execute(1L, Faction.HOA))
+                .isInstanceOf(FactionUnchangedException.class);
+        assertThat(changes.pillsUsed).isZero();
     }
 }

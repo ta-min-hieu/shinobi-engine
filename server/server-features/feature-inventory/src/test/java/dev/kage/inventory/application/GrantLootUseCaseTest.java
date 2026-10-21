@@ -98,6 +98,21 @@ class GrantLootUseCaseTest {
         assertThat(inventoryPort.saved.items()).containsExactly(ItemStack.newItem(100L, 2, 0));
     }
 
+    @Test
+    void shouldRollTheTableTwice_whenADropEventDoublesTheRollCount() {
+        // ADR-067 — sự kiện x2 rơi đồ: hai lượt roll độc lập; món không xếp chồng ⇒ hai ô.
+        List<DropTableEntry> entries = List.of(new DropTableEntry(100L, 100, 1, 1));
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(1L, 10, List.of()));
+        GrantLootUseCase useCase = new GrantLootUseCase(
+                        new FakeDropTablePort(entries), inventoryPort, templatePortWithMaxStack(1), DIRECT_TX)
+                .withRollCount(() -> 2);
+
+        List<ItemStack> granted = useCase.execute(1L, "any_code");
+
+        assertThat(granted).hasSize(2);
+        assertThat(inventoryPort.saved.items()).hasSize(2);
+    }
+
     /**
      * Mỗi chồng đồ rơi vào túi để lại một dòng audit (quyết định chủ dự án 2026-10-11) — rơi đồ là nguồn
      * sinh vật phẩm lớn nhất và trước đó không có dấu vết nào. Chồng KHÔNG vào được túi thì không ghi.

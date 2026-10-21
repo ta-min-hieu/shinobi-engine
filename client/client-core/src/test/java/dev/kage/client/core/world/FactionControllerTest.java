@@ -32,11 +32,12 @@ class FactionControllerTest {
     }
 
     @Test
-    @DisplayName("Đã đổi hệ rồi thì đóng lối vào lại, dù server vẫn cho đổi tiếp")
-    void hidesEntranceAfterLeavingTheStartingFaction() {
+    @DisplayName("ADR-066: đã đổi hệ vẫn mở được cửa sổ (đổi lại), nhưng không nhắc lại lời mời")
+    void keepsEntranceAfterLeavingTheStartingFactionButStopsAnnouncing() {
         controller.onCharacterState(30, Faction.FACTION_THUY);
 
-        assertThat(controller.canOffer()).isFalse();
+        assertThat(controller.canOffer()).isTrue();
+        assertThat(controller.shouldAnnounce()).isFalse();
     }
 
     @Test
@@ -55,22 +56,27 @@ class FactionControllerTest {
     }
 
     @Test
-    @DisplayName("Server xác nhận xong thì hệ phái đổi, và lối vào đóng lại")
+    @DisplayName("Server xác nhận xong thì hệ phái đổi, và thôi nhắc lời mời")
     void confirmedSelectionAdoptsTheNewFaction() {
         controller.onCharacterState(12, Faction.FACTION_HOA);
+        assertThat(controller.shouldAnnounce()).isTrue();
 
         controller.onSelectionConfirmed(Faction.FACTION_LOI);
 
         assertThat(controller.faction()).isEqualTo(Faction.FACTION_LOI);
-        assertThat(controller.canOffer()).isFalse();
+        assertThat(controller.shouldAnnounce()).isFalse();
     }
 
     @Test
-    @DisplayName("Bốn hệ chọn được = mọi hệ TRỪ hệ khởi đầu, đúng thứ tự enum của character.proto")
-    void selectableIsEveryFactionButTheStartingOne() {
+    @DisplayName("ADR-066: cả năm hệ chọn được (đổi về Hỏa cũng được), đúng thứ tự enum của character.proto")
+    void selectableIsEveryFaction() {
         assertThat(FactionController.SELECTABLE)
-                .containsExactly(Faction.FACTION_THUY, Faction.FACTION_PHONG, Faction.FACTION_LOI, Faction.FACTION_THO)
-                .doesNotContain(FactionController.STARTING_FACTION);
+                .containsExactly(
+                        Faction.FACTION_HOA,
+                        Faction.FACTION_THUY,
+                        Faction.FACTION_PHONG,
+                        Faction.FACTION_LOI,
+                        Faction.FACTION_THO);
     }
 
     @Test

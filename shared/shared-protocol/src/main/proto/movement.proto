@@ -149,3 +149,22 @@ message WorldChangedEvent {
   int32 current_hp = 5;
   int32 max_hp = 6;
 }
+
+// ADR-067 — loại sự kiện nhân đôi.
+enum GameEventType {
+  GAME_EVENT_TYPE_UNSPECIFIED = 0;
+  GAME_EVENT_TYPE_EXP = 1;  // EXP đánh quái (không gồm thưởng nhiệm vụ)
+  GAME_EVENT_TYPE_DROP = 2; // số lượt roll bảng rơi đồ
+}
+
+message GameEventView {
+  GameEventType type = 1;
+  int32 multiplier = 2;
+  int64 ends_at_epoch_seconds = 3;
+}
+
+// Event: Server -> Client (OPCODE_GAME_EVENTS_CHANGED_EVENT). TOÀN BỘ sự kiện còn hiệu lực — rỗng = vừa
+// tắt hết. Hết hạn tự nhiên thì KHÔNG có gói nào: client tự ẩn theo ends_at.
+message GameEventsChangedEvent {
+  repeated GameEventView events = 1;
+}

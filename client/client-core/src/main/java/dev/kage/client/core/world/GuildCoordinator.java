@@ -3,6 +3,7 @@ package dev.kage.client.core.world;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
@@ -15,8 +16,11 @@ import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.ApproveGuildJoinRequestResponse;
 import dev.kage.protocol.CreateGuildResponse;
 import dev.kage.protocol.DisbandGuildResponse;
+import dev.kage.protocol.DonateToGuildCommand;
+import dev.kage.protocol.DonateToGuildResponse;
 import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.GetMyGuildResponse;
+import dev.kage.protocol.GuildProgressView;
 import dev.kage.protocol.KickGuildMemberResponse;
 import dev.kage.protocol.LeaveGuildResponse;
 import dev.kage.protocol.ListGuildMembersResponse;
@@ -50,6 +54,9 @@ final class GuildCoordinator implements WindowFlow {
     /** Không có lệnh Tạo bang nào đang chờ — sequenceId thật luôn dương. */
     private static final int NO_PENDING_CREATE = -1;
 
+    /** Một lần bấm "Góp" — đúng bậc nhỏ nhất server nhận (ADR-068 D2). */
+    private static final long DONATION_STEP = 1_000L;
+
     private final GuildController controller = new GuildController();
     private final GuildPanel panel;
     private final WorldCommandSender sender;
@@ -81,6 +88,7 @@ final class GuildCoordinator implements WindowFlow {
         panel.setOnReject(sender::rejectGuildJoinRequest);
         panel.setOnLeave(sender::leaveGuild);
         panel.setOnDisband(sender::disbandGuild);
+        panel.setOnDonate(this::donate);
         panel.setStatus(text("guild.hint.open"));
         refreshView();
     }
@@ -183,6 +191,9 @@ final class GuildCoordinator implements WindowFlow {
         } else if (opcode == Opcode.OPCODE_KICK_GUILD_MEMBER_RESPONSE_VALUE) {
             settle(GuildController.kickMessageKey(
                     KickGuildMemberResponse.parseFrom(payload).getOutcome()));
+        } else if (opcode == Opcode.OPCODE_DONATE_TO_GUILD_RESPONSE_VALUE) {
+            settle(GuildController.donateMessageKey(
+                    DonateToGuildResponse.parseFrom(payload).getOutcome()));
         } else {
             return false;
         }
@@ -215,6 +226,17 @@ final class GuildCoordinator implements WindowFlow {
         sender.requestPendingGuildJoinRequests();
     }
 
+    /** ADR-068 — góp một bậc {@link #DONATION_STEP}; server kiểm vàng + bang, có khoá chống trùng. */
+    private void donate() {
+        sender.sendReadRequest(
+                Opcode.OPCODE_DONATE_TO_GUILD_COMMAND_VALUE,
+                DonateToGuildCommand.newBuilder()
+                        .setAmount(DONATION_STEP)
+                        .setIdempotencyKey(UUID.randomUUID().toString())
+                        .build());
+        panel.setStatus(text("guild.status.donating"));
+    }
+
     private void submitName(String typed, Consumer<String> send) {
         GuildController.ComposeResult result = controller.composeGuildName(typed);
         switch (result) {
@@ -238,6 +260,7 @@ final class GuildCoordinator implements WindowFlow {
     private void showGuild(String guildName) {
         boolean leader = controller.isLeader();
         panel.showGuild(guildName + " — " + text(leader ? "guild.label.leader" : "guild.label.member"), leader);
+        panel.setProgress(progressText(controller.progress()));
         refreshMembers(leader);
         refreshPendingRequests();
     }
@@ -269,11 +292,36 @@ final class GuildCoordinator implements WindowFlow {
         panel.setPendingRequests(requestRows, overflowNotice(all.size() - shown));
     }
 
-    /** Ghép một dòng thành viên: {@code Tên — Vai trò · Trạng thái}. */
+    /** Ghép một dòng thành viên: {@code Tên — Vai trò · Trạng thái · Cống hiến}. */
     private String memberText(GuildController.Member member) {
         String role = text(member.leader() ? "guild.label.leader" : "guild.label.member");
         String presence = text(member.online() ? "guild.label.online" : "guild.label.offline");
-        return member.name() + " — " + role + " · " + presence;
+        return member.name() + " — " + role + " · " + presence + " · "
+                + format("guild.label.contribution", controller.contributionOf(member.characterId()));
+    }
+
+    /** ADR-068/069 — hai dòng: cấp bang + cống hiến, rồi nhiệm vụ tuần. Số do server gửi. */
+    private String progressText(GuildProgressView progress) {
+        String level = progress.getExpForNextLevel() == 0
+                ? KageI18n.formatOrKey(
+                        i18n,
+                        "guild.progress.level_max",
+                        progress.getLevel(),
+                        progress.getMaxMembers(),
+                        progress.getMyContribution())
+                : KageI18n.formatOrKey(
+                        i18n,
+                        "guild.progress.level",
+                        progress.getLevel(),
+                        progress.getExp(),
+                        progress.getExpForNextLevel(),
+                        progress.getMaxMembers(),
+                        progress.getMyContribution());
+        String weekly = progress.getWeeklyCompleted()
+                ? text("guild.progress.weekly_done")
+                : KageI18n.formatOrKey(
+                        i18n, "guild.progress.weekly", progress.getWeeklyKills(), progress.getWeeklyTarget());
+        return level + "\n" + weekly;
     }
 
     /**

@@ -53,12 +53,12 @@ final class FactionController {
     static final int MIN_LEVEL = 10;
 
     /**
-     * Bốn hệ chọn được — mọi hệ TRỪ hệ khởi đầu, đúng thứ tự khai báo trong enum {@code Faction}
-     * (character.proto). Danh sách dựng SẴN một lần: nó không bao giờ đổi, và nó được hỏi mỗi lần
-     * cửa sổ vẽ lại.
+     * Năm hệ chọn được (ADR-066: đổi lại được, kể cả về Hỏa), đúng thứ tự khai báo trong enum
+     * {@code Faction} (character.proto). Chọn đúng hệ đang có ⇒ server từ chối, không tốn gì. Danh sách
+     * dựng SẴN một lần: nó không bao giờ đổi, và nó được hỏi mỗi lần cửa sổ vẽ lại.
      */
-    static final List<Faction> SELECTABLE =
-            List.of(Faction.FACTION_THUY, Faction.FACTION_PHONG, Faction.FACTION_LOI, Faction.FACTION_THO);
+    static final List<Faction> SELECTABLE = List.of(
+            Faction.FACTION_HOA, Faction.FACTION_THUY, Faction.FACTION_PHONG, Faction.FACTION_LOI, Faction.FACTION_THO);
 
     /** Khoá i18n tên hiển thị từng hệ — dùng chung với màn hình chọn nhân vật, không đặt tên mới. */
     private static final Map<Faction, String> NAME_KEYS = Map.of(
@@ -102,14 +102,16 @@ final class FactionController {
     }
 
     /**
-     * Có bày lối vào chọn hệ phái ra hay không: đủ cấp VÀ vẫn còn ở hệ khởi đầu.
-     *
-     * <p>Server cho đổi lại nhiều lần (SelectFactionUseCase chỉ gate cấp độ — "đổi 1 lần miễn phí
-     * trước Lv30" của GDD chưa cài), nhưng lối vào ở client vẫn đóng lại sau lần đầu: đây là một
-     * cửa sổ để LỠ TAY bấm nhầm thì mất cả một hệ phái, không phải một bảng cài đặt.
+     * Có cho mở cửa sổ chọn linh căn không: đủ cấp. ADR-066 — đổi lại được (lần thứ hai miễn phí dưới
+     * Lv30, sau đó tốn Tẩy Căn Đan); server quyết chi phí, client chỉ ẩn lối vào khi chưa đủ cấp.
      */
     boolean canOffer() {
-        return level >= MIN_LEVEL && faction == STARTING_FACTION;
+        return level >= MIN_LEVEL;
+    }
+
+    /** Lời mời "nhấn H" chỉ dành cho người CHƯA thức tỉnh — người đã chọn không cần được nhắc lại. */
+    boolean shouldAnnounce() {
+        return canOffer() && faction == STARTING_FACTION;
     }
 
     int level() {

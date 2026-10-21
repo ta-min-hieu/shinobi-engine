@@ -96,6 +96,11 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-062](ADR-062-Achievements-And-Titles.md) | Thành tựu + danh hiệu — 9 mốc (V64), danh hiệu trong chat, dải opcode MỚI 1700–1704, module `feature-achievement` | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Ngoài cấp/Lực Chiến không có mục tiêu dài hạn nhìn thấy được |
 | [ADR-063](ADR-063-Market.md) | Phường thị — treo bán món chưa cường hoá, giá cố định, phí 5% (sink), hết hạn 48h trả qua thư (V65, opcode 1006–1014, module `feature-market`) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | Bán đồ cho người lạ phải cùng online + giao dịch trực tiếp; GDD §10 đòi phí đấu giá làm gold sink |
 | [ADR-064](ADR-064-Spirit-Jade-Sockets.md) | Linh Ngọc khảm nạm — 4 loại ngọc, 1 ô/trang bị, 50% + bảo hiểm sau 3 lần hỏng, phí 200 (V66, opcode 520/521) | ✅ **Accepted** *(2026-10-18, lô 16)* — thi hành cùng ngày | GDD hứa "bonus phụ có pity" + gold sink khảm nạm |
+| [ADR-065](ADR-065-Item-Sets.md) | Bộ pháp khí — thưởng bậc 2/4/6 theo số mẫu khác nhau đang mặc, hai bộ Tạp Dịch/Ngoại Môn (V67, `GetCharacterStatsResponse.item_sets`) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD hứa bộ 4/6/8 món; mặc trọn bộ không khác mặc lẫn |
+| [ADR-066](ADR-066-Faction-Change.md) | Đổi linh căn — thức tỉnh + một lần dưới Lv30 miễn phí, sau đó tốn Tẩy Căn Đan (V68 `faction_changes`) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | Đổi hệ không giới hạn, không tốn gì; GDD §4 |
+| [ADR-067](ADR-067-Double-Events.md) | Sự kiện nhân đôi EXP/rơi đồ — `/gm event` (ADMIN), sống qua khởi động lại (V69, opcode 309) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD §8 sự kiện bật/tắt không deploy |
+| [ADR-068](ADR-068-Guild-Level-And-Contribution.md) | Cấp bang 1–5 + cống hiến — góp linh thạch bội số 1.000 (sink), sĩ số 50+10/cấp, thẻ Bang hội ở Bia Anh Danh (V70, opcode 721/722) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | Bang không có gì để cùng cày; GDD §7 cấp bang |
+| [ADR-069](ADR-069-Guild-Weekly-Quest.md) | Nhiệm vụ bang tuần — cả bang hạ 300 yêu thú/tuần, thưởng thư 2.000 mỗi thành viên + 5.000 kinh nghiệm bang (V70) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD §7/§8 nhiệm vụ bang hợp tác |
 ---
 
 ## ADR cần tạo (chưa viết)

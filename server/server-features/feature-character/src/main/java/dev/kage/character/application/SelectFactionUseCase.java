@@ -3,25 +3,37 @@ package dev.kage.character.application;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.Faction;
+import dev.kage.character.domain.FactionChangePolicy;
+import dev.kage.character.domain.FactionChangePort;
+import dev.kage.character.domain.TransactionRunner;
 
 /**
- * Chọn/đổi hệ phái khi nhân vật đủ Lv10 (GDD §4 "chọn hệ ở Lv10", Phase 8 4 hệ phái mới).
- * {@code characterId} do gateway truyền vào SAU KHI đã verify sở hữu qua session (đã bound lúc
- * {@code SelectCharacterRequest}, Điều 24) — UseCase này không nhận {@code accountId}.
+ * Chọn/đổi linh căn khi nhân vật đủ Lv10 (GDD §4). {@code characterId} do gateway truyền vào SAU KHI đã
+ * verify sở hữu qua session (đã bound lúc {@code SelectCharacterRequest}, Điều 24) — UseCase này không
+ * nhận {@code accountId}.
  *
- * <p>Scope cut có chủ đích (cùng tinh thần feature-character/CLAUDE.md "Quyết định MVP"): GDD nói
- * "đổi 1 lần miễn phí trước Lv30, sau đó tốn Đá Chuyển Hệ" — lát cắt này CHỈ gate {@code level>=10},
- * CHƯA đếm số lần đổi/enforce tốn item (cần thêm cột DB {@code faction_change_count} + item "Đá
- * Chuyển Hệ" ở feature-inventory, để dành lát cắt sau).
+ * <p>ADR-066: lần đầu (thức tỉnh) miễn phí, lần thứ hai miễn phí nếu dưới Lv30, sau đó mỗi lần tốn một Tẩy
+ * Căn Đan ({@link FactionChangePolicy}). Đếm + tiêu đan + ghi hệ mới trong MỘT transaction, dưới khoá túi
+ * đồ rồi khoá dòng nhân vật — hai lệnh đổi song song không cùng hưởng một lần miễn phí.
  */
 public final class SelectFactionUseCase {
 
-    static final int MIN_LEVEL = 10;
+    static final int MIN_LEVEL = FactionChangePolicy.MIN_LEVEL;
 
     private final CharacterPort characterPort;
+    private final FactionChangePort changePort;
+    private final TransactionRunner transactionRunner;
 
+    /** Không có túi đồ/đan — bộ đếm trong bộ nhớ (composition test). */
     public SelectFactionUseCase(CharacterPort characterPort) {
+        this(characterPort, FactionChangePort.inMemory(characterPort), action -> action.accept(null));
+    }
+
+    public SelectFactionUseCase(
+            CharacterPort characterPort, FactionChangePort changePort, TransactionRunner transactionRunner) {
         this.characterPort = characterPort;
+        this.changePort = changePort;
+        this.transactionRunner = transactionRunner;
     }
 
     public Character execute(long characterId, Faction faction) {
@@ -30,7 +42,18 @@ public final class SelectFactionUseCase {
         if (character.level() < MIN_LEVEL) {
             throw new FactionSelectionLevelTooLowException(characterId, character.level(), MIN_LEVEL);
         }
-        characterPort.updateFaction(characterId, faction);
+        if (character.faction() == faction) {
+            throw new FactionUnchangedException(characterId);
+        }
+        transactionRunner.inTransaction(tx -> {
+            changePort.lockInventory(tx, characterId);
+            int changes = changePort.lockChangeCount(tx, characterId);
+            boolean free = FactionChangePolicy.isFree(changes, character.level());
+            if (!free && !changePort.takePill(tx, characterId)) {
+                throw new FactionChangePillRequiredException(characterId);
+            }
+            changePort.recordChange(tx, characterId, faction, !free);
+        });
         return new Character(
                 character.id(),
                 character.accountId(),

@@ -1,6 +1,7 @@
 package dev.kage.client.core.world;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -9,8 +10,10 @@ import dev.kage.client.core.render.FontFactory;
 import dev.kage.protocol.ApproveGuildJoinRequestOutcome;
 import dev.kage.protocol.CreateGuildOutcome;
 import dev.kage.protocol.DisbandGuildOutcome;
+import dev.kage.protocol.DonateToGuildOutcome;
 import dev.kage.protocol.GetMyGuildResponse;
 import dev.kage.protocol.GuildMemberView;
+import dev.kage.protocol.GuildProgressView;
 import dev.kage.protocol.KickGuildMemberOutcome;
 import dev.kage.protocol.LeaveGuildOutcome;
 import dev.kage.protocol.ListGuildMembersResponse;
@@ -100,6 +103,12 @@ final class GuildController {
 
     private final List<PendingRequest> pendingRequests = new ArrayList<>();
 
+    /** ADR-068 — cống hiến theo thành viên của lần liệt kê gần nhất. */
+    private final Map<Long, Long> contributions = new HashMap<>();
+
+    /** ADR-068/069 — cấp bang + nhiệm vụ tuần, theo lời server (mặc định rỗng = chưa biết). */
+    private GuildProgressView progress = GuildProgressView.getDefaultInstance();
+
     /**
      * Bang của mình, theo lời server. Đây là đường DUY NHẤT trạng thái "đang ở trong bang" thay đổi —
      * xem javadoc lớp về việc vì sao không có {@code onCreateOk()}.
@@ -109,6 +118,7 @@ final class GuildController {
      */
     void onMyGuild(GetMyGuildResponse response) {
         inGuild = response.getInGuild();
+        progress = response.getProgress();
         if (!inGuild) {
             guildId = 0L;
             guildName = "";
@@ -125,7 +135,9 @@ final class GuildController {
     /** Danh sách thành viên mới nhất từ server — thay TOÀN BỘ, không trộn với bản cũ. */
     void onMembers(ListGuildMembersResponse response) {
         members.clear();
+        contributions.clear();
         for (GuildMemberView view : response.getMembersList()) {
+            contributions.put(view.getCharacterId(), view.getContribution());
             members.add(new Member(
                     view.getCharacterId(),
                     ChatController.sanitize(view.getName()),
@@ -206,6 +218,8 @@ final class GuildController {
         leader = false;
         members.clear();
         pendingRequests.clear();
+        contributions.clear();
+        progress = GuildProgressView.getDefaultInstance();
     }
 
     // ---------------------------------------------------------------------------------------------
@@ -314,5 +328,27 @@ final class GuildController {
 
     static Optional<String> kickMessageKey(KickGuildMemberOutcome outcome) {
         return messageKey(KICK_MESSAGE_KEYS, outcome);
+    }
+
+    /** Cấp bang + nhiệm vụ tuần mới nhất (ADR-068/069). */
+    GuildProgressView progress() {
+        return progress;
+    }
+
+    /** Cống hiến của một thành viên (0 nếu chưa biết). */
+    long contributionOf(long characterId) {
+        return contributions.getOrDefault(characterId, 0L);
+    }
+
+    /** Khoá i18n cho kết quả góp linh thạch; rỗng nếu client không nhận ra (server mới hơn). */
+    static Optional<String> donateMessageKey(DonateToGuildOutcome outcome) {
+        return switch (outcome) {
+            case DONATE_TO_GUILD_OUTCOME_OK -> Optional.of("guild.notice.donated");
+            case DONATE_TO_GUILD_OUTCOME_NOT_IN_GUILD -> Optional.of("guild.error.not_in_guild");
+            case DONATE_TO_GUILD_OUTCOME_INSUFFICIENT_GOLD -> Optional.of("guild.error.insufficient_gold");
+            case DONATE_TO_GUILD_OUTCOME_INVALID_AMOUNT -> Optional.of("guild.error.invalid_amount");
+            case DONATE_TO_GUILD_OUTCOME_DUPLICATE_REQUEST -> Optional.of("guild.notice.donated");
+            default -> Optional.empty();
+        };
     }
 }

@@ -1,5 +1,6 @@
 package dev.kage.server.database;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,12 +36,16 @@ import dev.kage.friend.application.ListPendingFriendRequestsUseCase;
 import dev.kage.friend.application.RejectFriendRequestUseCase;
 import dev.kage.friend.application.RemoveFriendUseCase;
 import dev.kage.friend.application.SendFriendRequestUseCase;
+import dev.kage.gm.api.GameEventFacade;
 import dev.kage.gm.api.GmFacade;
+import dev.kage.gm.domain.GameEventKind;
 import dev.kage.guild.api.GuildFacade;
+import dev.kage.guild.api.GuildProgressionFacade;
 import dev.kage.guild.application.ApproveGuildJoinRequestUseCase;
 import dev.kage.guild.application.CreateGuildUseCase;
 import dev.kage.guild.application.DisbandGuildUseCase;
 import dev.kage.guild.application.FindMyGuildUseCase;
+import dev.kage.guild.application.GuildProgressionUseCase;
 import dev.kage.guild.application.GuildUseCases;
 import dev.kage.guild.application.KickGuildMemberUseCase;
 import dev.kage.guild.application.LeaveGuildUseCase;
@@ -98,15 +103,18 @@ import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.achievement.PostgresAchievementAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
+import dev.kage.server.database.character.PostgresFactionChangeAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.chat.PostgresChatMuteAdapter;
 import dev.kage.server.database.checkin.PostgresCheckInAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcPlacementAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
+import dev.kage.server.database.gm.PostgresGameEventAdapter;
 import dev.kage.server.database.gm.PostgresGmAuditAdapter;
 import dev.kage.server.database.gm.PostgresGmRoleAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
+import dev.kage.server.database.guild.PostgresGuildProgressionAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
@@ -116,6 +124,7 @@ import dev.kage.server.database.inventory.PostgresGoldAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryIdempotencyAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryTradeOfferAdapter;
+import dev.kage.server.database.inventory.PostgresItemSetAdapter;
 import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
 import dev.kage.server.database.inventory.PostgresStorageAdapter;
 import dev.kage.server.database.inventory.ThreadLocalGemRoll;
@@ -185,6 +194,7 @@ import dev.kage.world.api.WorldGeometryFacade;
 public final class ServerDatabaseBootstrap {
 
     private final DataSource dataSource;
+    private GameEventFacade gameEvents;
     private final RedisClient redisClient;
     private final RetentionJanitor retentionJanitor;
 
@@ -234,7 +244,8 @@ public final class ServerDatabaseBootstrap {
         CreateCharacterUseCase createUseCase = new CreateCharacterUseCase(characterPort, transactionRunner);
         ListCharactersUseCase listUseCase = new ListCharactersUseCase(characterPort);
         SelectCharacterUseCase selectUseCase = new SelectCharacterUseCase(characterPort);
-        SelectFactionUseCase selectFactionUseCase = new SelectFactionUseCase(characterPort);
+        SelectFactionUseCase selectFactionUseCase =
+                new SelectFactionUseCase(characterPort, new PostgresFactionChangeAdapter(), transactionRunner);
         CharacterUseCases useCases = new CharacterUseCases(
                 createUseCase,
                 listUseCase,
@@ -254,16 +265,16 @@ public final class ServerDatabaseBootstrap {
         PostgresInventoryIdempotencyAdapter idempotencyPort = new PostgresInventoryIdempotencyAdapter();
         JdbcInventoryTransactionRunner transactionRunner = new JdbcInventoryTransactionRunner(dataSource);
         AddItemUseCase addItemUseCase = new AddItemUseCase(inventoryPort, itemTemplatePort, transactionRunner);
-        GrantLootUseCase grantLootUseCase = new GrantLootUseCase(
-                        dropTablePort, inventoryPort, itemTemplatePort, transactionRunner)
-                .auditedBy(auditPort);
+        GrantLootUseCase grantLootUseCase =
+                grantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, transactionRunner);
         EquipItemUseCase equipItemUseCase =
                 new EquipItemUseCase(inventoryPort, itemTemplatePort, equipmentPort, transactionRunner);
         UnequipItemUseCase unequipItemUseCase =
                 new UnequipItemUseCase(equipmentPort, transactionRunner).guardedBy(inventoryPort);
         PostgresGemAdapter gemPort = new PostgresGemAdapter(dataSource);
-        ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase =
-                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort, gemPort);
+        ComputeEquipmentBonusUseCase computeEquipmentBonusUseCase = new ComputeEquipmentBonusUseCase(
+                        equipmentPort, inventoryPort, itemTemplatePort, gemPort)
+                .withItemSets(new PostgresItemSetAdapter(dataSource));
         EquipmentUseCases equipmentUseCases =
                 new EquipmentUseCases(equipItemUseCase, unequipItemUseCase, computeEquipmentBonusUseCase);
         EnhancePorts enhancePorts = new EnhancePorts(
@@ -524,6 +535,34 @@ public final class ServerDatabaseBootstrap {
     public ChatFacade wireChatFacade() {
         PostgresChatAuditAdapter auditPort = new PostgresChatAuditAdapter(dataSource);
         return new ChatFacade(new SendChatMessageUseCase(auditPort), new PostgresChatMuteAdapter(dataSource));
+    }
+
+    /** ADR-068/069 — cấp bang, cống hiến, nhiệm vụ tuần. */
+    public GuildProgressionFacade wireGuildProgressionFacade() {
+        return new GuildProgressionFacade(
+                new GuildProgressionUseCase(new PostgresGuildProgressionAdapter(dataSource), Clock.systemUTC()));
+    }
+
+    /** Rơi đồ có audit (2026-10-11) và số lượt roll theo sự kiện nhân đôi (ADR-067). */
+    private GrantLootUseCase grantLootUseCase(
+            PostgresDropTableAdapter dropTablePort,
+            PostgresInventoryAdapter inventoryPort,
+            PostgresItemTemplateAdapter itemTemplatePort,
+            JdbcInventoryTransactionRunner transactionRunner) {
+        return new GrantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, transactionRunner)
+                .auditedBy(new PostgresAuditAdapter())
+                .withRollCount(() -> wireGameEventFacade().multiplier(GameEventKind.DROP));
+    }
+
+    /**
+     * ADR-067 — sự kiện nhân đôi. MỘT bản cho cả tiến trình (rơi đồ ở đây và EXP/lệnh GM ở gateway cùng đọc
+     * một trạng thái) — tạo lần đầu được hỏi, đọc DB lúc đó.
+     */
+    public synchronized GameEventFacade wireGameEventFacade() {
+        if (gameEvents == null) {
+            gameEvents = new GameEventFacade(new PostgresGameEventAdapter(dataSource), Clock.systemUTC());
+        }
+        return gameEvents;
     }
 
     /** ADR-052 — quyền GM (chỉ đọc) + sổ audit write-ahead. */

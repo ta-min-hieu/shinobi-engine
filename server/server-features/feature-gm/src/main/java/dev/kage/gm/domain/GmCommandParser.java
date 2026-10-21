@@ -2,6 +2,7 @@ package dev.kage.gm.domain;
 
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -67,7 +68,8 @@ public final class GmCommandParser {
             Map.entry("mute", GmCommandParser::mute),
             Map.entry("give", GmCommandParser::give),
             Map.entry("gold", GmCommandParser::gold),
-            Map.entry("inspect", words -> oneTarget(words, "inspect <name>", GmCommand.Inspect::new)));
+            Map.entry("inspect", words -> oneTarget(words, "inspect <name>", GmCommand.Inspect::new)),
+            Map.entry("event", GmCommandParser::event));
 
     private static Parsed oneTarget(String[] words, String usage, Function<String, GmCommand> make) {
         return words.length == 2 ? new Parsed.Ok(make.apply(words[1])) : invalid(usage);
@@ -101,6 +103,37 @@ public final class GmCommandParser {
         }
         long amount = parseLong(words[2]);
         return amount >= 1 && amount <= MAX_GOLD ? new Parsed.Ok(new GmCommand.Gold(words[1], amount)) : invalid(usage);
+    }
+
+    private static Parsed event(String[] words) {
+        String usage = "event <exp|drop> <multiplier " + GameEvent.MIN_MULTIPLIER + "-" + GameEvent.MAX_MULTIPLIER
+                + "> <minutes 1-" + MAX_MUTE_MINUTES + "> | event <exp|drop> off";
+        Optional<GameEventKind> parsedKind = words.length >= 2 ? eventKind(words[1]) : Optional.empty();
+        if (parsedKind.isEmpty()) {
+            return invalid(usage);
+        }
+        GameEventKind kind = parsedKind.get();
+        if (words.length == 3 && "off".equalsIgnoreCase(words[2])) {
+            return new Parsed.Ok(new GmCommand.Event(kind, 0, 0));
+        }
+        if (words.length != 4) {
+            return invalid(usage);
+        }
+        int multiplier = parseInt(words[2]);
+        int minutes = parseInt(words[3]);
+        boolean valid = multiplier >= GameEvent.MIN_MULTIPLIER
+                && multiplier <= GameEvent.MAX_MULTIPLIER
+                && minutes >= 1
+                && minutes <= MAX_MUTE_MINUTES;
+        return valid ? new Parsed.Ok(new GmCommand.Event(kind, multiplier, minutes)) : invalid(usage);
+    }
+
+    private static Optional<GameEventKind> eventKind(String raw) {
+        return switch (raw.toLowerCase(Locale.ROOT)) {
+            case "exp" -> Optional.of(GameEventKind.EXP);
+            case "drop" -> Optional.of(GameEventKind.DROP);
+            default -> Optional.empty();
+        };
     }
 
     private static Parsed announce(String rest) {

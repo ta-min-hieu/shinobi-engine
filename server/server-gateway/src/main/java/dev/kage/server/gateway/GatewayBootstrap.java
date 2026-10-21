@@ -21,6 +21,7 @@ import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.engine.scripting.ScriptSandbox;
 import dev.kage.engine.scripting.ScriptValidator;
 import dev.kage.friend.api.FriendFacade;
+import dev.kage.gm.domain.GameEventKind;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.mail.api.MailFacade;
@@ -112,7 +113,11 @@ public final class GatewayBootstrap {
         ConnectedCharacterRegistry characterRegistry = new ConnectedCharacterRegistry(
                 facades.inventoryFacade(),
                 facades.contentFacades().questFacade(),
-                facades.characterFacade()::grantExperience,
+                // ADR-067 — EXP đánh quái (cả phần đồng đội) nhân theo sự kiện đang chạy; thưởng quest không đi đây.
+                (characterId, amount) -> facades.characterFacade()
+                        .grantExperience(
+                                characterId,
+                                amount * facades.progression().gameEvents().multiplier(GameEventKind.EXP)),
                 metricsContext.networkMetrics());
         wireGoldChangeNotifications(databaseBootstrap, characterRegistry);
         WorldContext worldContext = startWorld(
@@ -311,6 +316,10 @@ public final class GatewayBootstrap {
         // Cùng lý do: "đồng đội cùng World" chỉ tra được khi mọi bảng định tuyến đã có.
         characterRegistry.shareKillRewardsThrough(
                 KillRewardSharing.of(facades.contentFacades().socialFacades().partyFacade(), worldGateway));
+        characterRegistry.guildProgress.bind(
+                facades.progression().guildProgression(),
+                facades.contentFacades().socialFacades().mailFacade(),
+                (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
         characterRegistry.achievements.bind(
                 facades.progression().achievementFacade(),
                 (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
@@ -416,7 +425,9 @@ public final class GatewayBootstrap {
         ProgressionFacades progression = new ProgressionFacades(
                 databaseBootstrap.wireCheckInFacade(new CheckInMailSender(mailFacade, inventoryFacade)),
                 databaseBootstrap.wireAchievementFacade(),
-                databaseBootstrap.wireMarketFacade());
+                databaseBootstrap.wireMarketFacade(),
+                databaseBootstrap.wireGameEventFacade(),
+                databaseBootstrap.wireGuildProgressionFacade());
         return new GatewayFacades(
                 accountFacade,
                 characterFacade,

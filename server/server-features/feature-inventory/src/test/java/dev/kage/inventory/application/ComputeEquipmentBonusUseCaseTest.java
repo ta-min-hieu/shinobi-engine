@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.LongFunction;
 
 import org.junit.jupiter.api.Test;
@@ -15,6 +16,9 @@ import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.EquipmentSlotType;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
+import dev.kage.inventory.domain.ItemSet;
+import dev.kage.inventory.domain.ItemSetPort;
+import dev.kage.inventory.domain.ItemSetTier;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
@@ -158,5 +162,35 @@ class ComputeEquipmentBonusUseCaseTest {
         EquipmentBonus bonus = useCase.execute(CHARACTER_ID);
 
         assertThat(bonus).isEqualTo(new EquipmentBonus(30, 10, 0, 0));
+    }
+
+    @Test
+    void shouldAddItemSetBonus_whenTwoDistinctPiecesOfASetAreWorn() {
+        // ADR-065 — thưởng bộ cộng vào tổng; hai món cùng mẫu chỉ đếm một.
+        ItemStack armor = new ItemStack(1L, 100L, 1, 0);
+        ItemStack ring = new ItemStack(2L, 200L, 1, 0);
+        ItemStack ringCopy = new ItemStack(3L, 200L, 1, 0);
+        InventoryPort inventoryPort = fakeInventoryPort(List.of(armor, ring, ringCopy));
+        EquipmentPort equipmentPort = fakeEquipmentPort(Map.of(
+                EquipmentSlotType.ARMOR, 1L, EquipmentSlotType.ACCESSORY_1, 2L, EquipmentSlotType.ACCESSORY_2, 3L));
+        ItemTemplatePort itemTemplatePort = fakeItemTemplatePort(itemTemplateId -> switch ((int) itemTemplateId) {
+            case 100 -> Optional.of(new ItemTemplate(100L, EquipmentSlotType.ARMOR, 1, 0, 2, 0, 0, 1, null, 0));
+            case 200 -> Optional.of(new ItemTemplate(200L, EquipmentSlotType.ACCESSORY_1, 1, 1, 0, 0, 0, 1, null, 0));
+            default -> Optional.empty();
+        });
+        ItemSetPort sets = () -> List.of(new ItemSet(
+                "item_set.novice.name",
+                Set.of(100L, 200L, 300L),
+                List.of(
+                        new ItemSetTier(2, new EquipmentBonus(0, 0, 0, 5)),
+                        new ItemSetTier(3, new EquipmentBonus(9, 9, 9, 9)))));
+        ComputeEquipmentBonusUseCase useCase =
+                new ComputeEquipmentBonusUseCase(equipmentPort, inventoryPort, itemTemplatePort).withItemSets(sets);
+
+        assertThat(useCase.execute(CHARACTER_ID)).isEqualTo(new EquipmentBonus(2, 2, 0, 5));
+        assertThat(useCase.itemSetProgress(CHARACTER_ID)).singleElement().satisfies(set -> {
+            assertThat(set.wornPieces()).isEqualTo(2);
+            assertThat(set.totalPieces()).isEqualTo(3);
+        });
     }
 }

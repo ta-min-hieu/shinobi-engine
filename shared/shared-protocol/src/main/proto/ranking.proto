@@ -15,6 +15,9 @@ enum LeaderboardKind {
   LEADERBOARD_KIND_REALM = 1;        // cảnh giới: cấp giảm dần, rồi EXP, rồi id tăng dần
   LEADERBOARD_KIND_ARENA = 2;        // Elo đấu trường — chỉ người đã đánh ít nhất một trận
   LEADERBOARD_KIND_COMBAT_POWER = 3; // Lực Chiến (ADR-056)
+  // ADR-068 — bang hội: name = TÊN BANG, level = cấp bang, value = kinh nghiệm bang, character_id = bang
+  // chủ, faction để trống; own_rank = hạng bang của người hỏi.
+  LEADERBOARD_KIND_GUILD = 4;
 }
 
 // Command: Client -> Server (OPCODE_GET_LEADERBOARD_REQUEST = 1202).

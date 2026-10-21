@@ -2,6 +2,7 @@ package dev.kage.guild.application;
 
 import java.util.Optional;
 
+import dev.kage.guild.domain.GuildLevelTable;
 import dev.kage.guild.domain.GuildMember;
 import dev.kage.guild.domain.GuildPort;
 import dev.kage.guild.domain.GuildRole;
@@ -16,17 +17,19 @@ public final class ApproveGuildJoinRequestUseCase {
     }
 
     /**
-     * Số thành viên tối đa của một bang, tính cả bang chủ (quyết định chủ dự án 2026-10-11). Trước đó
-     * không có trần. Kiểm ở đây, trước khi chạm đơn: chỉ bang chủ duyệt được và họ duyệt từng đơn một,
-     * nên "đếm rồi mới ghi" không có ai để đua cùng ngoài chính họ bấm hai lần.
+     * Số thành viên tối đa của một bang CẤP 1, tính cả bang chủ (quyết định chủ dự án 2026-10-11). Từ
+     * ADR-068 trần tăng theo cấp bang ({@link GuildLevelTable#maxMembers}). Kiểm ở đây, trước khi chạm đơn:
+     * chỉ bang chủ duyệt được và họ duyệt từng đơn một, nên "đếm rồi mới ghi" không có ai để đua cùng ngoài
+     * chính họ bấm hai lần.
      */
-    public static final int MAX_MEMBERS = 50;
+    public static final int MAX_MEMBERS = GuildLevelTable.BASE_MAX_MEMBERS;
 
     public Result execute(long requestId, long leaderCharacterId) {
         Optional<GuildMember> leader = port.findMembershipOf(leaderCharacterId);
         if (leader.isPresent()
                 && leader.get().role() == GuildRole.LEADER
-                && port.listMembers(leader.get().guildId()).size() >= MAX_MEMBERS) {
+                && port.listMembers(leader.get().guildId()).size()
+                        >= GuildLevelTable.maxMembers(port.levelOf(leader.get().guildId()))) {
             return Result.GUILD_FULL;
         }
         return switch (port.approveJoinRequest(requestId, leaderCharacterId)) {
@@ -40,7 +43,7 @@ public final class ApproveGuildJoinRequestUseCase {
         OK,
         NOT_FOUND,
         TARGET_ALREADY_IN_GUILD,
-        /** Bang đã đủ {@link #MAX_MEMBERS} người — đơn còn nguyên, duyệt lại được khi có chỗ. */
+        /** Bang đã đủ người theo cấp bang — đơn còn nguyên, duyệt lại được khi có chỗ. */
         GUILD_FULL
     }
 }

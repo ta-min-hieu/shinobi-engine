@@ -175,4 +175,16 @@ message GetCharacterStatsResponse {
   int64 combat_power = 15;
   int32 equipment_bonus_hp = 16; // phần máu tối đa đến từ trang bị
   int32 max_chi = 17;
+  repeated ItemSetProgressView item_sets = 18; // ADR-065 — bộ pháp khí đang mặc ít nhất một món
+}
+
+// ADR-065 — một bộ pháp khí trên bảng nhân vật. Chỉ số thưởng ĐÃ nằm trong các tổng ở trên.
+message ItemSetProgressView {
+  string name_key = 1;
+  int32 worn_pieces = 2;
+  int32 total_pieces = 3;
+  int32 bonus_atk = 4;
+  int32 bonus_def = 5;
+  int32 bonus_res = 6;
+  int32 bonus_hp = 7;
 }

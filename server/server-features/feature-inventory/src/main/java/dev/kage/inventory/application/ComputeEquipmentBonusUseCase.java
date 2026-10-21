@@ -1,6 +1,9 @@
 package dev.kage.inventory.application;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import dev.kage.inventory.domain.EnhancementTable;
 import dev.kage.inventory.domain.Equipment;
@@ -9,6 +12,9 @@ import dev.kage.inventory.domain.EquipmentPort;
 import dev.kage.inventory.domain.GemPort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
+import dev.kage.inventory.domain.ItemSetPort;
+import dev.kage.inventory.domain.ItemSetProgress;
+import dev.kage.inventory.domain.ItemSets;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
@@ -25,6 +31,7 @@ public final class ComputeEquipmentBonusUseCase {
     private final InventoryPort inventoryPort;
     private final ItemTemplatePort itemTemplatePort;
     private final GemPort gemPort;
+    private final ItemSetPort itemSetPort;
 
     public ComputeEquipmentBonusUseCase(
             EquipmentPort equipmentPort, InventoryPort inventoryPort, ItemTemplatePort itemTemplatePort) {
@@ -41,6 +48,20 @@ public final class ComputeEquipmentBonusUseCase {
         this.inventoryPort = inventoryPort;
         this.itemTemplatePort = itemTemplatePort;
         this.gemPort = gemPort;
+        this.itemSetPort = ItemSetPort.NONE;
+    }
+
+    private ComputeEquipmentBonusUseCase(ComputeEquipmentBonusUseCase base, ItemSetPort itemSetPort) {
+        this.equipmentPort = base.equipmentPort;
+        this.inventoryPort = base.inventoryPort;
+        this.itemTemplatePort = base.itemTemplatePort;
+        this.gemPort = base.gemPort;
+        this.itemSetPort = itemSetPort;
+    }
+
+    /** Kèm bộ pháp khí (ADR-065): đủ số món khác nhau của một bộ thì cộng thưởng bậc. */
+    public ComputeEquipmentBonusUseCase withItemSets(ItemSetPort port) {
+        return new ComputeEquipmentBonusUseCase(this, port);
     }
 
     public EquipmentBonus execute(long characterId) {
@@ -55,6 +76,7 @@ public final class ComputeEquipmentBonusUseCase {
         int totalBonusDef = 0;
         int totalBonusRes = 0;
         int totalBonusHp = 0;
+        Set<Long> wornTemplateIds = new HashSet<>();
         for (long itemId : equipment.slots().values()) {
             ItemStack item = inventory.findItem(itemId).orElse(null);
             if (item == null) {
@@ -65,6 +87,7 @@ public final class ComputeEquipmentBonusUseCase {
             if (template == null) {
                 continue;
             }
+            wornTemplateIds.add(template.id());
             // ADR-036 D3 — cường hoá khuếch đại chỉ số GỐC của CHÍNH món đó, tính riêng từng món
             // rồi mới cộng lại. Cộng tổng trước rồi mới nhân hệ số là SAI: mỗi món có cấp cường
             // hoá riêng, một món +10 không được kéo theo cả bộ đồ +0.
@@ -75,11 +98,27 @@ public final class ComputeEquipmentBonusUseCase {
             totalBonusHp += EnhancementTable.enhancedBonus(template.bonusHp(), enhanceLevel);
         }
         EquipmentBonus gems = gemBonusOf(characterId, equipment);
+        EquipmentBonus sets = ItemSets.totalBonus(ItemSets.progress(itemSetPort.itemSets(), wornTemplateIds));
         return new EquipmentBonus(
-                totalBonusAtk + gems.bonusAtk(),
-                totalBonusDef + gems.bonusDef(),
-                totalBonusRes + gems.bonusRes(),
-                totalBonusHp + gems.bonusHp());
+                totalBonusAtk + gems.bonusAtk() + sets.bonusAtk(),
+                totalBonusDef + gems.bonusDef() + sets.bonusDef(),
+                totalBonusRes + gems.bonusRes() + sets.bonusRes(),
+                totalBonusHp + gems.bonusHp() + sets.bonusHp());
+    }
+
+    /** Các bộ pháp khí đang mặc ít nhất một món (ADR-065) — cho bảng nhân vật. Đọc thuần. */
+    public List<ItemSetProgress> itemSetProgress(long characterId) {
+        Equipment equipment = equipmentPort
+                .findByCharacter(characterId)
+                .orElseThrow(() -> new IllegalStateException("EquipmentPort phải luôn trả Optional có giá trị"));
+        Inventory inventory = inventoryPort
+                .findByCharacter(characterId)
+                .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
+        Set<Long> worn = new HashSet<>();
+        for (long itemId : equipment.slots().values()) {
+            inventory.findItem(itemId).ifPresent(item -> worn.add(item.itemTemplateId()));
+        }
+        return ItemSets.progress(itemSetPort.itemSets(), worn);
     }
 
     /** Tổng chỉ số ngọc trên các món ĐANG MẶC. */

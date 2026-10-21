@@ -11,6 +11,7 @@ import dev.kage.client.core.ui.theme.CultivationRealm;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.GetCharacterStatsRequest;
 import dev.kage.protocol.GetCharacterStatsResponse;
+import dev.kage.protocol.ItemSetProgressView;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.wire.PacketCodec;
 
@@ -80,6 +81,17 @@ final class CharacterSheetCoordinator implements WindowFlow {
         rows.add(row(
                 format("charsheet.row.accuracy", percent(stats.getHitPermille()), percent(stats.getDodgePermille()))));
         rows.add(row(format("charsheet.row.crit", percent(stats.getCritPermille()), stats.getCritDamagePercent())));
+        for (ItemSetProgressView set : stats.getItemSetsList()) {
+            rows.add(row(format(
+                    "charsheet.row.item_set",
+                    text(set.getNameKey()),
+                    set.getWornPieces(),
+                    set.getTotalPieces(),
+                    set.getBonusAtk(),
+                    set.getBonusDef(),
+                    set.getBonusRes(),
+                    set.getBonusHp())));
+        }
         return rows;
     }
 

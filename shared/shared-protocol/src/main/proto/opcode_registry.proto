@@ -73,6 +73,9 @@ enum Opcode {
   // ADR-051 — CHÍNH mình vừa được đưa sang World khác (hầm ngục, đấu trường, về world chính).
   // Một event cho MỌI cú đổi World, luôn tới TRƯỚC spawn đầu tiên của World mới.
   OPCODE_WORLD_CHANGED_EVENT = 308;
+  // ADR-067 — sự kiện nhân đôi EXP/rơi đồ đang chạy (cả server). Gửi lúc vào world nếu có và mỗi lần
+  // ADMIN bật/tắt. Chỉ thêm, protocolVersion không tăng.
+  OPCODE_GAME_EVENTS_CHANGED_EVENT = 309;
 
   // --- Combat / Skill (400-499) ---
   OPCODE_SET_TARGET_COMMAND = 400;
@@ -160,6 +163,9 @@ enum Opcode {
   OPCODE_GET_MY_GUILD_REQUEST = 718;
   OPCODE_GET_MY_GUILD_RESPONSE = 719;
   OPCODE_GUILD_CHANGED_EVENT = 720; // ADR-059 (2026-10-18) — bang vừa đổi thành viên
+  // ADR-068 — góp linh thạch cho bang. Chỉ thêm, protocolVersion không tăng.
+  OPCODE_DONATE_TO_GUILD_COMMAND = 721;
+  OPCODE_DONATE_TO_GUILD_RESPONSE = 722;
 
   // --- Chat (800-899) ---
   OPCODE_SEND_CHAT_MESSAGE_COMMAND = 800;

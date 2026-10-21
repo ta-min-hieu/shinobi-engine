@@ -165,4 +165,24 @@ public sealed interface GmCommand {
             return GmRole.ADMIN;
         }
     }
+
+    /**
+     * Bật/tắt sự kiện nhân đôi (ADR-067) — đổi nhịp kinh tế cả server ⇒ ADMIN. {@code minutes == 0} = tắt.
+     */
+    record Event(GameEventKind kind, int multiplier, int minutes) implements GmCommand {
+        @Override
+        public String name() {
+            return "event";
+        }
+
+        @Override
+        public GmRole requiredRole() {
+            return GmRole.ADMIN;
+        }
+
+        /** Lệnh tắt ({@code event <loại> off}). */
+        public boolean stops() {
+            return minutes == 0;
+        }
+    }
 }

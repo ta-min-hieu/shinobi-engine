@@ -58,6 +58,11 @@ public interface GuildPort {
     /** Từ chối — xoá dòng PENDING. {@code false} nếu không tồn tại HOẶC người gọi không phải leader của bang đó. */
     boolean rejectJoinRequest(long requestId, long leaderCharacterId);
 
+    /** Cấp bang (ADR-068) — quyết trần sĩ số. Mặc định 1 cho fake không quan tâm cấp. */
+    default int levelOf(long guildId) {
+        return 1;
+    }
+
     enum ApproveResult {
         OK,
         /** Không tìm thấy đơn, HOẶC {@code leaderCharacterId} không phải leader của bang đơn đó nhắm tới. */

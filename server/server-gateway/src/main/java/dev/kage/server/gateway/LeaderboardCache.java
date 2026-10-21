@@ -11,11 +11,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.function.Supplier;
 import java.util.function.ToLongFunction;
 
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
+import dev.kage.guild.domain.GuildRank;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.pvp.domain.PvpRating;
 
@@ -44,7 +46,9 @@ final class LeaderboardCache {
     enum Kind {
         REALM,
         ARENA,
-        COMBAT_POWER
+        COMBAT_POWER,
+        /** ADR-068 — bang hội theo kinh nghiệm bang; mỗi THÀNH VIÊN tra được hạng bang mình. */
+        GUILD
     }
 
     /** Một dòng đã xếp hạng. {@code rank} bắt đầu từ 1. */
@@ -56,18 +60,23 @@ final class LeaderboardCache {
     private final CharacterFacade characterFacade;
     private final PvpFacade pvpFacade;
     private final ToLongFunction<Character> combatPowerOf;
+    private final Supplier<List<GuildRank>> guildRanks;
     private final Clock clock;
     private final Map<Kind, Board> boards = new EnumMap<>(Kind.class);
     private final Map<Kind, Object> locks = new EnumMap<>(Kind.class);
 
-    LeaderboardCache(
+    /** Nguồn dữ liệu của các bảng — gom để constructor không vượt trần tham số. */
+    record Sources(
             CharacterFacade characterFacade,
             PvpFacade pvpFacade,
             ToLongFunction<Character> combatPowerOf,
-            Clock clock) {
-        this.characterFacade = characterFacade;
-        this.pvpFacade = pvpFacade;
-        this.combatPowerOf = combatPowerOf;
+            Supplier<List<GuildRank>> guildRanks) {}
+
+    LeaderboardCache(Sources sources, Clock clock) {
+        this.characterFacade = sources.characterFacade();
+        this.pvpFacade = sources.pvpFacade();
+        this.combatPowerOf = sources.combatPowerOf();
+        this.guildRanks = sources.guildRanks();
         this.clock = clock;
         for (Kind kind : Kind.values()) {
             locks.put(kind, new Object());
@@ -75,12 +84,10 @@ final class LeaderboardCache {
     }
 
     /** Bản dùng chung của server sở hữu {@code characterFacade} — dựng ở lần hỏi đầu tiên. */
-    static LeaderboardCache shared(
-            CharacterFacade characterFacade, PvpFacade pvpFacade, ToLongFunction<Character> combatPowerOf) {
+    static LeaderboardCache shared(Sources sources) {
         synchronized (BY_FACADES) {
             return BY_FACADES.computeIfAbsent(
-                    characterFacade,
-                    facade -> new LeaderboardCache(facade, pvpFacade, combatPowerOf, Clock.systemUTC()));
+                    sources.characterFacade(), facade -> new LeaderboardCache(sources, Clock.systemUTC()));
         }
     }
 
@@ -104,10 +111,14 @@ final class LeaderboardCache {
                     case REALM -> rank(characters, Character::exp);
                     case COMBAT_POWER -> rankByCombatPower(characters);
                     case ARENA -> rankByRating(characters);
+                    case GUILD -> List.of();
                 };
         Map<Long, Row> byId = new HashMap<>();
         for (Row row : rows) {
             byId.put(row.characterId(), row);
+        }
+        if (kind == Kind.GUILD) {
+            rows = rankGuilds(characters, byId);
         }
         return new Board(List.copyOf(rows), Collections.unmodifiableMap(byId), now);
     }
@@ -133,6 +144,29 @@ final class LeaderboardCache {
         for (Scored s : scored) {
             Character c = s.character();
             rows.add(new Row(rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), s.power()));
+        }
+        return rows;
+    }
+
+    /**
+     * ADR-068 — dòng bang: tên bang, cấp bang, kinh nghiệm bang; id nhân vật + hệ trên dòng là của bang chủ. Mọi
+     * thành viên được ghi vào {@code byId} để "hạng của tôi" là hạng bang mình.
+     */
+    private List<Row> rankGuilds(List<Character> characters, Map<Long, Row> byId) {
+        Map<Long, Character> charactersById = new HashMap<>();
+        for (Character c : characters) {
+            charactersById.put(c.id(), c);
+        }
+        List<Row> rows = new ArrayList<>();
+        for (GuildRank guild : guildRanks.get()) {
+            Character leader = charactersById.get(guild.leaderCharacterId());
+            Faction faction = leader == null ? Faction.HOA : leader.faction();
+            Row row = new Row(
+                    rows.size() + 1, guild.leaderCharacterId(), guild.name(), faction, guild.level(), guild.exp());
+            rows.add(row);
+            for (long member : guild.memberIds()) {
+                byId.put(member, row);
+            }
         }
         return rows;
     }
