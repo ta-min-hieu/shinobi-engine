@@ -2,10 +2,12 @@ package dev.kage.tools.loadtest;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.OptionalDouble;
+import java.util.Set;
 
 /**
  * Tham số dòng lệnh dạng {@code --key=value} — KHÔNG dùng thư viện CLI parser ngoài (~10 tham số
@@ -13,7 +15,9 @@ import java.util.OptionalDouble;
  * {@code probe.ProbeConfig} dùng chung đúng cú pháp tham số, thay vì mỗi công cụ tự hiểu một kiểu.
  *
  * <p>Tham số không nhận ra thì BỎ QUA im lặng — giữ nguyên hành vi bản cũ (Gradle chèn thêm tham
- * số của riêng nó vào {@code --args} là chuyện thường).
+ * số của riêng nó vào {@code --args} là chuyện thường). Riêng cờ trần {@code --key} (không dấu bằng)
+ * được {@link #flag} hiểu là {@code true}: trước 2026-10-21 nó bị bỏ qua, và {@code --retargetOnKill}
+ * gõ trần đã lặng lẽ không bật suốt nhiều lượt kiểm sống.
  */
 public final class CommandLineArguments {
 
@@ -22,9 +26,11 @@ public final class CommandLineArguments {
     private static final int MIN_EQUALS_INDEX = PREFIX.length() + 1;
 
     private final Map<String, String> values;
+    private final Set<String> bareFlags;
 
-    private CommandLineArguments(Map<String, String> values) {
+    private CommandLineArguments(Map<String, String> values, Set<String> bareFlags) {
         this.values = Map.copyOf(values);
+        this.bareFlags = Set.copyOf(bareFlags);
     }
 
     /**
@@ -34,13 +40,16 @@ public final class CommandLineArguments {
      */
     public static CommandLineArguments parse(String[] args) {
         Map<String, String> raw = new HashMap<>();
+        Set<String> bare = new HashSet<>();
         for (String arg : args) {
             int equals = arg.indexOf('=');
             if (arg.startsWith(PREFIX) && equals >= MIN_EQUALS_INDEX) {
                 raw.put(arg.substring(PREFIX.length(), equals), arg.substring(equals + 1));
+            } else if (arg.startsWith(PREFIX) && equals < 0 && arg.length() > PREFIX.length()) {
+                bare.add(arg.substring(PREFIX.length()));
             }
         }
-        return new CommandLineArguments(raw);
+        return new CommandLineArguments(raw, bare);
     }
 
     public String text(String key, String defaultValue) {
@@ -72,7 +81,7 @@ public final class CommandLineArguments {
     public boolean flag(String key, boolean defaultValue) {
         String value = values.get(key);
         if (value == null) {
-            return defaultValue;
+            return bareFlags.contains(key) || defaultValue;
         }
         String normalized = value.trim().toLowerCase(Locale.ROOT);
         return "true".equals(normalized) || "1".equals(normalized) || "yes".equals(normalized);

@@ -86,4 +86,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành (2026-10-18). ⚠️ Opcode thật là **1202/1203** (1200/1201 đã thuộc `GetPvpRating` từ Phase 8 — bản nháp ghi nhầm). Cache: `LeaderboardCache` (một bản mỗi bộ facade, khoá theo loại bảng). Panel `ReportPanel` phím L.
-2. ⏳ Kiểm sống với vài nhân vật thật trên DB dev.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--leaderboards=realm,combat_power,arena,guild`) trên DB dev 5 nhân vật: cảnh giới xếp theo cấp rồi EXP (Kagemaru 1 / tanthua44 2 / …), Lực Chiến cùng thứ tự, đấu trường chỉ 2 người đã đánh (Benkei 1001, Kagemaru 999), thẻ Bang có bang thử với kinh nghiệm 5.000.

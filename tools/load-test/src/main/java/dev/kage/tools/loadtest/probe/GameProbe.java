@@ -166,10 +166,7 @@ public final class GameProbe {
         if (config.moveToX().isPresent()) {
             walkTo(connection, observation, session, config.moveToX().getAsDouble());
         }
-        // Kinh tế SAU khi đi bộ: kho chỉ mở cạnh người giữ kho, nên vị trí đứng là một phần phép đo.
-        if (config.economy().isRequested()) {
-            new EconomyScenario(connection, session).run(config.economy());
-        }
+        runAfterWalking(connection, config, session);
         edge.sendChat(config.edge());
         if (!config.enterDungeon().isEmpty()) {
             new DungeonScenario(connection, session).run(config.enterDungeon());
@@ -180,6 +177,20 @@ public final class GameProbe {
             new QuestScenario(connection, session, observation).run(config.quest());
         }
         return arena;
+    }
+
+    /**
+     * Bước kinh tế (lô 16) và đọc/kiểm (lô 15) — SAU khi đi bộ: kho chỉ mở cạnh người giữ kho, nên
+     * vị trí đứng là một phần phép đo.
+     */
+    private static void runAfterWalking(GameConnection connection, ProbeConfig config, ProbeSession session)
+            throws IOException {
+        if (config.economy().isRequested()) {
+            new EconomyScenario(connection, session).run(config.economy());
+        }
+        if (config.inspection().isRequested()) {
+            new InspectionScenario(connection, session).run(config.inspection());
+        }
     }
 
     private static void enterWorld(

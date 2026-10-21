@@ -68,7 +68,8 @@ public record ProbeConfig(
         TradePlan trade,
         EdgePlan edge,
         ProgressionPlan progression,
-        EconomyPlan economy) {
+        EconomyPlan economy,
+        InspectionPlan inspection) {
 
     /**
      * Danh sách mã trang bị BẤT BIẾN — record không tự copy, mà lệnh gọi có thể truyền list sống
@@ -175,6 +176,29 @@ public record ProbeConfig(
         /** Danh sách ô bất biến — record không tự copy, mà lệnh gọi có thể truyền list sống. */
         public EdgePlan {
             unequipSlots = List.copyOf(unequipSlots);
+        }
+    }
+
+    /**
+     * Kế hoạch đọc/kiểm của lô 15 — chạy SAU khi đi bộ (xem {@link InspectionScenario}).
+     *
+     * @param abandonQuest mã nhiệm vụ cần bỏ; rỗng = không bỏ
+     * @param claimAllMail lĩnh mọi thư chưa lĩnh (mỗi thư gửi hai lần cùng khoá idempotency)
+     * @param statSheet in bảng nhân vật (210/211)
+     * @param leaderboards loại bảng xếp hạng cần in ({@code realm}, {@code arena}, {@code combat_power},
+     *     {@code guild})
+     */
+    public record InspectionPlan(
+            String abandonQuest, boolean claimAllMail, boolean statSheet, List<String> leaderboards) {
+
+        /** Danh sách bất biến — record không tự copy, mà lệnh gọi có thể truyền list sống. */
+        public InspectionPlan {
+            leaderboards = List.copyOf(leaderboards);
+        }
+
+        /** {@code true} khi có ít nhất một bước cần chạy. */
+        public boolean isRequested() {
+            return !abandonQuest.isEmpty() || claimAllMail || statSheet || !leaderboards.isEmpty();
         }
     }
 
@@ -305,7 +329,16 @@ public record ProbeConfig(
                 edgePlan(raw),
                 new ProgressionPlan(
                         raw.text("selectFaction", ""), raw.list("upgradeSkills"), raw.number("donateToGuild", 0L)),
-                economyPlan(raw));
+                economyPlan(raw),
+                inspectionPlan(raw));
+    }
+
+    private static InspectionPlan inspectionPlan(CommandLineArguments raw) {
+        return new InspectionPlan(
+                raw.text("abandonQuest", ""),
+                raw.flag("claimAllMail", false),
+                raw.flag("statSheet", false),
+                raw.list("leaderboards"));
     }
 
     private static EconomyPlan economyPlan(CommandLineArguments raw) {

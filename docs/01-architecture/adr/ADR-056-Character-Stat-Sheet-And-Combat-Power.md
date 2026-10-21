@@ -91,4 +91,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành (2026-10-18). `CharacterStatSheetTest`; panel chung `ReportPanel` (phím C).
-2. ⏳ Kiểm sống: mở bảng, mặc/gỡ một món, số đổi đúng.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--statSheet=true`): Kagemaru Lv40 máu 326 (trang bị +148), công 86, Lực Chiến 3.193, tốc độ +20% (phi kiếm), linh thú cấp 3. Đổi trang bị ⇒ máu đổi đúng đã đo ở ADR-065/064. Chưa nhìn cửa sổ C bằng client có giao diện.

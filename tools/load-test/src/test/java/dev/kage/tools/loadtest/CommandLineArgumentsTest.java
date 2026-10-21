@@ -36,6 +36,16 @@ final class CommandLineArgumentsTest {
         assertThat(args.text("x", "(none)")).isEqualTo("(none)");
     }
 
+    /** Cờ trần {@code --retargetOnKill} từng bị bỏ qua im lặng — nay {@code flag} hiểu là bật. */
+    @Test
+    void shouldTreatBareDoubleDashKeyAsTrueFlag() {
+        CommandLineArguments args = CommandLineArguments.parse(new String[] {"--retargetOnKill", "--quiet=false"});
+
+        assertThat(args.flag("retargetOnKill", false)).isTrue();
+        assertThat(args.flag("quiet", true)).isFalse();
+        assertThat(args.flag("absent", false)).isFalse();
+    }
+
     /** Giá trị chứa dấu {@code =} (vd. base64) phải giữ nguyên phần sau dấu bằng ĐẦU TIÊN. */
     @Test
     void shouldSplitOnFirstEqualsOnly() {

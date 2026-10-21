@@ -86,4 +86,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành (2026-10-18) — xem `AbandonQuestUseCase`, `AbandonQuestIntegrationTest`.
-2. ⏳ Kiểm sống bằng client thật: nhận một quest, bỏ, nhận lại.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--abandonQuest`): bỏ khi chưa nhận ⇒ NOT_IN_PROGRESS; nhận `daily_mountain_patrol` ở Chu Hoành (lựa chọn 0 → 19 → 1) ⇒ bỏ ⇒ OK, dòng tiến độ biến mất; nhận lại ⇒ OK, IN_PROGRESS.
