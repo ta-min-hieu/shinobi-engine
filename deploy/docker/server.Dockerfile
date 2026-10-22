@@ -9,7 +9,7 @@
 # ra — ba dòng FROM phải đổi CÙNG nhau (jlink-builder và builder cùng JDK, runtime cùng glibc).
 
 # ---- Stage 1: build ----
-FROM eclipse-temurin:25-jdk@sha256:201fbb8886b2d273218aa3a192f0afbf7b5ff65ee8cc6ef47f5dce2171f013ea AS builder
+FROM eclipse-temurin:25-jdk@sha256:2d5d5e9b533342a565907c84f47a2ec298c40cde7b13a3ca85d4950fa456a641 AS builder
 WORKDIR /build
 COPY gradle/ gradle/
 COPY gradlew settings.gradle.kts build.gradle.kts ./
@@ -75,7 +75,7 @@ RUN ./gradlew :server:server-gateway:installDist --no-daemon
 # ---- Stage 2: jlink custom runtime (DOCKER.md §8 — "jlink custom runtime: thêm ~50MB tiết kiệm") ----
 # jdeps quét THẬT bộ jar server-gateway vừa build (không đoán module list tay) — build.gradle.kts
 # thêm/bớt dependency thì layer này tự tính lại module cần, Dockerfile không cần sửa theo.
-FROM eclipse-temurin:25-jdk@sha256:201fbb8886b2d273218aa3a192f0afbf7b5ff65ee8cc6ef47f5dce2171f013ea AS jlink-builder
+FROM eclipse-temurin:25-jdk@sha256:2d5d5e9b533342a565907c84f47a2ec298c40cde7b13a3ca85d4950fa456a641 AS jlink-builder
 WORKDIR /jlink
 COPY --from=builder /build/server/server-gateway/build/install/server-gateway/lib/ ./lib/
 # ⚠️ PHÁT HIỆN THẬT (verify bằng jdeps chạy thật, không suy đoán): server-gateway/lib chứa ~25 jar
