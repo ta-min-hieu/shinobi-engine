@@ -33,6 +33,7 @@ import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveResponse;
+import dev.kage.protocol.MovementModifierChangedEvent;
 import dev.kage.protocol.NpcDespawnedEvent;
 import dev.kage.protocol.NpcSpawnedEvent;
 import dev.kage.protocol.Opcode;
@@ -225,6 +226,7 @@ final class ProbeEventLine {
         return switch (opcode) {
             case Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE -> Optional.of(attack(AttackResultEvent.parseFrom(payload)));
             case Opcode.OPCODE_HEALTH_CHANGED_EVENT_VALUE -> Optional.of(health(HealthChangedEvent.parseFrom(payload)));
+            case Opcode.OPCODE_MOVEMENT_MODIFIER_CHANGED_EVENT_VALUE -> Optional.of(movementModifier(payload));
             case Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE -> Optional.of(skill(SkillResultEvent.parseFrom(payload)));
             case Opcode.OPCODE_MONSTER_SPAWNED_EVENT_VALUE ->
                 Optional.of(monsterSpawn(MonsterSpawnedEvent.parseFrom(payload)));
@@ -345,5 +347,15 @@ final class ProbeEventLine {
      */
     static String meters(float value) {
         return String.format(Locale.ROOT, "%.2f", value);
+    }
+
+    /** ADR-073 — hệ số tốc độ do hiệu ứng + đang choáng/gục của chính mình. */
+    private static String movementModifier(byte[] payload) throws InvalidProtocolBufferException {
+        MovementModifierChangedEvent event = MovementModifierChangedEvent.parseFrom(payload);
+        return String.format(
+                Locale.ROOT,
+                "statusSpeed=%.2f immobilized=%b",
+                event.getStatusSpeedMultiplier(),
+                event.getImmobilized());
     }
 }

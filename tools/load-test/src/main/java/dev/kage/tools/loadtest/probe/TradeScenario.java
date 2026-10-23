@@ -3,12 +3,17 @@ package dev.kage.tools.loadtest.probe;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.Optional;
+import java.util.UUID;
 
 import dev.kage.protocol.AcceptTradeRequestCommand;
+import dev.kage.protocol.ConfirmTradeCommand;
+import dev.kage.protocol.ConfirmTradeResponse;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.GetTradeStatusRequest;
 import dev.kage.protocol.GetTradeStatusResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.RequestTradeCommand;
+import dev.kage.protocol.SetTradeOfferCommand;
 import dev.kage.protocol.TradeRequestedEvent;
 import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.tools.loadtest.GameConnection;
@@ -46,6 +51,7 @@ final class TradeScenario {
     void open(ProbeConfig.TradePlan plan) throws IOException {
         if (plan.acceptIncoming()) {
             acceptIncoming(plan.waitSeconds());
+            confirmSteps(plan.confirmTrade());
         } else if (!plan.requestTargetName().isEmpty()) {
             connection.send(
                     Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE,
@@ -71,6 +77,63 @@ final class TradeScenario {
                 .payload());
         session.note("trạng thái giao dịch: đangGiaoDịch=" + status.getInTrade() + " phiên=" + status.getSessionId()
                 + " giaiĐoạn=" + status.getPhase().name() + " đốiPhương=" + status.getCounterpartName());
+    }
+
+    /** ADR-075 — xem {@link ProbeConfig.TradePlan#confirmTrade}. */
+    private void confirmSteps(java.util.List<String> steps) throws IOException {
+        String idempotencyKey = UUID.randomUUID().toString();
+        for (String step : steps) {
+            GetTradeStatusResponse status = status();
+            long version = status.getOfferVersion();
+            if ("stale".equals(step)) {
+                connection.send(
+                        Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE,
+                        SetTradeOfferCommand.newBuilder()
+                                .setSessionId(status.getSessionId())
+                                .build()
+                                .toByteArray());
+                connection.readUntilOpcode(Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE, MAX_FRAMES_TO_SKIP);
+                session.note("tự đặt lại lời chào: phiên bản " + version + " → " + status().getOfferVersion());
+            }
+            int sequenceId = connection.send(
+                    Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE,
+                    ConfirmTradeCommand.newBuilder()
+                            .setSessionId(status.getSessionId())
+                            .setIdempotencyKey(idempotencyKey)
+                            .setOfferVersion(version)
+                            .build()
+                            .toByteArray());
+            session.note("xác nhận (" + step + ", phiên bản " + version + "): " + confirmReply(sequenceId));
+        }
+    }
+
+    private GetTradeStatusResponse status() throws IOException {
+        connection.send(
+                Opcode.OPCODE_GET_TRADE_STATUS_REQUEST_VALUE,
+                GetTradeStatusRequest.getDefaultInstance().toByteArray());
+        return GetTradeStatusResponse.parseFrom(connection
+                .readUntilOpcode(Opcode.OPCODE_GET_TRADE_STATUS_RESPONSE_VALUE, MAX_FRAMES_TO_SKIP)
+                .payload());
+    }
+
+    /** Kết quả xác nhận, hoặc {@code ErrorResponse} của ĐÚNG lệnh đó. */
+    private String confirmReply(int sequenceId) throws IOException {
+        for (int skipped = 0; skipped < MAX_FRAMES_TO_SKIP; skipped++) {
+            PacketCodec.Frame frame = connection.readFrame();
+            int opcode = frame.header().opcode();
+            if (opcode == Opcode.OPCODE_CONFIRM_TRADE_RESPONSE_VALUE) {
+                return ConfirmTradeResponse.parseFrom(frame.payload())
+                        .getOutcome()
+                        .name();
+            }
+            if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+                ErrorResponse error = ErrorResponse.parseFrom(frame.payload());
+                if (error.getRelatedSequenceId() == sequenceId) {
+                    return "BỊ TỪ CHỐI " + error.getErrorKey() + " (" + error.getErrorCode() + ")";
+                }
+            }
+        }
+        throw new IOException("Không thấy trả lời xác nhận sau " + MAX_FRAMES_TO_SKIP + " frame");
     }
 
     private void acceptIncoming(int waitSeconds) throws IOException {

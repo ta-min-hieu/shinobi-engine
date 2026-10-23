@@ -70,4 +70,4 @@ khoá khi rời màn world (cùng chỗ 310 tự đặt về 0).
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-23 (lô 18) — `CharacterLocomotionSystem.drainChanges`, `WorldOutboundSink#onMovementModifierChanged`, `LocalIntentSender#onMovementModifier`; test `CharacterStatusMovementTest`.
-2. Kiểm sống bằng gameProbe: bị khống chế ⇒ thấy gói 311 lúc trúng và lúc hết.
+2. ✅ **Kiểm sống 2026-10-23** (hai gameProbe, trận luận kiếm thật: `tanthua44` hệ Thuỷ ném `thuy_phong_toa` lên Benkei): Benkei nhận `311 statusSpeed=0.60` 5 ms sau `406 DEBUFF`, rồi `311 statusSpeed=1.00` đúng 4,0 s sau (hết hiệu ứng); người ra đòn nhận 0 gói 311. Trận kết thúc giữa lúc còn hiệu ứng thì chỉ có 308 — client tự đặt lại (D4).

@@ -55,4 +55,4 @@ lại được ngay — KHÔNG kích hoạt hạn chờ 10 phút của nhánh b�
 
 ## Việc cần làm tiếp theo
 
-1. ✅ Thi hành 2026-10-23 (lô 18) — `RemoveFriendUseCase#withdrawRequest` (dùng lại câu "từ chối" có điều kiện PENDING của port, không thêm method port), `FriendFacade#withdrawRequest`, nút "Rút mời". ⏳ Chưa kiểm sống.
+1. ✅ Thi hành 2026-10-23 (lô 18) — `RemoveFriendUseCase#withdrawRequest` (dùng lại câu "từ chối" có điều kiện PENDING của port, không thêm method port), `FriendFacade#withdrawRequest`, nút "Rút mời". ✅ **Kiểm sống 2026-10-23** (gameProbe `--friendSteps`): Kagemaru mời Benkei `OK` → rút `OK` → rút lần hai `NOT_PENDING` → mời lại NGAY `OK` (không dính hạn chờ 10 phút); Benkei "rút" lời mời Kagemaru gửi mình ⇒ `NOT_PENDING`, lời mời vẫn còn trong DB. Nút client chưa nhìn bằng giao diện.

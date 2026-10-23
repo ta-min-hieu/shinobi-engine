@@ -149,8 +149,22 @@ public record ProbeConfig(
      * @param acceptIncoming {@code true} = đợi lời mời đến rồi chấp nhận
      * @param waitSeconds hạn chót chờ lời mời
      * @param report {@code true} = in trạng thái phiên giao dịch sau vòng quan sát
+     * @param confirmTrade lô 18 (ADR-075), bên chấp nhận chạy ngay sau khi nhận lời: {@code stale} = tự đặt lại
+     *     lời chào (tăng phiên bản) rồi xác nhận bằng phiên bản CŨ; {@code current} = xác nhận bằng phiên bản hiện
+     *     tại. Mọi bước dùng CHUNG một khoá chống trùng.
      */
-    public record TradePlan(String requestTargetName, boolean acceptIncoming, int waitSeconds, boolean report) {}
+    public record TradePlan(
+            String requestTargetName,
+            boolean acceptIncoming,
+            int waitSeconds,
+            boolean report,
+            List<String> confirmTrade) {
+
+        /** Danh sách bất biến — record không tự copy. */
+        public TradePlan {
+            confirmTrade = List.copyOf(confirmTrade);
+        }
+    }
 
     /**
      * Các lệnh lẻ gửi từ trong world ({@link SessionEdgeScenario}).
@@ -188,13 +202,20 @@ public record ProbeConfig(
      * @param statSheet in bảng nhân vật (210/211)
      * @param leaderboards loại bảng xếp hạng cần in ({@code realm}, {@code arena}, {@code combat_power},
      *     {@code guild})
+     * @param friendSteps lô 18 (ADR-074): {@code send:Ten} gửi lời mời kết bạn, {@code withdraw:Ten} rút lời mời
      */
     public record InspectionPlan(
-            String abandonQuest, boolean claimAllMail, String sendMail, boolean statSheet, List<String> leaderboards) {
+            String abandonQuest,
+            boolean claimAllMail,
+            String sendMail,
+            boolean statSheet,
+            List<String> leaderboards,
+            List<String> friendSteps) {
 
         /** Danh sách bất biến — record không tự copy, mà lệnh gọi có thể truyền list sống. */
         public InspectionPlan {
             leaderboards = List.copyOf(leaderboards);
+            friendSteps = List.copyOf(friendSteps);
         }
 
         /** {@code true} khi có ít nhất một bước cần chạy. */
@@ -203,7 +224,8 @@ public record ProbeConfig(
                     || claimAllMail
                     || !sendMail.isEmpty()
                     || statSheet
-                    || !leaderboards.isEmpty();
+                    || !leaderboards.isEmpty()
+                    || !friendSteps.isEmpty();
         }
     }
 
@@ -327,16 +349,21 @@ public record ProbeConfig(
                         raw.flag("partyAccept", false),
                         raw.integer("partyWaitSeconds", DEFAULT_PARTY_WAIT_SECONDS),
                         raw.flag("partyReport", false)),
-                new TradePlan(
-                        raw.text("tradeRequest", ""),
-                        raw.flag("tradeAccept", false),
-                        raw.integer("tradeWaitSeconds", DEFAULT_PARTY_WAIT_SECONDS),
-                        raw.flag("tradeReport", false)),
+                tradePlan(raw),
                 edgePlan(raw),
                 new ProgressionPlan(
                         raw.text("selectFaction", ""), raw.list("upgradeSkills"), raw.number("donateToGuild", 0L)),
                 economyPlan(raw),
                 inspectionPlan(raw));
+    }
+
+    private static TradePlan tradePlan(CommandLineArguments raw) {
+        return new TradePlan(
+                raw.text("tradeRequest", ""),
+                raw.flag("tradeAccept", false),
+                raw.integer("tradeWaitSeconds", DEFAULT_PARTY_WAIT_SECONDS),
+                raw.flag("tradeReport", false),
+                raw.list("confirmTrade"));
     }
 
     private static InspectionPlan inspectionPlan(CommandLineArguments raw) {
@@ -345,7 +372,8 @@ public record ProbeConfig(
                 raw.flag("claimAllMail", false),
                 raw.text("sendMail", ""),
                 raw.flag("statSheet", false),
-                raw.list("leaderboards"));
+                raw.list("leaderboards"),
+                raw.list("friendSteps"));
     }
 
     private static EconomyPlan economyPlan(CommandLineArguments raw) {

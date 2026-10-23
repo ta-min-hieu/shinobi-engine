@@ -52,4 +52,4 @@ qua phép so (chỉ còn khoá 3 giây).
 
 ## Việc cần làm tiếp theo
 
-1. ✅ Thi hành 2026-10-23 (lô 18) — V74, `ConfirmTradeUseCase` ném `StaleOfferException` trong transaction (rollback cả khoá chống trùng); test `ConfirmTradeUseCaseTest`, `TradeIntegrationTest`. ⏳ Chưa kiểm sống.
+1. ✅ Thi hành 2026-10-23 (lô 18) — V74, `ConfirmTradeUseCase` ném `StaleOfferException` trong transaction (rollback cả khoá chống trùng); test `ConfirmTradeUseCaseTest`, `TradeIntegrationTest`. ✅ **Kiểm sống 2026-10-23** (hai gameProbe, `--confirmTrade=stale,current` cùng MỘT khoá chống trùng): Kagemaru tự đặt lại lời chào (phiên bản 1 → 2), xác nhận bằng 1 ⇒ `error.trade_offer_just_changed (409)`; xác nhận bằng 2 với chính khoá đó ⇒ `CONFIRM_TRADE_OUTCOME_OK` (khoá không bị đốt). Ngắt kết nối ⇒ `trade_session` về 0 dòng.

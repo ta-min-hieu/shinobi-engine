@@ -57,6 +57,7 @@ final class InspectionScenario {
         if (!plan.sendMail().isEmpty()) {
             sendMailTwice(plan.sendMail());
         }
+        new FriendScenario(connection, session).run(plan.friendSteps());
         if (plan.statSheet()) {
             statSheet();
         }
