@@ -7,6 +7,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 import java.util.random.RandomGenerator;
 
@@ -36,6 +37,11 @@ import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
+import dev.kage.server.database.trade.PostgresTradeSessionAdapter;
+import dev.kage.trade.application.AcceptTradeRequestUseCase;
+import dev.kage.trade.application.RequestTradeUseCase;
+import dev.kage.trade.application.SetTradeOfferUseCase;
+import dev.kage.trade.domain.OfferedItemInput;
 
 /**
  * Linh Ngọc (ADR-064) trên PostgreSQL THẬT: hỏng 3 lần thì lần thứ tư chắc chắn thành (bảo hiểm), mỗi lần
@@ -129,6 +135,44 @@ class SpiritJadeIntegrationTest {
         assertThat(storage().deposit(characterId, sword, 1).outcome()).isEqualTo(StorageUseCase.Outcome.SOCKETED);
     }
 
+    /**
+     * docs/README.md dòng 82: món đích đang chào, hoặc mọi viên ngọc đang chào ⇒ từ chối, không tốn phí hay
+     * ngọc. Chào 1 trong chồng 2 viên thì viên còn lại vẫn khảm được (cùng luật dùng vật phẩm, dòng 80).
+     */
+    @Test
+    void offeredGearOrEveryOfferedJadeShouldBeRefused_andSpendNothing() {
+        long giverId = createFreshCharacter("JadeC");
+        long receiverId = createFreshCharacter("JadeD");
+        long sword = query(INSERT_ITEM, giverId, swordTemplateId, 1);
+        long jades = query(INSERT_ITEM, giverId, fireJadeTemplateId, 2);
+        query(SET_GOLD, 1_000L, giverId);
+        PostgresTradeSessionAdapter sessions = new PostgresTradeSessionAdapter(dataSource);
+        long sessionId = new RequestTradeUseCase(sessions)
+                .execute(giverId, receiverId)
+                .session()
+                .id();
+        new AcceptTradeRequestUseCase(sessions).execute(sessionId, receiverId);
+        SetTradeOfferUseCase offer = new SetTradeOfferUseCase(sessions);
+        SocketGemUseCase lucky = socketing(fixedRoll(0.0));
+
+        offer.execute(sessionId, giverId, 0, List.of(new OfferedItemInput(sword, 1)));
+        assertThat(lucky.execute(giverId, sword, jades, key()).outcome())
+                .as("món đích đang chào")
+                .isEqualTo(SocketGemUseCase.Outcome.ITEM_IN_TRADE);
+        offer.execute(sessionId, giverId, 0, List.of(new OfferedItemInput(jades, 2)));
+        assertThat(lucky.execute(giverId, sword, jades, key()).outcome())
+                .as("cả hai viên ngọc đang chào")
+                .isEqualTo(SocketGemUseCase.Outcome.ITEM_IN_TRADE);
+        assertThat(query(GOLD, giverId)).isEqualTo(1_000L);
+        assertThat(query(GEMS_LEFT, giverId, fireJadeTemplateId)).isEqualTo(2L);
+
+        offer.execute(sessionId, giverId, 0, List.of(new OfferedItemInput(jades, 1)));
+        assertThat(lucky.execute(giverId, sword, jades, key()).outcome())
+                .as("còn một viên không chào")
+                .isEqualTo(SocketGemUseCase.Outcome.SUCCESS);
+        assertThat(query(GEMS_LEFT, giverId, fireJadeTemplateId)).isEqualTo(1L);
+    }
+
     private static SocketGemUseCase socketing(RandomGenerator random) {
         PostgresInventoryAdapter inventory = new PostgresInventoryAdapter(dataSource);
         return new SocketGemUseCase(
@@ -136,7 +180,8 @@ class SpiritJadeIntegrationTest {
                         inventory,
                         new PostgresItemTemplateAdapter(dataSource),
                         new PostgresGemAdapter(dataSource),
-                        new PostgresGoldAdapter()),
+                        new PostgresGoldAdapter(),
+                        new PostgresInventoryTradeOfferAdapter()),
                 new SocketGemUseCase.Records(new PostgresInventoryIdempotencyAdapter(), new PostgresAuditAdapter()),
                 new JdbcInventoryTransactionRunner(dataSource),
                 random);

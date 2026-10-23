@@ -18,6 +18,7 @@ import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
+import dev.kage.inventory.domain.TradeOfferPort;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
 
@@ -39,7 +40,13 @@ public final class SocketGemUseCase {
         /** Món "ngọc" không phải Linh Ngọc. */
         NOT_A_GEM,
         INSUFFICIENT_GOLD,
-        DUPLICATE_REQUEST
+        DUPLICATE_REQUEST,
+        /**
+         * Món đích đang được chào, hoặc không còn viên ngọc nào ngoài phần đang chào, trong một giao dịch còn mở
+         * (docs/README.md dòng 82, theo tiền lệ cường hoá 2026-09-29). Gateway trả {@code error.item_in_trade},
+         * không có giá trị {@code SocketGemOutcome} tương ứng.
+         */
+        ITEM_IN_TRADE
     }
 
     /**
@@ -54,7 +61,12 @@ public final class SocketGemUseCase {
     }
 
     /** Gom port — trần {@code ParameterNumber}. */
-    public record Ports(InventoryPort inventory, ItemTemplatePort templates, GemPort gems, GoldPort gold) {}
+    public record Ports(
+            InventoryPort inventory,
+            ItemTemplatePort templates,
+            GemPort gems,
+            GoldPort gold,
+            TradeOfferPort tradeOffers) {}
 
     /** Khoá chống trùng + audit. */
     public record Records(IdempotencyPort idempotency, AuditPort audit) {}
@@ -73,7 +85,8 @@ public final class SocketGemUseCase {
 
     /** Bản không có Linh Ngọc (composition test) — mọi lệnh {@code NOT_FOUND}, không ô khảm nào. */
     public static SocketGemUseCase unavailable() {
-        return new SocketGemUseCase(new Ports(null, null, GemPort.NONE, null), new Records(null, null), null, null);
+        return new SocketGemUseCase(
+                new Ports(null, null, GemPort.NONE, null, null), new Records(null, null), null, null);
     }
 
     /** Ô khảm trong túi nhân vật — {@code inventory_item.id → item_template.id} của ngọc. */
@@ -110,6 +123,7 @@ public final class SocketGemUseCase {
                 .findByCharacterForUpdate(t, characterId)
                 .orElseThrow(() -> new CharacterInventoryNotFoundException(characterId));
         ItemStack gem = validate(inventory, pick);
+        rejectIfOffered(t, characterId, pick, gem);
         if (!ports.gold().deductGold(t, characterId, GemPolicy.SOCKET_FEE)) {
             throw new Abort(Outcome.INSUFFICIENT_GOLD);
         }
@@ -145,6 +159,19 @@ public final class SocketGemUseCase {
             throw new Abort(Outcome.NOT_A_GEM);
         }
         return gem.get();
+    }
+
+    /**
+     * Khảm vào món đang chào đổi giá trị của nó SAU khi bên kia đã đồng ý; tiêu viên ngọc đang chào làm giao dịch
+     * hỏng lúc xác nhận. Hỏi SAU khoá túi đồ (xem {@link TradeOfferPort}), TRƯỚC phí và khoá chống trùng: huỷ giao
+     * dịch xong thử lại bằng chính khoá đó vẫn là cùng một lần khảm.
+     */
+    private void rejectIfOffered(Transaction t, long characterId, Pick pick, ItemStack gem) {
+        boolean targetOffered = ports.tradeOffers().isOfferedInActiveTrade(t, characterId, pick.targetItemId());
+        boolean noFreeGem = gem.quantity() - ports.tradeOffers().offeredQuantity(t, characterId, gem.id()) < 1;
+        if (targetOffered || noFreeGem) {
+            throw new Abort(Outcome.ITEM_IN_TRADE);
+        }
     }
 
     private static String detail(Pick pick, long gemTemplateId, boolean success) {

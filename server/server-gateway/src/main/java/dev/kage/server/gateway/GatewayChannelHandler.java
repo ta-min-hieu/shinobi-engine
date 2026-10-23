@@ -1772,20 +1772,37 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         if (rejectMalformedIdempotencyKey(ctx, header.sequenceId(), command.getIdempotencyKey())) {
             return;
         }
-        runStorage(
-                ctx,
-                header.sequenceId(),
-                Opcode.OPCODE_SOCKET_GEM_RESPONSE_VALUE,
-                characterId -> socketGem(characterId, command));
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        executeBlocking(ctx, sequenceId, () -> socketGem(ctx, sequenceId, characterId, command));
     }
 
     /**
      * Thành công thì tính lại chỉ số trang bị + máu tối đa (ADR-064 D4) — món đích có thể đang mặc; tính lại
      * khi nó nằm trong túi thì chỉ số không đổi, vô hại. Cùng đường cường hoá (ADR-043).
+     *
+     * <p>Món/ngọc đang chào trong giao dịch (docs/README.md dòng 82): KHÔNG thêm giá trị {@code SocketGemOutcome}
+     * (đổi protocol) — đi đường {@code ErrorResponse} + error_key như cường hoá; client khớp theo sequenceId.
      */
-    private SocketGemResponse socketGem(long characterId, SocketGemCommand command) {
+    private void socketGem(ChannelHandlerContext ctx, int sequenceId, long characterId, SocketGemCommand command) {
         SocketGemUseCase.Result result = inventoryFacade.socketGem(
                 characterId, command.getTargetItemId(), command.getGemItemId(), command.getIdempotencyKey());
+        if (result.outcome() == SocketGemUseCase.Outcome.ITEM_IN_TRADE) {
+            sendError(ctx, sequenceId, 409, "error.item_in_trade");
+            return;
+        }
+        send(
+                ctx,
+                Opcode.OPCODE_SOCKET_GEM_RESPONSE_VALUE,
+                sequenceId,
+                socketGemResponse(characterId, result).toByteArray());
+    }
+
+    private SocketGemResponse socketGemResponse(long characterId, SocketGemUseCase.Result result) {
         boolean success = result.outcome() == SocketGemUseCase.Outcome.SUCCESS;
         return SocketGemResponse.newBuilder()
                 .setOutcome(SocketGemOutcome.valueOf(

@@ -13,6 +13,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.client.core.ui.hud.ReportPanel;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.EquipmentSlot;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.InventoryItemView;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.Opcode;
@@ -61,6 +62,9 @@ final class GemCoordinator implements WindowFlow {
 
     private long targetItemId;
 
+    /** {@code sequenceId} của lệnh khảm đang chờ; {@code 0} = không có. */
+    private int pendingSequenceId;
+
     GemCoordinator(ReportPanel panel, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         this.panel = panel;
         this.sender = sender;
@@ -81,7 +85,7 @@ final class GemCoordinator implements WindowFlow {
             redraw();
             return;
         }
-        sender.sendReadRequest(
+        pendingSequenceId = sender.sendReadRequest(
                 Opcode.OPCODE_SOCKET_GEM_COMMAND_VALUE,
                 SocketGemCommand.newBuilder()
                         .setTargetItemId(targetItemId)
@@ -108,10 +112,29 @@ final class GemCoordinator implements WindowFlow {
             return false; // KHÔNG nuốt — túi đồ, kho, phường thị cũng cần gói này
         }
         if (opcode == Opcode.OPCODE_SOCKET_GEM_RESPONSE_VALUE) {
+            pendingSequenceId = 0;
             onSocketed(SocketGemResponse.parseFrom(frame.payload()));
             return true;
         }
+        if (opcode == Opcode.OPCODE_ERROR_VALUE) {
+            return onRejected(ErrorResponse.parseFrom(frame.payload()));
+        }
         return false;
+    }
+
+    /**
+     * Món/ngọc đang chào trong giao dịch (docs/README.md dòng 82) tới bằng {@code ErrorResponse}, không bằng
+     * {@code SocketGemOutcome} — cùng đường {@code InventoryCoordinator#onEnhanceRejected}. Lỗi của lệnh KHÁC
+     * trả {@code false}: opcode 5 dùng chung cho cả giao thức.
+     */
+    private boolean onRejected(ErrorResponse error) {
+        if (pendingSequenceId == 0 || error.getRelatedSequenceId() != pendingSequenceId) {
+            return false;
+        }
+        pendingSequenceId = 0;
+        panel.setStatus(text(
+                "error.item_in_trade".equals(error.getErrorKey()) ? "gem.error.item_in_trade" : "gem.error.unknown"));
+        return true;
     }
 
     private void onSocketed(SocketGemResponse response) {
@@ -201,6 +224,7 @@ final class GemCoordinator implements WindowFlow {
         gems.clear();
         actions.clear();
         targetItemId = 0L;
+        pendingSequenceId = 0;
         panel.setRows(List.of());
         panel.setStatus(text("gem.hint.open"));
     }

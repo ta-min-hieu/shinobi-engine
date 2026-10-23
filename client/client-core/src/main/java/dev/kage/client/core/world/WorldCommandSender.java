@@ -180,9 +180,14 @@ final class WorldCommandSender implements SessionRecovery.Link {
      * Gửi một yêu cầu CHỈ ĐỌC (bảng nhân vật 210 — ADR-056, Bia Anh Danh 1202 — ADR-057). Một hàm chung
      * thay vì một hàm mỗi gói: lớp này chạm trần độ phức tạp PMD tính cho CẢ LỚP (80), và hai gói này
      * không có gì riêng ngoài opcode + message.
+     *
+     * @return {@code sequenceId} của gói — để khớp một {@code ErrorResponse} về đúng lệnh (khảm ngọc vào món
+     *     đang chào giao dịch, docs/README.md dòng 82)
      */
-    void sendReadRequest(int opcode, MessageLite request) {
-        send(opcode, request.toByteArray(), request.getClass().getSimpleName());
+    int sendReadRequest(int opcode, MessageLite request) {
+        int sequenceId = connection.nextSequenceId();
+        send(opcode, sequenceId, request.toByteArray(), request.getClass().getSimpleName());
+        return sequenceId;
     }
 
     /** Bỏ nhiệm vụ đang làm (opcode 612, ADR-054) — chỉ ý định; server tự kiểm trạng thái. */

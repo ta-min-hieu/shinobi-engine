@@ -288,10 +288,7 @@ public final class ServerDatabaseBootstrap {
                 idempotencyPort,
                 new PostgresInventoryTradeOfferAdapter());
         EnhanceItemUseCase enhanceItemUseCase = new EnhanceItemUseCase(enhancePorts, transactionRunner);
-        UseItemUseCase useItemUseCase = new UseItemUseCase(
-                new UseItemUseCase.Ports(
-                        inventoryPort, itemTemplatePort, auditPort, new PostgresInventoryTradeOfferAdapter()),
-                transactionRunner);
+        UseItemUseCase useItemUseCase = useItemUseCase(inventoryPort, itemTemplatePort, auditPort, transactionRunner);
         InventoryQueryUseCases queryUseCases = new InventoryQueryUseCases(
                 new ListInventoryUseCase(inventoryPort, equipmentPort), new GetItemCatalogUseCase(itemTemplatePort));
         return new InventoryFacade(
@@ -301,12 +298,34 @@ public final class ServerDatabaseBootstrap {
                         enhanceItemUseCase,
                         useItemUseCase,
                         storageUseCase(inventoryPort, equipmentPort, itemTemplatePort, transactionRunner),
-                        new SocketGemUseCase(
-                                new SocketGemUseCase.Ports(inventoryPort, itemTemplatePort, gemPort, goldPort),
+                        socketGemUseCase(
+                                new SocketGemUseCase.Ports(
+                                        inventoryPort,
+                                        itemTemplatePort,
+                                        gemPort,
+                                        goldPort,
+                                        new PostgresInventoryTradeOfferAdapter()),
                                 new SocketGemUseCase.Records(idempotencyPort, auditPort),
-                                transactionRunner,
-                                ThreadLocalGemRoll.INSTANCE)),
+                                transactionRunner)),
                 queryUseCases);
+    }
+
+    /** Dùng vật phẩm (ADR-046 D5) — tách khỏi {@link #wireInventoryFacade} vì trần {@code MethodLength}. */
+    private static UseItemUseCase useItemUseCase(
+            PostgresInventoryAdapter inventoryPort,
+            PostgresItemTemplateAdapter itemTemplatePort,
+            PostgresAuditAdapter auditPort,
+            JdbcInventoryTransactionRunner tx) {
+        return new UseItemUseCase(
+                new UseItemUseCase.Ports(
+                        inventoryPort, itemTemplatePort, auditPort, new PostgresInventoryTradeOfferAdapter()),
+                tx);
+    }
+
+    /** Khảm Linh Ngọc (ADR-064) — tách khỏi {@link #wireInventoryFacade} vì trần {@code MethodLength}. */
+    private static SocketGemUseCase socketGemUseCase(
+            SocketGemUseCase.Ports ports, SocketGemUseCase.Records records, JdbcInventoryTransactionRunner tx) {
+        return new SocketGemUseCase(ports, records, tx, ThreadLocalGemRoll.INSTANCE);
     }
 
     /** Kho đồ tông môn (ADR-061) — tách khỏi {@link #wireInventoryFacade} vì trần {@code MethodLength}. */
