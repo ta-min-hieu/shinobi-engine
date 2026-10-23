@@ -85,3 +85,16 @@ dependencies {
 dependencies {
     "errorprone"("com.google.errorprone:error_prone_core:2.50.0")  // ⚠️ sync libs.versions.toml
 }
+
+// Ngân sách RAM (2026-10-23, xem gradle.properties gốc): mỗi tool này chạy trong một JVM worker
+// riêng, không đặt trần thì mỗi worker được tới 1/4 RAM vật lý. SpotBugs effort MAX là con ăn RAM
+// nhất nên được phần lớn nhất.
+tasks.withType<com.github.spotbugs.snom.SpotBugsTask>().configureEach {
+    maxHeapSize = "1536m"
+}
+tasks.withType<Pmd>().configureEach {
+    maxHeapSize = "1g"
+}
+tasks.withType<Checkstyle>().configureEach {
+    maxHeapSize = "512m"
+}

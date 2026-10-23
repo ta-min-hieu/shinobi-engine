@@ -23,6 +23,11 @@ tasks.withType<JavaCompile>().configureEach {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // Ngân sách RAM (2026-10-23): máy dev tối đa 32GB. Không đặt thì JVM test lấy trần heap mặc định
+    // = 1/4 RAM vật lý (8GB) và GC cứ để heap phình tới đó; vài JVM test + SpotBugs chạy song song
+    // là đủ làm máy cạn RAM (lần `check` toàn repo 2026-10-21 bị giết đúng vì vậy). Tổng ngân sách ở
+    // gradle.properties gốc.
+    maxHeapSize = "1g"
     testLogging {
         events("passed", "skipped", "failed")
     }

@@ -6,6 +6,11 @@ Mọi version `⚠️` trong catalog thực tế **đã resolve OK** (AssertJ 3.
 
 ## Yêu cầu để chạy
 - **JDK 25** — máy đã có (JBR 25.0.3 trong IntelliJ). `./gradlew` tự dùng JDK từ IntelliJ hoặc `JAVA_HOME`.
+- **RAM: máy dev tối đa 32GB.** Ngân sách ở `gradle.properties` gốc (daemon 2GB, tối đa 4 worker) và
+  ở build-logic (JVM test 1GB, SpotBugs 1,5GB, PMD 1GB, Checkstyle 512MB). Đo 2026-10-23: `check`
+  toàn repo xanh trong 25 phút, Java dùng đỉnh ~6,6GB, máy luôn còn trống ≥7,7GB (IDE + Docker
+  vẫn mở). Trước đó không có trần nào ⇒ 32 worker × trần mặc định 8GB ⇒ lần chạy 2026-10-21 bị
+  giết vì cạn RAM. Thêm module nặng RAM thì giữ tổng trong khung này, đừng nâng `workers.max`.
 
 ## Chạy build
 ```bash
