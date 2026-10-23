@@ -19,6 +19,8 @@ import dev.kage.protocol.ListMailRequest;
 import dev.kage.protocol.ListMailResponse;
 import dev.kage.protocol.MailView;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.SendMailCommand;
+import dev.kage.protocol.SendMailResponse;
 import dev.kage.tools.loadtest.GameConnection;
 
 /**
@@ -51,6 +53,9 @@ final class InspectionScenario {
         }
         if (plan.claimAllMail()) {
             claimAllMail();
+        }
+        if (!plan.sendMail().isEmpty()) {
+            sendMailTwice(plan.sendMail());
         }
         if (plan.statSheet()) {
             statSheet();
@@ -93,6 +98,31 @@ final class InspectionScenario {
                     claim(mail.getMailId(), key),
                     claim(mail.getMailId(), key)));
         }
+    }
+
+    /** ADR-058: cùng khoá gửi hai lần ⇒ lần hai phải là DUPLICATE_REQUEST, vàng trừ một lần. */
+    private void sendMailTwice(String recipientAndGold) throws IOException {
+        String[] parts = recipientAndGold.split(":", 2);
+        if (parts.length != 2) {
+            throw new IllegalArgumentException("--sendMail cần dạng nguoiNhan:soVang, nhận '" + recipientAndGold + "'");
+        }
+        SendMailCommand command = SendMailCommand.newBuilder()
+                .setRecipientName(parts[0])
+                .setSubject("probe")
+                .setBody("probe ADR-058")
+                .setGoldAmount(Long.parseLong(parts[1]))
+                .setIdempotencyKey(UUID.randomUUID().toString())
+                .build();
+        session.note("gửi thư cho " + parts[0] + " kèm " + parts[1] + " linh thạch: lần 1 " + send(command)
+                + ", lần 2 cùng khoá " + send(command));
+    }
+
+    private String send(SendMailCommand command) throws IOException {
+        connection.send(Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, command.toByteArray());
+        SendMailResponse response = SendMailResponse.parseFrom(connection
+                .readUntilOpcode(Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, MAX_FRAMES_TO_SKIP)
+                .payload());
+        return response.getOutcome() + " (thư " + response.getMailId() + ")";
     }
 
     private String claim(long mailId, String idempotencyKey) throws IOException {

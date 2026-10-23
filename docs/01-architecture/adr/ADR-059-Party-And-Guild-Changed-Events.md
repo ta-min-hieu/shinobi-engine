@@ -72,4 +72,4 @@ Không.
 
 ## Việc cần làm tiếp theo
 
-1. ✅ Thi hành (2026-10-18) — `MembershipNotices` (gateway, phát sau lệnh vào/rời/kick/giải tán/duyệt + chuyển quyền trưởng nhóm lúc rớt mạng), `MembershipNoticeCoordinator` (client: một dòng chat hệ thống + hỏi lại danh sách). ⏳ Chưa kiểm sống bằng hai client.
+1. ✅ Thi hành (2026-10-18) — `MembershipNotices` (gateway, phát sau lệnh vào/rời/kick/giải tán/duyệt + chuyển quyền trưởng nhóm lúc rớt mạng), `MembershipNoticeCoordinator` (client: một dòng chat hệ thống + hỏi lại danh sách). ✅ Kiểm sống 2026-10-23 bằng hai gameProbe (hai tài khoản): Benkei (trưởng nhóm, online) mời tanthua44, tanthua44 nhận ⇒ Benkei nhận 1318 `PARTY_CHANGED_EVENT`; góp bang/xong nhiệm vụ bang ⇒ 720 (ADR-068/069). Dòng chat hệ thống phía client chưa nhìn bằng giao diện.

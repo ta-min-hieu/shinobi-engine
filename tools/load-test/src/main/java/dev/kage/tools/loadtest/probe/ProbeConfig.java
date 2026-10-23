@@ -184,12 +184,13 @@ public record ProbeConfig(
      *
      * @param abandonQuest mã nhiệm vụ cần bỏ; rỗng = không bỏ
      * @param claimAllMail lĩnh mọi thư chưa lĩnh (mỗi thư gửi hai lần cùng khoá idempotency)
+     * @param sendMail {@code nguoiNhan:soVang} — gửi một thư kèm vàng, HAI lần cùng khoá (ADR-058); rỗng = không
      * @param statSheet in bảng nhân vật (210/211)
      * @param leaderboards loại bảng xếp hạng cần in ({@code realm}, {@code arena}, {@code combat_power},
      *     {@code guild})
      */
     public record InspectionPlan(
-            String abandonQuest, boolean claimAllMail, boolean statSheet, List<String> leaderboards) {
+            String abandonQuest, boolean claimAllMail, String sendMail, boolean statSheet, List<String> leaderboards) {
 
         /** Danh sách bất biến — record không tự copy, mà lệnh gọi có thể truyền list sống. */
         public InspectionPlan {
@@ -198,7 +199,11 @@ public record ProbeConfig(
 
         /** {@code true} khi có ít nhất một bước cần chạy. */
         public boolean isRequested() {
-            return !abandonQuest.isEmpty() || claimAllMail || statSheet || !leaderboards.isEmpty();
+            return !abandonQuest.isEmpty()
+                    || claimAllMail
+                    || !sendMail.isEmpty()
+                    || statSheet
+                    || !leaderboards.isEmpty();
         }
     }
 
@@ -337,6 +342,7 @@ public record ProbeConfig(
         return new InspectionPlan(
                 raw.text("abandonQuest", ""),
                 raw.flag("claimAllMail", false),
+                raw.text("sendMail", ""),
                 raw.flag("statSheet", false),
                 raw.list("leaderboards"));
     }

@@ -62,3 +62,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành (2026-10-18) — outcome thật là **9** (bản nháp ghi 10; 9 còn trống). `SendMailIdempotencyIntegrationTest` (Postgres thật: cùng khoá ⇒ một thư, vàng trừ một lần; khoá rỗng vẫn gửi). Client giữ khoá tới khi có trả lời (`MailCoordinator#sendKey`).
+2. ✅ Kiểm sống 2026-10-23 bằng gameProbe (`--sendMail=Benkei:100`): cùng khoá gửi hai lần ⇒ lần 1 OK (thư 8), lần 2 `DUPLICATE_REQUEST`; vàng người gửi trừ đúng 100 một lần, DB chỉ có một thư.

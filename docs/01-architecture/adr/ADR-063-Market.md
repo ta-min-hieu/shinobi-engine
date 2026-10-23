@@ -90,4 +90,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-18 (lô 16).
-2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--listOnMarket/--buyFromMarket`): Kagemaru treo Hộ Thủ Tạp Dịch giá 500; tanthua44 mua ⇒ người mua −500, người bán +475 (500 − 5%), dòng `SOLD`. Sự kiện 1014 cho người bán chưa thấy: hai nhân vật cùng tài khoản nên phiên người bán bị đá (`logged_in_elsewhere`) — cần hai tài khoản.
+2. ✅ Kiểm sống 2026-10-21 bằng gameProbe (`--listOnMarket/--buyFromMarket`): Kagemaru treo Hộ Thủ Tạp Dịch giá 500; tanthua44 mua ⇒ người mua −500, người bán +475 (500 − 5%), dòng `SOLD`. Lượt hai tài khoản (2026-10-23): Benkei treo Mũ Tạp Dịch 300 rồi đứng online, Kagemaru mua ⇒ Benkei +285 kèm 1014 `LISTING_SOLD_EVENT`.
