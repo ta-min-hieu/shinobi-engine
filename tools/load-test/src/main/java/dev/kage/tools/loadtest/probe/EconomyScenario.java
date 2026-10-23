@@ -12,7 +12,10 @@ import dev.kage.protocol.CreateListingCommand;
 import dev.kage.protocol.CreateListingResponse;
 import dev.kage.protocol.DepositItemCommand;
 import dev.kage.protocol.DepositItemResponse;
+import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.GetItemCatalogRequest;
+import dev.kage.protocol.GetTradeStatusRequest;
+import dev.kage.protocol.GetTradeStatusResponse;
 import dev.kage.protocol.InventoryItemView;
 import dev.kage.protocol.ItemCatalogEntry;
 import dev.kage.protocol.ItemCatalogResponse;
@@ -26,11 +29,15 @@ import dev.kage.protocol.MarketListingView;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SetActiveTitleCommand;
 import dev.kage.protocol.SetActiveTitleResponse;
+import dev.kage.protocol.SetTradeOfferCommand;
+import dev.kage.protocol.SetTradeOfferResponse;
 import dev.kage.protocol.SocketGemCommand;
 import dev.kage.protocol.SocketGemResponse;
 import dev.kage.protocol.StoredItemView;
+import dev.kage.protocol.TradeOfferItemInput;
 import dev.kage.protocol.WithdrawItemCommand;
 import dev.kage.protocol.WithdrawItemResponse;
+import dev.kage.protocol.wire.PacketCodec;
 import dev.kage.tools.loadtest.GameConnection;
 
 /**
@@ -64,8 +71,12 @@ final class EconomyScenario {
         for (String raw : plan.withdrawItems()) {
             withdraw(ShopScenario.Line.parse(raw, ShopScenario.ALL));
         }
-        for (String pair : plan.socketGems()) {
-            socket(pair);
+        for (String step : plan.socketGems()) {
+            int arrow = step.indexOf('>');
+            if (arrow >= 0) {
+                offerInTrade(ShopScenario.Line.parse(step.substring(0, arrow), 1));
+            }
+            socket(step.substring(arrow + 1));
         }
         if (!plan.setTitle().isEmpty()) {
             setTitle(plan.setTitle());
@@ -142,7 +153,7 @@ final class EconomyScenario {
             session.note("khảm " + pair + ": túi thiếu trang bị hoặc ngọc — bỏ qua");
             return;
         }
-        connection.send(
+        int sequenceId = connection.send(
                 Opcode.OPCODE_SOCKET_GEM_COMMAND_VALUE,
                 SocketGemCommand.newBuilder()
                         .setTargetItemId(target.get().getItemId())
@@ -150,9 +161,13 @@ final class EconomyScenario {
                         .setIdempotencyKey(UUID.randomUUID().toString())
                         .build()
                         .toByteArray());
-        SocketGemResponse response = SocketGemResponse.parseFrom(connection
-                .readUntilOpcode(Opcode.OPCODE_SOCKET_GEM_RESPONSE_VALUE, MAX_FRAMES_TO_SKIP)
-                .payload());
+        PacketCodec.Frame frame = readReplyOrError(Opcode.OPCODE_SOCKET_GEM_RESPONSE_VALUE, sequenceId);
+        if (frame.header().opcode() == Opcode.OPCODE_ERROR_VALUE) {
+            ErrorResponse error = ErrorResponse.parseFrom(frame.payload());
+            session.note("khảm " + pair + ": BỊ TỪ CHỐI " + error.getErrorKey() + " (" + error.getErrorCode() + ")");
+            return;
+        }
+        SocketGemResponse response = SocketGemResponse.parseFrom(frame.payload());
         session.note(String.format(
                 Locale.ROOT,
                 "khảm %s: %s hỏngLiênTiếp=%d/%d máuTốiĐa=%d",
@@ -161,6 +176,52 @@ final class EconomyScenario {
                 response.getFailuresInARow(),
                 response.getPityAfter(),
                 response.getMaxHp()));
+    }
+
+    /**
+     * Đặt lại lời chào của MÌNH trong phiên giao dịch đang mở (thay hẳn lời chào cũ) — tiền đề cho bước khảm
+     * ngay sau nó ({@code --socketGems=ma:soLuong>trangBi:ngoc}, docs/README.md dòng 82).
+     */
+    private void offerInTrade(ShopScenario.Line line) throws IOException {
+        Optional<InventoryItemView> item = findInBag(line.code(), true);
+        connection.send(
+                Opcode.OPCODE_GET_TRADE_STATUS_REQUEST_VALUE,
+                GetTradeStatusRequest.getDefaultInstance().toByteArray());
+        GetTradeStatusResponse status = GetTradeStatusResponse.parseFrom(connection
+                .readUntilOpcode(Opcode.OPCODE_GET_TRADE_STATUS_RESPONSE_VALUE, MAX_FRAMES_TO_SKIP)
+                .payload());
+        if (item.isEmpty() || !status.getInTrade()) {
+            session.note("chào " + line.code() + ": túi không có hoặc không trong giao dịch nào — bỏ qua");
+            return;
+        }
+        connection.send(
+                Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE,
+                SetTradeOfferCommand.newBuilder()
+                        .setSessionId(status.getSessionId())
+                        .addItems(TradeOfferItemInput.newBuilder()
+                                .setItemId(item.get().getItemId())
+                                .setQuantity(line.quantity()))
+                        .build()
+                        .toByteArray());
+        SetTradeOfferResponse response = SetTradeOfferResponse.parseFrom(connection
+                .readUntilOpcode(Opcode.OPCODE_SET_TRADE_OFFER_RESPONSE_VALUE, MAX_FRAMES_TO_SKIP)
+                .payload());
+        session.note("chào " + line.code() + " x" + line.quantity() + " trong phiên " + status.getSessionId() + ": "
+                + response.getOutcome());
+    }
+
+    /** Phản hồi {@code opcode}, hoặc {@code ErrorResponse} của ĐÚNG lệnh {@code sequenceId}. */
+    private PacketCodec.Frame readReplyOrError(int opcode, int sequenceId) throws IOException {
+        for (int skipped = 0; skipped < MAX_FRAMES_TO_SKIP; skipped++) {
+            PacketCodec.Frame frame = connection.readFrame();
+            int got = frame.header().opcode();
+            boolean ownError = got == Opcode.OPCODE_ERROR_VALUE
+                    && ErrorResponse.parseFrom(frame.payload()).getRelatedSequenceId() == sequenceId;
+            if (got == opcode || ownError) {
+                return frame;
+            }
+        }
+        throw new IOException("Không thấy opcode " + opcode + " sau " + MAX_FRAMES_TO_SKIP + " frame");
     }
 
     private void setTitle(String achievementCode) throws IOException {

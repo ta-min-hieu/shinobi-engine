@@ -212,7 +212,8 @@ public record ProbeConfig(
      *
      * @param depositItems món gửi kho, {@code code} hoặc {@code code:soLuong}
      * @param withdrawItems món rút kho, {@code code} hoặc {@code code:soLuong}
-     * @param socketGems lượt khảm, mỗi phần tử {@code maTrangBi:maNgoc}
+     * @param socketGems lượt khảm, mỗi phần tử {@code maTrangBi:maNgoc}; tiền tố {@code ma:soLuong>} đặt lời chào
+     *     giao dịch đó ngay trước lượt khảm (dòng 82)
      * @param setTitle mã thành tựu cần đeo làm danh hiệu; rỗng = không đổi
      * @param listOnMarket dòng treo phường thị, mỗi phần tử {@code ma:giaTong}
      * @param buyFromMarket mã món cần mua dòng rẻ nhất ở phường thị
