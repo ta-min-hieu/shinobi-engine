@@ -87,6 +87,27 @@ class MarketUseCaseTest {
     }
 
     @Test
+    void buyShouldTouchGoldRowsInAscendingCharacterId_whicheverSideIsLower() {
+        // Hai người mua chéo dòng của nhau cùng lúc: mỗi bên chỉ khoá túi đồ CỦA MÌNH, nên vòng khoá duy nhất
+        // là hai dòng vàng. Trừ-người-mua-rồi-cộng-người-bán khoá A→B ở bên này, B→A ở bên kia ⇒ deadlock.
+        world.bag.put(KUNAI_ROW, 10);
+        world.gold.put(BUYER, 5_000L);
+        market.create(new ListingRequest(SELLER, KUNAI_ROW, 1, 1_000, "k1"));
+        market.buy(BUYER, world.listings.keySet().iterator().next(), "k2");
+
+        assertThat(world.goldTouched).as("người bán id nhỏ hơn").containsExactly(SELLER, BUYER);
+
+        long highSeller = BUYER + 1;
+        world.goldTouched.clear();
+        world.bagOwner = highSeller;
+        market.create(new ListingRequest(highSeller, KUNAI_ROW, 1, 1_000, "k3"));
+        market.buy(BUYER, world.listings.keySet().iterator().next(), "k4");
+
+        assertThat(world.goldTouched).as("người bán id lớn hơn").containsExactly(BUYER, highSeller);
+        assertThat(world.gold).containsEntry(BUYER, 3_000L).containsEntry(highSeller, 950L);
+    }
+
+    @Test
     void sameKeyTwice_shouldListOnce() {
         world.bag.put(KUNAI_ROW, 10);
 
@@ -127,6 +148,11 @@ class MarketUseCaseTest {
         final Map<Long, MarketListing> listings = new HashMap<>();
         final Set<String> keys = new HashSet<>();
         final List<String> given = new ArrayList<>();
+        /** Thứ tự các dòng vàng bị chạm — Postgres khoá dòng {@code character_stat} theo đúng thứ tự này. */
+        final List<Long> goldTouched = new ArrayList<>();
+        /** Chủ của các dòng trong {@link #bag}. */
+        long bagOwner = SELLER;
+
         long nextId = 1;
 
         // PMD AvoidCatchingGenericException: đúng ý — fake phải hoàn tác với MỌI lỗi, như Postgres rollback.
@@ -226,7 +252,7 @@ class MarketUseCaseTest {
         @Override
         public TakeResult take(Transaction tx, long characterId, long inventoryItemId, int quantity) {
             Integer have = bag.get(inventoryItemId);
-            if (characterId != SELLER || have == null) {
+            if (characterId != bagOwner || have == null) {
                 return new TakeResult.Refused(MarketOutcome.NOT_FOUND);
             }
             if (quantity > have) {
@@ -244,6 +270,7 @@ class MarketUseCaseTest {
 
         @Override
         public boolean deduct(Transaction tx, long characterId, long amount) {
+            goldTouched.add(characterId);
             long have = gold.getOrDefault(characterId, 0L);
             if (have < amount) {
                 return false;
@@ -254,6 +281,7 @@ class MarketUseCaseTest {
 
         @Override
         public void credit(Transaction tx, long characterId, long amount) {
+            goldTouched.add(characterId);
             gold.merge(characterId, amount, Long::sum);
         }
 

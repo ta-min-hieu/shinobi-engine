@@ -90,11 +90,8 @@ public final class MarketUseCase {
                 throw new Abort(MarketOutcome.OWN_LISTING);
             }
             ports.records().recordKey(t, key);
-            if (!ports.gold().deduct(t, buyerId, listing.price())) {
-                throw new Abort(MarketOutcome.INSUFFICIENT_GOLD);
-            }
             long proceeds = MarketPolicy.proceedsOf(listing.price());
-            ports.gold().credit(t, listing.sellerId(), proceeds);
+            moveGold(t, buyerId, listing, proceeds);
             if (!ports.inventory().give(t, buyerId, listing.itemTemplateId(), listing.quantity())) {
                 throw new Abort(MarketOutcome.BAG_FULL);
             }
@@ -105,6 +102,24 @@ public final class MarketUseCase {
             sale.set(new Sale(listingId, listing.sellerId(), listing.itemTemplateId(), listing.quantity(), proceeds));
         });
         return new BuyResult(outcome, Optional.ofNullable(sale.get()));
+    }
+
+    /**
+     * Trừ người mua, cộng người bán — chạm hai dòng vàng theo {@code character_id} TĂNG DẦN. Mỗi bên mua chỉ khoá
+     * túi đồ của chính mình (DATABASE.md §5.1 bước 1), nên hai người mua chéo dòng của nhau cùng lúc không xếp hàng ở
+     * đâu cả trước khi tới vàng; trừ-rồi-cộng cố định thì một bên khoá A→B, bên kia B→A ⇒ deadlock, một bên nhận
+     * {@code error.server_internal}. Cộng trước rồi mới trừ không lộ gì: thiếu vàng ⇒ ném ⇒ rollback cả hai.
+     */
+    private void moveGold(Transaction t, long buyerId, MarketListing listing, long proceeds) {
+        if (listing.sellerId() < buyerId) {
+            ports.gold().credit(t, listing.sellerId(), proceeds);
+        }
+        if (!ports.gold().deduct(t, buyerId, listing.price())) {
+            throw new Abort(MarketOutcome.INSUFFICIENT_GOLD);
+        }
+        if (listing.sellerId() > buyerId) {
+            ports.gold().credit(t, listing.sellerId(), proceeds);
+        }
     }
 
     /** Người bán huỷ — món về túi (đầy ⇒ {@code BAG_FULL}, không gì đổi). */

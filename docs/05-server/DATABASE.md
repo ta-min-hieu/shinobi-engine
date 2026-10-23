@@ -241,6 +241,7 @@ Hai luật nhỏ hơn, cùng tinh thần §5.1 — đều bắt được bằng 
 |---|---|---|
 | Party | Dòng `party` `FOR UPDATE` **trước** mọi dòng `party_member`/`party_invite` — ở cả `acceptInvite` lẫn `leaveParty` | `leaveParty` từng khoá dòng thành viên của người rời trước dòng party, trong khi leader rời lại khoá dòng thành viên của leader kế nhiệm SAU dòng party ⇒ leader và thành viên vào sớm nhất cùng rời = deadlock thật, một bên nhận `error.server_internal`. `PartyDissolveRaceIntegrationTest` |
 | Party/bang vừa giải tán | Vi phạm FK tới dòng cha (mời vào party vừa mất leader cuối, xin vào bang vừa giải tán) được adapter dịch thành `PartyDissolvedException`/`GuildDisbandedException` ⇒ outcome thường | Trước đó là 500. `GuildDisbandRaceIntegrationTest` |
+| Phường thị (mua) | Trừ vàng người mua / cộng vàng người bán theo `character_id` **tăng dần** (`MarketUseCase#moveGold`) | Người mua chỉ khoá túi đồ của chính mình nên §5.1 bước 1 không xếp hàng hai người mua chéo dòng của nhau; trừ-rồi-cộng cố định khoá A→B và B→A ⇒ deadlock (rà code 2026-10-23, `MarketUseCaseTest`) |
 | `pvp_rating` | Chèn dòng mặc định `ON CONFLICT DO NOTHING` **rồi mới** `FOR UPDATE`, theo `character_id` tăng dần | `FOR UPDATE` không khoá được dòng chưa tồn tại (READ COMMITTED cũng không chờ INSERT chưa commit) ⇒ hai trận đầu đời settle cùng lúc từng mất trọn Elo của một trận. `PostgresPvpRatingAdapterIntegrationTest` |
 
 ---
