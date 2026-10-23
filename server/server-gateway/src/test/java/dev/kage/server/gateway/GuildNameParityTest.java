@@ -48,7 +48,15 @@ class GuildNameParityTest {
             "ㅤㅤ",
             "ＫＡＧＥ",
             "𝐊𝐚",
-            "Kage²");
+            "Kage²",
+            // 2026-10-23 (dòng 42) — trộn hệ chữ trông giống nhau: а Cyrillic trong Kage, ο Hy Lạp; đối chứng
+            // thuần Cyrillic, thuần Hy Lạp, tiếng Việt, Latin + chữ Hán (không giống nhau nên không chặn).
+            "Kаge",
+            "Kagο",
+            "Каге",
+            "Καγε",
+            "Kiếm_Tiên9",
+            "Kage龍");
 
     @Test
     void guildNameRuleShouldMatchCharacterNameRule() {

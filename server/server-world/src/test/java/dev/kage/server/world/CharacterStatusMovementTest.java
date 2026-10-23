@@ -39,12 +39,20 @@ class CharacterStatusMovementTest {
 
     private record SkillResult(String skillCode, long target, SkillEffectKind kind) {}
 
+    private record Modifier(long characterId, float multiplier, boolean immobilized) {}
+
     private static final class RecordingSink implements WorldOutboundSink {
         final List<Accepted> accepted = new CopyOnWriteArrayList<>();
         final List<SkillResult> skillResults = new CopyOnWriteArrayList<>();
         final List<Long> spawnedTo = new CopyOnWriteArrayList<>();
         final List<Long> defeated = new CopyOnWriteArrayList<>();
         final List<Long> respawned = new CopyOnWriteArrayList<>();
+        final List<Modifier> modifiers = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void onMovementModifierChanged(long characterId, float statusSpeedMultiplier, boolean immobilized) {
+            modifiers.add(new Modifier(characterId, statusSpeedMultiplier, immobilized));
+        }
 
         @Override
         public void onMoveAccepted(WorldOutboundSink.MoveAcceptedSnapshot snapshot) {
@@ -164,6 +172,25 @@ class CharacterStatusMovementTest {
         float resumedFrom = positionOf(2L);
         sleepQuietly(500);
         assertThat(resumedFrom - positionOf(2L)).isGreaterThan(1f);
+    }
+
+    /**
+     * ADR-073: người bị choáng được báo "không đi được" lúc trúng và "đi lại được" lúc hết — đúng hai lần, chỉ cho
+     * chính họ; người ra đòn không nhận gì.
+     */
+    @Test
+    void shouldTellOnlyTheStunnedCharacter_whenTheStunLandsAndWhenItEnds() {
+        world.allowPlayerVersusPlayer();
+        world.start();
+        world.attachCharacter(1L, 0f, 0f, LOI_STATS);
+        world.attachCharacter(2L, 3f, 0f, HOA_STATS);
+        awaitTrue(() -> sink.spawnedTo.contains(1L) && sink.spawnedTo.contains(2L));
+
+        world.useSkill(1L, "loi_dien_giat", 2L); // stun 2,5 giây
+        awaitTrue(() -> sink.modifiers.contains(new Modifier(2L, 1f, true)));
+        awaitTrue(() -> sink.modifiers.contains(new Modifier(2L, 1f, false)));
+
+        assertThat(sink.modifiers).containsExactly(new Modifier(2L, 1f, true), new Modifier(2L, 1f, false));
     }
 
     @Test

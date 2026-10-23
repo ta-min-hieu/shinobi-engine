@@ -112,6 +112,7 @@ public final class FriendPanel implements HudWindow {
     private final Label notice;
 
     private Consumer<String> onSendRequest;
+    private Consumer<String> onWithdrawRequest;
     private IntConsumer onAccept;
     private IntConsumer onReject;
     private IntConsumer onRemove;
@@ -208,9 +209,13 @@ public final class FriendPanel implements HudWindow {
     private Table buildComposer() {
         Table composer = new Table();
         composer.add(nameInput)
-                .width(PANEL_WIDTH_PX - (2f * (ACTION_BUTTON_WIDTH_PX + ROW_GAP_PX)))
+                .width(PANEL_WIDTH_PX - (3f * (ACTION_BUTTON_WIDTH_PX + ROW_GAP_PX)))
                 .growX();
         composer.add(button("friend.action.add", this::submitRequest))
+                .width(ACTION_BUTTON_WIDTH_PX)
+                .padLeft(ROW_GAP_PX);
+        // ADR-074 — rút lời mời đã gửi cho người có tên đang gõ (client không có danh sách lời mời đã gửi).
+        composer.add(button("friend.action.withdraw", this::submitWithdraw))
                 .width(ACTION_BUTTON_WIDTH_PX)
                 .padLeft(ROW_GAP_PX);
         composer.add(button("friend.action.close", this::close))
@@ -268,6 +273,11 @@ public final class FriendPanel implements HudWindow {
     /** Tên người chơi vừa gõ xong (Enter hoặc nút) — có thể rỗng, lọc là việc của controller. */
     public void setOnSendRequest(Consumer<String> listener) {
         this.onSendRequest = listener;
+    }
+
+    /** ADR-074 — tên đang gõ khi bấm "Rút mời"; có thể rỗng, lọc là việc của controller. */
+    public void setOnWithdrawRequest(Consumer<String> listener) {
+        this.onWithdrawRequest = listener;
     }
 
     /** CHỈ SỐ dòng lời mời vừa bấm Đồng ý — xem javadoc lớp về việc widget không giữ id. */
@@ -426,6 +436,14 @@ public final class FriendPanel implements HudWindow {
         nameInput.setText("");
         if (onSendRequest != null) {
             onSendRequest.accept(typed);
+        }
+    }
+
+    private void submitWithdraw() {
+        String typed = nameInput.getText();
+        nameInput.setText("");
+        if (onWithdrawRequest != null) {
+            onWithdrawRequest.accept(typed);
         }
     }
 

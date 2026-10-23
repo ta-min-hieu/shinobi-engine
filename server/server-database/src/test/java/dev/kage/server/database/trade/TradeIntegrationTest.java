@@ -265,6 +265,57 @@ class TradeIntegrationTest {
         return UUID.randomUUID().toString();
     }
 
+    /**
+     * Dòng 40(iv): phiên sót lại từ lần server chết đột ngột (đang mở, đã có lời chào) bị huỷ sạch lúc khởi
+     * động — cả lời chào đi theo (CASCADE), hai bên mời giao dịch mới được ngay; đồ/vàng không đổi.
+     */
+    @Test
+    void shouldCancelEveryLeftoverSession_andFreeBothSides() {
+        long a = createFreshCharacter("TradeA40");
+        long b = createFreshCharacter("TradeB40");
+        long itemA = persistOneItem(a, kunaiTemplateId, 2);
+        PostgresTradeSessionAdapter sessionPort = newSessionPort();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(a, b).session();
+        new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), b);
+        new SetTradeOfferUseCase(sessionPort).execute(session.id(), a, 0, List.of(new OfferedItemInput(itemA, 2)));
+
+        int cancelled = new CancelTradeUseCase(sessionPort).cancelLeftoverSessions();
+
+        assertThat(cancelled).isPositive();
+        assertThat(sessionPort.findActiveSessionOfCharacter(a)).isEmpty();
+        assertThat(sessionPort.findActiveSessionOfCharacter(b)).isEmpty();
+        assertThat(itemOwner(itemA)).isEqualTo(a);
+        assertThat(new RequestTradeUseCase(sessionPort).execute(b, a).outcome())
+                .isEqualTo(RequestTradeUseCase.Outcome.OK);
+    }
+
+    /**
+     * ADR-075 trên Postgres thật: mỗi lần đặt lời chào tăng {@code offer_version}; xác nhận nhắm bản cũ bị từ chối
+     * và transaction rollback trọn — chính khoá chống trùng đó dùng lại được với phiên bản đúng.
+     */
+    @Test
+    void shouldRefuseAStaleOfferVersion_withoutSpendingTheIdempotencyKey() {
+        long a = createFreshCharacter("TradeA75");
+        long b = createFreshCharacter("TradeB75");
+        PostgresTradeSessionAdapter sessionPort = newSessionPort();
+        TradeSession session =
+                new RequestTradeUseCase(sessionPort).execute(a, b).session();
+        new AcceptTradeRequestUseCase(sessionPort).execute(session.id(), b);
+        long seen = sessionPort.findSnapshot(session.id()).orElseThrow().offerVersion();
+        new SetTradeOfferUseCase(sessionPort).execute(session.id(), b, 0, List.of());
+        ConfirmTradeUseCase confirm = newConfirmUseCase(sessionPort);
+        String key = UUID.randomUUID().toString();
+
+        ConfirmTradeUseCase.Result stale = confirm.execute(session.id(), a, key, seen);
+        long current = sessionPort.findSnapshot(session.id()).orElseThrow().offerVersion();
+        ConfirmTradeUseCase.Result retried = confirm.execute(session.id(), a, key, current);
+
+        assertThat(stale).isEqualTo(ConfirmTradeUseCase.Result.OFFER_JUST_CHANGED);
+        assertThat(current).isEqualTo(seen + 1);
+        assertThat(retried).isEqualTo(ConfirmTradeUseCase.Result.OK);
+    }
+
     @Test
     void shouldExecuteTrade_swappingGoldAndItems_whenBothConfirm() {
         long a = createFreshCharacter("TradeA1");

@@ -90,6 +90,9 @@ public record Character(
                 || name.codePoints().anyMatch(Character::isInvisibleLetter)) {
             throw new IllegalArgumentException("tên nhân vật chứa ký tự vô hình hoặc dạng tương thích");
         }
+        if (mixesLookalikeScripts(name)) {
+            throw new IllegalArgumentException("tên nhân vật trộn chữ Latin với Cyrillic/Hy Lạp");
+        }
     }
 
     /**
@@ -101,6 +104,26 @@ public record Character(
      */
     public static String normalizeNewName(String name) {
         return name == null ? null : Normalizer.normalize(name, Normalizer.Form.NFC);
+    }
+
+    /**
+     * Tên trộn chữ của HAI trong ba hệ trông giống nhau — Latin, Cyrillic, Hy Lạp (dòng 42, lô 18, chủ dự án
+     * duyệt 2026-10-23): {@code "Kаge"} với {@code а} Cyrillic giả hệt {@code "Kage"}. Tên thuần một hệ (kể cả
+     * thuần Cyrillic) và tiếng Việt (Latin) không bị ảnh hưởng; chữ số, {@code _} và dấu kết hợp không thuộc hệ
+     * nào nên không tính.
+     */
+    private static boolean mixesLookalikeScripts(String name) {
+        int scripts = name.codePoints().map(Character::lookalikeScriptBit).reduce(0, (a, b) -> a | b);
+        return Integer.bitCount(scripts) > 1;
+    }
+
+    private static int lookalikeScriptBit(int codePoint) {
+        return switch (java.lang.Character.UnicodeScript.of(codePoint)) {
+            case LATIN -> 1;
+            case CYRILLIC -> 2;
+            case GREEK -> 4;
+            default -> 0;
+        };
     }
 
     /**

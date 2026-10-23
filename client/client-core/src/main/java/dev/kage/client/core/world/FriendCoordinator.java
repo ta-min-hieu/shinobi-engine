@@ -12,6 +12,8 @@ import dev.kage.client.core.ui.hud.FriendPanel;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.AcceptFriendRequestOutcome;
 import dev.kage.protocol.AcceptFriendRequestResponse;
+import dev.kage.protocol.CancelFriendRequestCommand;
+import dev.kage.protocol.CancelFriendRequestResponse;
 import dev.kage.protocol.FriendOfflineEvent;
 import dev.kage.protocol.FriendOnlineEvent;
 import dev.kage.protocol.ListFriendsResponse;
@@ -73,6 +75,7 @@ final class FriendCoordinator implements WindowFlow {
         this.feedback = feedback;
         panel.setCanOpen(canOpen);
         panel.setOnSendRequest(this::onSendRequest);
+        panel.setOnWithdrawRequest(this::onWithdrawRequest);
         panel.setOnAccept(this::onAccept);
         panel.setOnReject(this::onReject);
         panel.setOnRemove(this::onRemove);
@@ -155,6 +158,11 @@ final class FriendCoordinator implements WindowFlow {
                     response.getOutcome() == RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_OK);
             return true;
         }
+        if (opcode == Opcode.OPCODE_CANCEL_FRIEND_REQUEST_RESPONSE_VALUE) {
+            notice(FriendController.cancelOutcomeMessageKey(
+                    CancelFriendRequestResponse.parseFrom(payload).getOutcome()));
+            return true;
+        }
         if (opcode == Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE) {
             RemoveFriendResponse response = RemoveFriendResponse.parseFrom(payload);
             settle(
@@ -208,6 +216,23 @@ final class FriendCoordinator implements WindowFlow {
             case FriendController.ComposeResult.Reject reject -> notice(reject.messageKey());
             case FriendController.ComposeResult.Nothing ignored -> {
                 // Ô nhập rỗng — không gửi gì, và cũng không mắng người chơi.
+            }
+        }
+    }
+
+    /** ADR-074 — cùng bộ lọc tên với gửi lời mời, rồi gửi lệnh rút. */
+    private void onWithdrawRequest(String typed) {
+        FriendController.ComposeResult result = controller.compose(typed);
+        switch (result) {
+            case FriendController.ComposeResult.Send send ->
+                sender.sendReadRequest(
+                        Opcode.OPCODE_CANCEL_FRIEND_REQUEST_COMMAND_VALUE,
+                        CancelFriendRequestCommand.newBuilder()
+                                .setTargetName(send.targetName())
+                                .build());
+            case FriendController.ComposeResult.Reject reject -> notice(reject.messageKey());
+            case FriendController.ComposeResult.Nothing ignored -> {
+                // Ô nhập rỗng — không gửi gì.
             }
         }
     }

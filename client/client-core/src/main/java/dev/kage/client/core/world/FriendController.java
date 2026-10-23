@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import dev.kage.protocol.AcceptFriendRequestOutcome;
+import dev.kage.protocol.CancelFriendRequestOutcome;
 import dev.kage.protocol.FriendView;
 import dev.kage.protocol.ListFriendsResponse;
 import dev.kage.protocol.ListPendingFriendRequestsResponse;
@@ -199,6 +200,11 @@ final class FriendController {
             RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_TARGET_NOT_FOUND, "friend.error.target_not_found",
             RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_NOT_FRIENDS, "friend.error.not_friends");
 
+    private static final Map<CancelFriendRequestOutcome, String> CANCEL_OUTCOME_MESSAGE_KEYS = Map.of(
+            CancelFriendRequestOutcome.CANCEL_FRIEND_REQUEST_OUTCOME_OK, "friend.notice.withdrawn",
+            CancelFriendRequestOutcome.CANCEL_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND, "friend.error.target_not_found",
+            CancelFriendRequestOutcome.CANCEL_FRIEND_REQUEST_OUTCOME_NOT_PENDING, "friend.error.no_pending_request");
+
     /**
      * Câu giải thích một kết quả. Bốn hàm chứ không phải một hàm tổng quát: bốn enum protobuf khác
      * nhau không có tổ tiên chung nào ngoài {@code Object}, gộp lại chỉ mua được một chữ ký nhận
@@ -224,5 +230,10 @@ final class FriendController {
     /** Xem {@link #sendOutcomeMessageKey}. */
     static String removeOutcomeMessageKey(RemoveFriendOutcome outcome) {
         return REMOVE_OUTCOME_MESSAGE_KEYS.getOrDefault(outcome, "friend.error.unknown");
+    }
+
+    /** ADR-074 — xem {@link #sendOutcomeMessageKey}. */
+    static String cancelOutcomeMessageKey(CancelFriendRequestOutcome outcome) {
+        return CANCEL_OUTCOME_MESSAGE_KEYS.getOrDefault(outcome, "friend.error.unknown");
     }
 }

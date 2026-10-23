@@ -104,6 +104,9 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-070](ADR-070-Flying-Sword-Mount.md) | Phi kiếm — ô trang bị MOUNT, chỉ +% tốc độ (V71, opcode 310, `EQUIPMENT_SLOT_MOUNT`) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD §5 phi kiếm chỉ tốc độ |
 | [ADR-071](ADR-071-Skill-Ranks.md) | Điểm công pháp — cấp/2 điểm, bậc chiêu 1–5 (+10%/bậc), cửa sổ phím R (V72, opcode 409–412) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD §5 điểm công pháp |
 | [ADR-072](ADR-072-Spirit-Pets.md) | Linh thú bản đầu — ô trang bị PET, cấp 1–30 theo EXP chủ nhân, chỉ số +10%/cấp (V71, `pet_state`) | ✅ **Accepted** *(2026-10-21, lô 17)* — thi hành cùng ngày | GDD §5 linh thú |
+| [ADR-073](ADR-073-Self-Movement-Modifier-Event.md) | Event hiệu ứng di chuyển trên chính mình — hết giật vị trí khi bị choáng/làm chậm (opcode 311) | ✅ **Accepted** *(2026-10-23, lô 18)* | README dòng 38 |
+| [ADR-074](ADR-074-Withdraw-Friend-Request.md) | Rút lời mời kết bạn theo tên (opcode 1114/1115) | ✅ **Accepted** *(2026-10-23, lô 18)* | README dòng 71(c) |
+| [ADR-075](ADR-075-Trade-Offer-Version.md) | `offer_version` — xác nhận đúng lời chào đã thấy (V74, thêm field) | ✅ **Accepted** *(2026-10-23, lô 18)* | README dòng 25(i) |
 ---
 
 ## ADR cần tạo (chưa viết)

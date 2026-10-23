@@ -127,6 +127,7 @@ public final class GatewayBootstrap {
         CharacterPositionPersister positionPersister =
                 new CharacterPositionPersister(facades.characterFacade(), characterRegistry, POSITION_SAVE_INTERVAL);
         positionPersister.start();
+        cancelLeftoverTrades(facades);
         InstanceRegistries instanceRegistries =
                 buildInstanceRegistries(characterRegistry, facades, mainWorldChannels, positionPersister);
 
@@ -278,6 +279,17 @@ public final class GatewayBootstrap {
      */
     record InstanceRegistries(
             DungeonInstanceRegistry dungeon, ArenaInstanceRegistry arena, WorldGateway worldGateway) {}
+
+    /**
+     * Dòng 40(iv), lô 18 (2026-10-23): phiên giao dịch sót lại từ lần server chết đột ngột (tắt êm thì mọi phiên đã
+     * bị huỷ lúc đóng kết nối) bị huỷ TRƯỚC khi mở cổng game — chưa ai online nên không ai đang dùng nó.
+     */
+    private static void cancelLeftoverTrades(GatewayFacades facades) {
+        int cancelled = facades.contentFacades().socialFacades().tradeFacade().cancelLeftoverSessions();
+        if (cancelled > 0) {
+            LOG.info("Huỷ {} phiên giao dịch sót lại từ lần chạy trước", cancelled);
+        }
+    }
 
     /**
      * Tách khỏi {@code main()} để giữ dưới giới hạn Checkstyle MethodLength — Dungeon/Arena

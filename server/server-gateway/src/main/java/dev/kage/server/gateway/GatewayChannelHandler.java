@@ -90,6 +90,9 @@ import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyListingCommand;
 import dev.kage.protocol.BuyOutcome;
+import dev.kage.protocol.CancelFriendRequestCommand;
+import dev.kage.protocol.CancelFriendRequestOutcome;
+import dev.kage.protocol.CancelFriendRequestResponse;
 import dev.kage.protocol.CancelListingCommand;
 import dev.kage.protocol.CancelTradeCommand;
 import dev.kage.protocol.CancelTradeOutcome;
@@ -526,6 +529,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_ACCEPT_FRIEND_REQUEST_COMMAND_VALUE, this::handleAcceptFriendRequestCommand),
             Map.entry(Opcode.OPCODE_REJECT_FRIEND_REQUEST_COMMAND_VALUE, this::handleRejectFriendRequestCommand),
             Map.entry(Opcode.OPCODE_REMOVE_FRIEND_COMMAND_VALUE, this::handleRemoveFriendCommand),
+            Map.entry(Opcode.OPCODE_CANCEL_FRIEND_REQUEST_COMMAND_VALUE, this::handleCancelFriendRequestCommand),
             Map.entry(Opcode.OPCODE_LIST_FRIENDS_REQUEST_VALUE, this::handleListFriendsRequest),
             Map.entry(
                     Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
@@ -2916,6 +2920,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
     }
 
+    /** ADR-074 — rút lời mời kết bạn mình đã gửi, theo tên người nhận. */
+    private void handleCancelFriendRequestCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        CancelFriendRequestCommand command = CancelFriendRequestCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_CANCEL_FRIEND_REQUEST_RESPONSE_VALUE,
+                characterId -> cancelFriendRequest(characterId, command));
+    }
+
+    private CancelFriendRequestResponse cancelFriendRequest(long characterId, CancelFriendRequestCommand command) {
+        CancelFriendRequestOutcome outcome = characterFacade
+                .findByName(command.getTargetName())
+                .map(target -> friendFacade.withdrawRequest(characterId, target.id()) == FriendFacade.RemoveResult.OK
+                        ? CancelFriendRequestOutcome.CANCEL_FRIEND_REQUEST_OUTCOME_OK
+                        : CancelFriendRequestOutcome.CANCEL_FRIEND_REQUEST_OUTCOME_NOT_PENDING)
+                .orElse(CancelFriendRequestOutcome.CANCEL_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND);
+        return CancelFriendRequestResponse.newBuilder().setOutcome(outcome).build();
+    }
+
     private void handleListFriendsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         ListFriendsRequest.parser().parseFrom(payload); // không field nào — parse để chắc payload hợp lệ
@@ -4099,8 +4124,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             long characterId = request.characterId();
             ConfirmTradeCommand command = request.command();
             Optional<TradeFacade.TradeStatusView> statusBefore = tradeFacade.getStatus(characterId);
-            TradeFacade.ConfirmResult result =
-                    tradeFacade.confirm(command.getSessionId(), characterId, command.getIdempotencyKey());
+            TradeFacade.ConfirmResult result = tradeFacade.confirm(
+                    command.getSessionId(), characterId, command.getIdempotencyKey(), command.getOfferVersion());
             span.setAttribute("result", result.name());
             if (result == TradeFacade.ConfirmResult.OFFER_JUST_CHANGED) {
                 // Không có outcome trên dây (protocol đã chốt) — cùng khuôn error.friend_request_cooldown.
@@ -4199,7 +4224,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setMyGoldOffer(status.myGoldOffer())
                     .setTheirGoldOffer(status.theirGoldOffer())
                     .setMyConfirmed(status.myConfirmed())
-                    .setTheirConfirmed(status.theirConfirmed());
+                    .setTheirConfirmed(status.theirConfirmed())
+                    .setOfferVersion(status.offerVersion());
             for (TradeFacade.OfferItemView item : status.myItems()) {
                 responseBuilder.addMyItems(toProtoOfferItemView(item));
             }

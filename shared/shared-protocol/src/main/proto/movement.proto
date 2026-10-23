@@ -174,3 +174,11 @@ message GameEventsChangedEvent {
 message MoveSpeedChangedEvent {
   int32 move_speed_percent = 1;
 }
+
+// Event: Server -> Client (OPCODE_MOVEMENT_MODIFIER_CHANGED_EVENT = 311). ADR-073 — hiệu ứng trạng thái trên CHÍNH
+// mình vừa đổi tốc độ đi: status_speed_multiplier là tích các hiệu ứng tốc độ (KHÔNG gồm phi kiếm — xem 310);
+// immobilized = đang choáng hoặc đã gục. Chỉ gửi lúc đổi. Client nhân vào dự đoán; server vẫn quyết vị trí.
+message MovementModifierChangedEvent {
+  float status_speed_multiplier = 1;
+  bool immobilized = 2;
+}

@@ -54,6 +54,16 @@ public final class TradeFacade {
     }
 
     /**
+     * Huỷ mọi phiên giao dịch sót lại từ lần chạy trước (server chết đột ngột không kịp huỷ) — gọi ĐÚNG MỘT lần
+     * lúc khởi động, TRƯỚC khi mở cổng game (dòng 40(iv), lô 18). Không có escrow nên không có gì để hoàn trả.
+     *
+     * @return số phiên đã huỷ
+     */
+    public int cancelLeftoverSessions() {
+        return useCases.cancelTradeUseCase().cancelLeftoverSessions();
+    }
+
+    /**
      * Thay TOÀN BỘ lời chào của {@code characterId} — reset cờ xác nhận của cả hai bên. Chỉ lưu ý định:
      * sở hữu được xác thực lại lúc thi hành ({@link #confirm}).
      */
@@ -72,7 +82,16 @@ public final class TradeFacade {
      * chuyển vàng/vật phẩm, ghi audit) — xem {@code ConfirmTradeUseCase}.
      */
     public ConfirmResult confirm(long sessionId, long characterId, String idempotencyKey) {
-        return switch (useCases.confirmTradeUseCase().execute(sessionId, characterId, idempotencyKey)) {
+        return confirm(sessionId, characterId, idempotencyKey, ConfirmTradeUseCase.NO_OFFER_VERSION);
+    }
+
+    /**
+     * Như {@link #confirm(long, long, String)}, kèm phiên bản lời chào client đang hiển thị (ADR-075) — lệch thì
+     * {@link ConfirmResult#OFFER_JUST_CHANGED}.
+     */
+    public ConfirmResult confirm(long sessionId, long characterId, String idempotencyKey, long seenOfferVersion) {
+        return switch (useCases.confirmTradeUseCase()
+                .execute(sessionId, characterId, idempotencyKey, seenOfferVersion)) {
             case ConfirmTradeUseCase.Result.OK -> ConfirmResult.OK;
             case ConfirmTradeUseCase.Result.EXECUTED -> ConfirmResult.EXECUTED;
             case ConfirmTradeUseCase.Result.NOT_FOUND -> ConfirmResult.NOT_FOUND;
@@ -110,7 +129,8 @@ public final class TradeFacade {
                     theirGold,
                     theirItems,
                     myConfirmed,
-                    theirConfirmed);
+                    theirConfirmed,
+                    r.offerVersion());
         });
     }
 
@@ -180,7 +200,8 @@ public final class TradeFacade {
             long theirGoldOffer,
             List<OfferItemView> theirItems,
             boolean myConfirmed,
-            boolean theirConfirmed) {
+            boolean theirConfirmed,
+            long offerVersion) {
         /** Chép phòng thủ hai danh sách lời chào. */
         public TradeStatusView {
             myItems = List.copyOf(myItems);

@@ -492,7 +492,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(chatPanel, chat);
         panels.register(new MembershipNoticeCoordinator(chat, party, guild));
         panels.register(new GameEventNoticeCoordinator(chat));
-        panels.register(new MoveSpeedCoordinator(intents::onMoveSpeedPercent));
+        panels.register(new MoveSpeedCoordinator(intents));
         panels.register(worldChange);
         panels.register(dungeon);
         panels.register(connection);

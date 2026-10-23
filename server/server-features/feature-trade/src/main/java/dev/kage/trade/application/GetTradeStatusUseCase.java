@@ -60,7 +60,8 @@ public final class GetTradeStatusUseCase {
                 snapshot.targetGold(),
                 snapshot.requesterConfirmed(),
                 snapshot.targetConfirmed(),
-                resolvedItems));
+                resolvedItems,
+                snapshot.offerVersion()));
     }
 
     /**
@@ -79,7 +80,8 @@ public final class GetTradeStatusUseCase {
             long targetGold,
             boolean requesterConfirmed,
             boolean targetConfirmed,
-            List<ResolvedOfferItem> items) {
+            List<ResolvedOfferItem> items,
+            long offerVersion) {
         public Result {
             items = List.copyOf(items);
         }

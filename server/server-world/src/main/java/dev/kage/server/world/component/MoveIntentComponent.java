@@ -14,4 +14,13 @@ public final class MoveIntentComponent implements Component {
 
     /** Hệ số tốc độ của phi kiếm đang mặc (ADR-070) — 1 = không có. Đặt lại mỗi lần áp chỉ số trang bị. */
     public float speedMultiplier = 1f;
+
+    /**
+     * ADR-073 — hệ số tốc độ do hiệu ứng trạng thái đã BÁO cho client lần gần nhất. Chỉ
+     * {@code CharacterLocomotionSystem} ghi, để phát event khi đổi thay vì mỗi tick.
+     */
+    public float announcedStatusMultiplier = 1f;
+
+    /** ADR-073 — trạng thái "không đi được" (choáng/gục) đã báo lần gần nhất. */
+    public boolean announcedImmobilized;
 }

@@ -30,6 +30,9 @@ public final class ConfirmTradeUseCase {
 
     private final TradePorts ports;
     private final TransactionRunner tx;
+    /** Client không gửi phiên bản lời chào (field protobuf vắng = 0) — xem ADR-075 D3. */
+    public static final long NO_OFFER_VERSION = 0L;
+
     private final TradeOfferChanges offerChanges;
 
     /** Sổ {@link TradeOfferChanges} riêng — chỉ dành cho test không quan tâm luật chặn xác nhận. */
@@ -44,7 +47,19 @@ public final class ConfirmTradeUseCase {
         this.offerChanges = offerChanges;
     }
 
+    /** Như {@link #execute(long, long, String, long)} không kèm phiên bản lời chào (client cũ — chỉ còn khoá 3 s). */
     public Result execute(long sessionId, long characterId, String idempotencyKey) {
+        return execute(sessionId, characterId, idempotencyKey, NO_OFFER_VERSION);
+    }
+
+    /**
+     * Xác nhận lời chào ĐÚNG phiên bản client đang hiển thị (ADR-075).
+     *
+     * @param seenOfferVersion phiên bản lời chào client đang hiển thị (ADR-075); {@link #NO_OFFER_VERSION} = client
+     *     cũ, bỏ qua phép so. Lệch phiên bản hiện tại ⇒ {@link Result#OFFER_JUST_CHANGED}, transaction rollback nên
+     *     khoá chống trùng chưa bị đốt.
+     */
+    public Result execute(long sessionId, long characterId, String idempotencyKey, long seenOfferVersion) {
         // Kiểm TRƯỚC transaction: bị chặn thì idempotencyKey chưa bị ghi, client gửi lại cùng khoá
         // sau khi đã thấy lời chào mới vẫn được (README dòng 25(i)(b)).
         if (offerChanges.counterpartJustChanged(sessionId, characterId)) {
@@ -65,6 +80,9 @@ public final class ConfirmTradeUseCase {
                     return;
                 }
                 TradeSessionSnapshot snapshot = snapshotOpt.get();
+                if (seenOfferVersion != NO_OFFER_VERSION && seenOfferVersion != snapshot.offerVersion()) {
+                    throw new StaleOfferException();
+                }
                 ports.sessionPort().setConfirmed(t, sessionId, characterId);
                 boolean requesterConfirmed =
                         snapshot.requesterConfirmed() || characterId == snapshot.requesterCharacterId();
@@ -82,6 +100,8 @@ public final class ConfirmTradeUseCase {
             return Result.DUPLICATE_REQUEST;
         } catch (TradeExecutionAbortedException e) {
             return Result.OFFER_INVALID;
+        } catch (StaleOfferException e) {
+            return Result.OFFER_JUST_CHANGED;
         }
         return resultHolder.get();
     }
@@ -211,5 +231,15 @@ public final class ConfirmTradeUseCase {
         DUPLICATE_REQUEST,
         /** Đối phương vừa sửa lời chào trong {@link TradeOfferChanges#BLOCK_WINDOW} — chưa xác nhận gì. */
         OFFER_JUST_CHANGED
+    }
+
+    /** Xác nhận nhắm một phiên bản lời chào đã cũ — ném để rollback transaction (ADR-075). */
+    private static final class StaleOfferException extends RuntimeException {
+        @java.io.Serial
+        private static final long serialVersionUID = 1L;
+
+        StaleOfferException() {
+            super("offer_version lệch", null, false, false);
+        }
     }
 }

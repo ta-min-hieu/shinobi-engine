@@ -186,7 +186,7 @@ ngoài 3×3 ô (chắc chắn ngoài tầm); id trong 3×3 ô để vòng quét 
 hai lần. Test: `AreaOfInterestBoundaryTest`. Chi phí thêm chưa đo lại bằng load test (thêm một lượt
 duyệt tập đang thấy + một `Iterator` mỗi nhân vật mỗi lần sync ở 20Hz).
 
-**Kích thước AoI — đang chạy, CHƯA có quyết định chính thức** (rà 2026-10-03): bán kính **15 m** (`WorldConstants.AOI_RADIUS_METERS`, javadoc tự ghi "placeholder"), lưới ô cạnh 15 m quét 3×3, đồng bộ **20 Hz** (`AOI_SYNC_RATE_HZ`). Con số này chạy từ Phase 3 và mọi số đo capacity ([BENCHMARK §5](../09-performance/BENCHMARK.md)) đều gắn với nó, nhưng không ADR hay tài liệu Accepted nào chốt nó — ảnh hưởng cả gameplay (thấy được ai) lẫn băng thông. Chờ chủ dự án: dòng **54** bảng "🔴 ĐANG CHỜ CHỦ DỰ ÁN" ở [docs/README.md](../README.md).
+**Kích thước AoI — ĐÃ CHỐT 2026-10-23** (chủ dự án chọn ở lượt hỏi lô 18, dòng **54** [docs/README.md](../README.md)): bán kính **15 m** (`WorldConstants.AOI_RADIUS_METERS`), lưới ô cạnh 15 m quét 3×3, đồng bộ **20 Hz** (`AOI_SYNC_RATE_HZ`) — đúng số đã chạy từ Phase 3, nên mọi số đo capacity ([BENCHMARK §5](../09-performance/BENCHMARK.md)) vẫn giữ nghĩa. Đổi số này là đổi cả gameplay (thấy được ai) lẫn băng thông ⇒ phải đo lại BENCHMARK §5 trước khi đổi.
 
 ### Kiểm sống 2026-10-03 — AoI "bóng ma" (`e53722d`) và vị trí NaN (`5aab474`)
 
@@ -393,7 +393,7 @@ ghi xong thì phần thưởng vẫn vào DB, chỉ mất gói thông báo. Test
 | 7 | **Item/Gold ghi ngay + transaction**; vị trí ghi định kỳ | Mất item = mất tài sản thật | Accepted |
 | 8 | **Graceful shutdown bắt buộc** | Không mất dữ liệu chưa ghi | Accepted |
 | 9 | Tick rate **60Hz** | Ưu tiên độ mượt; ngân sách 16.6ms khắt khe | ✅ [ADR-018](../01-architecture/adr/ADR-018-Tick-Rate.md) |
-| 10 | Kích thước AoI: **đang chạy 15 m / ô 15 m quét 3×3 / sync 20 Hz**, chưa có quyết định chính thức | Ảnh hưởng gameplay + băng thông | ⏳ Chờ chủ dự án — [README dòng 54](../README.md) |
+| 10 | Kích thước AoI: **15 m / ô 15 m quét 3×3 / sync 20 Hz** | Ảnh hưởng gameplay + băng thông; mọi số đo capacity gắn với nó | Accepted 2026-10-23 (chủ dự án, lô 18) — [README dòng 54](../README.md) |
 | 11 | Ngân sách §11 **chưa đo** | Mục tiêu, không phải sự thật | ⏳ Đo Phase 9 |
 | 12 | **Một nhân vật — một phiên sống; phiên mới đá phiên cũ** (§5.1) | Hai phiên = hai thực thể, dọn nhầm phiên của nhau | ✅ Chủ dự án quyết 2026-09-25 |
 

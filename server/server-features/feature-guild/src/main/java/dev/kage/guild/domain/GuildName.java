@@ -41,7 +41,27 @@ public final class GuildName {
                 && name.length() <= MAX_LENGTH
                 && ALLOWED.matcher(name).matches()
                 && Normalizer.isNormalized(name, Normalizer.Form.NFKC)
-                && name.codePoints().noneMatch(GuildName::isInvisibleLetter);
+                && name.codePoints().noneMatch(GuildName::isInvisibleLetter)
+                && !mixesLookalikeScripts(name);
+    }
+
+    /**
+     * Bản chép của {@code Character#mixesLookalikeScripts} — {@code GuildNameParityTest} giữ hai bản khớp
+     * nhau. Trộn chữ của hai trong ba hệ trông giống nhau (Latin, Cyrillic, Hy Lạp) bị chặn — dòng 42, lô 18,
+     * chủ dự án duyệt 2026-10-23.
+     */
+    private static boolean mixesLookalikeScripts(String name) {
+        int scripts = name.codePoints().map(GuildName::lookalikeScriptBit).reduce(0, (a, b) -> a | b);
+        return Integer.bitCount(scripts) > 1;
+    }
+
+    private static int lookalikeScriptBit(int codePoint) {
+        return switch (java.lang.Character.UnicodeScript.of(codePoint)) {
+            case LATIN -> 1;
+            case CYRILLIC -> 2;
+            case GREEK -> 4;
+            default -> 0;
+        };
     }
 
     /**

@@ -121,6 +121,13 @@ public interface WorldOutboundSink {
     default void onCharacterPositionSampled(long characterId, float x, float y) {}
 
     /**
+     * ADR-073 — hệ số tốc độ do hiệu ứng trạng thái ({@code statusSpeedMultiplier}, không gồm phi kiếm) hoặc trạng
+     * thái "không đi được" (choáng/gục) của CHÍNH {@code characterId} vừa đổi. Chỉ gửi cho người đó. Mặc định bỏ qua
+     * (sink của test); sink thật của gateway PHẢI ghi đè.
+     */
+    default void onMovementModifierChanged(long characterId, float statusSpeedMultiplier, boolean immobilized) {}
+
+    /**
      * Ảnh chụp vị trí sau khi xử lý {@code MoveCommand}/{@code JumpCommand} (ADR-033) — gộp tham số
      * (STATIC-ANALYSIS.md, checkstyle {@code ParameterNumberCheck} max=4). {@code z}/{@code
      * grounded} thêm ở ADR-033.

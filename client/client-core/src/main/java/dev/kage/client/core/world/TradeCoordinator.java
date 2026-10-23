@@ -255,8 +255,8 @@ final class TradeCoordinator implements WindowFlow {
         if (!controller.inTrade()) {
             return;
         }
-        pendingConfirmSequenceId =
-                sender.confirmTrade(controller.sessionId(), controller.beginConfirm(controller.sessionId()));
+        pendingConfirmSequenceId = sender.confirmTrade(
+                controller.sessionId(), controller.beginConfirm(controller.sessionId()), controller.offerVersion());
     }
 
     private void cancel() {

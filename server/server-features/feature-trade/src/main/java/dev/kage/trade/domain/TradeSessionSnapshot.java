@@ -6,6 +6,8 @@ import java.util.Objects;
 /**
  * Toàn bộ trạng thái 1 phiên trade tại 1 thời điểm — dùng CẢ cho xem trạng thái (đọc thuần) LẪN
  * thi hành (đọc có khoá {@code FOR UPDATE}, xem {@link TradeSessionPort#lockForExecution}).
+ *
+ * @param offerVersion tăng mỗi lần một bên đặt lại lời chào (ADR-075)
  */
 public record TradeSessionSnapshot(
         long id,
@@ -16,7 +18,8 @@ public record TradeSessionSnapshot(
         long targetGold,
         boolean requesterConfirmed,
         boolean targetConfirmed,
-        List<TradeOfferItem> items) {
+        List<TradeOfferItem> items,
+        long offerVersion) {
 
     public TradeSessionSnapshot {
         Objects.requireNonNull(status, "status");

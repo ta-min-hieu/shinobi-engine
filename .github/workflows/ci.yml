@@ -163,3 +163,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # Dòng 63(i), lô 18 (2026-10-23): cache layer qua GitHub Actions cache — lần build sau không kéo lại
+          # base image + tầng dependency. mode=max lưu cả tầng của stage trung gian.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

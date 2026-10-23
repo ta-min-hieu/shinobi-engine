@@ -68,6 +68,9 @@ final class TradeController {
     private boolean myConfirmed;
     private boolean theirConfirmed;
 
+    /** ADR-075 — phiên bản lời chào của ảnh chụp đang hiển thị; gửi kèm lệnh xác nhận. */
+    private long offerVersion;
+
     private final List<OfferItem> myItems = new ArrayList<>();
     private final List<OfferItem> theirItems = new ArrayList<>();
 
@@ -101,6 +104,7 @@ final class TradeController {
         theirGoldOffer = response.getTheirGoldOffer();
         myConfirmed = response.getMyConfirmed();
         theirConfirmed = response.getTheirConfirmed();
+        offerVersion = response.getOfferVersion();
         copyItems(response.getMyItemsList(), myItems);
         copyItems(response.getTheirItemsList(), theirItems);
     }
@@ -128,6 +132,7 @@ final class TradeController {
         theirGoldOffer = 0L;
         myConfirmed = false;
         theirConfirmed = false;
+        offerVersion = 0L;
         myItems.clear();
         theirItems.clear();
         onConfirmSettled();
@@ -149,6 +154,10 @@ final class TradeController {
 
     long sessionId() {
         return sessionId;
+    }
+
+    long offerVersion() {
+        return offerVersion;
     }
 
     TradePhase phase() {

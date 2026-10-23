@@ -72,6 +72,23 @@ message RemoveFriendResponse {
   RemoveFriendOutcome outcome = 1;
 }
 
+// ADR-074 (2026-10-23) — người gửi rút lời mời kết bạn còn chờ, theo TÊN người nhận (client không có danh sách
+// lời mời đã gửi). Chỉ thêm, protocolVersion không tăng.
+message CancelFriendRequestCommand {
+  string target_name = 1;
+}
+
+enum CancelFriendRequestOutcome {
+  CANCEL_FRIEND_REQUEST_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  CANCEL_FRIEND_REQUEST_OUTCOME_OK = 1;
+  CANCEL_FRIEND_REQUEST_OUTCOME_TARGET_NOT_FOUND = 2;
+  CANCEL_FRIEND_REQUEST_OUTCOME_NOT_PENDING = 3; // không có lời mời MÌNH gửi người đó còn chờ
+}
+
+message CancelFriendRequestResponse {
+  CancelFriendRequestOutcome outcome = 1;
+}
+
 message ListFriendsRequest {
 }
 

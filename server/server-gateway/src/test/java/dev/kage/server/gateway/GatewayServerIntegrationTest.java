@@ -2127,6 +2127,11 @@ class GatewayServerIntegrationTest {
         }
 
         @Override
+        public int deleteAllSessions() {
+            return 0;
+        }
+
+        @Override
         public boolean replaceOffer(
                 long sessionId, long characterId, long goldAmount, List<dev.kage.trade.domain.OfferedItemInput> items) {
             throw new UnsupportedOperationException("không dùng ở test này");

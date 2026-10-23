@@ -75,18 +75,20 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
             """;
 
     private static final String UPDATE_REQUESTER_GOLD_AND_RESET_CONFIRM = """
-            UPDATE trade_session SET requester_gold = ?, requester_confirmed = FALSE, target_confirmed = FALSE
+            UPDATE trade_session SET requester_gold = ?, requester_confirmed = FALSE, target_confirmed = FALSE,
+                   offer_version = offer_version + 1
              WHERE id = ?
             """;
 
     private static final String UPDATE_TARGET_GOLD_AND_RESET_CONFIRM = """
-            UPDATE trade_session SET target_gold = ?, requester_confirmed = FALSE, target_confirmed = FALSE
+            UPDATE trade_session SET target_gold = ?, requester_confirmed = FALSE, target_confirmed = FALSE,
+                   offer_version = offer_version + 1
              WHERE id = ?
             """;
 
     private static final String SELECT_SESSION = """
             SELECT id, requester_character_id, target_character_id, status, requester_gold, target_gold,
-                   requester_confirmed, target_confirmed
+                   requester_confirmed, target_confirmed, offer_version
               FROM trade_session WHERE id = ?
             """;
 
@@ -101,6 +103,10 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
                SET requester_confirmed = CASE WHEN requester_character_id = ? THEN TRUE ELSE requester_confirmed END,
                    target_confirmed = CASE WHEN target_character_id = ? THEN TRUE ELSE target_confirmed END
              WHERE id = ?
+            """;
+
+    private static final String DELETE_ALL_SESSIONS = """
+            DELETE FROM trade_session
             """;
 
     private static final String DELETE_SESSION = """
@@ -175,6 +181,11 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
     @Override
     public boolean deleteSessionIfParticipant(long sessionId, long characterId) {
         return JdbcOperations.update(dataSource, DELETE_IF_PARTICIPANT, sessionId, characterId, characterId) > 0;
+    }
+
+    @Override
+    public int deleteAllSessions() {
+        return JdbcOperations.update(dataSource, DELETE_ALL_SESSIONS);
     }
 
     // PMD AvoidCatchingGenericException: đúng ý — ranh giới transaction PHẢI rollback khi action
@@ -282,7 +293,8 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
                 r.targetGold(),
                 r.requesterConfirmed(),
                 r.targetConfirmed(),
-                items));
+                items,
+                r.offerVersion()));
     }
 
     /** Kết quả SELECT 1 dòng {@code trade_session} — record header không tính Checkstyle {@code ParameterNumber}. */
@@ -293,7 +305,8 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
             long requesterGold,
             long targetGold,
             boolean requesterConfirmed,
-            boolean targetConfirmed) {}
+            boolean targetConfirmed,
+            long offerVersion) {}
 
     private static SessionRow mapSessionRow(ResultSet rs) throws SQLException {
         return new SessionRow(
@@ -303,7 +316,8 @@ public final class PostgresTradeSessionAdapter implements TradeSessionPort {
                 rs.getLong("requester_gold"),
                 rs.getLong("target_gold"),
                 rs.getBoolean("requester_confirmed"),
-                rs.getBoolean("target_confirmed"));
+                rs.getBoolean("target_confirmed"),
+                rs.getLong("offer_version"));
     }
 
     private static TradeOfferItem mapOfferItem(ResultSet rs) throws SQLException {

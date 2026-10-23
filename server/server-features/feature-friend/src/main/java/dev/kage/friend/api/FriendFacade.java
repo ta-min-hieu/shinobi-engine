@@ -58,6 +58,17 @@ public final class FriendFacade {
         };
     }
 
+    /**
+     * ADR-074 — rút lời mời {@code requesterId} đã gửi cho {@code addresseeId} khi nó còn chờ. Không kích hoạt hạn
+     * chờ sau từ chối: rút xong mời lại được ngay.
+     */
+    public RemoveResult withdrawRequest(long requesterId, long addresseeId) {
+        return switch (useCases.removeFriendUseCase().withdrawRequest(requesterId, addresseeId)) {
+            case RemoveFriendUseCase.Result.OK -> RemoveResult.OK;
+            case RemoveFriendUseCase.Result.NOT_FOUND -> RemoveResult.NOT_FOUND;
+        };
+    }
+
     /** ID nhân vật của toàn bộ bạn bè đã ACCEPTED. */
     public List<Long> listFriends(long characterId) {
         return useCases.listFriendsUseCase().execute(characterId);

@@ -176,6 +176,27 @@ class GuildIntegrationTest {
                 .isInstanceOf(DuplicateGuildJoinRequestException.class);
     }
 
+    /**
+     * Dòng 28 (V73): đơn chờ thứ hai của cùng một nhân vật — kể cả vào bang KHÁC — bị chính DB chặn, nên hai
+     * lệnh xin vào hai bang gửi cùng lúc không còn cùng lọt qua bước kiểm "đã có đơn chờ" của application.
+     */
+    @Test
+    void shouldRejectASecondPendingRequest_toAnotherGuild_atDatabaseLevel() {
+        long leaderA = createFreshCharacter("GuildLeader28a");
+        long leaderB = createFreshCharacter("GuildLeader28b");
+        long applicant = createFreshCharacter("GuildApplicant28");
+        PostgresGuildAdapter adapter = newAdapter();
+        Guild guildA = adapter.createGuild("Konoha28", leaderA);
+        Guild guildB = adapter.createGuild("Suna28", leaderB);
+        adapter.sendJoinRequest(guildA.id(), applicant);
+
+        assertThatThrownBy(() -> adapter.sendJoinRequest(guildB.id(), applicant))
+                .isInstanceOf(DuplicateGuildJoinRequestException.class);
+        assertThat(adapter.findPendingRequestOfCharacter(applicant))
+                .map(GuildJoinRequest::guildId)
+                .contains(guildA.id());
+    }
+
     @Test
     void shouldDropStaleRequest_whenApplicantAlreadyInAnotherGuildAtApprovalTime() {
         long leaderA = createFreshCharacter("GuildLeader7");

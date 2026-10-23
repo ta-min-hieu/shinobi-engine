@@ -87,6 +87,9 @@ message SetTradeOfferResponse {
 message ConfirmTradeCommand {
   int64 session_id = 1;
   string idempotency_key = 2;
+  // ADR-075 (2026-10-23) — phiên bản lời chào client đang HIỂN THỊ (GetTradeStatusResponse.offer_version). Lệch
+  // phiên bản hiện tại ⇒ ErrorResponse 409 error.trade_offer_just_changed. 0 = client cũ, bỏ qua phép so.
+  int64 offer_version = 3;
 }
 
 enum ConfirmTradeOutcome {
@@ -133,6 +136,7 @@ message GetTradeStatusResponse {
   repeated TradeOfferItemView their_items = 10;
   bool my_confirmed = 11;
   bool their_confirmed = 12;
+  int64 offer_version = 13; // ADR-075 — tăng mỗi lần một bên đặt lại lời chào; gửi lại trong ConfirmTradeCommand
 }
 
 // Đẩy cho target khi có yêu cầu trade mới — client tự quyết định hỏi Accept/Cancel.

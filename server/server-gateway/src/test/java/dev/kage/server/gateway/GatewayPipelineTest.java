@@ -1466,6 +1466,11 @@ class GatewayPipelineTest {
         }
 
         @Override
+        public int deleteAllSessions() {
+            return 0;
+        }
+
+        @Override
         public boolean replaceOffer(
                 long sessionId,
                 long characterId,

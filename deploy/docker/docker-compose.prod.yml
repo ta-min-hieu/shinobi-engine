@@ -58,6 +58,9 @@ services:
       retries: 10
     volumes:
       - pgdata:/var/lib/postgresql/data
+    # Trần bộ nhớ (dòng 59, lô 18 — chủ dự án duyệt 2026-10-23), cùng lý do trần 6g của `server`. Số TẠM,
+    # CHƯA đo: image mặc định shared_buffers 128MB, 2g chừa chỗ cho work_mem của ~20 kết nối Hikari.
+    mem_limit: 2g
     logging:
       driver: json-file
       options: { max-size: "50m", max-file: "5" }
@@ -65,7 +68,11 @@ services:
   cache:
     image: redis:8
     restart: unless-stopped
-    command: ["redis-server", "--requirepass", "${CACHE_PASSWORD:?set CACHE_PASSWORD}"]
+    # --maxmemory dưới mem_limit: chạm trần thì Redis từ chối GHI (noeviction mặc định) thay vì bị OOM-killer
+    # giết; ghi phiên hỏng thì đăng nhập vẫn qua với token rỗng (dòng 45(i)).
+    command: ["redis-server", "--requirepass", "${CACHE_PASSWORD:?set CACHE_PASSWORD}", "--maxmemory", "384mb"]
+    # Trần bộ nhớ (dòng 59, lô 18 — 2026-10-23). Số TẠM: Redis chỉ giữ token phiên.
+    mem_limit: 512m
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s

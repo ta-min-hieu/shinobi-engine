@@ -208,6 +208,7 @@ public final class WorldFacade {
 
     private final BossAiSystem bossAiSystem;
     private final HealthRegenSystem healthRegenSystem;
+    private final CharacterLocomotionSystem locomotionSystem = new CharacterLocomotionSystem();
 
     /**
      * Giữ tham chiếu (khác trước: dựng thẳng trong {@code addSystem}) vì ADR-046 D4 cần drain
@@ -405,7 +406,7 @@ public final class WorldFacade {
         // hành vi lặp mỗi tick như đánh thường) — thứ tự với CombatSystem không quan trọng.
         ecsWorld.addSystem(aiSystem);
         // Vận tốc nhân vật theo stun/slow/buff HIỆN HÀNH — phải trước MovementSystem (2026-10-02).
-        ecsWorld.addSystem(new CharacterLocomotionSystem());
+        ecsWorld.addSystem(locomotionSystem);
         ecsWorld.addSystem(new MovementSystem());
         addPositionSystems(wiring.content().safeZones());
         ecsWorld.addSystem(combatSystem);
@@ -854,6 +855,7 @@ public final class WorldFacade {
         handleHealthChanges(healthRegenSystem.drainResults()); // ADR-046 D2
         handleHealthChanges(aiSystem.drainHealthChanges()); // ADR-046 D4
         handleHealthChanges(drainHealthChangeQueue()); // ADR-046 D3 + D5
+        announceMovementModifiers(locomotionSystem.drainChanges()); // ADR-073
         tickMonsterRespawn(WorldConstants.FIXED_DT);
         // O(n²) — chạy chậm hơn tick loop (WorldConstants.AOI_SYNC_INTERVAL_TICKS), xem
         // javadoc AreaOfInterestTracker + WorldConstants.AOI_SYNC_RATE_HZ. Combat/skill/boss
@@ -1552,6 +1554,14 @@ public final class WorldFacade {
         List<HealthChange> results = List.copyOf(pendingHealthChanges);
         pendingHealthChanges.clear();
         return results;
+    }
+
+    /** ADR-073 — chỉ người dính hiệu ứng nhận, để client dự đoán di chuyển đúng. */
+    private void announceMovementModifiers(List<CharacterLocomotionSystem.MovementModifierChange> changes) {
+        for (CharacterLocomotionSystem.MovementModifierChange change : changes) {
+            outboundSink.onMovementModifierChanged(
+                    change.characterId(), change.statusSpeedMultiplier(), change.immobilized());
+        }
     }
 
     /**

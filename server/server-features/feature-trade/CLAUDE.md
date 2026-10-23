@@ -111,6 +111,11 @@ yêu cầu, KHÔNG có thiết kế nào — mọi cơ chế bên dưới là qu
   cuối của gateway thành 500 kèm stack trace mức ERROR mỗi gói. Nghiệp vụ (đủ vàng, còn sở hữu) vẫn
   là việc của use case.
 - **Không có `DisbandTrade`/kick riêng** — trade luôn đúng 2 người, `CancelTradeUseCase` đã đủ.
+- **`offer_version` (ADR-075, 2026-10-23)**: mỗi `replaceOffer` tăng `trade_session.offer_version`; xác nhận mang
+  phiên bản client đang hiển thị, lệch ⇒ `OFFER_JUST_CHANGED`, ném trong transaction để khoá chống trùng rollback
+  theo. `0` = client cũ. Khoá 3 giây (`TradeOfferChanges`) vẫn giữ.
+- **Phiên sót lúc khởi động (README dòng 40(iv), 2026-10-23)**: `TradeFacade#cancelLeftoverSessions` xoá mọi phiên
+  trước khi mở cổng game — chỉ gọi lúc chưa ai online.
 
 ## Cứng
 

@@ -85,6 +85,11 @@ final class DungeonOutboundSink implements WorldOutboundSink {
     }
 
     @Override
+    public void onMovementModifierChanged(long characterId, float statusSpeedMultiplier, boolean immobilized) {
+        registry.onMovementModifierChanged(characterId, statusSpeedMultiplier, immobilized);
+    }
+
+    @Override
     public void onSkillResult(long targetCharacterId, WorldOutboundSink.SkillOutcome outcome) {
         registry.onSkillResult(targetCharacterId, outcome);
     }

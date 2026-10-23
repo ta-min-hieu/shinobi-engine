@@ -36,6 +36,30 @@ class ConfirmTradeUseCaseTest {
         assertThat(sessionPort.findActiveSessionOfCharacter(1)).isPresent(); // chưa thi hành
     }
 
+    /** ADR-075: xác nhận nhắm phiên bản lời chào cũ bị từ chối, cờ xác nhận không được đặt; đúng phiên bản thì qua. */
+    @Test
+    void shouldRefuseConfirmation_whenTheSeenOfferVersionIsStale() {
+        FakeTradeSessionPort sessionPort = new FakeTradeSessionPort();
+        TradeSession session = sessionPort.createRequest(1, 5);
+        sessionPort.acceptRequest(session.id(), 5);
+        long seen = sessionPort.findSnapshot(session.id()).orElseThrow().offerVersion();
+        sessionPort.replaceOffer(session.id(), 5, 10, List.of()); // đối phương sửa lời chào sau khi mình đã xem
+        ConfirmTradeUseCase useCase = newUseCase(new TradePorts(
+                sessionPort,
+                new FakeTradeInventoryPort(),
+                new FakeTradeGoldPort(),
+                new FakeTradeAuditPort(),
+                new FakeIdempotencyPort()));
+
+        ConfirmTradeUseCase.Result stale = useCase.execute(session.id(), 1, "key-stale", seen);
+        long current = sessionPort.findSnapshot(session.id()).orElseThrow().offerVersion();
+        ConfirmTradeUseCase.Result fresh = useCase.execute(session.id(), 1, "key-fresh", current);
+
+        assertThat(stale).isEqualTo(ConfirmTradeUseCase.Result.OFFER_JUST_CHANGED);
+        assertThat(current).isEqualTo(seen + 1);
+        assertThat(fresh).isEqualTo(ConfirmTradeUseCase.Result.OK);
+    }
+
     @Test
     void shouldExecuteAndSwapGoldAndItems_whenBothConfirmed() {
         FakeTradeSessionPort sessionPort = new FakeTradeSessionPort();

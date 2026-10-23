@@ -63,6 +63,21 @@ class CharacterTest {
         assertThat(Character.isValidName(null)).isFalse();
     }
 
+    /** Dòng 42 (lô 18): trộn Latin với Cyrillic/Hy Lạp bị chặn; tên thuần một hệ và tiếng Việt vẫn qua. */
+    @Test
+    void validateNewNameShouldRejectLookalikeScriptMixes_butKeepSingleScriptNames() {
+        assertThatThrownBy(() -> Character.validateNewName("Kаge"))
+                .as("а Cyrillic giả a Latin")
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Character.validateNewName("Kagο"))
+                .as("ο Hy Lạp giả o Latin")
+                .isInstanceOf(IllegalArgumentException.class);
+        Character.validateNewName("Каге");
+        Character.validateNewName("Καγε");
+        Character.validateNewName("Kiếm_Tiên9");
+        Character.validateNewName("Kage龍");
+    }
+
     /**
      * Luật tên MỚI (quyết định chủ dự án 2026-10-11): ký tự lấp chỗ Hangul là chữ cái theo Unicode
      * nhưng hiện ra là khoảng trống — tên vô hình; chữ khổ toàn phần và chữ toán học trông y hệt chữ

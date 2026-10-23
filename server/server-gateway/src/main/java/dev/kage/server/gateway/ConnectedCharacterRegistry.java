@@ -28,6 +28,7 @@ import dev.kage.protocol.MonsterDespawnedEvent;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.MonsterSpawnedEvent;
 import dev.kage.protocol.MoveResponse;
+import dev.kage.protocol.MovementModifierChangedEvent;
 import dev.kage.protocol.NpcDespawnedEvent;
 import dev.kage.protocol.NpcSpawnedEvent;
 import dev.kage.protocol.Opcode;
@@ -473,18 +474,29 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         send(ctx, Opcode.OPCODE_SKILL_RESULT_EVENT_VALUE, 0, event.toByteArray());
     }
 
+    /** ADR-073 — gửi cho chính nhân vật vừa dính/hết hiệu ứng tốc độ hoặc choáng. */
+    @Override
+    public void onMovementModifierChanged(long characterId, float statusSpeedMultiplier, boolean immobilized) {
+        sendToCharacterIfOnline(
+                characterId,
+                Opcode.OPCODE_MOVEMENT_MODIFIER_CHANGED_EVENT_VALUE,
+                0,
+                MovementModifierChangedEvent.newBuilder()
+                        .setStatusSpeedMultiplier(statusSpeedMultiplier)
+                        .setImmobilized(immobilized)
+                        .build()
+                        .toByteArray());
+    }
+
     @Override
     public void onHealthChanged(long targetCharacterId, WorldOutboundSink.HealthSnapshot health) {
-        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
-        if (ctx == null) {
-            return;
-        }
+        // Qua sendToCharacterIfOnline (2026-10-23): lớp này đang sát trần CyclomaticComplexity PMD tính cho CẢ LỚP.
         HealthChangedEvent event = HealthChangedEvent.newBuilder()
                 .setEntityId(health.entityId())
                 .setCurrentHp(health.currentHp())
                 .setMaxHp(health.maxHp())
                 .build();
-        send(ctx, Opcode.OPCODE_HEALTH_CHANGED_EVENT_VALUE, 0, event.toByteArray());
+        sendToCharacterIfOnline(targetCharacterId, Opcode.OPCODE_HEALTH_CHANGED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     private static EffectKind toProtoEffectKind(dev.kage.server.world.SkillEffectKind effectKind) {

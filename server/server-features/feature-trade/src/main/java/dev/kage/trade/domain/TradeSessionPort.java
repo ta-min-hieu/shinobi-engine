@@ -31,6 +31,14 @@ public interface TradeSessionPort {
     boolean deleteSessionIfParticipant(long sessionId, long characterId);
 
     /**
+     * Xoá MỌI phiên còn lại (CASCADE offer items) — chỉ gọi lúc khởi động, khi chưa ai online: phiên sót lại
+     * từ lần server chết đột ngột (dòng 40(iv)). Không có escrow nên xoá không mất gì.
+     *
+     * @return số phiên đã xoá
+     */
+    int deleteAllSessions();
+
+    /**
      * Đặt lại TOÀN BỘ lời chào của {@code characterId} — xoá offer item cũ, thêm offer item mới,
      * cập nhật gold, RESET CẢ 2 cờ confirmed về false (sửa lời chào sau khi 1 bên đã confirm phải
      * confirm lại — chống lừa đảo đổi lời chào giữa chừng, GAMEPLAY.md §8). KHÔNG xác thực sở hữu

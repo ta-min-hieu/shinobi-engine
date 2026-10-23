@@ -19,6 +19,11 @@ public final class CancelTradeUseCase {
         return port.deleteSessionIfParticipant(sessionId, characterId) ? Result.OK : Result.NOT_FOUND;
     }
 
+    /** Huỷ mọi phiên sót lại từ lần chạy trước — xem {@link TradeSessionPort#deleteAllSessions}. */
+    public int cancelLeftoverSessions() {
+        return port.deleteAllSessions();
+    }
+
     public enum Result {
         OK,
         NOT_FOUND

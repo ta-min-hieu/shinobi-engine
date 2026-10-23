@@ -39,6 +39,7 @@ final class FakeTradeSessionPort implements TradeSessionPort {
         long targetGold;
         boolean requesterConfirmed;
         boolean targetConfirmed;
+        long offerVersion = 1L;
         Instant createdAt;
         final List<TradeOfferItem> items = new ArrayList<>();
     }
@@ -102,6 +103,13 @@ final class FakeTradeSessionPort implements TradeSessionPort {
     }
 
     @Override
+    public int deleteAllSessions() {
+        int count = sessions.size();
+        sessions.clear();
+        return count;
+    }
+
+    @Override
     public boolean replaceOffer(long sessionId, long characterId, long goldAmount, List<OfferedItemInput> items) {
         MutableState state = sessions.get(sessionId);
         if (state == null
@@ -121,6 +129,7 @@ final class FakeTradeSessionPort implements TradeSessionPort {
         }
         state.requesterConfirmed = false;
         state.targetConfirmed = false;
+        state.offerVersion++;
         return true;
     }
 
@@ -167,6 +176,7 @@ final class FakeTradeSessionPort implements TradeSessionPort {
                 s.targetGold,
                 s.requesterConfirmed,
                 s.targetConfirmed,
-                List.copyOf(s.items));
+                List.copyOf(s.items),
+                s.offerVersion);
     }
 }

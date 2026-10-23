@@ -35,6 +35,11 @@ final class LocalIntentSender {
     /** ADR-070 — hệ số tốc độ phi kiếm theo lời server (1 = không có); chỉ để dự đoán. */
     private float speedMultiplier = 1f;
 
+    /** ADR-073 — hệ số tốc độ do hiệu ứng trạng thái server báo (choáng tính riêng ở {@link #immobilized}). */
+    private float statusSpeedMultiplier = 1f;
+
+    private boolean immobilized;
+
     /** Hướng đi gửi lần cuối — chỉ gửi lại khi ĐỔI, không phải mỗi tick (60 gói/giây là vô nghĩa). */
     private float lastSentDirX;
 
@@ -80,11 +85,23 @@ final class LocalIntentSender {
      */
     void onWorldChanged() {
         lastSentDirX = 0f;
+        // ADR-073 D4: entity mới không mang hiệu ứng nào, và server chỉ báo khi ĐỔI so với mặc định của entity đó —
+        // choáng dở ở World cũ sẽ không bao giờ được báo "hết".
+        onMovementModifier(1f, false);
     }
 
     /** ADR-070 D4 — server vừa báo tốc độ phi kiếm (phần trăm cộng thêm). */
     void onMoveSpeedPercent(int percent) {
         speedMultiplier = 1f + Math.max(0, percent) / 100f;
+    }
+
+    /**
+     * ADR-073 — server vừa báo hiệu ứng trên chính mình đổi tốc độ đi / làm không đi được. Hướng đang giữ vẫn được
+     * gửi như cũ: server giữ ý định để hết choáng là chạy tiếp.
+     */
+    void onMovementModifier(float statusMultiplier, boolean cannotMove) {
+        statusSpeedMultiplier = Math.max(0f, statusMultiplier);
+        immobilized = cannotMove;
     }
 
     /** Gọi mỗi tick cố định từ {@code WorldScreen#fixedUpdate}. */
@@ -119,7 +136,7 @@ final class LocalIntentSender {
         }
 
         VelocityComponent velocity = VELOCITY.get(context.localPlayer());
-        velocity.x = dirX * WorldConstants.MOVE_SPEED_MPS * speedMultiplier;
+        velocity.x = immobilized ? 0f : dirX * WorldConstants.MOVE_SPEED_MPS * speedMultiplier * statusSpeedMultiplier;
         velocity.y = 0f;
 
         if (dirX != lastSentDirX) {

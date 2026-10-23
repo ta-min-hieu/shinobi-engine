@@ -78,6 +78,8 @@ enum Opcode {
   OPCODE_GAME_EVENTS_CHANGED_EVENT = 309;
   // ADR-070 — tốc độ phi kiếm của CHÍNH mình (dự đoán di chuyển). Gửi lúc vào world + sau mỗi lần mặc/gỡ đồ.
   OPCODE_MOVE_SPEED_CHANGED_EVENT = 310;
+  // ADR-073 — hiệu ứng tốc độ/choáng trên CHÍNH mình vừa đổi (dự đoán di chuyển). Chỉ thêm, protocolVersion không tăng.
+  OPCODE_MOVEMENT_MODIFIER_CHANGED_EVENT = 311;
 
   // --- Combat / Skill (400-499) ---
   OPCODE_SET_TARGET_COMMAND = 400;
@@ -223,6 +225,9 @@ enum Opcode {
   OPCODE_LIST_PENDING_FRIEND_REQUESTS_RESPONSE = 1111;
   OPCODE_FRIEND_ONLINE_EVENT = 1112;
   OPCODE_FRIEND_OFFLINE_EVENT = 1113;
+  // ADR-074 — rút lời mời kết bạn đã gửi. Chỉ thêm, protocolVersion không tăng.
+  OPCODE_CANCEL_FRIEND_REQUEST_COMMAND = 1114;
+  OPCODE_CANCEL_FRIEND_REQUEST_RESPONSE = 1115;
 
   // --- Party (1300-1399) ---
   OPCODE_CREATE_PARTY_COMMAND = 1300;

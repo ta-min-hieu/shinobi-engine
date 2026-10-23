@@ -922,11 +922,13 @@ final class WorldCommandSender implements SessionRecovery.Link {
      *
      * @param idempotencyKey UUID do client sinh, GIỮ NGUYÊN qua các lần thử lại cùng một lần xác
      *     nhận — xem {@link TradeController#beginConfirm}.
+     * @param offerVersion phiên bản lời chào đang hiển thị (ADR-075) — server từ chối nếu nó đã cũ
      */
-    int confirmTrade(long sessionId, String idempotencyKey) {
+    int confirmTrade(long sessionId, String idempotencyKey, long offerVersion) {
         ConfirmTradeCommand command = ConfirmTradeCommand.newBuilder()
                 .setSessionId(sessionId)
                 .setIdempotencyKey(idempotencyKey)
+                .setOfferVersion(offerVersion)
                 .build();
         int sequenceId = connection.nextSequenceId();
         send(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, sequenceId, command.toByteArray(), "ConfirmTradeCommand");
