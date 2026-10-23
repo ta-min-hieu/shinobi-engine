@@ -70,4 +70,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-21 (lô 17).
-2. ✅ Kiểm sống 2026-10-21: `/gm event exp 2 5` ⇒ opcode 309 + dòng hệ thống; cùng loài `wandering_bandit` 35 → 70 EXP. Sự kiện rơi đồ x2 chưa đo (xác suất, cần nhiều lượt).
+2. ✅ Kiểm sống 2026-10-21: `/gm event exp 2 5` ⇒ opcode 309 + dòng hệ thống; cùng loài `wandering_bandit` 35 → 70 EXP. Rơi đồ x2 (2026-10-23): `/gm event drop 2 5` ⇒ 309; `outer_sect_tally` của tán tu tỉ lệ 100% ra 2 viên/con thay vì 1 (hai lượt, lượt hai tràn trần chồng 10 sang chồng mới), sắt vụn ra ở cả hai lần tung.

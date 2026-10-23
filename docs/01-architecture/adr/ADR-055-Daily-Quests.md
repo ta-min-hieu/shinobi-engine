@@ -97,4 +97,4 @@ Không.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành (2026-10-18). `DailyQuestIntegrationTest` (Postgres thật: vàng vào túi, cùng ngày không nhận lại, qua 0h nhận lại; quest ONCE không bao giờ làm mới), `QuestScriptRunnerBoundaryTest` (biên `give_gold`). Cap vàng: dùng lại `error.gold_cap_reached` 409 sẵn có của gateway thay cho outcome mới (D5 thu hẹp lúc thi hành — không cần `GOLD_CAP_REACHED`).
-2. 🟡 Kiểm sống một phần 2026-10-21: ba lựa chọn nhận nhiệm vụ ngày hiện ở nút `daily_duty` của Chu Hoành, nhận được. Số thưởng và mốc 0h CHƯA đo sống.
+2. ✅ Kiểm sống 2026-10-23 bằng gameProbe: nhận `daily_mountain_patrol` ở nút `daily_duty` (0 → 19 → 1), hạ 3 tán tu ⇒ COMPLETED, lĩnh ⇒ +300 EXP, +60 linh thạch (209 `quest_reward`). Nhận lại cùng ngày ⇒ `ALREADY_ACCEPTED`; lùi `updated_at` một ngày bằng SQL (mô phỏng qua 0h, không chờ giờ thật) ⇒ nhận lại OK, tiến độ về 0. Số thưởng vẫn là đề xuất chưa playtest cân bằng.
