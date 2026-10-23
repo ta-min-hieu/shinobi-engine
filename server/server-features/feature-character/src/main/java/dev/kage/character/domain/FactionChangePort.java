@@ -15,8 +15,8 @@ public interface FactionChangePort {
     /** Khoá túi đồ của nhân vật TRƯỚC mọi khoá khác (DATABASE.md §5.1). */
     void lockInventory(Transaction tx, long characterId);
 
-    /** Số lần đã đổi — khoá dòng nhân vật tới hết transaction. */
-    int lockChangeCount(Transaction tx, long characterId);
+    /** Hệ hiện tại + số lần đã đổi — khoá dòng nhân vật tới hết transaction. */
+    FactionChangeState lockState(Transaction tx, long characterId);
 
     /** Tiêu một Tẩy Căn Đan; {@code false} = không có viên nào lấy được (chưa ghi gì). */
     boolean takePill(Transaction tx, long characterId);
@@ -37,8 +37,12 @@ public interface FactionChangePort {
             }
 
             @Override
-            public synchronized int lockChangeCount(Transaction tx, long characterId) {
-                return changes.getOrDefault(characterId, 0);
+            public synchronized FactionChangeState lockState(Transaction tx, long characterId) {
+                Faction current = characterPort
+                        .findById(characterId)
+                        .map(Character::faction)
+                        .orElseThrow(() -> new IllegalStateException("Nhân vật " + characterId + " không tồn tại"));
+                return new FactionChangeState(current, changes.getOrDefault(characterId, 0));
             }
 
             @Override

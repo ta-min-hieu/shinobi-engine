@@ -5,6 +5,7 @@ import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.FactionChangePolicy;
 import dev.kage.character.domain.FactionChangePort;
+import dev.kage.character.domain.FactionChangeState;
 import dev.kage.character.domain.TransactionRunner;
 
 /**
@@ -47,8 +48,12 @@ public final class SelectFactionUseCase {
         }
         transactionRunner.inTransaction(tx -> {
             changePort.lockInventory(tx, characterId);
-            int changes = changePort.lockChangeCount(tx, characterId);
-            boolean free = FactionChangePolicy.isFree(changes, character.level());
+            FactionChangeState state = changePort.lockState(tx, characterId);
+            // Kiểm LẠI dưới khoá: lệnh đổi song song có thể vừa ghi đúng hệ này (bấm đúp) — không trả đan cho nó.
+            if (state.faction() == faction) {
+                throw new FactionUnchangedException(characterId);
+            }
+            boolean free = FactionChangePolicy.isFree(state.changes(), character.level());
             if (!free && !changePort.takePill(tx, characterId)) {
                 throw new FactionChangePillRequiredException(characterId);
             }

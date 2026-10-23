@@ -15,6 +15,7 @@ import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.CharacterStats;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.FactionChangePort;
+import dev.kage.character.domain.FactionChangeState;
 import dev.kage.character.domain.NewCharacter;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.character.domain.Transaction;
@@ -158,6 +159,8 @@ class SelectFactionUseCaseTest {
         private int changes;
         private int pills;
         private int pillsUsed;
+        /** Hệ DB thấy lúc khoá — khác hệ đọc trước transaction khi có lệnh song song vừa ghi. */
+        private Faction lockedFaction;
 
         FakeChangePort(FakeCharacterPort characters, int changes, int pills) {
             this.characters = characters;
@@ -169,8 +172,11 @@ class SelectFactionUseCaseTest {
         public void lockInventory(Transaction tx, long characterId) {}
 
         @Override
-        public int lockChangeCount(Transaction tx, long characterId) {
-            return changes;
+        public FactionChangeState lockState(Transaction tx, long characterId) {
+            Faction current = lockedFaction != null
+                    ? lockedFaction
+                    : characters.findById(characterId).orElseThrow().faction();
+            return new FactionChangeState(current, changes);
         }
 
         @Override
@@ -224,6 +230,20 @@ class SelectFactionUseCaseTest {
         assertThatThrownBy(() -> useCase(port, changes).execute(1L, Faction.THO))
                 .isInstanceOf(FactionChangePillRequiredException.class);
         assertThat(port.findById(1L).orElseThrow().faction()).isEqualTo(Faction.HOA);
+        assertThat(changes.changes).isEqualTo(2);
+    }
+
+    @Test
+    void concurrentDuplicateRequestIsRefusedUnderTheLock_withoutSpendingAPill() {
+        // Bấm đúp: lệnh 1 đã ghi THO trong khi lệnh 2 còn cầm bản đọc HOA cũ. Lệnh 2 phải thấy THO dưới
+        // khoá và dừng — trước bản vá nó trả một viên Tẩy Căn Đan để "đổi" THO sang THO.
+        FakeCharacterPort port = new FakeCharacterPort(characterAtLevel(40));
+        FakeChangePort changes = new FakeChangePort(port, 2, 1);
+        changes.lockedFaction = Faction.THO;
+
+        assertThatThrownBy(() -> useCase(port, changes).execute(1L, Faction.THO))
+                .isInstanceOf(FactionUnchangedException.class);
+        assertThat(changes.pillsUsed).isZero();
         assertThat(changes.changes).isEqualTo(2);
     }
 

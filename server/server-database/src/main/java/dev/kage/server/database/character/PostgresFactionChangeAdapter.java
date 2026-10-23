@@ -6,6 +6,7 @@ import java.time.Instant;
 
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.FactionChangePort;
+import dev.kage.character.domain.FactionChangeState;
 import dev.kage.character.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
@@ -14,7 +15,7 @@ import dev.kage.server.database.inventory.InventoryItemTake;
 /** Hiện thực {@link FactionChangePort} (ADR-066, V68) — {@code character.faction_changes} + Tẩy Căn Đan. */
 public final class PostgresFactionChangeAdapter implements FactionChangePort {
 
-    private static final String LOCK_COUNT = "SELECT faction_changes FROM character WHERE id = ? FOR UPDATE";
+    private static final String LOCK_STATE = "SELECT faction, faction_changes FROM character WHERE id = ? FOR UPDATE";
     private static final String RECORD =
             "UPDATE character SET faction = ?, faction_changes = faction_changes + 1 WHERE id = ?";
     private static final String AUDIT = """
@@ -27,9 +28,13 @@ public final class PostgresFactionChangeAdapter implements FactionChangePort {
     }
 
     @Override
-    public int lockChangeCount(Transaction tx, long characterId) {
-        return JdbcOperations.queryOne(connection(tx), LOCK_COUNT, rs -> rs.getInt(1), characterId)
-                .orElse(0);
+    public FactionChangeState lockState(Transaction tx, long characterId) {
+        return JdbcOperations.queryOne(
+                        connection(tx),
+                        LOCK_STATE,
+                        rs -> new FactionChangeState(Faction.valueOf(rs.getString(1)), rs.getInt(2)),
+                        characterId)
+                .orElseThrow(() -> new IllegalStateException("Nhân vật " + characterId + " không tồn tại"));
     }
 
     @Override
