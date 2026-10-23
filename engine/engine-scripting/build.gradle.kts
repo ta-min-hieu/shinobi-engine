@@ -13,6 +13,8 @@ jmh {
     timeOnIteration.set("1s")
     resultsFile.set(rootProject.file("benchmarks/results/engine-scripting-jmh-result.json"))
     resultFormat.set("JSON")
+    // -PjmhIncludes=ProductionScriptBenchmark chạy riêng một benchmark (README dòng 70(b), 2026-10-23).
+    providers.gradleProperty("jmhIncludes").orNull?.let { includes.set(listOf(it)) }
 }
 // Truffle (GraalJS) đòi `Multi-Release: true` trong manifest; uber jar của JMH làm mất nó và Truffle từ
 // chối khởi động ("Multi-Release classes are not configured correctly").

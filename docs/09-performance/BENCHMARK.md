@@ -1136,6 +1136,31 @@ JVM. Lưu ý jmh: uber jar của plugin làm mất `Multi-Release: true` mà Tru
 tự thêm lại vào manifest của `jmhJar`. ⚠️ Con số "5–20 ms mỗi eval" ghi ở README dòng 70(c) trước đó là
 đo thô lúc JVM chưa ấm, không phải trạng thái ổn định.
 
+### 5.13 Từng script skill/boss THẬT trên tick (2026-10-23, README dòng 70(b), lô 18)
+
+**Đo.** `engine/engine-scripting/src/jmh/.../ProductionScriptBenchmark` (JMH, `./gradlew :engine:engine-scripting:jmh
+-PjmhIncludes=ProductionScriptBenchmark`; `java -jar` thẳng jar JMH không nạp được GraalJS). Chạy đủ 20 script skill +
+2 script boss đang ship, qua đúng `ScriptSandbox.eval` (Engine chung, Context mới mỗi lần, trần 10.000 câu lệnh), host
+API đúng hình dạng `SkillSystem`/`BossAiSystem`. Máy dev, JDK 25 (JBR), máy yên (không build nào chạy song song),
+2 fork × 10 lượt đo.
+
+| Script | µs/lần (trung bình ± sai số 99,9%) |
+|---|---|
+| 20 script skill | **88,0 – 94,3** (mỗi script ± 1,4–2,8) |
+| `boss/sample_boss` | 93,1 ± 2,3 |
+| `boss/blood_sand_enforcer` | 130,6 ± **82,1** (dao động lớn — một fork lệch; nội dung script dài nhất) |
+
+**Đọc.** Mọi script cùng một bậc với phép đo "Engine chung" ở §5.12 (94 µs) ⇒ chi phí **gần như toàn bộ là dựng
+Context**, không phải nội dung script — script skill hiện tại chỉ là `return { ... }` vài phép tính. Chốt chống treo
+500 ms gấp **~5.000 lần** số đo. Ngân sách tick 16,6 ms chứa được ~180 lần cast trong MỘT tick trước khi script một
+mình ăn hết tick.
+
+**Đề xuất (chưa đổi trần — chủ dự án chọn "chỉ đo + báo số")**: nếu đặt ngân sách riêng cho cast trên tick thì
+**5 ms** (ví dụ ở SCRIPTING.md) vẫn gấp ~50 lần số đo xấu nhất lúc yên, nhưng bài học 70(d) cho thấy trần thời gian
+thật bị GC/máy tải cắt nhầm script HỢP LỆ — trần 5 ms sẽ từ chối cast hợp lệ dưới GC dừng. Hai hướng rẻ hơn, đáng
+cân nhắc trước khi hạ trần: (a) giữ 500 ms chống treo, thêm metric thời gian eval theo mã script để PHÁT HIỆN script
+chậm thay vì cắt; (b) giảm chi phí dựng Context (cache Source, tái dùng Context theo World) — đo lại sau đổi.
+
 ## 6. Khi nào chạy
 
 | Loại | Ở PR? | Khi nào |
