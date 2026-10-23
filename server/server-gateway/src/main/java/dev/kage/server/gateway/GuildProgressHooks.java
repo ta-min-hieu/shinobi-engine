@@ -62,8 +62,13 @@ final class GuildProgressHooks {
 
     /** Nối bản thật — một lần, lúc khởi động. */
     void bind(GuildProgressionFacade realProgression, MailFacade realMail, Sink realSink) {
+        bind(realProgression, realMail::sendMail, realSink);
+    }
+
+    /** Như trên với một {@link Mailer} bất kỳ — test thay thư thật bằng bản ném lỗi. */
+    void bind(GuildProgressionFacade realProgression, Mailer realMail, Sink realSink) {
         this.progression = realProgression;
-        this.mail = realMail::sendMail;
+        this.mail = realMail;
         this.sink = realSink;
     }
 
@@ -84,6 +89,23 @@ final class GuildProgressHooks {
 
     private void reward(WeeklyCompletion completion) {
         for (long member : completion.memberIds()) {
+            rewardMember(completion.guildId(), member);
+        }
+        notifyAll(completion.memberIds(), GuildChangeReason.GUILD_CHANGE_REASON_WEEKLY_QUEST_COMPLETED);
+        if (completion.leveledUp()) {
+            notifyAll(completion.memberIds(), GuildChangeReason.GUILD_CHANGE_REASON_LEVEL_UP);
+        }
+    }
+
+    /**
+     * Thư của MỘT thành viên. Lỗi dừng ở đây (docs/README.md dòng 81, phương án (b)): tuần đã chốt trong
+     * transaction riêng, một thư ném lỗi mà bỏ dở cả vòng thì những người sau mất thưởng vĩnh viễn. Vẫn mất
+     * thưởng nếu server sập giữa vòng — rủi ro đó chờ outbox (phương án (a)).
+     */
+    // PMD AvoidCatchingGenericException: lỗi của một thư không được chặn thư của người khác.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void rewardMember(long guildId, long member) {
+        try {
             MailFacade.SendOutcome outcome = mail.send(new MailFacade.SendMailRequest(
                     null, member, SUBJECT, BODY, GuildWeeklyQuest.REWARD_GOLD_PER_MEMBER, List.of()));
             if (outcome.result() == MailFacade.SendResult.OK) {
@@ -97,14 +119,12 @@ final class GuildProgressHooks {
             } else {
                 LOG.warn(
                         "Thư thưởng bang tuần không gửi được: guildId={}, characterId={}, result={}",
-                        completion.guildId(),
+                        guildId,
                         member,
                         outcome.result());
             }
-        }
-        notifyAll(completion.memberIds(), GuildChangeReason.GUILD_CHANGE_REASON_WEEKLY_QUEST_COMPLETED);
-        if (completion.leveledUp()) {
-            notifyAll(completion.memberIds(), GuildChangeReason.GUILD_CHANGE_REASON_LEVEL_UP);
+        } catch (RuntimeException e) {
+            LOG.warn("Thư thưởng bang tuần lỗi: guildId={}, characterId={}", guildId, member, e);
         }
     }
 
