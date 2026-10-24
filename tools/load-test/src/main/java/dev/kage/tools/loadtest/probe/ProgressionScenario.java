@@ -110,7 +110,7 @@ final class ProgressionScenario {
                     skill.getRank(),
                     skill.getMaxRank(),
                     skill.getRequiredLevel(),
-                    skill.getUnlocked() ? "" : ", khoá"));
+                    (skill.getUnlocked() ? "" : ", khoá") + (skill.getPassive() ? ", tâm pháp" : "")));
         }
         session.note(line.toString());
     }

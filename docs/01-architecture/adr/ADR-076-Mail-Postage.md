@@ -63,4 +63,4 @@ vàng — **không thêm giá trị enum, protocol không đổi**. Cộng tràn
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 19).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24 (gameProbe `--sendMail=Benkei:1000`): vàng Kagemaru 97.134 → 96.114 (−1.020 = 1.000 + 10 + 1%); gửi lại CÙNG khoá ⇒ `DUPLICATE_REQUEST`, không trừ lần hai; `audit_log.MAIL_SEND` có `"postage":20`.

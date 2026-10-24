@@ -157,4 +157,13 @@ class PetEvolutionUseItemTest {
         assertThat(PetPolicy.staged(10, 2)).isEqualTo(15);
         assertThat(PetPolicy.staged(3, 2)).isEqualTo(4);
     }
+
+    /** Hồi quy 2026-10-24: linh thú cấp 17..30 từng làm tính chỉ số ném lỗi (bảng cường hoá chặn ở +15). */
+    @Test
+    void petBonusShouldScaleAllTheWayToMaxLevel() {
+        assertThat(PetPolicy.petBonus(10, 1, 1)).isEqualTo(10);
+        assertThat(PetPolicy.petBonus(10, 20, 1)).isEqualTo(29);
+        assertThat(PetPolicy.petBonus(10, PetPolicy.MAX_LEVEL, 1)).isEqualTo(39);
+        assertThat(PetPolicy.petBonus(10, PetPolicy.MAX_LEVEL, 2)).isEqualTo(58);
+    }
 }

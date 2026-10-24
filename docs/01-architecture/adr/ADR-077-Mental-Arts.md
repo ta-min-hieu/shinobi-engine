@@ -72,4 +72,4 @@ không tăng.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 19).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24 (gameProbe `--upgradeSkills`): bảng Công pháp có 2 dòng tâm pháp bậc 0/5 (Lv15, Lv30); nâng Liệt Hoả Tâm Kinh ×2 + Hoả Linh Hộ Thể ×1 ⇒ điểm 16 → 13; máu tối đa 343 → 353 (+10, đúng 1 bậc).

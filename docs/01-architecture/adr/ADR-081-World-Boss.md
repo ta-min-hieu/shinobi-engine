@@ -60,4 +60,4 @@ phẩm theo hạng, tham số SQL); mọi người gây ≥ 1 sát thương nh�
 
 1. ✅ Thi hành 2026-10-24 (lô 19).
 3. ⏳ Chấm art Yêu Vương bằng ảnh render đối chứng ở camera client (ASSET-LOG).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24 (DB dev, máu boss tạm hạ 300 rồi trả lại 6.000; `KAGE_WORLD_BOSS_FIRST_SPAWN_SECONDS=20`): log `Boss thế giới xuất hiện: demon_king` đúng giờ, client thấy `model=mob_demon-king` ở x≈−28; Kagemaru hạ ⇒ hai client cùng nhận dòng "Yêu Vương đã bị hạ! Kagemaru gây nhiều sát thương nhất."; `world_boss_damage` = 304; thư hệ thống hạng 1 (5.000 vàng + Linh Thú Đan); Bia Anh Danh thẻ BOSS_DAMAGE hạng 1 = 304. Ghi chú: sổ cộng sát thương THÔ của đòn kết liễu (304 > 300 máu) — chưa kẹp theo máu còn lại.

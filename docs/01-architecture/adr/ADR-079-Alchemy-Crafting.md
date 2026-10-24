@@ -68,4 +68,4 @@ Tên món tra catalog vật phẩm (ADR-035).
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 19).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24 (gameProbe `--craftRecipes`): đứng xa ⇒ `TOO_FAR`; đứng cạnh trưởng lão (x=−5): túi đủ 20 ô ⇒ Linh Thú Đan `BAG_FULL`, hoàn lại trọn (Yêu Đan 15, vàng không trừ); Tiểu Hồi Xuân Đan `OK` (3 → 6 viên, −2 Linh Thảo, −10 vàng, gộp chồng nên túi đầy vẫn được); bán bớt rồi luyện Linh Thú Đan `OK` (−10 Yêu Đan, −10 Linh Thảo, −3.000 vàng).

@@ -16,6 +16,9 @@ public final class PetPolicy {
 
     private static final int PERCENT = 100;
 
+    /** Mỗi cấp linh thú trên 1 cộng chừng này phần trăm chỉ số gốc — bằng bước cường hoá (ADR-072 D2). */
+    private static final int LEVEL_STEP_PERCENT = 10;
+
     private PetPolicy() {}
 
     /** EXP cần để từ cấp {@code level} lên cấp kế; 0 nếu đã tối đa. */
@@ -44,8 +47,13 @@ public final class PetPolicy {
         return stage >= MAX_STAGE ? value * EVOLVED_STAT_PERCENT / PERCENT : value;
     }
 
-    /** Cấp linh thú quy ra "cấp cường hoá" để nhân chỉ số gốc (cùng công thức +10%/cấp). */
-    public static int bonusLevel(int petLevel) {
-        return Math.max(0, petLevel - 1);
+    /**
+     * Chỉ số linh thú: gốc × (1 + 10% × (cấp − 1)) (ADR-072 D2, cùng công thức cường hoá nhưng KHÔNG chặn ở +15 —
+     * cấp linh thú tới {@link #MAX_LEVEL}), rồi nhân bậc tiến hoá (ADR-078). Làm tròn nửa-lên như cường hoá.
+     */
+    public static int petBonus(int base, int petLevel, int stage) {
+        int steps = Math.clamp(petLevel, 1, MAX_LEVEL) - 1;
+        long scaledHundredths = (long) base * (PERCENT + LEVEL_STEP_PERCENT * steps);
+        return staged(Math.toIntExact(Math.floorDiv(scaledHundredths + PERCENT / 2, PERCENT)), stage);
     }
 }

@@ -61,3 +61,4 @@ Không.
 1. ✅ Thi hành 2026-10-21 (lô 17).
 2. ✅ Kiểm sống 2026-10-21 bằng gameProbe: mặc Linh Hồ ⇒ máu tối đa +10; mỗi lần chủ nhận EXP thì `pet_state.exp` cộng đúng bằng (kể cả x2 sự kiện); 140 EXP ⇒ lên cấp 2 kèm dòng song ngữ.
 3. ⏳ Art: model linh thú (chủ dự án).
+4. ✅ 2026-10-24: vá lỗi linh thú cấp 17–30 khoá nhân vật ngoài world (chỉ số đi qua bảng cường hoá chặn +15) — xem [ADR-078](ADR-078-Pet-Evolution.md) mục 3.

@@ -128,15 +128,15 @@ public final class ComputeEquipmentBonusUseCase {
             // ADR-036 D3 — cường hoá khuếch đại chỉ số GỐC của CHÍNH món đó, tính riêng từng món
             // rồi mới cộng lại. Cộng tổng trước rồi mới nhân hệ số là SAI: mỗi món có cấp cường
             // hoá riêng, một món +10 không được kéo theo cả bộ đồ +0.
-            int enhanceLevel = slot.getKey() == EquipmentSlotType.PET
-                    ? PetPolicy.bonusLevel(petLevels.getOrDefault(itemId, 1))
-                    : item.enhanceLevel();
-            // Bậc tiến hoá linh thú (ADR-078) nhân SAU cấp; món không phải linh thú luôn bậc 1.
-            int stage = petStages.getOrDefault(itemId, 1);
-            totalBonusAtk += PetPolicy.staged(EnhancementTable.enhancedBonus(template.bonusAtk(), enhanceLevel), stage);
-            totalBonusDef += PetPolicy.staged(EnhancementTable.enhancedBonus(template.bonusDef(), enhanceLevel), stage);
-            totalBonusRes += PetPolicy.staged(EnhancementTable.enhancedBonus(template.bonusRes(), enhanceLevel), stage);
-            totalBonusHp += PetPolicy.staged(EnhancementTable.enhancedBonus(template.bonusHp(), enhanceLevel), stage);
+            // Linh thú: cấp linh thú (1..30) thay cấp cường hoá — KHÔNG qua bảng cường hoá vốn chặn ở +15 (sửa
+            // 2026-10-24: linh thú cấp 17+ từng ném IllegalArgumentException và khoá nhân vật ngoài world).
+            ItemLevel level = slot.getKey() == EquipmentSlotType.PET
+                    ? new ItemLevel(true, petLevels.getOrDefault(itemId, 1), petStages.getOrDefault(itemId, 1))
+                    : new ItemLevel(false, item.enhanceLevel(), 1);
+            totalBonusAtk += level.scale(template.bonusAtk());
+            totalBonusDef += level.scale(template.bonusDef());
+            totalBonusRes += level.scale(template.bonusRes());
+            totalBonusHp += level.scale(template.bonusHp());
         }
         EquipmentBonus gems = gemBonusOf(characterId, equipment);
         EquipmentBonus sets = ItemSets.totalBonus(ItemSets.progress(itemSetPort.itemSets(), wornTemplateIds));
@@ -145,6 +145,20 @@ public final class ComputeEquipmentBonusUseCase {
                 totalBonusDef + gems.bonusDef() + sets.bonusDef(),
                 totalBonusRes + gems.bonusRes() + sets.bonusRes(),
                 totalBonusHp + gems.bonusHp() + sets.bonusHp());
+    }
+
+    /**
+     * Cách khuếch đại chỉ số gốc của MỘT món: cường hoá (0..15) cho trang bị, cấp + bậc tiến hoá cho linh thú.
+     *
+     * @param pet món ở ô linh thú
+     * @param value cấp cường hoá, hoặc cấp linh thú
+     * @param stage bậc tiến hoá linh thú (1 cho mọi món khác)
+     */
+    private record ItemLevel(boolean pet, int value, int stage) {
+
+        int scale(int base) {
+            return pet ? PetPolicy.petBonus(base, value, stage) : EnhancementTable.enhancedBonus(base, value);
+        }
     }
 
     /** Các bộ pháp khí đang mặc ít nhất một món (ADR-065) — cho bảng nhân vật. Đọc thuần. */

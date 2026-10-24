@@ -69,7 +69,8 @@ public record ProbeConfig(
         EdgePlan edge,
         ProgressionPlan progression,
         EconomyPlan economy,
-        InspectionPlan inspection) {
+        InspectionPlan inspection,
+        Lot19Plan lot19) {
 
     /**
      * Danh sách mã trang bị BẤT BIẾN — record không tự copy, mà lệnh gọi có thể truyền list sống
@@ -269,6 +270,29 @@ public record ProbeConfig(
     }
 
     /**
+     * Kế hoạch lô 19 (xem {@link Lot19Scenario}).
+     *
+     * @param craftRecipes mã công thức lò đan cần luyện, mỗi phần tử một mẻ
+     * @param guildShopBuy {@code item_template_id} cần đổi ở cửa hàng bang
+     * @param partyFinderSteps bước bảng tìm nhóm: {@code post:GOAL[:minLevel]}, {@code list}, {@code join:<id>},
+     *     {@code remove}
+     */
+    public record Lot19Plan(List<String> craftRecipes, List<String> guildShopBuy, List<String> partyFinderSteps) {
+
+        /** Danh sách bất biến — record không tự copy. */
+        public Lot19Plan {
+            craftRecipes = List.copyOf(craftRecipes);
+            guildShopBuy = List.copyOf(guildShopBuy);
+            partyFinderSteps = List.copyOf(partyFinderSteps);
+        }
+
+        /** {@code true} khi có ít nhất một bước cần chạy. */
+        public boolean isRequested() {
+            return !craftRecipes.isEmpty() || !guildShopBuy.isEmpty() || !partyFinderSteps.isEmpty();
+        }
+    }
+
+    /**
      * Kế hoạch tiến triển nhân vật của lô 17 — chạy TRƯỚC khi đi bộ (xem {@link ProgressionScenario}).
      *
      * @param selectFaction tên hệ cần đổi sang ({@code hoa}, {@code thuy}...); rỗng = không đổi
@@ -354,7 +378,8 @@ public record ProbeConfig(
                 new ProgressionPlan(
                         raw.text("selectFaction", ""), raw.list("upgradeSkills"), raw.number("donateToGuild", 0L)),
                 economyPlan(raw),
-                inspectionPlan(raw));
+                inspectionPlan(raw),
+                new Lot19Plan(raw.list("craftRecipes"), raw.list("guildShopBuy"), raw.list("partyFinder")));
     }
 
     private static TradePlan tradePlan(CommandLineArguments raw) {

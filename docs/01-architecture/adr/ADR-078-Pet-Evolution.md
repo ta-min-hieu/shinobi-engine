@@ -61,4 +61,5 @@ chỉ số như sau khi mặc đồ (kèm `HealthChangedEvent` nếu máu tối 
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 19).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24: luyện Linh Thú Đan ở lò đan rồi `--useItemCode=spirit_beast_pill` ⇒ `pet_state.stage` 1 → 2; Linh Hồ cấp 20: máu tối đa 353 → 367 (+14 = 43 − 29), công 95 → 99 (+4); viên thứ hai ⇒ `error.pet_already_evolved`, viên đan còn nguyên.
+3. ✅ **Bug thật của ADR-072 tìm ra lúc kiểm (đã vá)**: chỉ số linh thú đi qua `EnhancementTable.enhancedBonus`, hàm chặn cấp ở +15 ⇒ linh thú cấp 17–30 ném `IllegalArgumentException` và nhân vật **không vào world được** (`error.select_character_failed`). Kiểm sống ADR-072 trước đó chỉ tới cấp 2 nên không thấy. Nay `PetPolicy.petBonus` (cùng công thức, không chặn), test hồi quy tới cấp 30.

@@ -161,6 +161,9 @@ public final class GameProbe {
         if (config.progression().isRequested()) {
             new ProgressionScenario(connection, session).run(config.progression());
         }
+        if (config.lot19().isRequested()) {
+            new Lot19Scenario(connection, session).run(config.lot19());
+        }
         SessionEdgeScenario edge = new SessionEdgeScenario(connection, session);
         edge.runBeforeWalking(config.edge());
         if (config.moveToX().isPresent()) {

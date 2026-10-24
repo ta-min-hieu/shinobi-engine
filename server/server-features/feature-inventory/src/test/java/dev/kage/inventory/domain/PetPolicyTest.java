@@ -34,7 +34,7 @@ class PetPolicyTest {
         assertThat(progress.level()).isEqualTo(PetPolicy.MAX_LEVEL);
         assertThat(progress.expIntoLevel()).isZero();
         assertThat(progress.expToNext()).isZero();
-        assertThat(PetPolicy.bonusLevel(1)).isZero();
-        assertThat(PetPolicy.bonusLevel(5)).isEqualTo(4);
+        assertThat(PetPolicy.petBonus(10, 1, 1)).isEqualTo(10);
+        assertThat(PetPolicy.petBonus(10, 5, 1)).isEqualTo(14);
     }
 }

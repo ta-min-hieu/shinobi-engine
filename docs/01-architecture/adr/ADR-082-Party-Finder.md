@@ -53,4 +53,4 @@ chấp nhận) — tin công khai là lời mời công khai. Nhóm đầy hoặ
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 19) — `PartyFinderBoard` (feature-party domain, giữ ở `ConnectedCharacterRegistry`), `PartyFinderCommands` (gateway).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24 (gameProbe `--partyFinder`, 2 tài khoản): Kagemaru đăng tin ⇒ bảng 1 tin còn 600 s; Benkei `join:3` ⇒ `OK`, vào nhóm thật (`party_member`); lần hai `ALREADY_IN_PARTY`; tin "từ Lv5" với Benkei Lv3 ⇒ `LEVEL_TOO_LOW`; tự vào tin mình ⇒ `OWN_LISTING`. ⚠️ Một lần đăng đầu tiên trả `NOT_LEADER` dù DB ghi Kagemaru là trưởng nhóm — không tái hiện được ở 3 lần sau; chưa rõ nguyên nhân.

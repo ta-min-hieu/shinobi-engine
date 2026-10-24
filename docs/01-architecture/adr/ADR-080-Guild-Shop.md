@@ -56,4 +56,4 @@ cấp món bằng các mảnh SQL túi đồ dùng chung) — feature-guild khô
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 19).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24 (gameProbe `--donateToGuild=5000 --guildShopBuy=20,23,46`): cống hiến 5.000; đổi Tiểu Hồi Xuân Đan (200) `OK` ⇒ còn 4.800, `contribution` vẫn 5.000, `contribution_spent` 200; món #23 không bán ⇒ `UNKNOWN_ITEM`; Linh Thú Đan (bang cấp 4) ⇒ `GUILD_LEVEL_TOO_LOW`.
