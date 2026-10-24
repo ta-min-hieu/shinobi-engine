@@ -146,6 +146,12 @@ final class CombatFeedbackPresenter implements Disposable {
         floatingText.show(text, color, anchor);
     }
 
+    /** Như {@link #showSelfText} nhưng neo ở một điểm thế giới bất kỳ (biểu cảm của người khác — ADR-092). */
+    void showTextAt(String text, Color color, float x, float y) {
+        anchor.set(x, y, 0f);
+        floatingText.show(text, color, anchor);
+    }
+
     /** Vừa lên cấp — {@code leveled_up} của {@code ExperienceChangedEvent}. */
     void showLevelUp() {
         showSelfNotice("hud.exp.level_up", FloatingCombatText.LEVEL_UP);

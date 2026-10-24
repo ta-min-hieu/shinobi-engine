@@ -129,6 +129,12 @@ sealed interface WorldCommand {
     record SetSkillRanksCommand(long characterId, SkillRankSnapshot ranks) implements WorldCommand {}
 
     /**
+     * ADR-092 — gọi {@code action} với id từng người đang NHÌN THẤY {@code characterId} (kèm chính họ). Chỉ đọc được
+     * trên tick thread, cùng lý do {@link AreaChatMessageCommand}; world không biết action làm gì (gateway gửi gói).
+     */
+    record ObserversCommand(long characterId, java.util.function.LongConsumer action) implements WorldCommand {}
+
+    /**
      * Mốc chặn hàng đợi — không đổi gì trong ECS, chỉ gọi {@code onReached} khi tick thread đã xử lý
      * xong mọi lệnh xếp TRƯỚC nó. Xem {@link WorldFacade#inboxBarrier()}. Mang callback chứ không
      * mang thẳng future: record không giữ đối tượng mutable của người gọi (SpotBugs EI).

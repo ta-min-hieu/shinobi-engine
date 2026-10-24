@@ -673,6 +673,14 @@ public final class WorldFacade {
         return CombatConstants.statSheet(baseStats, bonus, SkillConstants.CHARACTER_MAX_CHI);
     }
 
+    /**
+     * ADR-092 — gọi {@code action} với id từng người đang nhìn thấy {@code characterId} (kèm chính họ), TRÊN tick
+     * thread ở tick kế. {@code action} không được chặn (chỉ xếp gói ra dây). Nhân vật không còn trong World thì bỏ qua.
+     */
+    public void enqueueForObservers(long characterId, java.util.function.LongConsumer action) {
+        inbox.add(new WorldCommand.ObserversCommand(characterId, action));
+    }
+
     /** GAMEPLAY.md §10 — chat kênh Khu vực, cần {@code aoiTracker} nên phải qua tick thread. */
     public void enqueueAreaChatMessage(long characterId, String senderName, String body) {
         inbox.add(new WorldCommand.AreaChatMessageCommand(characterId, senderName, body));
@@ -982,6 +990,7 @@ public final class WorldFacade {
                 case WorldCommand.SetSkillRanksCommand c -> handleSetSkillRanks(c.characterId(), c.ranks());
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c);
                 case WorldCommand.ResetCharacterLevelCommand c -> handleResetCharacterLevel(c.characterId(), c.level());
+                case WorldCommand.ObserversCommand c -> handleObservers(c.characterId(), c.action());
                 case WorldCommand.InboxBarrierCommand c -> c.onReached().run();
             }
         }
@@ -1243,6 +1252,17 @@ public final class WorldFacade {
         observers.add(characterId); // người gửi luôn thấy tin nhắn của chính mình.
         for (long observerId : observers) {
             outboundSink.onAreaChatMessage(observerId, characterId, senderName, body);
+        }
+    }
+
+    private void handleObservers(long characterId, java.util.function.LongConsumer action) {
+        if (!entitiesByCharacterId.containsKey(characterId)) {
+            return; // đã ngắt kết nối giữa lúc lệnh còn trong hàng đợi — bỏ qua an toàn.
+        }
+        Set<Long> observers = aoiTracker.observersOf(characterId);
+        observers.add(characterId);
+        for (long observerId : observers) {
+            action.accept(observerId);
         }
     }
 

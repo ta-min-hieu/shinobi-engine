@@ -33,8 +33,11 @@ import dev.kage.crafting.application.CraftItemUseCase;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.api.NpcPlacementFacade;
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
+import dev.kage.friend.api.BlockFacade;
+import dev.kage.friend.api.DaoLuFacade;
 import dev.kage.friend.api.FriendFacade;
 import dev.kage.friend.api.FriendGiftFacade;
+import dev.kage.friend.api.MentorshipFacade;
 import dev.kage.friend.application.AcceptFriendRequestUseCase;
 import dev.kage.friend.application.FriendGiftUseCase;
 import dev.kage.friend.application.FriendRequestCooldowns;
@@ -127,8 +130,11 @@ import dev.kage.server.database.crafting.PostgresCraftingWorkshopAdapter;
 import dev.kage.server.database.crafting.PostgresRecipeAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcPlacementAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
+import dev.kage.server.database.friend.PostgresBlockAdapter;
+import dev.kage.server.database.friend.PostgresDaoLuAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
 import dev.kage.server.database.friend.PostgresFriendGiftAdapter;
+import dev.kage.server.database.friend.PostgresMentorshipAdapter;
 import dev.kage.server.database.gm.PostgresGameEventAdapter;
 import dev.kage.server.database.gm.PostgresGmAuditAdapter;
 import dev.kage.server.database.gm.PostgresGmRoleAdapter;
@@ -686,6 +692,21 @@ public final class ServerDatabaseBootstrap {
     public FriendGiftFacade wireFriendGiftFacade() {
         return new FriendGiftFacade(
                 new FriendGiftUseCase(new PostgresFriendGiftAdapter(dataSource), java.time.Clock.systemUTC()));
+    }
+
+    /** Chặn người chơi (ADR-091). */
+    public BlockFacade wireBlockFacade() {
+        return new BlockFacade(new PostgresBlockAdapter(dataSource));
+    }
+
+    /** Sư đồ (ADR-093). */
+    public MentorshipFacade wireMentorshipFacade() {
+        return new MentorshipFacade(new PostgresMentorshipAdapter(dataSource), java.time.Clock.systemUTC());
+    }
+
+    /** Đạo lữ (ADR-094). */
+    public DaoLuFacade wireDaoLuFacade() {
+        return new DaoLuFacade(new PostgresDaoLuAdapter(dataSource), java.time.Clock.systemUTC());
     }
 
     /** Boss thế giới (ADR-081) — lịch, thưởng, sổ sát thương tích luỹ. */

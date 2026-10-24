@@ -31,6 +31,7 @@ import dev.kage.client.core.ui.hud.PartyPanel;
 import dev.kage.client.core.ui.hud.QuestLogPanel;
 import dev.kage.client.core.ui.hud.ShopPanel;
 import dev.kage.client.core.ui.hud.TradePanel;
+import dev.kage.client.core.world.ReportWindows.Feeds;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
 import dev.kage.engine.ecs.EcsWorld;
@@ -334,7 +335,8 @@ public final class WorldScreen implements GameScreen {
                 combatFeedback,
                 new LocalCharacterAppearance(models, combatHudController, WorldConstants.LOCAL_CHARACTER_ID));
         this.itemCatalog = new ItemCatalogCoordinator(sender);
-        ReportWindows.Feeds feeds = new ReportWindows.Feeds(itemCatalog, chat, combatHudController::onOwnMaxHpChanged);
+        EmoteBubbles bubbles = new EmoteBubbles(localCharacterId, combatFeedback, remoteCharacters.characters());
+        Feeds feeds = new Feeds(itemCatalog, chat, combatHudController::onOwnMaxHpChanged, bubbles);
         this.reports = ReportWindows.create(combatHud.skin(), sender, localCharacterId, feeds);
         this.mail = new MailCoordinator(mailPanel, sender, combatFeedback, panels::noneOpen);
         this.inventory = buildInventory();
@@ -484,6 +486,8 @@ public final class WorldScreen implements GameScreen {
         panels.register(reports.partyFinderPanel(), reports.partyFinder());
         panels.register(reports.guildSkillPanel(), reports.guildSkills());
         panels.register(reports.spiritVeinPanel(), reports.spiritVeins());
+        panels.register(reports.relationshipPanel(), reports.relationships());
+        panels.register(reports.emotes());
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
         panels.register(friendPanel, friends);

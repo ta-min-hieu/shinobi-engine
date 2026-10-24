@@ -69,6 +69,8 @@ import dev.kage.party.api.PartyFacade;
 import dev.kage.protocol.AbandonQuestCommand;
 import dev.kage.protocol.AbandonQuestOutcome;
 import dev.kage.protocol.AbandonQuestResponse;
+import dev.kage.protocol.AcceptDaoLuCommand;
+import dev.kage.protocol.AcceptDiscipleCommand;
 import dev.kage.protocol.AcceptDuelCommand;
 import dev.kage.protocol.AcceptDuelOutcome;
 import dev.kage.protocol.AcceptDuelResponse;
@@ -87,6 +89,7 @@ import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.ApproveGuildJoinRequestOutcome;
 import dev.kage.protocol.ApproveGuildJoinRequestResponse;
 import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.BlockCharacterCommand;
 import dev.kage.protocol.BuyGuildShopItemCommand;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
@@ -139,6 +142,7 @@ import dev.kage.protocol.DialogueOptionView;
 import dev.kage.protocol.DisbandGuildCommand;
 import dev.kage.protocol.DisbandGuildOutcome;
 import dev.kage.protocol.DisbandGuildResponse;
+import dev.kage.protocol.DissolveDaoLuCommand;
 import dev.kage.protocol.DonateToGuildCommand;
 import dev.kage.protocol.DonateToGuildOutcome;
 import dev.kage.protocol.DonateToGuildResponse;
@@ -177,6 +181,7 @@ import dev.kage.protocol.GetMyPartyRequest;
 import dev.kage.protocol.GetMyPartyResponse;
 import dev.kage.protocol.GetPvpRatingRequest;
 import dev.kage.protocol.GetPvpRatingResponse;
+import dev.kage.protocol.GetRelationshipsRequest;
 import dev.kage.protocol.GetSpiritVeinStatusRequest;
 import dev.kage.protocol.GetTradeStatusRequest;
 import dev.kage.protocol.GetTradeStatusResponse;
@@ -201,6 +206,7 @@ import dev.kage.protocol.LeaderboardKind;
 import dev.kage.protocol.LeaveGuildCommand;
 import dev.kage.protocol.LeaveGuildOutcome;
 import dev.kage.protocol.LeaveGuildResponse;
+import dev.kage.protocol.LeaveMentorshipCommand;
 import dev.kage.protocol.LeavePartyCommand;
 import dev.kage.protocol.LeavePartyOutcome;
 import dev.kage.protocol.LeavePartyResponse;
@@ -249,6 +255,7 @@ import dev.kage.protocol.PetView;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.PostPartyFinderCommand;
+import dev.kage.protocol.ProposeDaoLuCommand;
 import dev.kage.protocol.QuestStatusChangedEvent;
 import dev.kage.protocol.RebirthCommand;
 import dev.kage.protocol.RebirthResponse;
@@ -265,6 +272,7 @@ import dev.kage.protocol.RemoveFriendCommand;
 import dev.kage.protocol.RemoveFriendOutcome;
 import dev.kage.protocol.RemoveFriendResponse;
 import dev.kage.protocol.RemovePartyFinderCommand;
+import dev.kage.protocol.RequestMentorCommand;
 import dev.kage.protocol.RequestTradeCommand;
 import dev.kage.protocol.RequestTradeOutcome;
 import dev.kage.protocol.RequestTradeResponse;
@@ -279,6 +287,7 @@ import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendChatMessageOutcome;
 import dev.kage.protocol.SendChatMessageResponse;
+import dev.kage.protocol.SendEmoteCommand;
 import dev.kage.protocol.SendFriendGiftCommand;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendFriendRequestOutcome;
@@ -306,6 +315,7 @@ import dev.kage.protocol.TradeOfferItemView;
 import dev.kage.protocol.TradePhase;
 import dev.kage.protocol.TradeRequestedEvent;
 import dev.kage.protocol.TradeUpdatedEvent;
+import dev.kage.protocol.UnblockCharacterCommand;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.UpgradeGuildSkillCommand;
@@ -443,6 +453,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final WorldBossFacade worldBoss;
     private final PartyFinderCommands partyFinder;
     private final FriendGiftCommands friendGifts;
+    private final RelationshipCommands relations;
     private final GuildSkillCommands guildSkills;
     private final dev.kage.character.api.RebirthFacade rebirth;
     private final SpiritVeinCommands spiritVeins;
@@ -566,6 +577,62 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_REMOVE_FRIEND_COMMAND_VALUE, this::handleRemoveFriendCommand),
             Map.entry(Opcode.OPCODE_CANCEL_FRIEND_REQUEST_COMMAND_VALUE, this::handleCancelFriendRequestCommand),
             Map.entry(Opcode.OPCODE_SEND_FRIEND_GIFT_COMMAND_VALUE, this::handleSendFriendGiftCommand),
+            // Lô 21 phần 1 — chặn (ADR-091), sư đồ (ADR-093), đạo lữ (ADR-094), biểu cảm (ADR-092).
+            Map.entry(
+                    Opcode.OPCODE_BLOCK_CHARACTER_COMMAND_VALUE,
+                    storageCommand(
+                            BlockCharacterCommand.parser(),
+                            Opcode.OPCODE_BLOCK_CHARACTER_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.blocks().block(id, c.getTargetName()))),
+            Map.entry(
+                    Opcode.OPCODE_UNBLOCK_CHARACTER_COMMAND_VALUE,
+                    storageCommand(
+                            UnblockCharacterCommand.parser(),
+                            Opcode.OPCODE_UNBLOCK_CHARACTER_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.blocks().unblock(id, c.getTargetName()))),
+            Map.entry(
+                    Opcode.OPCODE_GET_RELATIONSHIPS_REQUEST_VALUE,
+                    storageCommand(
+                            GetRelationshipsRequest.parser(),
+                            Opcode.OPCODE_GET_RELATIONSHIPS_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.query().of(id))),
+            Map.entry(
+                    Opcode.OPCODE_REQUEST_MENTOR_COMMAND_VALUE,
+                    storageCommand(
+                            RequestMentorCommand.parser(),
+                            Opcode.OPCODE_REQUEST_MENTOR_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.mentorship().request(id, c.getMentorName()))),
+            Map.entry(
+                    Opcode.OPCODE_ACCEPT_DISCIPLE_COMMAND_VALUE,
+                    storageCommand(
+                            AcceptDiscipleCommand.parser(),
+                            Opcode.OPCODE_ACCEPT_DISCIPLE_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.mentorship().accept(id, c.getDiscipleName()))),
+            Map.entry(
+                    Opcode.OPCODE_LEAVE_MENTORSHIP_COMMAND_VALUE,
+                    storageCommand(
+                            LeaveMentorshipCommand.parser(),
+                            Opcode.OPCODE_LEAVE_MENTORSHIP_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.mentorship().leave(id, c.getOtherName()))),
+            Map.entry(
+                    Opcode.OPCODE_PROPOSE_DAO_LU_COMMAND_VALUE,
+                    storageCommand(
+                            ProposeDaoLuCommand.parser(),
+                            Opcode.OPCODE_PROPOSE_DAO_LU_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.daoLu().propose(id, c.getTargetName()))),
+            Map.entry(
+                    Opcode.OPCODE_ACCEPT_DAO_LU_COMMAND_VALUE,
+                    storageCommand(
+                            AcceptDaoLuCommand.parser(),
+                            Opcode.OPCODE_ACCEPT_DAO_LU_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.daoLu().accept(id, c.getProposerName()))),
+            Map.entry(
+                    Opcode.OPCODE_DISSOLVE_DAO_LU_COMMAND_VALUE,
+                    storageCommand(
+                            DissolveDaoLuCommand.parser(),
+                            Opcode.OPCODE_DISSOLVE_DAO_LU_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.daoLu().dissolve(id))),
+            Map.entry(Opcode.OPCODE_SEND_EMOTE_COMMAND_VALUE, this::handleSendEmoteCommand),
             Map.entry(Opcode.OPCODE_LIST_FRIENDS_REQUEST_VALUE, this::handleListFriendsRequest),
             Map.entry(
                     Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
@@ -655,6 +722,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 facades.contentFacades().socialFacades().partyFacade(),
                 characterFacade,
                 worldGateway.registry().partyFinder);
+        this.relations = RelationshipCommands.of(facades, characterFacade, worldGateway);
         this.authExecutor = authExecutor;
         this.chatExecutor = new SerialExecutor(authExecutor);
         this.networkMetrics = observability.networkMetrics();
@@ -1954,15 +2022,57 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         });
     }
 
+    /**
+     * Phần việc của một lệnh chạm DB: handler (để đọc field final mà bảng {@code handlers} — khởi tạo TRƯỚC
+     * constructor — chưa thấy được) + nhân vật từ session + lệnh đã giải mã → gói trả lời.
+     */
+    @FunctionalInterface
+    private interface CommandWork<C> {
+        com.google.protobuf.MessageLite apply(GatewayChannelHandler handler, long characterId, C command);
+    }
+
+    /**
+     * Handler chung cho lệnh "giải mã → chạy trên Virtual Thread → trả MỘT gói" (lô 21) — thay cho cặp
+     * {@code handleXxxCommand}/{@code handleXxxBlocking} chép tay mỗi opcode. Từ chối giữa chừng đi qua
+     * {@link CommandRefusedException}.
+     */
+    private <C> PacketHandler storageCommand(
+            com.google.protobuf.Parser<C> parser, int responseOpcode, CommandWork<C> work) {
+        return (ctx, header, payload) -> {
+            C command = parser.parseFrom(payload);
+            runStorage(ctx, header.sequenceId(), responseOpcode, characterId -> work.apply(this, characterId, command));
+        };
+    }
+
+    /** ADR-092 — biểu cảm: không DB, chạy thẳng trên EventLoop (chỉ xếp lệnh vào World). */
+    private void handleSendEmoteCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        SendEmoteCommand command = SendEmoteCommand.parseFrom(payload);
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, header.sequenceId(), 401, "error.not_authenticated");
+            return;
+        }
+        send(
+                ctx,
+                Opcode.OPCODE_SEND_EMOTE_RESPONSE_VALUE,
+                header.sequenceId(),
+                relations
+                        .emotes()
+                        .send(characterId, command.getEmote(), currentWorldFacadeIfPresent(characterId))
+                        .toByteArray());
+    }
+
     /** ADR-084 — tặng quà bạn bè theo tên. */
     private void handleSendFriendGiftCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         SendFriendGiftCommand command = SendFriendGiftCommand.parseFrom(payload);
-        runStorage(
-                ctx,
-                header.sequenceId(),
-                Opcode.OPCODE_SEND_FRIEND_GIFT_RESPONSE_VALUE,
-                characterId -> friendGifts.gift(characterId, command.getTargetName()));
+        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_SEND_FRIEND_GIFT_RESPONSE_VALUE, characterId -> {
+            characterFacade
+                    .findByName(command.getTargetName().strip())
+                    .ifPresent(target -> relations.blocks().requireNotBlocked(characterId, target.id()));
+            return friendGifts.gift(characterId, command.getTargetName());
+        });
     }
 
     private void handleCraftItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -2997,6 +3107,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
                 return;
             }
+            if (relations.blocks().eitherBlocks(characterId, target.get().id())) {
+                sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
+                return;
+            }
             FriendFacade.SendRequestResult result =
                     friendFacade.sendRequest(characterId, target.get().id());
             if (result == FriendFacade.SendRequestResult.FRIEND_LIST_FULL) {
@@ -3196,6 +3310,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         try {
             ListFriendsResponse.Builder responseBuilder = ListFriendsResponse.newBuilder();
             Map<Long, Integer> intimacy = friendGifts.intimacyOf(characterId);
+            long daoLuPartner = relations.daoLu().partnerOf(characterId).orElse(0L);
             for (long friendId : friendFacade.listFriends(characterId)) {
                 // findByName/findById chạm DB mỗi bạn — chấp nhận N+1 ở quy mô danh sách bạn bè MVP
                 // (vài chục), không phải đường nóng mỗi tick (khác AoI/combat).
@@ -3206,6 +3321,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         .setName(name)
                         .setOnline(worldGateway.registry().isOnline(friendId))
                         .setIntimacy(intimacy.getOrDefault(friendId, 0))
+                        .setDaoLu(friendId == daoLuPartner)
                         .build());
             }
             send(
@@ -3661,6 +3777,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
+        if (relations.blocks().eitherBlocks(characterId, target.get().id())) {
+            sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
+            return;
+        }
         PartyFacade.InviteResult result =
                 partyFacade.invite(characterId, target.get().id());
         InvitePartyMemberResponse response = InvitePartyMemberResponse.newBuilder()
@@ -3982,6 +4102,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_CHALLENGE_DUEL_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
+        if (relations.blocks().eitherBlocks(characterId, target.get().id())) {
+            sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
+            return;
+        }
         ArenaInstanceRegistry.ChallengeResult result = worldGateway
                 .arenaInstanceRegistry()
                 .challengeDuel(characterId, target.get().id());
@@ -4191,6 +4315,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setOutcome(RequestTradeOutcome.REQUEST_TRADE_OUTCOME_TARGET_NOT_FOUND)
                     .build();
             send(ctx, Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            return;
+        }
+        if (relations.blocks().eitherBlocks(characterId, target.get().id())) {
+            sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
             return;
         }
         TradeFacade.RequestResult result =
@@ -4756,6 +4884,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 return;
             }
             target = found.get();
+            if (relations.blocks().eitherBlocks(characterId, target.id())) {
+                sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
+                return;
+            }
             if (!worldGateway.registry().isOnline(target.id())) {
                 sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_OFFLINE);
                 return;
@@ -5043,6 +5175,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         executor.execute(() -> {
             try {
                 handler.run();
+            } catch (CommandRefusedException e) {
+                // Từ chối nghiệp vụ cắt ngang nhiều lệnh (ví dụ đã chặn nhau — ADR-091), không phải sự cố.
+                sendError(ctx, sequenceId, e.code(), e.errorKey());
             } catch (dev.kage.server.database.GoldCapExceededException e) {
                 // Trần vàng (quyết định chủ dự án 2026-10-11): bán / lĩnh thư / giao dịch sẽ đẩy số dư
                 // của một bên vượt trần ⇒ transaction đã rollback trọn, và đây là một từ chối nghiệp vụ

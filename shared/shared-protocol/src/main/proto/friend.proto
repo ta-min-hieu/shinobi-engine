@@ -98,6 +98,7 @@ message FriendView {
   string name = 2;
   bool online = 3;
   int32 intimacy = 4; // ADR-084 — thân mật của cặp bạn (tăng khi tặng quà)
+  bool dao_lu = 5;     // ADR-094 — người này là đạo lữ của mình
 }
 
 message ListFriendsResponse {
@@ -149,4 +150,170 @@ message SendFriendGiftResponse {
   SendFriendGiftOutcome outcome = 1;
   int32 intimacy = 2;   // thân mật SAU lần tặng (0 nếu từ chối)
   int32 milestone = 3;  // mốc thân mật vừa chạm (thư thưởng đã gửi cho cả hai); 0 = không
+}
+
+// ===== ADR-091 — chặn người chơi. CHỈ THÊM. Người bị chặn (theo CẢ HAI chiều) không chat riêng, mời kết bạn, mời
+// nhóm, mời giao dịch, thách đấu, tặng quà, bái sư hay cầu đạo lữ được — gateway trả ErrorResponse error.blocked. =====
+
+// Command: Client -> Server (OPCODE_BLOCK_CHARACTER_COMMAND = 1118). Chặn xong thì tình bạn (và lời mời) giữa hai
+// người bị xoá.
+message BlockCharacterCommand {
+  string target_name = 1;
+}
+
+enum BlockCharacterOutcome {
+  BLOCK_CHARACTER_OUTCOME_UNSPECIFIED = 0;
+  BLOCK_CHARACTER_OUTCOME_OK = 1;
+  BLOCK_CHARACTER_OUTCOME_TARGET_NOT_FOUND = 2;
+  BLOCK_CHARACTER_OUTCOME_CANNOT_BLOCK_SELF = 3;
+  BLOCK_CHARACTER_OUTCOME_ALREADY_BLOCKED = 4;
+  BLOCK_CHARACTER_OUTCOME_LIST_FULL = 5;
+}
+
+// Response: Server -> Client (OPCODE_BLOCK_CHARACTER_RESPONSE = 1119).
+message BlockCharacterResponse {
+  BlockCharacterOutcome outcome = 1;
+}
+
+// Command: Client -> Server (OPCODE_UNBLOCK_CHARACTER_COMMAND = 1120).
+message UnblockCharacterCommand {
+  string target_name = 1;
+}
+
+enum UnblockCharacterOutcome {
+  UNBLOCK_CHARACTER_OUTCOME_UNSPECIFIED = 0;
+  UNBLOCK_CHARACTER_OUTCOME_OK = 1;
+  UNBLOCK_CHARACTER_OUTCOME_NOT_BLOCKED = 2;
+}
+
+// Response: Server -> Client (OPCODE_UNBLOCK_CHARACTER_RESPONSE = 1121).
+message UnblockCharacterResponse {
+  UnblockCharacterOutcome outcome = 1;
+}
+
+// Request: Client -> Server (OPCODE_GET_RELATIONSHIPS_REQUEST = 1122) — mọi quan hệ lô 21 của chính mình trong MỘT
+// gói: sư phụ, đồ đệ (ADR-093), đạo lữ (ADR-094), danh sách chặn (ADR-091).
+message GetRelationshipsRequest {
+}
+
+message RelationMemberView {
+  int64 character_id = 1;
+  string name = 2;
+  int32 level = 3;
+  bool online = 4;
+}
+
+// Response: Server -> Client (OPCODE_GET_RELATIONSHIPS_RESPONSE = 1123). Client dùng danh sách chặn để ẩn tin chat
+// kênh chung (thế giới/khu vực/bang) của người bị chặn — việc hiển thị, không phải luật server.
+message GetRelationshipsResponse {
+  RelationMemberView mentor = 1;               // không set = chưa có sư phụ
+  repeated RelationMemberView disciples = 2;
+  RelationMemberView dao_lu = 3;               // không set = chưa có đạo lữ
+  repeated RelationMemberView blocked = 4;
+}
+
+// ===== ADR-093 — sư đồ. CHỈ THÊM. Đồ đệ (< Lv30) bái sư người Lv>=40; sư phụ nhận tối đa 3 đồ đệ. Đồ đệ chạm
+// Lv10/20/30 ⇒ thư thưởng cho CẢ HAI; Lv30 là xuất sư (quan hệ khép lại). =====
+
+// Command: Client -> Server (OPCODE_REQUEST_MENTOR_COMMAND = 1124) — đồ đệ xin bái sư. Xem quan hệ hiện có qua
+// GetRelationshipsRequest (1122).
+message RequestMentorCommand {
+  string mentor_name = 1;
+}
+
+enum MentorshipOutcome {
+  MENTORSHIP_OUTCOME_UNSPECIFIED = 0;
+  MENTORSHIP_OUTCOME_OK = 1;
+  MENTORSHIP_OUTCOME_TARGET_NOT_FOUND = 2;
+  MENTORSHIP_OUTCOME_TARGET_OFFLINE = 3;
+  MENTORSHIP_OUTCOME_DISCIPLE_LEVEL_TOO_HIGH = 4;  // đồ đệ đã Lv30 trở lên
+  MENTORSHIP_OUTCOME_MENTOR_LEVEL_TOO_LOW = 5;     // sư phụ chưa Lv40
+  MENTORSHIP_OUTCOME_ALREADY_HAS_MENTOR = 6;
+  MENTORSHIP_OUTCOME_MENTOR_FULL = 7;              // sư phụ đã đủ 3 đồ đệ
+  MENTORSHIP_OUTCOME_NO_PENDING_REQUEST = 8;       // không có lời bái sư (hoặc đã hết hạn 5 phút)
+  MENTORSHIP_OUTCOME_NOT_RELATED = 9;              // hai người không phải sư đồ
+  MENTORSHIP_OUTCOME_CANNOT_TARGET_SELF = 10;
+}
+
+// Response: Server -> Client (OPCODE_REQUEST_MENTOR_RESPONSE = 1125).
+message RequestMentorResponse {
+  MentorshipOutcome outcome = 1;
+}
+
+// Event: Server -> Client (OPCODE_MENTOR_REQUEST_RECEIVED_EVENT = 1126) — báo sư phụ tương lai có người xin bái sư.
+message MentorRequestReceivedEvent {
+  int64 disciple_id = 1;
+  string disciple_name = 2;
+  int32 disciple_level = 3;
+}
+
+// Command: Client -> Server (OPCODE_ACCEPT_DISCIPLE_COMMAND = 1127) — sư phụ nhận lời bái sư.
+message AcceptDiscipleCommand {
+  string disciple_name = 1;
+}
+
+// Response: Server -> Client (OPCODE_ACCEPT_DISCIPLE_RESPONSE = 1128).
+message AcceptDiscipleResponse {
+  MentorshipOutcome outcome = 1;
+}
+
+// Command: Client -> Server (OPCODE_LEAVE_MENTORSHIP_COMMAND = 1129) — một trong hai bên cắt quan hệ (không mất gì).
+message LeaveMentorshipCommand {
+  string other_name = 1;
+}
+
+// Response: Server -> Client (OPCODE_LEAVE_MENTORSHIP_RESPONSE = 1130).
+message LeaveMentorshipResponse {
+  MentorshipOutcome outcome = 1;
+}
+
+// ===== ADR-094 — đạo lữ. CHỈ THÊM. Hai người bạn thân mật >= 600 kết đạo lữ (người cầu tốn 5.000 linh thạch lúc
+// được nhận lời); cùng nhóm thì EXP đánh quái +10%; một trong hai giải được bất cứ lúc nào. =====
+
+// Command: Client -> Server (OPCODE_PROPOSE_DAO_LU_COMMAND = 1131).
+message ProposeDaoLuCommand {
+  string target_name = 1;
+}
+
+enum DaoLuOutcome {
+  DAO_LU_OUTCOME_UNSPECIFIED = 0;
+  DAO_LU_OUTCOME_OK = 1;
+  DAO_LU_OUTCOME_TARGET_NOT_FOUND = 2;
+  DAO_LU_OUTCOME_TARGET_OFFLINE = 3;
+  DAO_LU_OUTCOME_INTIMACY_TOO_LOW = 4;       // chưa là bạn, hoặc thân mật < 600
+  DAO_LU_OUTCOME_ALREADY_BOUND = 5;          // một trong hai đã có đạo lữ
+  DAO_LU_OUTCOME_INSUFFICIENT_GOLD = 6;      // người cầu không đủ linh thạch
+  DAO_LU_OUTCOME_NO_PENDING_PROPOSAL = 7;
+  DAO_LU_OUTCOME_NOT_BOUND = 8;
+  DAO_LU_OUTCOME_CANNOT_TARGET_SELF = 9;
+}
+
+// Response: Server -> Client (OPCODE_PROPOSE_DAO_LU_RESPONSE = 1132).
+message ProposeDaoLuResponse {
+  DaoLuOutcome outcome = 1;
+}
+
+// Event: Server -> Client (OPCODE_DAO_LU_PROPOSAL_EVENT = 1133).
+message DaoLuProposalEvent {
+  int64 proposer_id = 1;
+  string proposer_name = 2;
+}
+
+// Command: Client -> Server (OPCODE_ACCEPT_DAO_LU_COMMAND = 1134).
+message AcceptDaoLuCommand {
+  string proposer_name = 1;
+}
+
+// Response: Server -> Client (OPCODE_ACCEPT_DAO_LU_RESPONSE = 1135).
+message AcceptDaoLuResponse {
+  DaoLuOutcome outcome = 1;
+}
+
+// Command: Client -> Server (OPCODE_DISSOLVE_DAO_LU_COMMAND = 1136).
+message DissolveDaoLuCommand {
+}
+
+// Response: Server -> Client (OPCODE_DISSOLVE_DAO_LU_RESPONSE = 1137).
+message DissolveDaoLuResponse {
+  DaoLuOutcome outcome = 1;
 }

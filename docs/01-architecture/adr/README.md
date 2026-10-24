@@ -122,6 +122,18 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-088](ADR-088-Bag-Expansion.md) | Mở rộng túi — sức chứa theo nhân vật 20→40, Túi Càn Khôn +5 (V83) | ✅ **Accepted** *(2026-10-24, lô 20)* | ADR-046 D5 |
 | [ADR-089](ADR-089-Rebirth.md) | Độ Kiếp Chuyển Thế — cấp 100 về cấp 1, Đạo Vận vĩnh viễn, tối đa 5 lần (212/213) | ✅ **Accepted** *(2026-10-24, lô 20)* | GDD §5 |
 | [ADR-090](ADR-090-Spirit-Vein-Contest.md) | Tranh đoạt Linh Mạch bản đầu — bang đông nhất trong vùng tích điểm, thắng giữ 7 ngày + thư thưởng (V84, 731/732) | ✅ **Accepted** *(2026-10-24, lô 20)* | — |
+| [ADR-091](ADR-091-Block-List.md) | Chặn người chơi — hai chiều, chặn = cắt mọi quan hệ, trần 50, 403 `error.blocked` (V85, 1118–1123) | ✅ **Accepted** *(2026-10-24, lô 21)* | feature-friend |
+| [ADR-092](ADR-092-Emotes.md) | Biểu cảm — 6 lệnh chữ phát theo AoI qua `ObserversCommand`, 1/2 giây (803–805) | ✅ **Accepted** *(2026-10-24, lô 21)* | — |
+| [ADR-093](ADR-093-Mentorship.md) | Sư đồ — <Lv30 bái ≥Lv40, tối đa 3, mốc 10/20/30 thư cả hai một lần trọn đời (V85, 1124–1130) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-091 |
+| [ADR-094](ADR-094-Dao-Lu.md) | Đạo lữ — thân mật ≥600, người cầu trả 5.000, +10% EXP cùng nhóm (V85, 1131–1137) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-084 |
+| [ADR-095](ADR-095-Seclusion-Offline-Exp.md) | Bế quan — quỹ offline ≤8 giờ, 8 giờ ≈ 1 cấp, x2 trả cấp × 50 vàng (V86, 214–217) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-055 |
+| [ADR-096](ADR-096-Online-Time-Rewards.md) | Thưởng online — mốc 10/30/60 phút mỗi ngày, quà qua thư (V86, 218–221) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-060 |
+| [ADR-097](ADR-097-Dismantle-Equipment.md) | Phân giải pháp khí — vàng + Linh Thảo theo cấp yêu cầu và cường hoá (522/523) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-079 |
+| [ADR-098](ADR-098-Herb-Gathering.md) | Hái linh thảo — bụi là dữ liệu + trạng thái RAM, hái 3 giây server đếm (V86, 312–316) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-079 |
+| [ADR-099](ADR-099-Dungeon-Daily-Runs-And-First-Clear.md) | Bí Cảnh — 3 lượt/ngày, thư thưởng lần đầu hạ boss (V87) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-047 |
+| [ADR-100](ADR-100-Teleport-Talisman.md) | Truyền tống phù — điểm mở khi đứng gần, phù tiêu hao, dời qua đường ADR-051 (V87, 317–320) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-052 |
+| [ADR-101](ADR-101-Bounty-Board.md) | Bảng truy nã — 3 truy nã/ngày tất định, 5 lần xong/ngày (V87, 614–618) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-055 |
+| [ADR-102](ADR-102-Guild-War.md) | Bang chiến — PvP theo cặp ngoài vùng an toàn, 60 phút, đếm lần hạ (733–736) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-090 |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -29,7 +29,8 @@ record ProgressionFacades(
         FriendGiftFacade friendGifts,
         GuildSkillFacade guildSkills,
         RebirthFacade rebirth,
-        SpiritVeinFacade spiritVeins) {
+        SpiritVeinFacade spiritVeins,
+        RelationshipFacades relationships) {
 
     /** Composition không có các tính năng này (test). */
     static final ProgressionFacades DISABLED = new ProgressionFacades(
@@ -44,5 +45,6 @@ record ProgressionFacades(
             FriendGiftFacade.DISABLED,
             GuildSkillFacade.DISABLED,
             RebirthFacade.DISABLED,
-            SpiritVeinFacade.DISABLED);
+            SpiritVeinFacade.DISABLED,
+            RelationshipFacades.DISABLED);
 }

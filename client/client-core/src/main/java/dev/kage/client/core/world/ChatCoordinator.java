@@ -2,6 +2,8 @@ package dev.kage.client.core.world;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.LongPredicate;
+import java.util.function.Predicate;
 
 import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
@@ -34,6 +36,12 @@ final class ChatCoordinator implements WindowFlow {
     private final List<String> renderedLines = new ArrayList<>();
 
     private final List<ChatPanel.LineKind> lineKinds = new ArrayList<>();
+
+    /** Lệnh gạch chéo phía client (biểu cảm, mở cửa sổ Quan hệ — lô 21); mỗi bộ trả {@code true} nếu đã nhận dòng. */
+    private final List<Predicate<String>> slashCommands = new ArrayList<>();
+
+    /** Người gửi bị ẩn tin (danh sách chặn — ADR-091); chỉ là hiển thị, luật chặn ở server. */
+    private LongPredicate hiddenSender = senderId -> false;
 
     ChatCoordinator(ChatPanel panel, WorldCommandSender sender) {
         this.panel = panel;
@@ -75,6 +83,19 @@ final class ChatCoordinator implements WindowFlow {
         refreshLines();
     }
 
+    /**
+     * Thêm một bộ lệnh gạch chéo phía client — dòng gõ vào bắt đầu bằng {@code /} được hỏi qua từng bộ trước khi đi
+     * đường chat thường ({@code /w}, {@code /gm} vẫn tới server vì không bộ nào nhận).
+     */
+    void addSlashCommands(Predicate<String> handler) {
+        slashCommands.add(handler);
+    }
+
+    /** Ẩn tin của những người gửi khớp {@code filter} (ADR-091 — người mình đã chặn). */
+    void hideSendersMatching(LongPredicate filter) {
+        this.hiddenSender = filter;
+    }
+
     /** Người chơi vừa vào/rời nhóm — kênh Nhóm xuất hiện/biến mất, xem {@code ChatController}. */
     void setPartyAvailable(boolean available) {
         controller.setPartyAvailable(available);
@@ -93,7 +114,11 @@ final class ChatCoordinator implements WindowFlow {
 
     private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE) {
-            controller.onMessage(withTitle(ChatMessageEvent.parseFrom(payload)));
+            ChatMessageEvent event = ChatMessageEvent.parseFrom(payload);
+            if (event.getSenderId() != 0L && hiddenSender.test(event.getSenderId())) {
+                return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
+            }
+            controller.onMessage(withTitle(event));
             refreshLines();
             return true;
         }
@@ -137,6 +162,14 @@ final class ChatCoordinator implements WindowFlow {
     }
 
     private void onSend(String typed) {
+        String line = typed.strip();
+        if (line.startsWith("/")) {
+            for (Predicate<String> handler : slashCommands) {
+                if (handler.test(line)) {
+                    return;
+                }
+            }
+        }
         ChatController.ComposeResult result = controller.compose(typed);
         switch (result) {
             case ChatController.ComposeResult.Send send ->

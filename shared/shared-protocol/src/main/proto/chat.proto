@@ -56,3 +56,40 @@ message ChatMessageEvent {
   // ADR-062 — khoá i18n danh hiệu người gửi đang đeo; rỗng = không đeo (và mọi tin hệ thống).
   string sender_title_key = 5;
 }
+
+// ===== ADR-092 — biểu cảm. CHỈ THÊM. Phát cho mọi người đang nhìn thấy mình (AoI, gồm cả chính mình); client vẽ
+// bong bóng trên đầu nhân vật. Không ghi DB. =====
+
+enum Emote {
+  EMOTE_UNSPECIFIED = 0;
+  EMOTE_GREET = 1;    // /chao — chắp tay chào
+  EMOTE_BOW = 2;      // /cui — cúi đầu
+  EMOTE_LAUGH = 3;    // /cuoi — cười
+  EMOTE_CRY = 4;      // /khoc — khóc
+  EMOTE_ANGRY = 5;    // /gian — giận
+  EMOTE_CHEER = 6;    // /vui — reo hò
+}
+
+// Command: Client -> Server (OPCODE_SEND_EMOTE_COMMAND = 803).
+message SendEmoteCommand {
+  Emote emote = 1;
+}
+
+enum SendEmoteOutcome {
+  SEND_EMOTE_OUTCOME_UNSPECIFIED = 0;
+  SEND_EMOTE_OUTCOME_OK = 1;
+  SEND_EMOTE_OUTCOME_INVALID_EMOTE = 2;
+  SEND_EMOTE_OUTCOME_RATE_LIMITED = 3;   // quá 1 lần / 2 giây
+  SEND_EMOTE_OUTCOME_NOT_IN_WORLD = 4;
+}
+
+// Response: Server -> Client (OPCODE_SEND_EMOTE_RESPONSE = 804).
+message SendEmoteResponse {
+  SendEmoteOutcome outcome = 1;
+}
+
+// Event: Server -> Client (OPCODE_EMOTE_EVENT = 805).
+message EmoteEvent {
+  int64 character_id = 1;
+  Emote emote = 2;
+}

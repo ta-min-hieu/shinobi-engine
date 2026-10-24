@@ -61,6 +61,7 @@ final class Lot19Scenario {
             partyFinderStep(step.strip());
         }
         new Lot20Scenario(connection, session).run(plan.lot20Steps());
+        new Lot21Scenario(connection, session).run(plan.lot21Steps());
     }
 
     private ListRecipesResponse listRecipes() throws IOException {

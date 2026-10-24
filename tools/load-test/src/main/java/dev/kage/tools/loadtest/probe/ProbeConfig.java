@@ -278,12 +278,14 @@ public record ProbeConfig(
      * @param partyFinderSteps bước bảng tìm nhóm: {@code post:GOAL[:minLevel]}, {@code list}, {@code join:<id>},
      *     {@code remove}
      * @param lot20Steps bước lô 20 (xem {@link Lot20Scenario})
+     * @param lot21Steps bước lô 21 (xem {@link Lot21Scenario})
      */
     public record Lot19Plan(
             List<String> craftRecipes,
             List<String> guildShopBuy,
             List<String> partyFinderSteps,
-            List<String> lot20Steps) {
+            List<String> lot20Steps,
+            List<String> lot21Steps) {
 
         /** Danh sách bất biến — record không tự copy. */
         public Lot19Plan {
@@ -291,6 +293,7 @@ public record ProbeConfig(
             guildShopBuy = List.copyOf(guildShopBuy);
             partyFinderSteps = List.copyOf(partyFinderSteps);
             lot20Steps = List.copyOf(lot20Steps);
+            lot21Steps = List.copyOf(lot21Steps);
         }
 
         /** {@code true} khi có ít nhất một bước cần chạy. */
@@ -298,7 +301,8 @@ public record ProbeConfig(
             return !craftRecipes.isEmpty()
                     || !guildShopBuy.isEmpty()
                     || !partyFinderSteps.isEmpty()
-                    || !lot20Steps.isEmpty();
+                    || !lot20Steps.isEmpty()
+                    || !lot21Steps.isEmpty();
         }
     }
 
@@ -394,7 +398,11 @@ public record ProbeConfig(
 
     private static Lot19Plan lot19Plan(CommandLineArguments raw) {
         return new Lot19Plan(
-                raw.list("craftRecipes"), raw.list("guildShopBuy"), raw.list("partyFinder"), raw.list("lot20"));
+                raw.list("craftRecipes"),
+                raw.list("guildShopBuy"),
+                raw.list("partyFinder"),
+                raw.list("lot20"),
+                raw.list("lot21"));
     }
 
     private static TradePlan tradePlan(CommandLineArguments raw) {

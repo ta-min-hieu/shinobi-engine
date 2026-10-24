@@ -344,7 +344,9 @@ public final class GatewayBootstrap {
                 arenaInstanceRegistry);
         // Lên cấp giữa phiên phải tới luật trong world (cổng Tuyệt Kỹ) — nối ở đây vì đây là chỗ đầu
         // tiên mọi bảng định tuyến World cùng tồn tại.
-        characterRegistry.syncLevelUpsThrough(CharacterLevelSync.of(worldGateway));
+        // ADR-093 — thưởng sư đồ đi theo mỗi cú lên cấp.
+        characterRegistry.syncLevelUpsThrough(
+                CharacterLevelSync.of(worldGateway, mentorshipCommands(facades, characterRegistry)::onLevelReached));
         // Cùng lý do: "đồng đội cùng World" chỉ tra được khi mọi bảng định tuyến đã có.
         characterRegistry.shareKillRewardsThrough(
                 KillRewardSharing.of(facades.contentFacades().socialFacades().partyFacade(), worldGateway));
@@ -475,7 +477,11 @@ public final class GatewayBootstrap {
                 databaseBootstrap.wireFriendGiftFacade(),
                 databaseBootstrap.wireGuildSkillFacade(),
                 databaseBootstrap.wireRebirthFacade(),
-                databaseBootstrap.wireSpiritVeinFacade());
+                databaseBootstrap.wireSpiritVeinFacade(),
+                new RelationshipFacades(
+                        databaseBootstrap.wireBlockFacade(),
+                        databaseBootstrap.wireMentorshipFacade(),
+                        databaseBootstrap.wireDaoLuFacade()));
         return new GatewayFacades(
                 accountFacade,
                 characterFacade,
@@ -512,6 +518,17 @@ public final class GatewayBootstrap {
         return scheduler;
     }
 
+    /** Sư đồ (ADR-093) — bản dùng cho móc lên cấp; mỗi kết nối có bản riêng cho lệnh, cùng facade. */
+    private static MentorshipCommands mentorshipCommands(
+            GatewayFacades facades, ConnectedCharacterRegistry characterRegistry) {
+        RelationshipFacades relationships = facades.progression().relationships();
+        return new MentorshipCommands(
+                relationships.mentorship(),
+                facades.characterFacade(),
+                new BlockCommands(relationships.blocks(), relationships.daoLu(), facades.characterFacade()),
+                new PlayerNotices(facades.contentFacades().socialFacades().mailFacade(), characterRegistry));
+    }
+
     /** Bậc chiêu + tâm pháp (ADR-071/077) — tâm pháp cần linh căn hiện tại đọc từ DB. */
     private static void bindSkillRanks(
             ConnectedCharacterRegistry characterRegistry,
@@ -527,9 +544,13 @@ public final class GatewayBootstrap {
                 facades.progression().rebirth().rebirthCountOf(characterId)));
     }
 
-    /** Registry kết nối — kiêm WorldOutboundSink; EXP đánh quái nhân sự kiện (ADR-067) rồi kỹ năng bang (ADR-085). */
+    /**
+     * Registry kết nối — kiêm WorldOutboundSink; EXP đánh quái nhân sự kiện (ADR-067), rồi kỹ năng bang (ADR-085), rồi
+     * thưởng đạo lữ cùng nhóm (ADR-094).
+     */
     private static ConnectedCharacterRegistry newCharacterRegistry(
             GatewayFacades facades, MetricsContext metricsContext) {
+        PartyFacade partyFacade = facades.contentFacades().socialFacades().partyFacade();
         return new ConnectedCharacterRegistry(
                 facades.inventoryFacade(),
                 facades.contentFacades().questFacade(),
@@ -537,13 +558,19 @@ public final class GatewayBootstrap {
                 (characterId, amount) -> facades.characterFacade()
                         .grantExperience(
                                 characterId,
-                                GuildSkillEffects.boostedExp(
-                                        facades.progression().guildSkills(),
+                                DaoLuEffects.boostedExp(
+                                        facades.progression().relationships().daoLu(),
                                         characterId,
-                                        amount
-                                                * facades.progression()
-                                                        .gameEvents()
-                                                        .multiplier(GameEventKind.EXP))),
+                                        GuildSkillEffects.boostedExp(
+                                                facades.progression().guildSkills(),
+                                                characterId,
+                                                amount
+                                                        * facades.progression()
+                                                                .gameEvents()
+                                                                .multiplier(GameEventKind.EXP)),
+                                        id -> partyFacade.listMembers(id).stream()
+                                                .map(PartyFacade.MemberView::characterId)
+                                                .toList())),
                 metricsContext.networkMetrics());
     }
 }

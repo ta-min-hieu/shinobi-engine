@@ -31,19 +31,38 @@ import dev.kage.server.world.WorldFacade;
  */
 final class CharacterLevelSync {
 
+    /** Việc phụ khác chạy theo cú lên cấp (thưởng sư đồ — ADR-093); tự cô lập lỗi của nó, chạy trên Virtual Thread. */
+    @FunctionalInterface
+    interface LevelListener {
+        void onLevelReached(long characterId, int level);
+    }
+
     private final WorldRouteLookup worldsFollowingLevel;
+    private final LevelListener listener;
 
     /** @param worldsFollowingLevel các World có cấp đi theo cú lên cấp giữa phiên, theo thứ tự ưu tiên */
     CharacterLevelSync(WorldRouteLookup worldsFollowingLevel) {
+        this(worldsFollowingLevel, (characterId, level) -> {});
+    }
+
+    CharacterLevelSync(WorldRouteLookup worldsFollowingLevel, LevelListener listener) {
         this.worldsFollowingLevel = worldsFollowingLevel;
+        this.listener = listener;
     }
 
     /** Định tuyến production — xem "World nào nhận" ở javadoc lớp. */
     static CharacterLevelSync of(WorldGateway worldGateway) {
-        return new CharacterLevelSync(new WorldRouteLookup(List.of(
-                worldGateway.arenaInstanceRegistry()::worldFacadeFor,
-                worldGateway.dungeonInstanceRegistry()::worldFacadeFor,
-                worldGateway.mainWorldChannels()::worldFacadeFor)));
+        return of(worldGateway, (characterId, level) -> {});
+    }
+
+    /** Như {@link #of(WorldGateway)} kèm một việc phụ theo mỗi cú lên cấp. */
+    static CharacterLevelSync of(WorldGateway worldGateway, LevelListener listener) {
+        return new CharacterLevelSync(
+                new WorldRouteLookup(List.of(
+                        worldGateway.arenaInstanceRegistry()::worldFacadeFor,
+                        worldGateway.dungeonInstanceRegistry()::worldFacadeFor,
+                        worldGateway.mainWorldChannels()::worldFacadeFor)),
+                listener);
     }
 
     /**
@@ -74,5 +93,6 @@ final class CharacterLevelSync {
         int level = result.progress().level();
         worldsFollowingLevel.find(characterId).ifPresent(world -> world.enqueueCharacterLevel(characterId, level));
         achievements.onLevelReached(characterId, level);
+        listener.onLevelReached(characterId, level);
     }
 }

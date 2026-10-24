@@ -11,8 +11,9 @@ import dev.kage.client.core.ui.theme.KageSkin;
 /**
  * Sáu cửa sổ dựng từ {@link ReportPanel}: Bảng nhân vật (phím C, ADR-056), Bia Anh Danh (phím L, ADR-057),
  * kho đồ tông môn (không phím — mở qua hội thoại, ADR-061), Thành tựu (phím U, ADR-062) và phường thị (phím
- * O, ADR-063), khảm Linh Ngọc (phím V, ADR-064), Công pháp (phím R, ADR-071), lò đan (không phím, ADR-079). Gom lại để
- * constructor {@code WorldScreen} không vượt trần {@code MethodLength}.
+ * O, ADR-063), khảm Linh Ngọc (phím V, ADR-064), Công pháp (phím R, ADR-071), lò đan (không phím, ADR-079), Quan hệ
+ * (phím Q, lô 21) — kèm luồng biểu cảm không cửa sổ (ADR-092). Gom lại để constructor {@code WorldScreen} không vượt
+ * trần {@code MethodLength}.
  */
 record ReportWindows(
         ReportPanel characterSheetPanel,
@@ -38,36 +39,41 @@ record ReportWindows(
         ReportPanel guildSkillPanel,
         GuildSkillCoordinator guildSkills,
         ReportPanel spiritVeinPanel,
-        SpiritVeinCoordinator spiritVeins) {
+        SpiritVeinCoordinator spiritVeins,
+        ReportPanel relationshipPanel,
+        RelationshipCoordinator relationships,
+        EmoteCoordinator emotes) {
 
     /**
      * Luồng nền các cửa sổ này mượn: catalog vật phẩm (tên món), nhật ký chat (báo mở thành tựu, đã bán), và
      * nơi nhận MÁU TỐI ĐA mới (khảm Linh Ngọc vào món đang mặc — ADR-064 D4).
      */
-    record Feeds(ItemCatalogCoordinator itemCatalog, ChatCoordinator chat, IntConsumer onOwnMaxHpChanged) {}
+    record Feeds(
+            ItemCatalogCoordinator itemCatalog,
+            ChatCoordinator chat,
+            IntConsumer onOwnMaxHpChanged,
+            EmoteCoordinator.EmoteDisplay emoteDisplay) {}
 
     static ReportWindows create(KageSkin skin, WorldCommandSender sender, long localCharacterId, Feeds feeds) {
         ReportPanel sheetPanel = new ReportPanel(skin, "charsheet.title", Input.Keys.C, List.of());
         ReportPanel boardPanel =
                 new ReportPanel(skin, "leaderboard.title", Input.Keys.L, LeaderboardCoordinator.TAB_KEYS);
-        // Không phím mở: Input.Keys.UNKNOWN không bao giờ tới, và StorageCoordinator khoá luôn canOpen.
-        ReportPanel storagePanel = new ReportPanel(skin, "storage.title", Input.Keys.UNKNOWN, List.of());
+        ReportPanel storagePanel = keyless(skin, "storage.title");
         // Phím U — H đã là của khung chọn hệ (ADR-062 D6).
         ReportPanel achievementPanel = new ReportPanel(skin, "achievement.title", Input.Keys.U, List.of());
         ReportPanel marketPanel = new ReportPanel(skin, "market.title", Input.Keys.O, MarketCoordinator.TAB_KEYS);
         ReportPanel gemPanel = new ReportPanel(skin, "gem.title", Input.Keys.V, List.of());
         // Phím R — công pháp (ADR-071 D6; K đã là của Luận Kiếm).
         ReportPanel skillRankPanel = new ReportPanel(skin, "skillrank.title", Input.Keys.R, List.of());
-        // Không phím mở — lò đan mở qua hội thoại trưởng lão (ADR-079 D4), như kho đồ.
-        ReportPanel craftingPanel = new ReportPanel(skin, "crafting.title", Input.Keys.UNKNOWN, List.of());
-        // Không phím mở — cửa hàng bang mở từ nút trong cửa sổ Bang (ADR-080 D5).
-        ReportPanel guildShopPanel = new ReportPanel(skin, "guildshop.title", Input.Keys.UNKNOWN, List.of());
-        // Không phím mở — bảng tìm nhóm mở từ nút trong cửa sổ Nhóm (ADR-082 D6).
-        ReportPanel partyFinderPanel = new ReportPanel(skin, "partyfinder.title", Input.Keys.UNKNOWN, List.of());
-        // Không phím mở — kỹ năng bang mở từ nút trong cửa sổ Bang (ADR-085).
-        ReportPanel guildSkillPanel = new ReportPanel(skin, "guildskill.title", Input.Keys.UNKNOWN, List.of());
-        // Không phím mở — Linh Mạch mở từ nút trong cửa sổ Bang (ADR-090).
-        ReportPanel spiritVeinPanel = new ReportPanel(skin, "spiritvein.title", Input.Keys.UNKNOWN, List.of());
+        // nhóm (nút cửa sổ Nhóm).
+        ReportPanel craftingPanel = keyless(skin, "crafting.title");
+        ReportPanel guildShopPanel = keyless(skin, "guildshop.title");
+        ReportPanel partyFinderPanel = keyless(skin, "partyfinder.title");
+        ReportPanel guildSkillPanel = keyless(skin, "guildskill.title");
+        ReportPanel spiritVeinPanel = keyless(skin, "spiritvein.title");
+        // Phím Q — Quan hệ: sư đồ, đạo lữ, chặn (lô 21).
+        ReportPanel relationshipPanel =
+                new ReportPanel(skin, "relation.title", Input.Keys.Q, RelationshipCoordinator.TAB_KEYS);
         return new ReportWindows(
                 sheetPanel,
                 new CharacterSheetCoordinator(sheetPanel, sender, feeds.itemCatalog()),
@@ -92,7 +98,18 @@ record ReportWindows(
                 guildSkillPanel,
                 new GuildSkillCoordinator(guildSkillPanel, sender),
                 spiritVeinPanel,
-                new SpiritVeinCoordinator(spiritVeinPanel, sender));
+                new SpiritVeinCoordinator(spiritVeinPanel, sender),
+                relationshipPanel,
+                new RelationshipCoordinator(relationshipPanel, sender, feeds.chat()),
+                new EmoteCoordinator(sender, feeds.chat(), feeds.emoteDisplay()));
+    }
+
+    /**
+     * Cửa sổ không phím mở ({@code Input.Keys.UNKNOWN} không bao giờ tới): kho đồ và lò đan mở qua hội thoại; cửa hàng
+     * bang, kỹ năng bang, Linh Mạch từ nút cửa sổ Bang; tìm nhóm từ nút cửa sổ Nhóm.
+     */
+    private static ReportPanel keyless(KageSkin skin, String titleKey) {
+        return new ReportPanel(skin, titleKey, Input.Keys.UNKNOWN, List.of());
     }
 
     /** Cổng phím CHUNG của các cửa sổ mở bằng phím ({@code PanelHub#noneOpen}); kho đồ không có phím. */
@@ -103,5 +120,6 @@ record ReportWindows(
         marketPanel.setCanOpen(noneOpen);
         gemPanel.setCanOpen(noneOpen);
         skillRankPanel.setCanOpen(noneOpen);
+        relationshipPanel.setCanOpen(noneOpen);
     }
 }
