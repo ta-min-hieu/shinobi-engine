@@ -143,7 +143,7 @@ RUN jlink \
 # Base OS: Ubuntu (KHÔNG Alpine — musl libc phá native lib Netty, DOCKER.md §8 đã reject) — CÙNG
 # distro với eclipse-temurin:25-jdk/-jre (xác nhận thật qua `/etc/os-release` cả 2 image: Ubuntu
 # 26.04) để runtime jlink build ở stage trên khớp glibc ABI, không phải suy đoán tương thích.
-FROM ubuntu:26.04@sha256:3131b4cc82a783df6c9df078f86e01819a13594b865c2cad47bd1bca2b7063bb AS runtime
+FROM ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944 AS runtime
 # ⚠️ PHÁT HIỆN THẬT (verify bằng `docker run ... locale`, không suy đoán): `eclipse-temurin:25-jre`
 # (base cũ) tự cấu hình sẵn `LANG=en_US.UTF-8`, nhưng `ubuntu:26.04` trần mặc định locale `POSIX`
 # (không UTF-8) — mọi log/exception tiếng Việt của server (khắp `server-world`/`server-database`...)
