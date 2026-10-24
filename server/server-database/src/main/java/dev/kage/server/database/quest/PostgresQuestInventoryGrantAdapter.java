@@ -10,6 +10,7 @@ import java.util.Optional;
 import dev.kage.quest.domain.QuestInventoryGrantPort;
 import dev.kage.quest.domain.Transaction;
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.BagCapacity;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.server.database.inventory.InventoryStackMerge;
 
@@ -27,10 +28,6 @@ import dev.kage.server.database.inventory.InventoryStackMerge;
  * lần đầu lấp chồng tới 99 và lần sau phải mở ô mới. Tức là phép đếm LẠC QUAN, đúng chiều mất món.
  */
 public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryGrantPort {
-
-    // PLACEHOLDER trùng PostgresInventoryAdapter.DEFAULT_CAPACITY/PostgresShopInventoryGatewayAdapter
-    // (GDD chưa chốt sức chứa túi đồ thật) — đổi thì phải đổi ở cả 3 chỗ cho tới khi có nguồn chung.
-    private static final int DEFAULT_CAPACITY = 20;
 
     private static final String FIND_ITEM_TEMPLATE_ID_BY_CODE = """
             SELECT id FROM item_template WHERE code = ?
@@ -83,7 +80,7 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
                     .computeIfAbsent(grant.itemTemplateCode(), code -> new ArrayList<>())
                     .add(requirePositiveQuantity(grant.quantity()));
         }
-        int freeSlots = DEFAULT_CAPACITY - used;
+        int freeSlots = BagCapacity.of(connection, characterId) - used;
         // long: tổng số ô của nhiều lần trao lớn không được quay vòng về số âm rồi thành "đủ chỗ".
         long newSlotsNeeded = 0L;
         for (Map.Entry<String, List<Integer>> entry : quantitiesByCode.entrySet()) {
@@ -111,7 +108,7 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
      * chồng thì vòng lặp dưới chạy đủ hai tỉ lượt trong lúc đang giữ khoá túi đồ. Cùng lỗi tràn mà
      * {@code InventoryStackMerge.rowsNeeded} đã sửa 2026-10-03 — phép diễn lại ở đây bị bỏ sót.
      *
-     * @return số ô mới; khi lớn hơn {@code DEFAULT_CAPACITY} thì chỉ là "chắc chắn không vừa", không
+     * @return số ô mới; khi lớn hơn {@code BagCapacity.MAX} thì chỉ là "chắc chắn không vừa", không
      *     phải con số chính xác
      */
     private static long newSlotsForSequence(
@@ -129,7 +126,7 @@ public final class PostgresQuestInventoryGrantAdapter implements QuestInventoryG
             }
             long rows = ((long) quantity + maxStack - 1) / maxStack;
             newSlots += rows;
-            if (newSlots > DEFAULT_CAPACITY) {
+            if (newSlots > BagCapacity.MAX) {
                 return newSlots; // không túi nào chứa nổi — khỏi diễn lại từng dòng
             }
             int remaining = quantity;

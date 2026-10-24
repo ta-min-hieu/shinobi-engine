@@ -60,10 +60,6 @@ public final class InventoryStackMerge {
                           LIMIT 1)
             """;
 
-    // PLACEHOLDER trùng DEFAULT_CAPACITY của PostgresInventoryAdapter / shop / thư / quest (GDD chưa
-    // chốt sức chứa túi đồ thật) — đổi thì phải đổi ở mọi chỗ cho tới khi có nguồn chung.
-    private static final int BAG_CAPACITY = 20;
-
     private static final String FIND_MAX_STACK = """
             SELECT max_stack FROM item_template WHERE id = ?
             """;
@@ -134,7 +130,7 @@ public final class InventoryStackMerge {
         long rowsNeeded = rowsNeeded(quantity, maxStack);
         int used = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
                 .orElse(0);
-        if (used + rowsNeeded > BAG_CAPACITY) {
+        if (used + rowsNeeded > BagCapacity.of(connection, characterId)) {
             return false;
         }
         int remaining = quantity;

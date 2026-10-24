@@ -238,6 +238,7 @@ public final class GatewayBootstrap {
             ctx.server().stop();
             // Lịch boss thế giới gửi thư/ghi sổ qua DB — dừng TRƯỚC khi đóng pool (ADR-081).
             ctx.worldContext().worldBoss().stop();
+            ctx.worldContext().pvpSeason().stop();
             ctx.worldContext().mainWorldChannels().stopAll();
             ctx.instanceRegistries().dungeon().stopAll();
             ctx.instanceRegistries().arena().stopAll();
@@ -269,7 +270,8 @@ public final class GatewayBootstrap {
     private record WorldContext(
             MainWorldChannelRegistry mainWorldChannels,
             MetricsHttpServer metricsHttpServer,
-            WorldBossScheduler worldBoss) {}
+            WorldBossScheduler worldBoss,
+            PvpSeasonScheduler pvpSeason) {}
 
     /**
      * Gộp Dungeon/Arena instance registry + {@link WorldGateway} — dựng cùng lúc,
@@ -415,7 +417,8 @@ public final class GatewayBootstrap {
         WorldBossScheduler worldBoss = startWorldBoss(firstChannelFacade, databaseBootstrap, characterRegistry);
         MainWorldChannelRegistry mainWorldChannels =
                 new MainWorldChannelRegistry(characterRegistry, firstChannelFacade, meterRegistry, worldContent);
-        return new WorldContext(mainWorldChannels, metricsHttpServer, worldBoss);
+        return new WorldContext(
+                mainWorldChannels, metricsHttpServer, worldBoss, startPvpSeason(databaseBootstrap, characterRegistry));
     }
 
     /**
@@ -471,6 +474,18 @@ public final class GatewayBootstrap {
                         databaseBootstrap.wireMailFacade(),
                         databaseBootstrap.wireCharacterFacade(),
                         registry),
+                java.time.Clock.systemUTC());
+        scheduler.start();
+        return scheduler;
+    }
+
+    /** Mùa Luận Kiếm (ADR-087) — chốt mùa hết hạn, gửi hàng đợi thưởng. */
+    private static PvpSeasonScheduler startPvpSeason(
+            ServerDatabaseBootstrap databaseBootstrap, ConnectedCharacterRegistry registry) {
+        PvpSeasonScheduler scheduler = new PvpSeasonScheduler(
+                databaseBootstrap.wirePvpSeasonFacade(),
+                databaseBootstrap.wireMailFacade(),
+                registry,
                 java.time.Clock.systemUTC());
         scheduler.start();
         return scheduler;

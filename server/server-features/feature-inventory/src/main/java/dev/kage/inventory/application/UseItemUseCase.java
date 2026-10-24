@@ -60,7 +60,9 @@ public final class UseItemUseCase {
         /** Linh thú đang mặc chưa tới {@link PetPolicy#EVOLVE_LEVEL}. Không trừ viên đan. */
         PET_LEVEL_TOO_LOW,
         /** Linh thú đang mặc đã ở bậc cao nhất. Không trừ viên đan. */
-        PET_ALREADY_EVOLVED
+        PET_ALREADY_EVOLVED,
+        /** Túi đã đạt sức chứa tối đa (ADR-088). Không trừ Túi Càn Khôn. */
+        BAG_AT_MAX
     }
 
     /**
@@ -125,6 +127,10 @@ public final class UseItemUseCase {
         // xếp hàng — xem TradeOfferPort.
         if (item.quantity() - tradeOfferPort.offeredQuantity(t, characterId, inventoryItemId) < 1) {
             return UseItemResult.failed(Outcome.ITEM_IN_TRADE);
+        }
+        if (template.get().useEffect() == ItemUseEffect.EXPAND_BAG
+                && !inventoryPort.expandCapacity(t, characterId, template.get().useValue())) {
+            return UseItemResult.failed(Outcome.BAG_AT_MAX);
         }
         if (template.get().useEffect() == ItemUseEffect.EVOLVE_PET) {
             Optional<Outcome> refused = evolveEquippedPet(t, characterId);

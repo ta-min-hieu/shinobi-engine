@@ -15,5 +15,7 @@ public enum ItemUseEffect {
     /** Hồi {@link ItemTemplate#useValue()} máu ngay lập tức. Đan dược của arc 1. */
     HEAL_HP,
     /** Tiến hoá linh thú ĐANG MẶC lên bậc 2 (ADR-078) — {@link ItemTemplate#useValue()} không dùng. */
-    EVOLVE_PET
+    EVOLVE_PET,
+    /** Mở rộng túi đồ thêm {@link ItemTemplate#useValue()} ô (ADR-088), tới trần. */
+    EXPAND_BAG
 }

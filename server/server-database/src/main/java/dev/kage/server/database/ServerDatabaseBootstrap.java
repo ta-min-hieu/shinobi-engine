@@ -100,6 +100,7 @@ import dev.kage.party.application.ListPendingPartyInvitesUseCase;
 import dev.kage.party.application.PartyUseCases;
 import dev.kage.party.application.RejectPartyInviteUseCase;
 import dev.kage.pvp.api.PvpFacade;
+import dev.kage.pvp.api.PvpSeasonFacade;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.quest.application.AbandonQuestUseCase;
 import dev.kage.quest.application.AcceptQuestUseCase;
@@ -160,6 +161,7 @@ import dev.kage.server.database.monster.PostgresMonsterCatalogAdapter;
 import dev.kage.server.database.monster.PostgresWorldBossAdapter;
 import dev.kage.server.database.party.PostgresPartyAdapter;
 import dev.kage.server.database.pvp.PostgresPvpRatingAdapter;
+import dev.kage.server.database.pvp.PostgresPvpSeasonAdapter;
 import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
 import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
@@ -652,6 +654,11 @@ public final class ServerDatabaseBootstrap {
     public CheckInFacade wireCheckInFacade(CheckInRewardSender sender) {
         return new CheckInFacade(new ClaimDailyCheckInUseCase(
                 new PostgresCheckInAdapter(dataSource), sender, java.time.Clock.systemUTC()));
+    }
+
+    /** Mùa Luận Kiếm (ADR-087). */
+    public PvpSeasonFacade wirePvpSeasonFacade() {
+        return new PvpSeasonFacade(new PostgresPvpSeasonAdapter(dataSource));
     }
 
     /** Kỹ năng bang (ADR-085). */

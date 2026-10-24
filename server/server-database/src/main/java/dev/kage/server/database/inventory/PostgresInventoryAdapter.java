@@ -41,10 +41,6 @@ public final class PostgresInventoryAdapter implements InventoryPort {
                  + (SELECT COUNT(*) FROM pet_state WHERE inventory_item_id = ?)
             """;
 
-    // Sức chứa túi đồ — PLACEHOLDER, GDD chưa chốt (cùng tinh thần STARTING_STAT ở
-    // PostgresCharacterAdapter). Chưa đọc từ character (level/VIP...) — lát cắt sau nếu cần.
-    private static final int DEFAULT_CAPACITY = 20;
-
     // Đồ đang mặc không chiếm ô túi (quyết định chủ dự án 2026-10-11). `Inventory` chứa MỌI dòng
     // `inventory_item` của nhân vật, kể cả món đang mặc, và không biết món nào đang mặc — nên sức chứa
     // nó nhận là "20 ô túi + số món đang mặc": số món nằm trong túi vì thế vẫn bị chặn ở đúng 20.
@@ -96,7 +92,13 @@ public final class PostgresInventoryAdapter implements InventoryPort {
                 dataSource, FIND_BY_CHARACTER, PostgresInventoryAdapter::mapItemStack, characterId);
         int equipped = JdbcOperations.queryOne(dataSource, COUNT_EQUIPPED, rs -> rs.getInt(1), characterId)
                 .orElse(0);
-        return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY + equipped, items));
+        return Optional.of(new Inventory(characterId, BagCapacity.of(dataSource, characterId) + equipped, items));
+    }
+
+    /** ADR-088 — Túi Càn Khôn: một câu UPDATE có điều kiện, sau khoá túi đồ của giao dịch dùng vật phẩm. */
+    @Override
+    public boolean expandCapacity(Transaction tx, long characterId, int amount) {
+        return BagCapacity.expand(((JdbcTransaction) tx).connection(), characterId, amount);
     }
 
     /**
@@ -114,7 +116,7 @@ public final class PostgresInventoryAdapter implements InventoryPort {
                 connection, FIND_BY_CHARACTER, PostgresInventoryAdapter::mapItemStack, characterId);
         int equipped = JdbcOperations.queryOne(connection, COUNT_EQUIPPED, rs -> rs.getInt(1), characterId)
                 .orElse(0);
-        return Optional.of(new Inventory(characterId, DEFAULT_CAPACITY + equipped, items));
+        return Optional.of(new Inventory(characterId, BagCapacity.of(connection, characterId) + equipped, items));
     }
 
     /**

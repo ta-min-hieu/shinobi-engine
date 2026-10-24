@@ -69,4 +69,14 @@ public interface InventoryPort {
     default boolean isSocketed(Transaction tx, long itemId) {
         return false;
     }
+
+    /**
+     * Mở rộng túi thêm {@code amount} ô (ADR-088 — Túi Càn Khôn) nếu không vượt trần; trong giao dịch dùng vật phẩm.
+     * Mặc định không hỗ trợ (fake ở test) ⇒ {@code false}, không ai mất vật phẩm.
+     *
+     * @return {@code false} nếu đã chạm trần — không đổi gì
+     */
+    default boolean expandCapacity(Transaction tx, long characterId, int amount) {
+        return false;
+    }
 }

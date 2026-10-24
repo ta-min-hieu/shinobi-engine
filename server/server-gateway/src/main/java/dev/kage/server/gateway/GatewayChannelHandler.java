@@ -1759,6 +1759,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return switch (effect) {
             case HEAL_HP -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_HEAL_HP;
             case EVOLVE_PET -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_EVOLVE_PET;
+            case EXPAND_BAG -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_EXPAND_BAG;
         };
     }
 
@@ -1771,6 +1772,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case NO_PET_EQUIPPED -> "error.no_pet_equipped";
             case PET_LEVEL_TOO_LOW -> "error.pet_level_too_low";
             case PET_ALREADY_EVOLVED -> "error.pet_already_evolved";
+            case BAG_AT_MAX -> "error.bag_at_max";
         };
     }
 

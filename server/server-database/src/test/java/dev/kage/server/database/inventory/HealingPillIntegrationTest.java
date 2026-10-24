@@ -100,7 +100,9 @@ class HealingPillIntegrationTest {
 
         // Linh Thú Đan (ADR-078) là món dùng được thứ hai — có hiệu ứng riêng, không phải backfill.
         assertThat(catalog)
-                .filteredOn(entry -> !PILL_CODE.equals(entry.code()) && !"spirit_beast_pill".equals(entry.code()))
+                .filteredOn(entry -> !PILL_CODE.equals(entry.code())
+                        && !"spirit_beast_pill".equals(entry.code())
+                        && !"bag_expansion_pouch".equals(entry.code()))
                 .isNotEmpty()
                 .allSatisfy(entry -> assertThat(entry.useEffect()).isNull());
     }

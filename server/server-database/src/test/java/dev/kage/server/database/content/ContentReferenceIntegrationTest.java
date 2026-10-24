@@ -108,7 +108,9 @@ class ContentReferenceIntegrationTest {
             "spirit_beast_pill",
             // ADR-079 — nguyên liệu luyện đan lên trước art.
             "spirit_herb",
-            "demon_core");
+            "demon_core",
+            // ADR-088 — Túi Càn Khôn lên trước art.
+            "bag_expansion_pouch");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

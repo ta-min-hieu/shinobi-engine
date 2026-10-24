@@ -8,6 +8,7 @@ import java.util.Optional;
 import javax.sql.DataSource;
 
 import dev.kage.server.database.JdbcOperations;
+import dev.kage.server.database.inventory.BagCapacity;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.server.database.inventory.InventoryStackMerge;
 import dev.kage.trade.domain.OwnedItemSnapshot;
@@ -21,9 +22,6 @@ import dev.kage.trade.domain.Transaction;
  * UPDATE, kiểm còn đúng chủ + đủ số lượng, gộp vào chồng sẵn có của người nhận hoặc tách stack.
  */
 public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
-
-    // PLACEHOLDER trùng PostgresInventoryAdapter.DEFAULT_CAPACITY (GDD chưa chốt sức chứa thật).
-    private static final int DEFAULT_CAPACITY = 20;
 
     private static final String FIND_BY_ID = """
             SELECT id, character_id, item_template_id, quantity, enhance_level FROM inventory_item WHERE id = ?
@@ -155,7 +153,8 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
 
     @Override
     public boolean exceedsCapacity(Transaction tx, long characterId) {
-        return countItems(((JdbcTransaction) tx).connection(), characterId) > DEFAULT_CAPACITY;
+        Connection connection = ((JdbcTransaction) tx).connection();
+        return countItems(connection, characterId) > BagCapacity.of(connection, characterId);
     }
 
     private static Optional<OwnedItemSnapshot> selectForUpdate(Connection connection, long itemId) {

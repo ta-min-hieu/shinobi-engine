@@ -25,6 +25,7 @@ bản** (không phải Battlefield 5v5 hay Chiếm Lãnh Địa guild war — 2 
   `server-gateway` (`ArenaInstanceRegistry`), giống hệt lý do `DungeonInstanceRegistry` KHÔNG phải
   `feature-dungeon` (ADR-026, ROADMAP Phase 8 lát cắt 1). Khi lát cắt sau cần lưu lịch sử trận đấu/
   season, đó là lúc mở rộng module này.
+- **Mùa có từ 2026-10-24** ([ADR-087](../../../docs/01-architecture/adr/ADR-087-Arena-Seasons.md)): `PvpSeasonPort` chốt mùa 28 ngày, kéo Elo nửa đường về 1000, hàng đợi thưởng `pvp_season_payout`. Dòng dưới là lịch sử.
 - **Elo cổ điển, K=32 cố định, KHÔNG season/decay** — `EloRating` thuần Java, test được không cần
   Port/DB. Điểm khởi điểm 1000 cho nhân vật CHƯA từng đấu (không tạo dòng DB lúc tạo nhân vật, chỉ
   tạo lúc trận đầu tiên kết thúc — tránh ghi rác cho nhân vật không bao giờ đấu).

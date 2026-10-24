@@ -118,6 +118,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-084](ADR-084-Friend-Gifts.md) | Tặng quà bạn bè — thân mật theo cặp, mốc thưởng thư (V80, 1116/1117) | ✅ **Accepted** *(2026-10-24, lô 20)* | feature-friend |
 | [ADR-085](ADR-085-Guild-Skills.md) | Kỹ năng bang — Ngộ Tính/Cường Thể/Hộ Thể, điểm = cấp bang × 2 (V81, 727–730) | ✅ **Accepted** *(2026-10-24, lô 20)* | ADR-068 |
 | [ADR-086](ADR-086-Pet-Skills.md) | Kỹ năng linh thú — Linh Hồ đánh thêm / Huyền Quy chắn, bậc 2 ×2 xác suất (không đổi protocol/schema) | ✅ **Accepted** *(2026-10-24, lô 20)* | ADR-072 |
+| [ADR-087](ADR-087-Arena-Seasons.md) | Mùa Luận Kiếm 28 ngày — chốt nguyên tử, hàng đợi thưởng thư, Elo kéo nửa đường về 1000 (V82) | ✅ **Accepted** *(2026-10-24, lô 20)* | feature-pvp |
+| [ADR-088](ADR-088-Bag-Expansion.md) | Mở rộng túi — sức chứa theo nhân vật 20→40, Túi Càn Khôn +5 (V83) | ✅ **Accepted** *(2026-10-24, lô 20)* | ADR-046 D5 |
 ---
 
 ## ADR cần tạo (chưa viết)

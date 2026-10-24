@@ -196,6 +196,7 @@ enum ItemUseEffect {
   ITEM_USE_EFFECT_UNSPECIFIED = 0;
   ITEM_USE_EFFECT_HEAL_HP = 1;
   ITEM_USE_EFFECT_EVOLVE_PET = 2; // ADR-078 — Linh Thú Đan: tiến hoá linh thú đang mặc
+  ITEM_USE_EFFECT_EXPAND_BAG = 3; // ADR-088 — Túi Càn Khôn: túi đồ +use_value ô, tới trần 40
 }
 
 // 1 dòng catalog. KHÔNG mang tên hiển thị và KHÔNG mang icon: tên tra qua name_key trong bundle
