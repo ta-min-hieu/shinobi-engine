@@ -86,6 +86,7 @@ import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.ApproveGuildJoinRequestOutcome;
 import dev.kage.protocol.ApproveGuildJoinRequestResponse;
 import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.BuyGuildShopItemCommand;
 import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyListingCommand;
@@ -207,6 +208,7 @@ import dev.kage.protocol.ListFriendsRequest;
 import dev.kage.protocol.ListFriendsResponse;
 import dev.kage.protocol.ListGuildMembersRequest;
 import dev.kage.protocol.ListGuildMembersResponse;
+import dev.kage.protocol.ListGuildShopRequest;
 import dev.kage.protocol.ListInventoryRequest;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.ListMailRequest;
@@ -426,6 +428,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final SectStorageCommands storage;
     private final MarketCommands market;
     private final CraftingCommands crafting;
+    private final GuildShopCommands guildShop;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -519,6 +522,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_WITHDRAW_ITEM_COMMAND_VALUE, this::handleWithdrawItemCommand),
             Map.entry(Opcode.OPCODE_LIST_RECIPES_REQUEST_VALUE, this::handleListRecipesRequest),
             Map.entry(Opcode.OPCODE_CRAFT_ITEM_COMMAND_VALUE, this::handleCraftItemCommand),
+            Map.entry(Opcode.OPCODE_LIST_GUILD_SHOP_REQUEST_VALUE, this::handleListGuildShopRequest),
+            Map.entry(Opcode.OPCODE_BUY_GUILD_SHOP_ITEM_COMMAND_VALUE, this::handleBuyGuildShopItemCommand),
             Map.entry(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, this::handleGetItemCatalogRequest),
             Map.entry(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, this::handleListQuestsRequest),
             Map.entry(Opcode.OPCODE_ABANDON_QUEST_COMMAND_VALUE, this::handleAbandonQuestCommand),
@@ -610,6 +615,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.storage = new SectStorageCommands(inventoryFacade, npcProximity);
         this.market = new MarketCommands(facades.progression().marketFacade(), worldGateway.registry());
         this.crafting = new CraftingCommands(facades.progression().crafting(), characterFacade, npcProximity);
+        this.guildShop = new GuildShopCommands(facades.progression().guildShop());
         this.authExecutor = authExecutor;
         this.chatExecutor = new SerialExecutor(authExecutor);
         this.networkMetrics = observability.networkMetrics();
@@ -1781,6 +1787,23 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             throws InvalidProtocolBufferException {
         ListRecipesRequest.parser().parseFrom(payload);
         runStorage(ctx, header.sequenceId(), Opcode.OPCODE_LIST_RECIPES_RESPONSE_VALUE, characterId -> crafting.list());
+    }
+
+    /** ADR-080 — cửa hàng bang (không cần đứng gần ai: hàng của bang, không phải của một nơi). */
+    private void handleListGuildShopRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListGuildShopRequest.parser().parseFrom(payload);
+        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_LIST_GUILD_SHOP_RESPONSE_VALUE, guildShop::list);
+    }
+
+    private void handleBuyGuildShopItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        BuyGuildShopItemCommand command = BuyGuildShopItemCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_BUY_GUILD_SHOP_ITEM_RESPONSE_VALUE,
+                characterId -> guildShop.buy(characterId, command));
     }
 
     private void handleCraftItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)

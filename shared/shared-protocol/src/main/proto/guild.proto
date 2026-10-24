@@ -211,3 +211,43 @@ message DonateToGuildResponse {
   DonateToGuildOutcome outcome = 1;
   GuildProgressView progress = 2;
 }
+
+// ===== ADR-080 — cửa hàng bang: đổi điểm cống hiến (tích luỹ − đã tiêu) lấy vật phẩm. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_LIST_GUILD_SHOP_REQUEST = 723).
+message ListGuildShopRequest {}
+
+message GuildShopItemView {
+  int64 item_template_id = 1;    // tên tra catalog vật phẩm
+  int64 contribution_cost = 2;
+  int32 required_guild_level = 3;
+}
+
+// Response: Server -> Client (OPCODE_LIST_GUILD_SHOP_RESPONSE = 724).
+message ListGuildShopResponse {
+  repeated GuildShopItemView items = 1;
+  bool in_guild = 2;
+  int32 guild_level = 3;
+  int64 contribution_available = 4;
+}
+
+// Command: Client -> Server (OPCODE_BUY_GUILD_SHOP_ITEM_COMMAND = 725).
+message BuyGuildShopItemCommand {
+  int64 item_template_id = 1;
+}
+
+enum BuyGuildShopItemOutcome {
+  BUY_GUILD_SHOP_ITEM_OUTCOME_UNSPECIFIED = 0;
+  BUY_GUILD_SHOP_ITEM_OUTCOME_OK = 1;
+  BUY_GUILD_SHOP_ITEM_OUTCOME_NOT_IN_GUILD = 2;
+  BUY_GUILD_SHOP_ITEM_OUTCOME_UNKNOWN_ITEM = 3;
+  BUY_GUILD_SHOP_ITEM_OUTCOME_GUILD_LEVEL_TOO_LOW = 4;
+  BUY_GUILD_SHOP_ITEM_OUTCOME_NOT_ENOUGH_CONTRIBUTION = 5;
+  BUY_GUILD_SHOP_ITEM_OUTCOME_BAG_FULL = 6;
+}
+
+// Response: Server -> Client (OPCODE_BUY_GUILD_SHOP_ITEM_RESPONSE = 726). shop luôn là trạng thái MỚI NHẤT.
+message BuyGuildShopItemResponse {
+  BuyGuildShopItemOutcome outcome = 1;
+  ListGuildShopResponse shop = 2;
+}

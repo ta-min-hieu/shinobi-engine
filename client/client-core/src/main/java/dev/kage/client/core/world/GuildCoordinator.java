@@ -24,6 +24,7 @@ import dev.kage.protocol.GuildProgressView;
 import dev.kage.protocol.KickGuildMemberResponse;
 import dev.kage.protocol.LeaveGuildResponse;
 import dev.kage.protocol.ListGuildMembersResponse;
+import dev.kage.protocol.ListGuildShopRequest;
 import dev.kage.protocol.ListPendingGuildJoinRequestsResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.RejectGuildJoinRequestResponse;
@@ -89,6 +90,7 @@ final class GuildCoordinator implements WindowFlow {
         panel.setOnLeave(sender::leaveGuild);
         panel.setOnDisband(sender::disbandGuild);
         panel.setOnDonate(this::donate);
+        panel.setOnShop(this::openShop);
         panel.setStatus(text("guild.hint.open"));
         refreshView();
     }
@@ -235,6 +237,12 @@ final class GuildCoordinator implements WindowFlow {
                         .setIdempotencyKey(UUID.randomUUID().toString())
                         .build());
         panel.setStatus(text("guild.status.donating"));
+    }
+
+    /** ADR-080 — đóng cửa sổ Bang rồi hỏi cửa hàng; {@code GuildShopCoordinator} mở cửa sổ khi có trả lời. */
+    private void openShop() {
+        panel.close();
+        sender.sendReadRequest(Opcode.OPCODE_LIST_GUILD_SHOP_REQUEST_VALUE, ListGuildShopRequest.getDefaultInstance());
     }
 
     private void submitName(String typed, Consumer<String> send) {

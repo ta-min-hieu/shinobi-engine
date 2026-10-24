@@ -123,6 +123,7 @@ public final class GuildPanel implements HudWindow {
     private Runnable onLeave;
     private Runnable onDisband;
     private Runnable onDonate;
+    private Runnable onShop;
     private Runnable onOpened;
 
     /**
@@ -240,6 +241,9 @@ public final class GuildPanel implements HudWindow {
         footer.add(leaveButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
         footer.add(disbandButton).width(ROW_BUTTON_WIDTH_PX).padRight(6f);
         footer.add(actionButton("guild.action.donate", () -> fire(onDonate)))
+                .width(ROW_BUTTON_WIDTH_PX)
+                .padRight(6f);
+        footer.add(actionButton("guild.action.shop", () -> fire(onShop)))
                 .width(ROW_BUTTON_WIDTH_PX)
                 .padRight(6f);
         footer.add(actionButton("guild.action.refresh", () -> fire(onOpened))).width(ROW_BUTTON_WIDTH_PX);
@@ -406,6 +410,11 @@ public final class GuildPanel implements HudWindow {
     /** ADR-068 — nút "Góp" (một bậc linh thạch). */
     public void setOnDonate(Runnable listener) {
         this.onDonate = listener;
+    }
+
+    /** ADR-080 — nút "Hàng bang" (mở cửa hàng bang). */
+    public void setOnShop(Runnable listener) {
+        this.onShop = listener;
     }
 
     /** ADR-068/069 — cấp bang, cống hiến, nhiệm vụ tuần; chuỗi ĐÃ dịch. */

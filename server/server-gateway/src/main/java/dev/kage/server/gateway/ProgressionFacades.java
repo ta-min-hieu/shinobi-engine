@@ -5,6 +5,7 @@ import dev.kage.checkin.api.CheckInFacade;
 import dev.kage.crafting.api.CraftingFacade;
 import dev.kage.gm.api.GameEventFacade;
 import dev.kage.guild.api.GuildProgressionFacade;
+import dev.kage.guild.api.GuildShopFacade;
 import dev.kage.market.api.MarketFacade;
 
 /**
@@ -17,7 +18,8 @@ record ProgressionFacades(
         MarketFacade marketFacade,
         GameEventFacade gameEvents,
         GuildProgressionFacade guildProgression,
-        CraftingFacade crafting) {
+        CraftingFacade crafting,
+        GuildShopFacade guildShop) {
 
     /** Composition không có các tính năng này (test). */
     static final ProgressionFacades DISABLED = new ProgressionFacades(
@@ -26,5 +28,6 @@ record ProgressionFacades(
             MarketFacade.DISABLED,
             GameEventFacade.DISABLED,
             GuildProgressionFacade.DISABLED,
-            CraftingFacade.DISABLED);
+            CraftingFacade.DISABLED,
+            GuildShopFacade.DISABLED);
 }

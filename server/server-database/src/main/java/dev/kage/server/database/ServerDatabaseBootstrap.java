@@ -45,6 +45,7 @@ import dev.kage.gm.api.GmFacade;
 import dev.kage.gm.domain.GameEventKind;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.guild.api.GuildProgressionFacade;
+import dev.kage.guild.api.GuildShopFacade;
 import dev.kage.guild.application.ApproveGuildJoinRequestUseCase;
 import dev.kage.guild.application.CreateGuildUseCase;
 import dev.kage.guild.application.DisbandGuildUseCase;
@@ -123,6 +124,7 @@ import dev.kage.server.database.gm.PostgresGmAuditAdapter;
 import dev.kage.server.database.gm.PostgresGmRoleAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
 import dev.kage.server.database.guild.PostgresGuildProgressionAdapter;
+import dev.kage.server.database.guild.PostgresGuildShopAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresCompanionAdapter;
@@ -643,6 +645,11 @@ public final class ServerDatabaseBootstrap {
     public CheckInFacade wireCheckInFacade(CheckInRewardSender sender) {
         return new CheckInFacade(new ClaimDailyCheckInUseCase(
                 new PostgresCheckInAdapter(dataSource), sender, java.time.Clock.systemUTC()));
+    }
+
+    /** Cửa hàng bang (ADR-080). */
+    public GuildShopFacade wireGuildShopFacade() {
+        return new GuildShopFacade(new PostgresGuildShopAdapter(dataSource));
     }
 
     /** Luyện đan (ADR-079) — công thức đọc một lần, mỗi mẻ một transaction. */
