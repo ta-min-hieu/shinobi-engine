@@ -122,8 +122,7 @@ public final class SendMailUseCase {
             throw new SendMailAbortedException(SendOutcome.INSUFFICIENT_GOLD);
         }
         for (MailAttachmentDraft attachment : draft.attachments()) {
-            boolean consumed = ports.inventoryGatewayPort()
-                    .consumeItem(t, senderId, attachment.itemTemplateId(), attachment.quantity());
+            boolean consumed = ports.inventoryGatewayPort().consumeItem(t, senderId, attachment.toAttachment());
             if (!consumed) {
                 throw new SendMailAbortedException(SendOutcome.ATTACHMENT_NOT_OWNED);
             }

@@ -46,7 +46,7 @@ public final class MailFacade {
     /** Như {@link #sendMail(SendMailRequest)} kèm khoá chống trùng của người chơi (ADR-058). */
     public SendOutcome sendMail(SendMailRequest request, String idempotencyKey) {
         List<MailAttachmentDraft> draftAttachments = request.attachments().stream()
-                .map(a -> new MailAttachmentDraft(a.itemTemplateId(), a.quantity()))
+                .map(a -> new MailAttachmentDraft(a.itemTemplateId(), a.quantity(), a.enhanceLevel()))
                 .toList();
         MailDraft draft = new MailDraft(
                 request.senderId(),
@@ -78,7 +78,7 @@ public final class MailFacade {
                         mail.body(),
                         mail.goldAmount(),
                         mail.attachments().stream()
-                                .map(a -> new AttachmentView(a.itemTemplateId(), a.quantity()))
+                                .map(a -> new AttachmentView(a.itemTemplateId(), a.quantity(), a.enhanceLevel()))
                                 .toList(),
                         mail.isClaimed()))
                 .toList();
@@ -144,7 +144,13 @@ public final class MailFacade {
     }
 
     /** Một món đính kèm người gửi muốn gửi đi. */
-    public record AttachmentRequest(long itemTemplateId, int quantity) {}
+    public record AttachmentRequest(long itemTemplateId, int quantity, int enhanceLevel) {
+
+        /** Món chưa cường hoá (thư hệ thống, phường thị, GM). */
+        public AttachmentRequest(long itemTemplateId, int quantity) {
+            this(itemTemplateId, quantity, 0);
+        }
+    }
 
     /** Gộp tham số gửi thư — tránh {@link #sendMail} vượt 4 tham số (Checkstyle ParameterNumber). */
     public record SendMailRequest(
@@ -161,7 +167,7 @@ public final class MailFacade {
     }
 
     /** Một món đính kèm trong thư đã nhận. */
-    public record AttachmentView(long itemTemplateId, int quantity) {}
+    public record AttachmentView(long itemTemplateId, int quantity, int enhanceLevel) {}
 
     /** Một thư trong hộp — {@code senderId} {@code null} là thư hệ thống. */
     public record MailView(

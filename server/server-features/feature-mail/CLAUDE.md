@@ -81,7 +81,7 @@ gold/vật phẩm ĐÍNH KÈM bị trừ khỏi người gửi ngay lúc gửi.
 đền bù GM/quest reward tồn đọng. Client không với tới đường này: gateway luôn truyền `characterId`
 lấy từ SESSION.
 
-⚠️ **Còn mở — cần chủ dự án quyết**: chỉ ký quỹ được món CHƯA cường hoá (`enhance_level = 0`).
+✅ **Đã mở 2026-10-24 ([ADR-083](../../../docs/01-architecture/adr/ADR-083-Mail-Enhanced-Items.md))**: `mail_item.enhance_level` (V79) — thư chở món cường hoá giữ cấp. Đoạn dưới là lịch sử: trước đó chỉ ký quỹ được món CHƯA cường hoá (`enhance_level = 0`).
 `mail_item` và `MailAttachmentView` không chở `enhance_level`, nên gửi một món +7 sẽ xoá mức cường
 hoá đó vĩnh viễn. Hiện chặn lại (`ATTACHMENT_NOT_OWNED`); mở ra thì phải đổi schema + protocol —
 cả hai đều là /CLAUDE.md §4.

@@ -97,7 +97,13 @@ public final class FriendPanel implements HudWindow {
     private static final Color NOTICE_COLOR = Color.valueOf("E0B860");
 
     /** Một dòng bạn bè để VẼ — không mang id, xem javadoc lớp. */
-    public record FriendRow(String displayName, boolean online) {}
+    public record FriendRow(String displayName, boolean online, int intimacy) {
+
+        /** Chưa có thân mật (công cụ xem trước bố cục). */
+        public FriendRow(String displayName, boolean online) {
+            this(displayName, online, 0);
+        }
+    }
 
     /** Một dòng lời mời để VẼ — không mang {@code friendship_id}, xem javadoc lớp. */
     public record RequestRow(String requesterName) {}
@@ -113,6 +119,7 @@ public final class FriendPanel implements HudWindow {
 
     private Consumer<String> onSendRequest;
     private Consumer<String> onWithdrawRequest;
+    private Consumer<String> onGift;
     private IntConsumer onAccept;
     private IntConsumer onReject;
     private IntConsumer onRemove;
@@ -209,13 +216,17 @@ public final class FriendPanel implements HudWindow {
     private Table buildComposer() {
         Table composer = new Table();
         composer.add(nameInput)
-                .width(PANEL_WIDTH_PX - (3f * (ACTION_BUTTON_WIDTH_PX + ROW_GAP_PX)))
+                .width(PANEL_WIDTH_PX - (4f * (ACTION_BUTTON_WIDTH_PX + ROW_GAP_PX)))
                 .growX();
         composer.add(button("friend.action.add", this::submitRequest))
                 .width(ACTION_BUTTON_WIDTH_PX)
                 .padLeft(ROW_GAP_PX);
         // ADR-074 — rút lời mời đã gửi cho người có tên đang gõ (client không có danh sách lời mời đã gửi).
         composer.add(button("friend.action.withdraw", this::submitWithdraw))
+                .width(ACTION_BUTTON_WIDTH_PX)
+                .padLeft(ROW_GAP_PX);
+        // ADR-084 — tặng quà cho người bạn có tên đang gõ.
+        composer.add(button("friend.action.gift", this::submitGift))
                 .width(ACTION_BUTTON_WIDTH_PX)
                 .padLeft(ROW_GAP_PX);
         composer.add(button("friend.action.close", this::close))
@@ -273,6 +284,11 @@ public final class FriendPanel implements HudWindow {
     /** Tên người chơi vừa gõ xong (Enter hoặc nút) — có thể rỗng, lọc là việc của controller. */
     public void setOnSendRequest(Consumer<String> listener) {
         this.onSendRequest = listener;
+    }
+
+    /** ADR-084 — nút "Tặng quà" với tên đang gõ. */
+    public void setOnGift(Consumer<String> listener) {
+        this.onGift = listener;
     }
 
     /** ADR-074 — tên đang gõ khi bấm "Rút mời"; có thể rỗng, lọc là việc của controller. */
@@ -391,8 +407,10 @@ public final class FriendPanel implements HudWindow {
         Label label = new Label(displayName(row.displayName()), skin.labelStyle);
         label.setEllipsis(true);
         label.setColor(row.online() ? ONLINE_COLOR : OFFLINE_COLOR);
+        String presence = text(row.online() ? "friend.status.online" : "friend.status.offline");
+        // ADR-084 — thân mật cạnh trạng thái; 0 thì không ghi để dòng của người chưa từng tặng quà gọn như cũ.
         Label status =
-                new Label(text(row.online() ? "friend.status.online" : "friend.status.offline"), skin.labelStyle);
+                new Label(row.intimacy() > 0 ? presence + " (" + row.intimacy() + ")" : presence, skin.labelStyle);
         status.setColor(row.online() ? ONLINE_COLOR : OFFLINE_COLOR);
         line.add(label).width(FRIEND_NAME_COLUMN_WIDTH_PX).left();
         line.add(status).padLeft(ROW_GAP_PX).left().expandX();
@@ -436,6 +454,14 @@ public final class FriendPanel implements HudWindow {
         nameInput.setText("");
         if (onSendRequest != null) {
             onSendRequest.accept(typed);
+        }
+    }
+
+    private void submitGift() {
+        String typed = nameInput.getText();
+        nameInput.setText("");
+        if (onGift != null) {
+            onGift.accept(typed);
         }
     }
 

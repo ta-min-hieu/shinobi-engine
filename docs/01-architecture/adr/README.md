@@ -114,6 +114,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-080](ADR-080-Guild-Shop.md) | Cửa hàng bang — đổi cống hiến (tích luỹ − đã tiêu) lấy vật phẩm theo cấp bang (V77, 723–726) | ✅ **Accepted** *(2026-10-24, lô 19)* | ADR-068 |
 | [ADR-081](ADR-081-World-Boss.md) | Boss thế giới định kỳ — lịch DB, sổ sát thương, thưởng thư theo hạng, thẻ "Diệt Yêu" (V78) | ✅ **Accepted** *(2026-10-24, lô 19)* | GDD §7 |
 | [ADR-082](ADR-082-Party-Finder.md) | Bảng tìm nhóm — tin RAM 10 phút, mục tiêu cố định, vào ngay (1319–1326) | ✅ **Accepted** *(2026-10-24, lô 19)* | feature-party |
+| [ADR-083](ADR-083-Mail-Enhanced-Items.md) | Thư chở món cường hoá giữ nguyên cấp (V79, thêm field) | ✅ **Accepted** *(2026-10-24, lô 20)* | feature-mail |
+| [ADR-084](ADR-084-Friend-Gifts.md) | Tặng quà bạn bè — thân mật theo cặp, mốc thưởng thư (V80, 1116/1117) | ✅ **Accepted** *(2026-10-24, lô 20)* | feature-friend |
 ---
 
 ## ADR cần tạo (chưa viết)

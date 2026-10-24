@@ -10,6 +10,7 @@ import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.server.database.inventory.InventoryStackMerge;
+import dev.kage.server.database.inventory.ItemLine;
 import dev.kage.server.database.inventory.TemplateQuantityConsumer;
 
 /**
@@ -63,6 +64,13 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
         Connection connection = ((JdbcTransaction) tx).connection();
         Map<Long, Long> unmergedByTemplate = new LinkedHashMap<>();
         for (MailAttachment attachment : attachments) {
+            // ADR-083 — món cường hoá không bao giờ gộp chồng: mở ô riêng giữ nguyên cấp.
+            if (attachment.enhanceLevel() > 0) {
+                if (!InventoryStackMerge.insertRespectingMaxStack(connection, characterId, line(attachment))) {
+                    return false;
+                }
+                continue;
+            }
             boolean merged = InventoryStackMerge.mergeIntoExistingStack(
                     connection, characterId, attachment.itemTemplateId(), attachment.quantity());
             if (!merged) {
@@ -109,7 +117,16 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
      */
     @Override
     public boolean consumeItem(Transaction tx, long characterId, long itemTemplateId, int quantity) {
-        return TemplateQuantityConsumer.consume(
-                ((JdbcTransaction) tx).connection(), characterId, itemTemplateId, quantity);
+        return consumeItem(tx, characterId, new MailAttachment(itemTemplateId, quantity));
+    }
+
+    /** ADR-083 — trừ đúng chồng ở cấp cường hoá đó; món khảm ngọc/linh thú vẫn không đi thư được. */
+    @Override
+    public boolean consumeItem(Transaction tx, long characterId, MailAttachment attachment) {
+        return TemplateQuantityConsumer.consume(((JdbcTransaction) tx).connection(), characterId, line(attachment));
+    }
+
+    private static ItemLine line(MailAttachment attachment) {
+        return new ItemLine(attachment.itemTemplateId(), attachment.quantity(), attachment.enhanceLevel());
     }
 }

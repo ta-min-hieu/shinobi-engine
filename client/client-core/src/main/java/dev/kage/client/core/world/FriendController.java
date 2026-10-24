@@ -56,7 +56,7 @@ final class FriendController {
      * bản hiển thị lên server là gửi một cái tên KHÁC — nghĩa là không bao giờ xoá được một người
      * bạn có tên chứa ký tự font UI không vẽ nổi.
      */
-    record Friend(long characterId, String name, String displayName, boolean online) {}
+    record Friend(long characterId, String name, String displayName, boolean online, int intimacy) {}
 
     /**
      * Một lời mời NGƯỜI KHÁC gửi tới mình. {@code friendshipId} là thứ duy nhất gửi ngược lên được
@@ -117,7 +117,11 @@ final class FriendController {
         friends.clear();
         for (FriendView view : response.getFriendsList()) {
             friends.add(new Friend(
-                    view.getCharacterId(), view.getName(), ChatController.sanitize(view.getName()), view.getOnline()));
+                    view.getCharacterId(),
+                    view.getName(),
+                    ChatController.sanitize(view.getName()),
+                    view.getOnline(),
+                    view.getIntimacy()));
         }
         friends.sort(Comparator.comparing(Friend::online).reversed().thenComparing(Friend::displayName));
     }
@@ -147,7 +151,8 @@ final class FriendController {
         for (int index = 0; index < friends.size(); index++) {
             Friend friend = friends.get(index);
             if (friend.characterId() == characterId) {
-                friends.set(index, new Friend(characterId, friend.name(), friend.displayName(), online));
+                friends.set(
+                        index, new Friend(characterId, friend.name(), friend.displayName(), online, friend.intimacy()));
                 return Optional.of(friend.displayName());
             }
         }

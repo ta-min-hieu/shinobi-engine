@@ -408,6 +408,41 @@ class MailIntegrationTest {
         assertThat(readItemQuantity(characterId, kunaiTemplateId)).isEqualTo(4);
     }
 
+    /** ADR-083 — món +7 đi qua thư GIỮ nguyên cấp; gửi sai cấp thì như không có món đó. */
+    @Test
+    void shouldCarryEnhanceLevelThroughMail() {
+        long senderId = createFreshCharacter("MailEnhA");
+        long recipientId = createFreshCharacter("MailEnhB");
+        grantGold(senderId, Postage.BASE_FEE * 2);
+        PostgresInventoryAdapter inventoryAdapter = new PostgresInventoryAdapter(dataSource);
+        new JdbcInventoryTransactionRunner(dataSource)
+                .inTransaction(tx -> inventoryAdapter.save(
+                        tx,
+                        new dev.kage.inventory.domain.Inventory(
+                                senderId,
+                                20,
+                                List.of(dev.kage.inventory.domain.ItemStack.newItem(woodenSwordTemplateId, 1, 7)))));
+
+        SendMailUseCase.SendResult wrongLevel = newSendUseCase()
+                .execute(playerDraft(
+                        senderId, recipientId, 0, List.of(new MailAttachmentDraft(woodenSwordTemplateId, 1))));
+        SendMailUseCase.SendResult sent = newSendUseCase()
+                .execute(playerDraft(
+                        senderId, recipientId, 0, List.of(new MailAttachmentDraft(woodenSwordTemplateId, 1, 7))));
+        ClaimMailUseCase.ClaimOutcome claimed =
+                newClaimUseCase().execute(sent.mail().orElseThrow().id(), recipientId, newIdempotencyKey());
+
+        assertThat(wrongLevel.outcome()).isEqualTo(SendMailUseCase.SendOutcome.ATTACHMENT_NOT_OWNED);
+        assertThat(sent.outcome()).isEqualTo(SendMailUseCase.SendOutcome.OK);
+        assertThat(claimed).isEqualTo(ClaimMailUseCase.ClaimOutcome.OK);
+        assertThat(readItemQuantity(senderId, woodenSwordTemplateId)).isZero();
+        assertThat(inventoryAdapter.findByCharacter(recipientId).orElseThrow().items())
+                .filteredOn(item -> item.itemTemplateId() == woodenSwordTemplateId)
+                .singleElement()
+                .extracting(dev.kage.inventory.domain.ItemStack::enhanceLevel)
+                .isEqualTo(7);
+    }
+
     /** Hai người: vàng chỉ CHUYỂN chỗ, tổng của cả hai bên không đổi. */
     @Test
     void shouldConserveTotalGold_whenTransferringBetweenTwoCharacters() {

@@ -275,6 +275,7 @@ import dev.kage.protocol.SellOutcome;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SendChatMessageOutcome;
 import dev.kage.protocol.SendChatMessageResponse;
+import dev.kage.protocol.SendFriendGiftCommand;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendFriendRequestOutcome;
 import dev.kage.protocol.SendFriendRequestResponse;
@@ -436,6 +437,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final GuildShopCommands guildShop;
     private final WorldBossFacade worldBoss;
     private final PartyFinderCommands partyFinder;
+    private final FriendGiftCommands friendGifts;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -551,6 +553,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_REJECT_FRIEND_REQUEST_COMMAND_VALUE, this::handleRejectFriendRequestCommand),
             Map.entry(Opcode.OPCODE_REMOVE_FRIEND_COMMAND_VALUE, this::handleRemoveFriendCommand),
             Map.entry(Opcode.OPCODE_CANCEL_FRIEND_REQUEST_COMMAND_VALUE, this::handleCancelFriendRequestCommand),
+            Map.entry(Opcode.OPCODE_SEND_FRIEND_GIFT_COMMAND_VALUE, this::handleSendFriendGiftCommand),
             Map.entry(Opcode.OPCODE_LIST_FRIENDS_REQUEST_VALUE, this::handleListFriendsRequest),
             Map.entry(
                     Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
@@ -627,6 +630,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.market = new MarketCommands(facades.progression().marketFacade(), worldGateway.registry());
         this.crafting = new CraftingCommands(facades.progression().crafting(), characterFacade, npcProximity);
         this.guildShop = new GuildShopCommands(facades.progression().guildShop());
+        this.friendGifts = new FriendGiftCommands(
+                facades.progression().friendGifts(),
+                characterFacade,
+                facades.contentFacades().socialFacades().mailFacade(),
+                worldGateway.registry());
         this.worldBoss = facades.progression().worldBoss();
         this.partyFinder = new PartyFinderCommands(
                 facades.contentFacades().socialFacades().partyFacade(),
@@ -1853,6 +1861,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             throws InvalidProtocolBufferException {
         RemovePartyFinderCommand.parser().parseFrom(payload);
         runStorage(ctx, header.sequenceId(), Opcode.OPCODE_REMOVE_PARTY_FINDER_RESPONSE_VALUE, partyFinder::remove);
+    }
+
+    /** ADR-084 — tặng quà bạn bè theo tên. */
+    private void handleSendFriendGiftCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        SendFriendGiftCommand command = SendFriendGiftCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_SEND_FRIEND_GIFT_RESPONSE_VALUE,
+                characterId -> friendGifts.gift(characterId, command.getTargetName()));
     }
 
     private void handleCraftItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -3084,6 +3103,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleListFriendsBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
         try {
             ListFriendsResponse.Builder responseBuilder = ListFriendsResponse.newBuilder();
+            Map<Long, Integer> intimacy = friendGifts.intimacyOf(characterId);
             for (long friendId : friendFacade.listFriends(characterId)) {
                 // findByName/findById chạm DB mỗi bạn — chấp nhận N+1 ở quy mô danh sách bạn bè MVP
                 // (vài chục), không phải đường nóng mỗi tick (khác AoI/combat).
@@ -3093,6 +3113,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         .setCharacterId(friendId)
                         .setName(name)
                         .setOnline(worldGateway.registry().isOnline(friendId))
+                        .setIntimacy(intimacy.getOrDefault(friendId, 0))
                         .build());
             }
             send(
@@ -4403,7 +4424,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         List<MailFacade.AttachmentRequest> attachments = command.getAttachmentsList().stream()
-                .map(a -> new MailFacade.AttachmentRequest(a.getItemTemplateId(), a.getQuantity()))
+                .map(a -> new MailFacade.AttachmentRequest(a.getItemTemplateId(), a.getQuantity(), a.getEnhanceLevel()))
                 .toList();
         MailFacade.SendMailRequest request = new MailFacade.SendMailRequest(
                 characterId,
@@ -4497,6 +4518,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 viewBuilder.addAttachments(MailAttachmentView.newBuilder()
                         .setItemTemplateId(attachment.itemTemplateId())
                         .setQuantity(attachment.quantity())
+                        .setEnhanceLevel(attachment.enhanceLevel())
                         .build());
             }
             responseBuilder.addMails(viewBuilder.build());

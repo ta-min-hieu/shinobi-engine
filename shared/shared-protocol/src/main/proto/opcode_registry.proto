@@ -232,6 +232,8 @@ enum Opcode {
   // ADR-074 — rút lời mời kết bạn đã gửi. Chỉ thêm, protocolVersion không tăng.
   OPCODE_CANCEL_FRIEND_REQUEST_COMMAND = 1114;
   OPCODE_CANCEL_FRIEND_REQUEST_RESPONSE = 1115;
+  OPCODE_SEND_FRIEND_GIFT_COMMAND = 1116;  // ADR-084 (2026-10-24) — tặng quà bạn bè
+  OPCODE_SEND_FRIEND_GIFT_RESPONSE = 1117;
 
   // --- Party (1300-1399) ---
   OPCODE_CREATE_PARTY_COMMAND = 1300;

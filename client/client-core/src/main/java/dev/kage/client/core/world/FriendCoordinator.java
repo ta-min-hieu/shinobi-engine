@@ -23,6 +23,9 @@ import dev.kage.protocol.RejectFriendRequestOutcome;
 import dev.kage.protocol.RejectFriendRequestResponse;
 import dev.kage.protocol.RemoveFriendOutcome;
 import dev.kage.protocol.RemoveFriendResponse;
+import dev.kage.protocol.SendFriendGiftCommand;
+import dev.kage.protocol.SendFriendGiftOutcome;
+import dev.kage.protocol.SendFriendGiftResponse;
 import dev.kage.protocol.SendFriendRequestOutcome;
 import dev.kage.protocol.SendFriendRequestResponse;
 import dev.kage.protocol.wire.PacketCodec;
@@ -45,6 +48,14 @@ import dev.kage.protocol.wire.PacketCodec;
  * </ul>
  */
 final class FriendCoordinator implements WindowFlow {
+
+    private static final java.util.Map<SendFriendGiftOutcome, String> GIFT_KEYS = java.util.Map.of(
+            SendFriendGiftOutcome.SEND_FRIEND_GIFT_OUTCOME_OK, "friend.notice.gifted",
+            SendFriendGiftOutcome.SEND_FRIEND_GIFT_OUTCOME_TARGET_NOT_FOUND, "friend.error.target_not_found",
+            SendFriendGiftOutcome.SEND_FRIEND_GIFT_OUTCOME_NOT_FRIENDS, "friend.error.not_friends",
+            SendFriendGiftOutcome.SEND_FRIEND_GIFT_OUTCOME_ALREADY_GIFTED_TODAY, "friend.error.already_gifted",
+            SendFriendGiftOutcome.SEND_FRIEND_GIFT_OUTCOME_INSUFFICIENT_GOLD, "friend.error.gift_no_gold",
+            SendFriendGiftOutcome.SEND_FRIEND_GIFT_OUTCOME_CANNOT_GIFT_SELF, "friend.error.gift_self");
 
     private final FriendController controller = new FriendController();
     private final FriendPanel panel;
@@ -76,6 +87,7 @@ final class FriendCoordinator implements WindowFlow {
         panel.setCanOpen(canOpen);
         panel.setOnSendRequest(this::onSendRequest);
         panel.setOnWithdrawRequest(this::onWithdrawRequest);
+        panel.setOnGift(this::onGift);
         panel.setOnAccept(this::onAccept);
         panel.setOnReject(this::onReject);
         panel.setOnRemove(this::onRemove);
@@ -158,6 +170,13 @@ final class FriendCoordinator implements WindowFlow {
                     response.getOutcome() == RejectFriendRequestOutcome.REJECT_FRIEND_REQUEST_OUTCOME_OK);
             return true;
         }
+        if (opcode == Opcode.OPCODE_SEND_FRIEND_GIFT_RESPONSE_VALUE) {
+            SendFriendGiftResponse response = SendFriendGiftResponse.parseFrom(payload);
+            settle(
+                    GIFT_KEYS.getOrDefault(response.getOutcome(), "friend.error.unknown"),
+                    response.getOutcome() == SendFriendGiftOutcome.SEND_FRIEND_GIFT_OUTCOME_OK);
+            return true;
+        }
         if (opcode == Opcode.OPCODE_CANCEL_FRIEND_REQUEST_RESPONSE_VALUE) {
             notice(FriendController.cancelOutcomeMessageKey(
                     CancelFriendRequestResponse.parseFrom(payload).getOutcome()));
@@ -220,6 +239,23 @@ final class FriendCoordinator implements WindowFlow {
         }
     }
 
+    /** ADR-084 — cùng bộ lọc tên với gửi lời mời, rồi gửi lệnh tặng quà. */
+    private void onGift(String typed) {
+        FriendController.ComposeResult result = controller.compose(typed);
+        switch (result) {
+            case FriendController.ComposeResult.Send send ->
+                sender.sendReadRequest(
+                        Opcode.OPCODE_SEND_FRIEND_GIFT_COMMAND_VALUE,
+                        SendFriendGiftCommand.newBuilder()
+                                .setTargetName(send.targetName())
+                                .build());
+            case FriendController.ComposeResult.Reject reject -> notice(reject.messageKey());
+            case FriendController.ComposeResult.Nothing ignored -> {
+                // Ô nhập rỗng — không gửi gì.
+            }
+        }
+    }
+
     /** ADR-074 — cùng bộ lọc tên với gửi lời mời, rồi gửi lệnh rút. */
     private void onWithdrawRequest(String typed) {
         FriendController.ComposeResult result = controller.compose(typed);
@@ -275,7 +311,7 @@ final class FriendCoordinator implements WindowFlow {
     private void refreshRows() {
         friendRows.clear();
         for (FriendController.Friend friend : controller.friends()) {
-            friendRows.add(new FriendPanel.FriendRow(friend.displayName(), friend.online()));
+            friendRows.add(new FriendPanel.FriendRow(friend.displayName(), friend.online(), friend.intimacy()));
         }
         requestRows.clear();
         for (FriendController.PendingRequest request : controller.pendingRequests()) {

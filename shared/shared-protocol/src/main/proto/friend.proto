@@ -97,6 +97,7 @@ message FriendView {
   int64 character_id = 1;
   string name = 2;
   bool online = 3;
+  int32 intimacy = 4; // ADR-084 — thân mật của cặp bạn (tăng khi tặng quà)
 }
 
 message ListFriendsResponse {
@@ -124,4 +125,28 @@ message FriendOnlineEvent {
 
 message FriendOfflineEvent {
   int64 character_id = 1;
+}
+
+// ===== ADR-084 — tặng quà bạn bè: mỗi ngày một món mỗi bạn, tốn linh thạch, cộng thân mật. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_SEND_FRIEND_GIFT_COMMAND = 1116). Theo TÊN, như RemoveFriendCommand.
+message SendFriendGiftCommand {
+  string target_name = 1;
+}
+
+enum SendFriendGiftOutcome {
+  SEND_FRIEND_GIFT_OUTCOME_UNSPECIFIED = 0;
+  SEND_FRIEND_GIFT_OUTCOME_OK = 1;
+  SEND_FRIEND_GIFT_OUTCOME_TARGET_NOT_FOUND = 2;
+  SEND_FRIEND_GIFT_OUTCOME_NOT_FRIENDS = 3;
+  SEND_FRIEND_GIFT_OUTCOME_ALREADY_GIFTED_TODAY = 4;
+  SEND_FRIEND_GIFT_OUTCOME_INSUFFICIENT_GOLD = 5;
+  SEND_FRIEND_GIFT_OUTCOME_CANNOT_GIFT_SELF = 6;
+}
+
+// Response: Server -> Client (OPCODE_SEND_FRIEND_GIFT_RESPONSE = 1117).
+message SendFriendGiftResponse {
+  SendFriendGiftOutcome outcome = 1;
+  int32 intimacy = 2;   // thân mật SAU lần tặng (0 nếu từ chối)
+  int32 milestone = 3;  // mốc thân mật vừa chạm (thư thưởng đã gửi cho cả hai); 0 = không
 }

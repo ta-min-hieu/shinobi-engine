@@ -24,7 +24,7 @@ public final class TemplateQuantityConsumer {
             """ + TradeOfferedQuantity.OF_INVENTORY_ITEM + """
                     AS offered
               FROM inventory_item
-             WHERE character_id = ? AND item_template_id = ? AND enhance_level = 0
+             WHERE character_id = ? AND item_template_id = ? AND enhance_level = ?
                AND NOT EXISTS (SELECT 1 FROM item_socket s WHERE s.inventory_item_id = inventory_item.id)
                AND NOT EXISTS (SELECT 1 FROM pet_state p WHERE p.inventory_item_id = inventory_item.id)
              ORDER BY id
@@ -42,13 +42,22 @@ public final class TemplateQuantityConsumer {
     private TemplateQuantityConsumer() {}
 
     public static boolean consume(Connection connection, long characterId, long itemTemplateId, int quantity) {
+        return consume(connection, characterId, new ItemLine(itemTemplateId, quantity, 0));
+    }
+
+    /** Như trên, chỉ trừ chồng ở đúng cấp cường hoá của {@code line} (thư chở đồ cường hoá — ADR-083). */
+    public static boolean consume(Connection connection, long characterId, ItemLine line) {
+        long itemTemplateId = line.itemTemplateId();
+        int quantity = line.quantity();
+        int enhanceLevel = line.enhanceLevel();
         List<Stack> stacks = JdbcOperations.query(
                 connection,
                 SELECT_STACKS_FOR_UPDATE,
                 rs -> new Stack(
                         rs.getLong("id"), rs.getInt("quantity"), rs.getBoolean("equipped"), rs.getInt("offered")),
                 characterId,
-                itemTemplateId);
+                itemTemplateId,
+                enhanceLevel);
         List<Stack> consumeOrder =
                 stacks.stream().filter(stack -> stack.takeable() > 0).toList();
         long available = consumeOrder.stream().mapToLong(Stack::takeable).sum();

@@ -42,7 +42,7 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
             """;
 
     private static final String INSERT_MAIL_ITEM = """
-            INSERT INTO mail_item (mail_id, item_template_id, quantity) VALUES (?, ?, ?)
+            INSERT INTO mail_item (mail_id, item_template_id, quantity, enhance_level) VALUES (?, ?, ?, ?)
             """;
 
     private static final String FIND_BY_ID = """
@@ -58,7 +58,7 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
             """;
 
     private static final String FIND_ATTACHMENTS_BY_MAIL = """
-            SELECT item_template_id, quantity FROM mail_item WHERE mail_id = ?
+            SELECT item_template_id, quantity, enhance_level FROM mail_item WHERE mail_id = ?
             """;
 
     private static final String MARK_CLAIMED = """
@@ -113,7 +113,9 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
 
     private static void insertMailItems(Connection connection, long mailId, List<MailAttachment> attachments) {
         List<Object[]> batchParams = attachments.stream()
-                .map(attachment -> new Object[] {mailId, attachment.itemTemplateId(), attachment.quantity()})
+                .map(attachment -> new Object[] {
+                    mailId, attachment.itemTemplateId(), attachment.quantity(), attachment.enhanceLevel()
+                })
                 .collect(Collectors.toList());
         JdbcOperations.batchUpdate(connection, INSERT_MAIL_ITEM, batchParams);
     }
@@ -203,7 +205,8 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
         return JdbcOperations.query(
                 connection,
                 FIND_ATTACHMENTS_BY_MAIL,
-                rs -> new MailAttachment(rs.getLong("item_template_id"), rs.getInt("quantity")),
+                rs -> new MailAttachment(
+                        rs.getLong("item_template_id"), rs.getInt("quantity"), rs.getInt("enhance_level")),
                 mailId);
     }
 }

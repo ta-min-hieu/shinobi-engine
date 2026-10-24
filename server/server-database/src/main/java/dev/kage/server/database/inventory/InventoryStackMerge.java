@@ -78,7 +78,7 @@ public final class InventoryStackMerge {
 
     private static final String INSERT_ITEM = """
             INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
-            VALUES (?, ?, ?, 0, ?)
+            VALUES (?, ?, ?, ?, ?)
             """;
 
     private InventoryStackMerge() {}
@@ -122,6 +122,14 @@ public final class InventoryStackMerge {
      */
     public static boolean insertRespectingMaxStack(
             Connection connection, long characterId, long itemTemplateId, int quantity) {
+        return insertRespectingMaxStack(connection, characterId, new ItemLine(itemTemplateId, quantity, 0));
+    }
+
+    /** Như trên, các dòng mới mang cấp cường hoá của {@code line} (thư chở đồ cường hoá — ADR-083). */
+    public static boolean insertRespectingMaxStack(Connection connection, long characterId, ItemLine line) {
+        long itemTemplateId = line.itemTemplateId();
+        int quantity = line.quantity();
+        int enhanceLevel = line.enhanceLevel();
         int maxStack = maxStackOf(connection, itemTemplateId);
         long rowsNeeded = rowsNeeded(quantity, maxStack);
         int used = JdbcOperations.queryOne(connection, COUNT_ITEMS, rs -> rs.getInt(1), characterId)
@@ -133,7 +141,8 @@ public final class InventoryStackMerge {
         for (int row = 0; row < rowsNeeded; row++) {
             int rowQuantity = Math.min(maxStack, remaining);
             // slot_index — nối vào cuối danh sách hiện có (cột chỉ để sắp xếp, V27).
-            JdbcOperations.update(connection, INSERT_ITEM, characterId, itemTemplateId, rowQuantity, used + row);
+            JdbcOperations.update(
+                    connection, INSERT_ITEM, characterId, itemTemplateId, rowQuantity, enhanceLevel, used + row);
             remaining -= rowQuantity;
         }
         return true;

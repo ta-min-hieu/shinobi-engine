@@ -67,4 +67,14 @@ public interface InventoryGatewayPort {
      *     kể cả khi {@code itemTemplateId} không tồn tại trong {@code item_template})
      */
     boolean consumeItem(Transaction tx, long characterId, long itemTemplateId, int quantity);
+
+    /**
+     * Như {@link #consumeItem(Transaction, long, long, int)} nhưng chỉ trừ chồng ở ĐÚNG cấp cường hoá của dòng
+     * (ADR-083). Mặc định chỉ
+     * hiểu cấp 0 — hiện thực không biết cường hoá thì từ chối món cường hoá thay vì xoá mất cấp của nó.
+     */
+    default boolean consumeItem(Transaction tx, long characterId, MailAttachment attachment) {
+        return attachment.enhanceLevel() == 0
+                && consumeItem(tx, characterId, attachment.itemTemplateId(), attachment.quantity());
+    }
 }

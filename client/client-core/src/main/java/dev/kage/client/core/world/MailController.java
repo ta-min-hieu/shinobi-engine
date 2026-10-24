@@ -75,7 +75,13 @@ final class MailController {
      * @param itemTemplateId khoá chính của {@code item_template}, không phải {@code code} đọc được.
      * @param quantity số lượng, luôn dương (V13 có {@code CHECK (quantity > 0)}).
      */
-    record Attachment(long itemTemplateId, int quantity) {}
+    record Attachment(long itemTemplateId, int quantity, int enhanceLevel) {
+
+        /** Món chưa cường hoá. */
+        Attachment(long itemTemplateId, int quantity) {
+            this(itemTemplateId, quantity, 0);
+        }
+    }
 
     /**
      * Một lá thư trong hòm.
@@ -155,7 +161,8 @@ final class MailController {
     private static Mail toMail(MailView view) {
         List<Attachment> attachments = new ArrayList<>(view.getAttachmentsCount());
         for (MailAttachmentView attachment : view.getAttachmentsList()) {
-            attachments.add(new Attachment(attachment.getItemTemplateId(), attachment.getQuantity()));
+            attachments.add(new Attachment(
+                    attachment.getItemTemplateId(), attachment.getQuantity(), attachment.getEnhanceLevel()));
         }
         return new Mail(
                 view.getMailId(),

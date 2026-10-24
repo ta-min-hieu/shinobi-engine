@@ -457,7 +457,8 @@ public final class GatewayBootstrap {
                 databaseBootstrap.wireGuildProgressionFacade(),
                 databaseBootstrap.wireCraftingFacade(),
                 databaseBootstrap.wireGuildShopFacade(),
-                databaseBootstrap.wireWorldBossFacade());
+                databaseBootstrap.wireWorldBossFacade(),
+                databaseBootstrap.wireFriendGiftFacade());
         return new GatewayFacades(
                 accountFacade,
                 characterFacade,

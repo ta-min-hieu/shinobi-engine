@@ -32,7 +32,9 @@ import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.api.NpcPlacementFacade;
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
 import dev.kage.friend.api.FriendFacade;
+import dev.kage.friend.api.FriendGiftFacade;
 import dev.kage.friend.application.AcceptFriendRequestUseCase;
+import dev.kage.friend.application.FriendGiftUseCase;
 import dev.kage.friend.application.FriendRequestCooldowns;
 import dev.kage.friend.application.FriendUseCases;
 import dev.kage.friend.application.ListFriendsUseCase;
@@ -120,6 +122,7 @@ import dev.kage.server.database.crafting.PostgresRecipeAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcPlacementAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
+import dev.kage.server.database.friend.PostgresFriendGiftAdapter;
 import dev.kage.server.database.gm.PostgresGameEventAdapter;
 import dev.kage.server.database.gm.PostgresGmAuditAdapter;
 import dev.kage.server.database.gm.PostgresGmRoleAdapter;
@@ -647,6 +650,12 @@ public final class ServerDatabaseBootstrap {
     public CheckInFacade wireCheckInFacade(CheckInRewardSender sender) {
         return new CheckInFacade(new ClaimDailyCheckInUseCase(
                 new PostgresCheckInAdapter(dataSource), sender, java.time.Clock.systemUTC()));
+    }
+
+    /** Tặng quà bạn bè (ADR-084). */
+    public FriendGiftFacade wireFriendGiftFacade() {
+        return new FriendGiftFacade(
+                new FriendGiftUseCase(new PostgresFriendGiftAdapter(dataSource), java.time.Clock.systemUTC()));
     }
 
     /** Boss thế giới (ADR-081) — lịch, thưởng, sổ sát thương tích luỹ. */

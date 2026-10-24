@@ -313,8 +313,10 @@ final class MailCoordinator implements WindowFlow {
     }
 
     private String formatAttachment(MailController.Attachment attachment) {
-        return KageI18n.formatOrKey(
+        String line = KageI18n.formatOrKey(
                 i18n, "mail.attachment.raw_item", attachment.itemTemplateId(), attachment.quantity());
+        // ADR-083 — món cường hoá đi qua thư giữ cấp; ghi cấp ngay sau dòng.
+        return attachment.enhanceLevel() > 0 ? line + " +" + attachment.enhanceLevel() : line;
     }
 
     /**
