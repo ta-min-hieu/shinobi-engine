@@ -31,6 +31,7 @@ import dev.kage.mail.application.DeleteMailUseCase;
 import dev.kage.mail.application.ListMailUseCase;
 import dev.kage.mail.application.MailPorts;
 import dev.kage.mail.application.SendMailUseCase;
+import dev.kage.mail.domain.Postage;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
@@ -88,7 +89,9 @@ class SendMailIdempotencyIntegrationTest {
 
         assertThat(first.result()).isEqualTo(MailFacade.SendResult.OK);
         assertThat(retry.result()).isEqualTo(MailFacade.SendResult.DUPLICATE_REQUEST);
-        assertThat(queryLong(GOLD, sender)).as("vàng ký quỹ trừ đúng một lần").isEqualTo(START_GOLD - GOLD_SENT);
+        assertThat(queryLong(GOLD, sender))
+                .as("vàng ký quỹ (kèm phí thư) trừ đúng một lần")
+                .isEqualTo(START_GOLD - GOLD_SENT - Postage.feeFor(GOLD_SENT, 0));
         assertThat(queryLong(MAIL_COUNT, recipient)).isEqualTo(1L);
     }
 

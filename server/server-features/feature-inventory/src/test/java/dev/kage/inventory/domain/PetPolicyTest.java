@@ -9,7 +9,7 @@ class PetPolicyTest {
     @Test
     void expShouldCarryOverAcrossSeveralLevels() {
         // cấp 1→2 cần 100, 2→3 cần 200: 350 EXP từ 0 = cấp 3 còn 50.
-        PetProgress progress = PetPolicy.gain(new PetProgress(7L, 9L, 1, 0L, false), 350L);
+        PetProgress progress = PetPolicy.gain(new PetProgress(7L, 9L, 1, 0L, false, 1), 350L);
 
         assertThat(progress.level()).isEqualTo(3);
         assertThat(progress.expIntoLevel()).isEqualTo(50L);
@@ -19,7 +19,7 @@ class PetPolicyTest {
 
     @Test
     void smallGainShouldNotLevelUp() {
-        PetProgress progress = PetPolicy.gain(new PetProgress(7L, 9L, 4, 10L, false), 20L);
+        PetProgress progress = PetPolicy.gain(new PetProgress(7L, 9L, 4, 10L, false, 1), 20L);
 
         assertThat(progress.level()).isEqualTo(4);
         assertThat(progress.expIntoLevel()).isEqualTo(30L);
@@ -28,7 +28,8 @@ class PetPolicyTest {
 
     @Test
     void maxLevelShouldDropTheRest() {
-        PetProgress progress = PetPolicy.gain(new PetProgress(7L, 9L, PetPolicy.MAX_LEVEL - 1, 0L, false), 1_000_000L);
+        PetProgress progress =
+                PetPolicy.gain(new PetProgress(7L, 9L, PetPolicy.MAX_LEVEL - 1, 0L, false, 1), 1_000_000L);
 
         assertThat(progress.level()).isEqualTo(PetPolicy.MAX_LEVEL);
         assertThat(progress.expIntoLevel()).isZero();

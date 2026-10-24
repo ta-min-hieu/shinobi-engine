@@ -33,6 +33,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import dev.kage.mail.domain.Postage;
 import dev.kage.protocol.AcceptPartyInviteCommand;
 import dev.kage.protocol.AcceptTradeRequestCommand;
 import dev.kage.protocol.AttackCommand;
@@ -214,8 +215,10 @@ class ServerShutdownMailAndDungeonDatabaseTest {
         LOG.info("Tắt giữa {} lệnh gửi thư: {} thư đã gửi trọn", MAILS_IN_FLIGHT, mails);
         assertThat(goldInMails).as("mỗi thư đã ghi mang đúng số vàng đã đính").isEqualTo(mails * GOLD_PER_MAIL);
         assertThat(itemsInMails).as("mỗi thư đã ghi mang đúng một món").isEqualTo(mails);
-        assertThat(senderGold + goldInMails)
-                .as("vàng bảo toàn: người gửi + thư (đã gửi %s thư)", mails)
+        // Phí thư (ADR-076) bị đốt — đúng một lần cho mỗi thư đã ghi.
+        long postage = mails * Postage.feeFor(GOLD_PER_MAIL, 1);
+        assertThat(senderGold + goldInMails + postage)
+                .as("vàng bảo toàn: người gửi + thư + phí thư (đã gửi %s thư)", mails)
                 .isEqualTo(START_GOLD);
         assertThat(itemQuantity(senderId, templateId) + itemsInMails)
                 .as("vật phẩm bảo toàn: người gửi + thư")

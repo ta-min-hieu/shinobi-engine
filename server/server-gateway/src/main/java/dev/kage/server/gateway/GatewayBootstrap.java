@@ -30,6 +30,7 @@ import dev.kage.party.api.PartyFacade;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.server.database.ServerDatabaseBootstrap;
+import dev.kage.server.world.Element;
 import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
 import dev.kage.shop.api.ShopFacade;
@@ -120,7 +121,7 @@ public final class GatewayBootstrap {
                                 amount * facades.progression().gameEvents().multiplier(GameEventKind.EXP)),
                 metricsContext.networkMetrics());
         wireGoldChangeNotifications(databaseBootstrap, characterRegistry);
-        characterRegistry.skillRanks.bind(databaseBootstrap.wireSkillRankFacade());
+        bindSkillRanks(characterRegistry, databaseBootstrap, facades);
         WorldContext worldContext = startWorld(
                 characterRegistry, databaseBootstrap, metricsContext.meterRegistry(), endpoints.metricsPort());
         MainWorldChannelRegistry mainWorldChannels = worldContext.mainWorldChannels();
@@ -455,5 +456,17 @@ public final class GatewayBootstrap {
                 contentFacades,
                 databaseBootstrap.wireGmFacade(),
                 progression);
+    }
+
+    /** Bậc chiêu + tâm pháp (ADR-071/077) — tâm pháp cần linh căn hiện tại đọc từ DB. */
+    private static void bindSkillRanks(
+            ConnectedCharacterRegistry characterRegistry,
+            ServerDatabaseBootstrap databaseBootstrap,
+            GatewayFacades facades) {
+        characterRegistry.skillRanks.bind(
+                databaseBootstrap.wireSkillRankFacade(), characterId -> facades.characterFacade()
+                        .findById(characterId)
+                        .map(character -> FactionMapping.toElement(character.faction()))
+                        .orElse(Element.NONE));
     }
 }

@@ -158,6 +158,7 @@ message SkillRankView {
   int32 max_rank = 4;
   int32 required_level = 5;
   bool unlocked = 6;         // đủ cấp mở chiêu
+  bool passive = 7;          // ADR-077 — tâm pháp bị động: rank 0 = chưa học, mỗi bậc tốn một điểm
 }
 
 // Response: Server -> Client (OPCODE_LIST_SKILL_RANKS_RESPONSE = 410).

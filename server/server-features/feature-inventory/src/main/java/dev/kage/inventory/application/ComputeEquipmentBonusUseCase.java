@@ -110,8 +110,9 @@ public final class ComputeEquipmentBonusUseCase {
         int totalBonusRes = 0;
         int totalBonusHp = 0;
         Set<Long> wornTemplateIds = new HashSet<>();
-        Map<Long, Integer> petLevels =
-                equipment.slots().containsKey(EquipmentSlotType.PET) ? companionPort.petLevels(characterId) : Map.of();
+        boolean hasPet = equipment.slots().containsKey(EquipmentSlotType.PET);
+        Map<Long, Integer> petLevels = hasPet ? companionPort.petLevels(characterId) : Map.of();
+        Map<Long, Integer> petStages = hasPet ? companionPort.petStages(characterId) : Map.of();
         for (Map.Entry<EquipmentSlotType, Long> slot : equipment.slots().entrySet()) {
             long itemId = slot.getValue();
             ItemStack item = inventory.findItem(itemId).orElse(null);
@@ -130,10 +131,12 @@ public final class ComputeEquipmentBonusUseCase {
             int enhanceLevel = slot.getKey() == EquipmentSlotType.PET
                     ? PetPolicy.bonusLevel(petLevels.getOrDefault(itemId, 1))
                     : item.enhanceLevel();
-            totalBonusAtk += EnhancementTable.enhancedBonus(template.bonusAtk(), enhanceLevel);
-            totalBonusDef += EnhancementTable.enhancedBonus(template.bonusDef(), enhanceLevel);
-            totalBonusRes += EnhancementTable.enhancedBonus(template.bonusRes(), enhanceLevel);
-            totalBonusHp += EnhancementTable.enhancedBonus(template.bonusHp(), enhanceLevel);
+            // Bậc tiến hoá linh thú (ADR-078) nhân SAU cấp; món không phải linh thú luôn bậc 1.
+            int stage = petStages.getOrDefault(itemId, 1);
+            totalBonusAtk += PetPolicy.staged(EnhancementTable.enhancedBonus(template.bonusAtk(), enhanceLevel), stage);
+            totalBonusDef += PetPolicy.staged(EnhancementTable.enhancedBonus(template.bonusDef(), enhanceLevel), stage);
+            totalBonusRes += PetPolicy.staged(EnhancementTable.enhancedBonus(template.bonusRes(), enhanceLevel), stage);
+            totalBonusHp += PetPolicy.staged(EnhancementTable.enhancedBonus(template.bonusHp(), enhanceLevel), stage);
         }
         EquipmentBonus gems = gemBonusOf(characterId, equipment);
         EquipmentBonus sets = ItemSets.totalBonus(ItemSets.progress(itemSetPort.itemSets(), wornTemplateIds));

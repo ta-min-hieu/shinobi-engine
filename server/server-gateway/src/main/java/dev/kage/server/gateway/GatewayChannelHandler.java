@@ -1238,8 +1238,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * {@code authExecutor} (Virtual Thread), không bao giờ trên EventLoop.
      */
     private EquipmentBonusSnapshot currentEquipmentBonus(long characterId) {
-        return CharacterLoadout.snapshotOf(
-                inventoryFacade.computeEquipmentBonus(characterId), inventoryFacade.moveSpeedPercent(characterId));
+        // Cùng đường với attach — kèm tâm pháp bị động (ADR-077).
+        return worldGateway.registry().equipmentBonusOf(characterId);
     }
 
     /**
@@ -1310,9 +1310,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // nào người khác thấy hệ mới mà world còn tính hệ cũ.
             dev.kage.server.world.Element element = FactionMapping.toElement(toDomainFaction(request.getFaction()));
             SkillRankSnapshot newRanks = worldGateway.registry().skillRanks.snapshotFor(characterId, element);
+            // Tâm pháp (ADR-077) chỉ tính trên linh căn hiện tại — DB đã ghi hệ mới ở trên.
+            EquipmentBonusSnapshot newBonus = currentEquipmentBonus(characterId);
             currentWorldFacadeIfPresent(characterId).ifPresent(facade -> {
                 facade.enqueueCharacterElement(characterId, element);
                 facade.enqueueSkillRanks(characterId, newRanks);
+                facade.applyEquipmentBonus(characterId, newBonus);
                 facade.enqueueAppearanceChanged(characterId);
             });
             SelectFactionResponse response =
@@ -1695,6 +1698,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             currentWorldFacadeIfPresent(characterId)
                     .ifPresent(facade -> facade.enqueueHealCharacter(characterId, result.value()));
         }
+        if (result.outcome() == UseItemUseCase.Outcome.OK && result.effect() == ItemUseEffect.EVOLVE_PET) {
+            // ADR-078 — chỉ số linh thú vừa nhân bậc 2: tính lại như sau khi mặc đồ.
+            applyEquipmentBonusAndComputeMaxHp(characterId);
+        }
         UseItemResponse response = UseItemResponse.newBuilder()
                 .setSuccess(result.outcome() == UseItemUseCase.Outcome.OK)
                 .setErrorKey(useItemErrorKey(result.outcome()))
@@ -1709,6 +1716,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         return switch (effect) {
             case HEAL_HP -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_HEAL_HP;
+            case EVOLVE_PET -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_EVOLVE_PET;
         };
     }
 
@@ -1718,6 +1726,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case ITEM_NOT_FOUND -> "error.item_not_found";
             case NOT_USABLE -> "error.item_not_usable";
             case ITEM_IN_TRADE -> "error.item_offered_in_trade";
+            case NO_PET_EQUIPPED -> "error.no_pet_equipped";
+            case PET_LEVEL_TOO_LOW -> "error.pet_level_too_low";
+            case PET_ALREADY_EVOLVED -> "error.pet_already_evolved";
         };
     }
 
@@ -1872,9 +1883,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         SkillRankUseCase.Outcome outcome =
                 ranks.facade().upgrade(characterId, skillCode, level, SkillRankSource.factionSkills(element));
         if (outcome == SkillRankUseCase.Outcome.OK) {
-            // Hiệu lực ngay trong World đang đứng — không chờ đăng nhập lại.
+            // Hiệu lực ngay trong World đang đứng — không chờ đăng nhập lại. Tâm pháp (ADR-077) đi đường chỉ số.
             SkillRankSnapshot snapshot = ranks.snapshotFor(characterId, element);
             currentWorldFacadeIfPresent(characterId).ifPresent(world -> world.enqueueSkillRanks(characterId, snapshot));
+            applyEquipmentBonusAndComputeMaxHp(characterId);
         }
         return UpgradeSkillResponse.newBuilder()
                 .setOutcome(UpgradeSkillOutcome.valueOf("UPGRADE_SKILL_OUTCOME_" + outcome.name()))
@@ -1903,7 +1915,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setRank(skill.rank())
                     .setMaxRank(SkillRankPolicy.MAX_RANK)
                     .setRequiredLevel(skill.requiredLevel())
-                    .setUnlocked(level >= skill.requiredLevel()));
+                    .setUnlocked(level >= skill.requiredLevel())
+                    .setPassive(skill.passive()));
         }
         return response.build();
     }
@@ -2168,7 +2181,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             .setItemTemplateId(pet.itemTemplateId())
                             .setLevel(pet.level())
                             .setExpIntoLevel(pet.expIntoLevel())
-                            .setExpToNext(pet.expToNext())));
+                            .setExpToNext(pet.expToNext())
+                            .setStage(pet.stage())));
             send(
                     ctx,
                     Opcode.OPCODE_GET_CHARACTER_STATS_RESPONSE_VALUE,

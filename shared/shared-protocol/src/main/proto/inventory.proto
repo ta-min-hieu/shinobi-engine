@@ -195,6 +195,7 @@ message EquippedSlotView {
 enum ItemUseEffect {
   ITEM_USE_EFFECT_UNSPECIFIED = 0;
   ITEM_USE_EFFECT_HEAL_HP = 1;
+  ITEM_USE_EFFECT_EVOLVE_PET = 2; // ADR-078 — Linh Thú Đan: tiến hoá linh thú đang mặc
 }
 
 // 1 dòng catalog. KHÔNG mang tên hiển thị và KHÔNG mang icon: tên tra qua name_key trong bundle

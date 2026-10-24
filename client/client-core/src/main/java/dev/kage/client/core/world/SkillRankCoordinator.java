@@ -97,8 +97,19 @@ final class SkillRankCoordinator implements WindowFlow {
         List<ReportPanel.Row> rows = new ArrayList<>();
         boolean hasPoints = sheet.getPointsAvailable() > 0;
         for (SkillRankView skill : sheet.getSkillsList()) {
-            String line = format(
-                    "skillrank.row", text("skill.name." + skill.getSkillCode()), skill.getRank(), skill.getMaxRank());
+            // ADR-077 — tâm pháp bị động: bậc 0 = chưa học, kèm dòng mô tả hiệu ứng mỗi bậc.
+            String line = skill.getPassive()
+                    ? format(
+                            "skillrank.row.passive",
+                            text("skill.name." + skill.getSkillCode()),
+                            skill.getRank(),
+                            skill.getMaxRank(),
+                            text("skill.desc." + skill.getSkillCode()))
+                    : format(
+                            "skillrank.row",
+                            text("skill.name." + skill.getSkillCode()),
+                            skill.getRank(),
+                            skill.getMaxRank());
             boolean upgradable = hasPoints && skill.getRank() < skill.getMaxRank() && skill.getUnlocked();
             rows.add(new ReportPanel.Row(
                     skill.getUnlocked() ? line : line + " " + format("skillrank.locked", skill.getRequiredLevel()),

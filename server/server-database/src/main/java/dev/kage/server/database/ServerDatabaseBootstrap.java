@@ -311,14 +311,19 @@ public final class ServerDatabaseBootstrap {
     }
 
     /** Dùng vật phẩm (ADR-046 D5) — tách khỏi {@link #wireInventoryFacade} vì trần {@code MethodLength}. */
-    private static UseItemUseCase useItemUseCase(
+    private UseItemUseCase useItemUseCase(
             PostgresInventoryAdapter inventoryPort,
             PostgresItemTemplateAdapter itemTemplatePort,
             PostgresAuditAdapter auditPort,
             JdbcInventoryTransactionRunner tx) {
         return new UseItemUseCase(
                 new UseItemUseCase.Ports(
-                        inventoryPort, itemTemplatePort, auditPort, new PostgresInventoryTradeOfferAdapter()),
+                        inventoryPort,
+                        itemTemplatePort,
+                        auditPort,
+                        new PostgresInventoryTradeOfferAdapter(),
+                        // ADR-078 — Linh Thú Đan tiến hoá linh thú đang mặc.
+                        new PostgresCompanionAdapter(dataSource)),
                 tx);
     }
 

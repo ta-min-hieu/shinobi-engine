@@ -33,6 +33,7 @@ import dev.kage.mail.domain.Mail;
 import dev.kage.mail.domain.MailAttachment;
 import dev.kage.mail.domain.MailAttachmentDraft;
 import dev.kage.mail.domain.MailDraft;
+import dev.kage.mail.domain.Postage;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
@@ -357,7 +358,7 @@ class MailIntegrationTest {
                 .execute(playerDraft(senderId, recipientId, 300, List.of(new MailAttachmentDraft(kunaiTemplateId, 2))));
 
         assertThat(result.outcome()).isEqualTo(SendMailUseCase.SendOutcome.OK);
-        assertThat(readGold(senderId)).isEqualTo(700);
+        assertThat(readGold(senderId)).isEqualTo(1_000 - 300 - Postage.feeFor(300, 1));
         assertThat(readItemQuantity(senderId, kunaiTemplateId)).isEqualTo(3);
     }
 
@@ -387,7 +388,8 @@ class MailIntegrationTest {
     @Test
     void shouldNotMintGoldOrItems_whenSendingToSelfAndClaiming() {
         long characterId = createFreshCharacter("MailSelfMint");
-        grantGold(characterId, 500);
+        long postage = Postage.feeFor(500, 1);
+        grantGold(characterId, 500 + postage);
         persistOneItem(characterId, kunaiTemplateId, 4);
 
         SendMailUseCase.SendResult sent = newSendUseCase()
@@ -401,7 +403,8 @@ class MailIntegrationTest {
                 newClaimUseCase().execute(sent.mail().orElseThrow().id(), characterId, newIdempotencyKey());
 
         assertThat(claimed).isEqualTo(ClaimMailUseCase.ClaimOutcome.OK);
-        assertThat(readGold(characterId)).isEqualTo(500); // ĐÚNG bằng lúc đầu, không hơn
+        // ĐÚNG bằng lúc đầu trừ phí thư (ADR-076) — không hơn một đồng.
+        assertThat(readGold(characterId)).isEqualTo(500);
         assertThat(readItemQuantity(characterId, kunaiTemplateId)).isEqualTo(4);
     }
 
@@ -410,7 +413,8 @@ class MailIntegrationTest {
     void shouldConserveTotalGold_whenTransferringBetweenTwoCharacters() {
         long senderId = createFreshCharacter("MailConsA");
         long recipientId = createFreshCharacter("MailConsB");
-        grantGold(senderId, 800);
+        long postage = Postage.feeFor(800, 0);
+        grantGold(senderId, 800 + postage);
         grantGold(recipientId, 200);
         long totalBefore = readGold(senderId) + readGold(recipientId);
 
@@ -419,7 +423,8 @@ class MailIntegrationTest {
 
         assertThat(readGold(senderId)).isZero();
         assertThat(readGold(recipientId)).isEqualTo(1_000);
-        assertThat(readGold(senderId) + readGold(recipientId)).isEqualTo(totalBefore);
+        // Tổng hai bên chỉ hụt đúng phí thư bị đốt (ADR-076).
+        assertThat(readGold(senderId) + readGold(recipientId)).isEqualTo(totalBefore - postage);
     }
 
     @Test
@@ -474,6 +479,7 @@ class MailIntegrationTest {
     void shouldRejectSend_whenItemTemplateDoesNotExist() {
         long senderId = createFreshCharacter("MailBadTpl");
         long recipientId = createFreshCharacter("MailRecvE5");
+        grantGold(senderId, Postage.BASE_FEE);
 
         SendMailUseCase.SendResult result = newSendUseCase()
                 .execute(playerDraft(senderId, recipientId, 0, List.of(new MailAttachmentDraft(999_999_999L, 1))));
@@ -580,6 +586,7 @@ class MailIntegrationTest {
                         dev.kage.inventory.domain.ItemStack.newItem(kunaiTemplateId, 2, 0),
                         dev.kage.inventory.domain.ItemStack.newItem(kunaiTemplateId, 3, 0)));
         inventoryTx.inTransaction(tx -> inventoryAdapter.save(tx, inventory));
+        grantGold(senderId, Postage.BASE_FEE);
 
         SendMailUseCase.SendResult result = newSendUseCase()
                 .execute(playerDraft(senderId, recipientId, 0, List.of(new MailAttachmentDraft(kunaiTemplateId, 4))));
@@ -618,8 +625,9 @@ class MailIntegrationTest {
         assertThat(recordedGoldChanges).hasSize(1);
         dev.kage.server.database.GoldChange change = recordedGoldChanges.get(0);
         assertThat(change.characterId()).isEqualTo(senderId);
-        assertThat(change.gold()).isEqualTo(750L); // SỐ DƯ TUYỆT ĐỐI sau thay đổi
-        assertThat(change.delta()).isEqualTo(-250L);
+        // SỐ DƯ TUYỆT ĐỐI sau thay đổi — 250 đính kèm + phí thư 12 (ADR-076), một sự kiện duy nhất.
+        assertThat(change.gold()).isEqualTo(738L);
+        assertThat(change.delta()).isEqualTo(-262L);
         assertThat(change.reasonKey()).isEqualTo("gold.reason.send_mail");
     }
 

@@ -26,8 +26,9 @@ Chiều: `api → application → domain`. **`domain/` không import gì bên ng
 ## Quyết định MVP (2026-07-23, Phase 6 lát cắt 5)
 
 - ~~**Gửi thư KHÔNG mất gold**~~ — **ĐÃ THAY 2026-08-28** (xem mục "Lỗ đúc vàng/vật phẩm" bên
-  dưới). Không có PHÍ bưu điện, nhưng gold/vật phẩm ĐÍNH KÈM bị ký quỹ khỏi người gửi. Thu thêm
-  phí gửi (chống spam mail giữa người chơi) vẫn là quyết định thiết kế game CHƯA chốt.
+  dưới). Gold/vật phẩm ĐÍNH KÈM bị ký quỹ khỏi người gửi. **Phí thư có từ 2026-10-24**
+  ([ADR-076](../../../docs/01-architecture/adr/ADR-076-Mail-Postage.md)): thư người chơi có đính kèm
+  mất `Postage.feeFor` = 10 + 1% vàng, trừ cùng câu với vàng đính kèm, đốt + ghi `postage` vào audit.
 - **`senderId` kiểu `Long` (nullable), `null` = thư hệ thống** — không dùng sentinel số (0/-1, dễ
   nhầm ID thật). Chưa có khái niệm "GM gửi thư" thật ở MVP; field tồn tại sẵn cho lúc cần.
 - **Xoá thư**: cấm xoá thư CHƯA nhận mà còn gold/item — phải `ClaimMailCommand` trước

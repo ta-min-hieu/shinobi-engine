@@ -98,8 +98,9 @@ class HealingPillIntegrationTest {
         // giữ nguyên "không dùng được", nếu không thì mọi món trong túi đều mọc nút "Dùng".
         List<ItemCatalogEntry> catalog = new PostgresItemTemplateAdapter(dataSource).listCatalog();
 
+        // Linh Thú Đan (ADR-078) là món dùng được thứ hai — có hiệu ứng riêng, không phải backfill.
         assertThat(catalog)
-                .filteredOn(entry -> !PILL_CODE.equals(entry.code()))
+                .filteredOn(entry -> !PILL_CODE.equals(entry.code()) && !"spirit_beast_pill".equals(entry.code()))
                 .isNotEmpty()
                 .allSatisfy(entry -> assertThat(entry.useEffect()).isNull());
     }

@@ -10,6 +10,7 @@ import dev.kage.mail.domain.MailAttachmentDraft;
 import dev.kage.mail.domain.MailContentViolation;
 import dev.kage.mail.domain.MailDraft;
 import dev.kage.mail.domain.NewMail;
+import dev.kage.mail.domain.Postage;
 import dev.kage.mail.domain.Transaction;
 import dev.kage.mail.domain.TransactionRunner;
 
@@ -34,8 +35,9 @@ import dev.kage.mail.domain.TransactionRunner;
  * được từ client: {@code GatewayChannelHandler} luôn truyền {@code characterId} lấy từ SESSION,
  * không bao giờ {@code null} (server/CLAUDE.md — characterId lấy từ session, không từ packet).
  *
- * <p><b>Phí bưu điện: KHÔNG có.</b> Chỉ trừ đúng số vàng người gửi ĐÍNH KÈM. Thu thêm phí là quyết
- * định thiết kế game, chưa được chốt (feature-mail/CLAUDE.md).
+ * <p><b>Phí thư (ADR-076, 2026-10-24).</b> Thư người chơi có đính kèm mất thêm {@link Postage} — trừ
+ * CÙNG câu với vàng đính kèm (một {@code UPDATE ... WHERE gold >= vàng + phí}), nên "đủ vàng đính kèm
+ * nhưng thiếu phí" cũng là {@link SendOutcome#INSUFFICIENT_GOLD} và không đổi gì. Phí ghi vào audit.
  */
 public final class SendMailUseCase {
 
@@ -113,7 +115,10 @@ public final class SendMailUseCase {
         // Đây là lời gọi DB đầu tiên của transaction gửi thư.
         ports.inventoryGatewayPort().lockInventory(t, senderId);
         recordKeyIfAny(t, idempotencyKey);
-        if (draft.goldAmount() > 0 && !ports.goldPort().deductGold(t, senderId, draft.goldAmount())) {
+        long totalGold = draft.goldAmount()
+                + Postage.feeFor(draft.goldAmount(), draft.attachments().size());
+        // totalGold < 0 chỉ khi cộng tràn long — số vàng đính kèm vô lý, không ai có đủ.
+        if (totalGold < 0 || (totalGold > 0 && !ports.goldPort().deductGold(t, senderId, totalGold))) {
             throw new SendMailAbortedException(SendOutcome.INSUFFICIENT_GOLD);
         }
         for (MailAttachmentDraft attachment : draft.attachments()) {
@@ -139,11 +144,13 @@ public final class SendMailUseCase {
         if (draft.senderId() == null || !sent.hasReward()) {
             return;
         }
-        String detail = "{\"mailId\":%d,\"recipientId\":%d,\"goldAmount\":%d,\"itemCount\":%d,\"items\":%s}"
+        String detail = ("{\"mailId\":%d,\"recipientId\":%d,\"goldAmount\":%d,\"postage\":%d,"
+                        + "\"itemCount\":%d,\"items\":%s}")
                 .formatted(
                         sent.id(),
                         sent.recipientId(),
                         sent.goldAmount(),
+                        Postage.feeFor(sent.goldAmount(), sent.attachments().size()),
                         sent.attachments().size(),
                         MailAttachment.auditJson(sent.attachments()));
         ports.auditPort().log(t, draft.senderId(), "MAIL_SEND", detail);
@@ -169,7 +176,7 @@ public final class SendMailUseCase {
 
     public enum SendOutcome {
         OK,
-        /** Không đủ vàng để đính kèm số đã yêu cầu. */
+        /** Không đủ vàng cho số đính kèm cộng phí thư ({@link Postage}). */
         INSUFFICIENT_GOLD,
         /** Không có/không đủ món đó trong túi — kể cả khi {@code itemTemplateId} không tồn tại. */
         ATTACHMENT_NOT_OWNED,

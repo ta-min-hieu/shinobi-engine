@@ -53,10 +53,73 @@ class SendMailUseCaseTest {
         assertThat(result.outcome()).isEqualTo(SendMailUseCase.SendOutcome.OK);
         assertThat(result.mail()).isPresent();
         assertThat(result.mail().get().goldAmount()).isEqualTo(100);
-        assertThat(fixture.goldPort.balances.get(SENDER_ID)).isEqualTo(400L);
+        assertThat(fixture.goldPort.balances.get(SENDER_ID))
+                .as("100 đính kèm + phí thư 10 + 1 phần trăm của 100")
+                .isEqualTo(389L);
         assertThat(fixture.inventoryGatewayPort.owned.get(KUNAI)).isEqualTo(7);
         assertThat(fixture.repositoryPort.stored).hasSize(1);
         assertThat(fixture.auditPort.loggedActions).containsExactly("MAIL_SEND");
+    }
+
+    /** ADR-076: thư chào hỏi rỗng không mất phí. */
+    @Test
+    void plainLetterShouldBeFree() {
+        Fixture fixture = fixture();
+        fixture.goldPort.balances.put(SENDER_ID, 500L);
+
+        SendMailUseCase.SendResult result = fixture.useCase().execute(draft(0, List.of()));
+
+        assertThat(result.outcome()).isEqualTo(SendMailUseCase.SendOutcome.OK);
+        assertThat(fixture.goldPort.balances.get(SENDER_ID)).isEqualTo(500L);
+    }
+
+    /** ADR-076: chỉ đính vật phẩm vẫn mất phí nền. */
+    @Test
+    void itemOnlyMailShouldPayTheBaseFee() {
+        Fixture fixture = fixture();
+        fixture.goldPort.balances.put(SENDER_ID, 500L);
+        fixture.inventoryGatewayPort.owned.put(KUNAI, 10);
+
+        fixture.useCase().execute(draft(0, List.of(new MailAttachmentDraft(KUNAI, 1))));
+
+        assertThat(fixture.goldPort.balances.get(SENDER_ID)).isEqualTo(490L);
+    }
+
+    /** ADR-076: đủ vàng đính kèm nhưng thiếu phí ⇒ từ chối, không đổi gì. */
+    @Test
+    void shouldRefuseAndChangeNothing_whenTheSenderCanAffordTheGoldButNotThePostage() {
+        Fixture fixture = fixture();
+        fixture.goldPort.balances.put(SENDER_ID, 105L);
+
+        SendMailUseCase.SendResult result = fixture.useCase().execute(draft(100, List.of()));
+
+        assertThat(result.outcome()).isEqualTo(SendMailUseCase.SendOutcome.INSUFFICIENT_GOLD);
+        assertThat(fixture.goldPort.balances.get(SENDER_ID)).isEqualTo(105L);
+        assertThat(fixture.repositoryPort.stored).isEmpty();
+    }
+
+    /** Cộng phí làm tràn long ⇒ không đủ vàng, không ném ArithmeticException hay trừ số âm. */
+    @Test
+    void shouldRefuse_whenAttachedGoldPlusPostageOverflows() {
+        Fixture fixture = fixture();
+        fixture.goldPort.balances.put(SENDER_ID, Long.MAX_VALUE);
+
+        SendMailUseCase.SendResult result = fixture.useCase().execute(draft(Long.MAX_VALUE, List.of()));
+
+        assertThat(result.outcome()).isEqualTo(SendMailUseCase.SendOutcome.INSUFFICIENT_GOLD);
+        assertThat(fixture.goldPort.balances.get(SENDER_ID)).isEqualTo(Long.MAX_VALUE);
+    }
+
+    /** Thư hệ thống không bao giờ mất phí. */
+    @Test
+    void systemMailShouldNotPayPostage() {
+        Fixture fixture = fixture();
+
+        SendMailUseCase.SendResult result =
+                fixture.useCase().execute(new MailDraft(null, RECIPIENT_ID, "Thưởng", "Nội dung", 50, List.of()));
+
+        assertThat(result.outcome()).isEqualTo(SendMailUseCase.SendOutcome.OK);
+        assertThat(fixture.goldPort.balances).isEmpty();
     }
 
     /** Dòng 41(iv) (2026-10-17): hộp người nhận đủ 100 thư ⇒ người chơi khác không gửi thêm được. */

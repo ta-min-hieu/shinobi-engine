@@ -13,5 +13,7 @@ package dev.kage.inventory.domain;
  */
 public enum ItemUseEffect {
     /** Hồi {@link ItemTemplate#useValue()} máu ngay lập tức. Đan dược của arc 1. */
-    HEAL_HP
+    HEAL_HP,
+    /** Tiến hoá linh thú ĐANG MẶC lên bậc 2 (ADR-078) — {@link ItemTemplate#useValue()} không dùng. */
+    EVOLVE_PET
 }

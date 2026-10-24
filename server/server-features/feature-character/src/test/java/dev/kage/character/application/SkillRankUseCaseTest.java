@@ -24,6 +24,43 @@ class SkillRankUseCaseTest {
     private final SkillRankUseCase useCase =
             new SkillRankUseCase(SkillRankPort.inMemory(), action -> action.accept(null));
 
+    private static final List<SkillRankUseCase.FactionSkill> HOA_WITH_ARTS = List.of(
+            new SkillRankUseCase.FactionSkill("fireball", 1),
+            new SkillRankUseCase.FactionSkill("hoa_liet_hoa_tam_kinh", 15, true));
+
+    /** ADR-077: tâm pháp khởi điểm bậc 0, mỗi bậc (kể cả bậc đầu) tốn một điểm, chung quỹ với chiêu. */
+    @Test
+    void mentalArtShouldStartUnlearned_andEveryRankCostsAPointFromTheSamePool() {
+        SkillRankUseCase.Sheet before = useCase.sheet(CHARACTER, 16, HOA_WITH_ARTS);
+        assertThat(before.skills().get(1).rank()).isZero();
+        assertThat(before.skills().get(1).passive()).isTrue();
+        assertThat(before.pointsAvailable()).isEqualTo(8);
+
+        assertThat(useCase.upgrade(CHARACTER, "hoa_liet_hoa_tam_kinh", 16, HOA_WITH_ARTS))
+                .isEqualTo(SkillRankUseCase.Outcome.OK);
+        assertThat(useCase.upgrade(CHARACTER, "fireball", 16, HOA_WITH_ARTS)).isEqualTo(SkillRankUseCase.Outcome.OK);
+
+        SkillRankUseCase.Sheet after = useCase.sheet(CHARACTER, 16, HOA_WITH_ARTS);
+        assertThat(after.skills().get(1).rank()).isEqualTo(1);
+        assertThat(after.pointsAvailable())
+                .as("bậc 1 tâm pháp + bậc 2 chiêu = 2 điểm")
+                .isEqualTo(6);
+    }
+
+    @Test
+    void mentalArtShouldRespectItsLevelGate_andMaxRank() {
+        assertThat(useCase.upgrade(CHARACTER, "hoa_liet_hoa_tam_kinh", 14, HOA_WITH_ARTS))
+                .isEqualTo(SkillRankUseCase.Outcome.LEVEL_TOO_LOW);
+        for (int i = 0; i < SkillRankPolicy.MAX_RANK; i++) {
+            assertThat(useCase.upgrade(CHARACTER, "hoa_liet_hoa_tam_kinh", 40, HOA_WITH_ARTS))
+                    .isEqualTo(SkillRankUseCase.Outcome.OK);
+        }
+        assertThat(useCase.upgrade(CHARACTER, "hoa_liet_hoa_tam_kinh", 40, HOA_WITH_ARTS))
+                .isEqualTo(SkillRankUseCase.Outcome.MAX_RANK);
+        assertThat(useCase.sheet(CHARACTER, 40, HOA_WITH_ARTS).pointsAvailable())
+                .isEqualTo(20 - 5);
+    }
+
     @Test
     void pointsShouldBeHalfTheLevel_andEachUpgradeSpendsOne() {
         assertThat(useCase.sheet(CHARACTER, 5, HOA).pointsAvailable()).isEqualTo(2);

@@ -27,6 +27,21 @@ public interface CompanionPort {
         public Optional<PetProgress> equippedPet(long characterId) {
             return Optional.empty();
         }
+
+        @Override
+        public Map<Long, Integer> petStages(long characterId) {
+            return Map.of();
+        }
+
+        @Override
+        public Optional<PetProgress> lockEquippedPet(Transaction tx, long characterId) {
+            return Optional.empty();
+        }
+
+        @Override
+        public void setPetStage(Transaction tx, long inventoryItemId, int stage) {
+            throw new IllegalStateException("CompanionPort.NONE không có linh thú nào để tiến hoá");
+        }
     };
 
     /** {@code item_template.move_speed_percent} của một mẫu (0 nếu không phải phi kiếm). */
@@ -40,4 +55,16 @@ public interface CompanionPort {
 
     /** Linh thú đang mặc và tiến độ của nó; rỗng nếu không mặc. */
     Optional<PetProgress> equippedPet(long characterId);
+
+    /** Bậc tiến hoá các linh thú ĐÃ có dòng {@code pet_state}, theo {@code inventory_item.id} (ADR-078). */
+    Map<Long, Integer> petStages(long characterId);
+
+    /**
+     * Linh thú đang mặc, khoá dòng {@code pet_state} tới hết transaction (tạo dòng cấp 1 nếu chưa có); rỗng nếu
+     * không mặc. Gọi SAU khoá túi đồ — thứ tự khoá chung.
+     */
+    Optional<PetProgress> lockEquippedPet(Transaction tx, long characterId);
+
+    /** Ghi bậc tiến hoá — chỉ sau {@link #lockEquippedPet} trong cùng transaction. */
+    void setPetStage(Transaction tx, long inventoryItemId, int stage);
 }

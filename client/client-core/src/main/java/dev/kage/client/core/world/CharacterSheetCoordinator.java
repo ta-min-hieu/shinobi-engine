@@ -110,9 +110,11 @@ final class CharacterSheetCoordinator implements WindowFlow {
                 .nameKey(pet.getItemTemplateId())
                 .map(this::text)
                 .orElseGet(() -> "#" + pet.getItemTemplateId());
-        return pet.getExpToNext() == 0
+        String line = pet.getExpToNext() == 0
                 ? format("charsheet.row.pet_max", name, pet.getLevel())
                 : format("charsheet.row.pet", name, pet.getLevel(), pet.getExpIntoLevel(), pet.getExpToNext());
+        // ADR-078 — bậc 2 ghi thêm nhãn; 0 (server cũ) và 1 là chưa tiến hoá.
+        return pet.getStage() >= 2 ? line + " " + text("charsheet.pet_evolved") : line;
     }
 
     private static ReportPanel.Row row(String text) {

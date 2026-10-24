@@ -8,8 +8,10 @@ package dev.kage.inventory.domain;
  * @param level cấp mới
  * @param expIntoLevel EXP đã có trong cấp hiện tại
  * @param leveledUp lần nhận này làm nó lên cấp
+ * @param stage bậc tiến hoá 1..{@link PetPolicy#MAX_STAGE} (ADR-078)
  */
-public record PetProgress(long inventoryItemId, long itemTemplateId, int level, long expIntoLevel, boolean leveledUp) {
+public record PetProgress(
+        long inventoryItemId, long itemTemplateId, int level, long expIntoLevel, boolean leveledUp, int stage) {
 
     /** EXP cần cho cấp kế (0 = tối đa). */
     public long expToNext() {

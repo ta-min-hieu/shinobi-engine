@@ -186,6 +186,7 @@ message PetView {
   int32 level = 2;
   int64 exp_into_level = 3;
   int64 exp_to_next = 4;      // 0 = cấp tối đa
+  int32 stage = 5;            // ADR-078 — bậc tiến hoá 1..2 (0 ở server cũ = bậc 1)
 }
 
 // ADR-065 — một bộ pháp khí trên bảng nhân vật. Chỉ số thưởng ĐÃ nằm trong các tổng ở trên.

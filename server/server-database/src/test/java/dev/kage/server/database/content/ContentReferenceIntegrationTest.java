@@ -103,7 +103,9 @@ class ContentReferenceIntegrationTest {
             "wooden_flying_sword",
             "jade_flying_sword",
             "spirit_fox",
-            "spirit_turtle");
+            "spirit_turtle",
+            // Lô 19 (2026-10-24) — Linh Thú Đan (ADR-078) lên trước art.
+            "spirit_beast_pill");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

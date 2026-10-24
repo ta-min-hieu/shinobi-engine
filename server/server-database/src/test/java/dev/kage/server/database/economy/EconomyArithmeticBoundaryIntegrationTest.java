@@ -19,6 +19,7 @@ import org.testcontainers.utility.DockerImageName;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.EnhancementTable;
 import dev.kage.mail.api.MailFacade;
+import dev.kage.mail.domain.Postage;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.GoldCapExceededException;
@@ -196,10 +197,12 @@ class EconomyArithmeticBoundaryIntegrationTest {
     @Test
     void shouldMoveExactlyTheAttachedGold_whenMailingAtEveryGoldEdge() {
         long balance = 500L;
-        for (long attached : new long[] {1L, balance - 1, balance, balance + 1, Long.MAX_VALUE}) {
+        // 486 + phí 14 = 500 đúng biên; 487 + 14 = 501 thiếu một (ADR-076).
+        for (long attached : new long[] {1L, 486L, 487L, balance - 1, balance, balance + 1, Long.MAX_VALUE}) {
             long sender = fixture.newCharacter(balance);
             long recipient = fixture.newCharacter(0L);
-            boolean affordable = attached <= balance;
+            long postage = Postage.feeFor(attached, 0);
+            boolean affordable = attached <= balance && attached + postage <= balance;
 
             MailFacade.SendOutcome sent = facades.mail()
                     .sendMail(new MailFacade.SendMailRequest(sender, recipient, "gold", "", attached, List.of()));
@@ -210,7 +213,7 @@ class EconomyArithmeticBoundaryIntegrationTest {
                     .isEqualTo(affordable ? MailFacade.SendResult.OK : MailFacade.SendResult.INSUFFICIENT_GOLD);
             assertThat(fixture.gold(sender))
                     .as(scenario + " — người gửi")
-                    .isEqualTo(affordable ? balance - attached : balance);
+                    .isEqualTo(affordable ? balance - attached - postage : balance);
             if (affordable) {
                 assertThat(facades.mail().claimMail(sent.mailId(), recipient, EconomyBoundaryFixture.newKey()))
                         .as(scenario + " — nhận")
@@ -226,7 +229,7 @@ class EconomyArithmeticBoundaryIntegrationTest {
         int spare = 51;
         int owned = maxStack + spare;
         for (int quantity : new int[] {1, owned - 1, owned, owned + 1, Integer.MAX_VALUE}) {
-            long sender = fixture.newCharacter(0L);
+            long sender = fixture.newCharacter(Postage.BASE_FEE);
             fixture.addRow(sender, kunai, maxStack);
             fixture.addRow(sender, kunai, spare);
             long recipient = fixture.newCharacter(0L);
@@ -297,7 +300,7 @@ class EconomyArithmeticBoundaryIntegrationTest {
         int total = perLine * lines;
         int maxStack = fixture.maxStack(kunai);
         long attachedGold = 300L;
-        long sender = fixture.newCharacter(attachedGold);
+        long sender = fixture.newCharacter(attachedGold + Postage.feeFor(attachedGold, lines));
         fixture.addRows(sender, kunai, maxStack, total / maxStack);
         fixture.addRow(sender, kunai, total % maxStack);
         long recipient = fixture.newCharacter(0L);
@@ -334,7 +337,7 @@ class EconomyArithmeticBoundaryIntegrationTest {
         int held = 30;
         int perLine = 60;
         int maxStack = fixture.maxStack(kunai);
-        long sender = fixture.newCharacter(0L);
+        long sender = fixture.newCharacter(Postage.BASE_FEE);
         fixture.addRow(sender, kunai, maxStack);
         fixture.addRow(sender, kunai, 2 * perLine - maxStack);
         long recipient = fixture.newCharacter(0L);

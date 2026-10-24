@@ -17,7 +17,7 @@ import java.util.concurrent.atomic.LongAdder;
  *
  * <p><b>Sổ vàng.</b> Bốn đường đổi {@code character_stat.gold} (cửa hàng, cường hoá, thư, giao dịch)
  * đều đi qua {@code GoldLedger} và ghi {@code audit_log} trong CÙNG transaction: {@code SHOP_BUY.goldCost},
- * {@code SHOP_SELL.goldEarned}, {@code ENHANCE_ITEM.goldCost}, {@code MAIL_SEND.goldAmount},
+ * {@code SHOP_SELL.goldEarned}, {@code ENHANCE_ITEM.goldCost}, {@code MAIL_SEND.goldAmount + postage},
  * {@code MAIL_CLAIM.goldAmount}, {@code TRADE_EXECUTED.goldReceived − goldGiven}. Nên vàng TỪNG nhân
  * vật phải bằng đúng vàng ban đầu cộng tổng sổ của chính họ — chặt hơn hẳn "tổng toàn server".
  *
@@ -31,11 +31,14 @@ final class EconomyInvariants {
 
     private static final String JSON = "a.detail_json::jsonb->>";
 
+    /** Phí thư (ADR-076) — vàng bị đốt, không đến tay ai; audit trước ADR-076 không có khoá này. */
+    private static final String POSTAGE = "COALESCE((" + JSON + "'postage')::bigint, 0)";
+
     private static final String AUDIT_GOLD_DELTA = "CASE a.action"
             + " WHEN 'SHOP_BUY' THEN -(" + JSON + "'goldCost')::bigint"
             + " WHEN 'SHOP_SELL' THEN (" + JSON + "'goldEarned')::bigint"
             + " WHEN 'ENHANCE_ITEM' THEN -(" + JSON + "'goldCost')::bigint"
-            + " WHEN 'MAIL_SEND' THEN -(" + JSON + "'goldAmount')::bigint"
+            + " WHEN 'MAIL_SEND' THEN -(" + JSON + "'goldAmount')::bigint - " + POSTAGE
             + " WHEN 'MAIL_CLAIM' THEN (" + JSON + "'goldAmount')::bigint"
             + " WHEN 'TRADE_EXECUTED' THEN (" + JSON + "'goldReceived')::bigint - (" + JSON + "'goldGiven')::bigint"
             + " ELSE 0 END";
@@ -45,7 +48,7 @@ final class EconomyInvariants {
             + " LEFT JOIN audit_log a ON a.character_id = c.id"
             + " WHERE c.account_id = ? GROUP BY c.id, cs.gold ORDER BY c.id";
 
-    // Vàng chỉ SINH ở bán hàng và chỉ MẤT ở mua hàng/cường hoá; thư và giao dịch chỉ chuyển chỗ.
+    // Vàng chỉ SINH ở bán hàng và chỉ MẤT ở mua hàng/cường hoá/phí thư; thư và giao dịch chỉ chuyển chỗ.
     // Vàng trong thư chưa nhận là vàng đang "ký quỹ" — vẫn tồn tại, chỉ chưa thuộc túi ai.
     private static final String SYSTEM_GOLD = "SELECT"
             + " (SELECT COALESCE(SUM(cs.gold), 0) FROM character_stat cs JOIN character c ON c.id = cs.character_id"
@@ -53,7 +56,8 @@ final class EconomyInvariants {
             + " + (SELECT COALESCE(SUM(m.gold_amount), 0) FROM mail m WHERE m.claimed_at IS NULL),"
             + " (SELECT COALESCE(SUM(CASE a.action WHEN 'SHOP_SELL' THEN (" + JSON + "'goldEarned')::bigint"
             + "   WHEN 'SHOP_BUY' THEN -(" + JSON + "'goldCost')::bigint"
-            + "   WHEN 'ENHANCE_ITEM' THEN -(" + JSON + "'goldCost')::bigint ELSE 0 END), 0)"
+            + "   WHEN 'ENHANCE_ITEM' THEN -(" + JSON + "'goldCost')::bigint"
+            + "   WHEN 'MAIL_SEND' THEN -" + POSTAGE + " ELSE 0 END), 0)"
             + "   FROM audit_log a JOIN character c ON c.id = a.character_id WHERE c.account_id = ?)";
 
     private static final String QUANTITY_BY_TEMPLATE = "SELECT t.id,"
@@ -151,7 +155,7 @@ final class EconomyInvariants {
         long expected = world.initialGoldEach() * world.characters().size() + row[1];
         return row[0] == expected
                 ? List.of()
-                : List.of("tổng vàng (túi + thư chưa nhận) = %d, kỳ vọng ban đầu + bán − mua − cường hoá = %d"
+                : List.of("tổng vàng (túi + thư chưa nhận) = %d, kỳ vọng ban đầu + bán − mua − cường hoá − phí thư = %d"
                         .formatted(row[0], expected));
     }
 

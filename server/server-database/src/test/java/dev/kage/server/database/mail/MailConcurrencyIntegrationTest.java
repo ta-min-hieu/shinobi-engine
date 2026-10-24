@@ -38,6 +38,7 @@ import dev.kage.mail.application.SendMailUseCase;
 import dev.kage.mail.domain.Mail;
 import dev.kage.mail.domain.MailAttachmentDraft;
 import dev.kage.mail.domain.MailDraft;
+import dev.kage.mail.domain.Postage;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
@@ -131,7 +132,7 @@ class MailConcurrencyIntegrationTest {
         for (int round = 0; round < RACE_ROUNDS; round++) {
             long senderId = newCharacter();
             long recipientId = newCharacter();
-            setGold(senderId, MAIL_GOLD);
+            setGold(senderId, MAIL_GOLD + Postage.feeFor(MAIL_GOLD, 0));
 
             List<SendMailUseCase.SendResult> results = runConcurrently(() ->
                     newSendUseCase().execute(new MailDraft(senderId, recipientId, "Quà", "", MAIL_GOLD, List.of())));
@@ -154,6 +155,8 @@ class MailConcurrencyIntegrationTest {
             long senderId = newCharacter();
             long recipientId = newCharacter();
             giveSword(senderId);
+            // Đủ phí thư cho MỌI lá (ADR-076) — chỉ thanh kiếm được phép là thứ thiếu.
+            setGold(senderId, Postage.BASE_FEE * 100);
 
             List<SendMailUseCase.SendResult> results = runConcurrently(() -> newSendUseCase()
                     .execute(new MailDraft(

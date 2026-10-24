@@ -3,11 +3,15 @@ package dev.kage.server.gateway;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongFunction;
 
 import dev.kage.character.api.SkillRankFacade;
 import dev.kage.character.application.SkillRankUseCase;
 import dev.kage.server.world.Element;
+import dev.kage.server.world.EquipmentBonusSnapshot;
 import dev.kage.server.world.FactionSkillSlot;
+import dev.kage.server.world.MentalArt;
+import dev.kage.server.world.MentalArts;
 import dev.kage.server.world.SkillRankSnapshot;
 import dev.kage.server.world.WorldFacade;
 
@@ -20,9 +24,23 @@ final class SkillRankSource {
     // volatile, không final: registry dựng TRƯỚC DB — bind() sau, cùng lý do AchievementHooks.
     private volatile SkillRankFacade facade = SkillRankFacade.inMemory();
 
+    // Linh căn hiện tại theo DB — tâm pháp chỉ tính trên linh căn hiện tại (ADR-077). Mặc định NONE: test
+    // dựng registry không DB thì không có tâm pháp nào.
+    private volatile LongFunction<Element> currentElement = characterId -> Element.NONE;
+
     /** Nối bản thật — một lần, lúc khởi động. */
-    void bind(SkillRankFacade realFacade) {
+    void bind(SkillRankFacade realFacade, LongFunction<Element> elementLookup) {
         this.facade = realFacade;
+        this.currentElement = elementLookup;
+    }
+
+    /**
+     * {@code equipment} cộng tâm pháp bị động đã học của linh căn hiện tại (ADR-077) — đường DUY NHẤT gộp hai
+     * thứ, nên mọi chỗ áp chỉ số (vào world, mặc/gỡ đồ, linh thú lên cấp, đổi linh căn, bảng nhân vật) thấy
+     * cùng một con số. Chạm DB: Virtual Thread.
+     */
+    EquipmentBonusSnapshot withMentalArts(long characterId, EquipmentBonusSnapshot equipment) {
+        return MentalArts.applyTo(equipment, currentElement.apply(characterId), facade.ranksOf(characterId));
     }
 
     SkillRankFacade facade() {
@@ -41,11 +59,14 @@ final class SkillRankSource {
         return new SkillRankSnapshot(bySlot[0], bySlot[1], bySlot[2], bySlot[3]);
     }
 
-    /** Chiêu của {@code element} theo thứ tự ô, dạng use case cần. */
+    /** Chiêu của {@code element} theo thứ tự ô, rồi tới tâm pháp (ADR-077), dạng use case cần. */
     static List<SkillRankUseCase.FactionSkill> factionSkills(Element element) {
         List<SkillRankUseCase.FactionSkill> skills = new ArrayList<>();
         for (FactionSkillSlot skill : WorldFacade.skillsOf(element)) {
             skills.add(new SkillRankUseCase.FactionSkill(skill.code(), skill.requiredLevel()));
+        }
+        for (MentalArt art : MentalArts.of(element)) {
+            skills.add(new SkillRankUseCase.FactionSkill(art.code(), art.requiredLevel(), true));
         }
         return skills;
     }

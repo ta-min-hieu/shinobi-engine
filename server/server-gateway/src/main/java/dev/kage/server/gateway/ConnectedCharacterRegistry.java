@@ -716,8 +716,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      * trên EventLoop.
      */
     EquipmentBonusSnapshot equipmentBonusOf(long characterId) {
-        return CharacterLoadout.snapshotOf(
-                inventoryFacade.computeEquipmentBonus(characterId), inventoryFacade.moveSpeedPercent(characterId));
+        return skillRanks.withMentalArts(
+                characterId,
+                CharacterLoadout.snapshotOf(
+                        inventoryFacade.computeEquipmentBonus(characterId),
+                        inventoryFacade.moveSpeedPercent(characterId)));
     }
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {

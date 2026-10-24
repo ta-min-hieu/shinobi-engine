@@ -40,6 +40,7 @@ import dev.kage.mail.application.MailPorts;
 import dev.kage.mail.application.SendMailUseCase;
 import dev.kage.mail.domain.MailAttachmentDraft;
 import dev.kage.mail.domain.MailDraft;
+import dev.kage.mail.domain.Postage;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
@@ -294,6 +295,9 @@ class EquipWhileItemLeavesIntegrationTest {
                 new PostgresMailInventoryGatewayAdapter(),
                 new PostgresMailAuditAdapter(),
                 new PostgresMailIdempotencyAdapter());
+        // Đủ phí thư (ADR-076) — ca này đo đường VẬT PHẨM, không được dừng sớm ở vàng.
+        queryLong(
+                "UPDATE character_stat SET gold = ? WHERE character_id = ? RETURNING gold", Postage.BASE_FEE, senderId);
         MailDraft draft = new MailDraft(
                 senderId, recipientId, "sword", "", 0L, List.of(new MailAttachmentDraft(swordTemplateId, 1)));
         return new SendMailUseCase(ports, new JdbcMailTransactionRunner(dataSource))

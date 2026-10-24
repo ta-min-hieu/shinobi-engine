@@ -4,12 +4,15 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
 import dev.kage.inventory.domain.AuditPort;
+import dev.kage.inventory.domain.CompanionPort;
 import dev.kage.inventory.domain.Inventory;
 import dev.kage.inventory.domain.InventoryPort;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.inventory.domain.ItemUseEffect;
+import dev.kage.inventory.domain.PetPolicy;
+import dev.kage.inventory.domain.PetProgress;
 import dev.kage.inventory.domain.TradeOfferPort;
 import dev.kage.inventory.domain.Transaction;
 import dev.kage.inventory.domain.TransactionRunner;
@@ -51,7 +54,13 @@ public final class UseItemUseCase {
          * Mọi cái của dòng đó đang được chào trong một phiên giao dịch còn mở (dòng 80, chủ dự án
          * duyệt 2026-10-18). Chồng 5 viên chào 2 thì vẫn uống được 3 viên kia.
          */
-        ITEM_IN_TRADE
+        ITEM_IN_TRADE,
+        /** Linh Thú Đan (ADR-078) nhưng không mặc linh thú nào. Không trừ viên đan. */
+        NO_PET_EQUIPPED,
+        /** Linh thú đang mặc chưa tới {@link PetPolicy#EVOLVE_LEVEL}. Không trừ viên đan. */
+        PET_LEVEL_TOO_LOW,
+        /** Linh thú đang mặc đã ở bậc cao nhất. Không trừ viên đan. */
+        PET_ALREADY_EVOLVED
     }
 
     /**
@@ -62,12 +71,24 @@ public final class UseItemUseCase {
             InventoryPort inventoryPort,
             ItemTemplatePort itemTemplatePort,
             AuditPort auditPort,
-            TradeOfferPort tradeOfferPort) {}
+            TradeOfferPort tradeOfferPort,
+            CompanionPort companionPort) {
+
+        /** Không có linh thú (mọi chỗ dựng trước ADR-078) — Linh Thú Đan luôn {@code NO_PET_EQUIPPED}. */
+        public Ports(
+                InventoryPort inventoryPort,
+                ItemTemplatePort itemTemplatePort,
+                AuditPort auditPort,
+                TradeOfferPort tradeOfferPort) {
+            this(inventoryPort, itemTemplatePort, auditPort, tradeOfferPort, CompanionPort.NONE);
+        }
+    }
 
     private final InventoryPort inventoryPort;
     private final ItemTemplatePort itemTemplatePort;
     private final AuditPort auditPort;
     private final TradeOfferPort tradeOfferPort;
+    private final CompanionPort companionPort;
     private final TransactionRunner tx;
 
     public UseItemUseCase(Ports ports, TransactionRunner tx) {
@@ -75,6 +96,7 @@ public final class UseItemUseCase {
         this.itemTemplatePort = ports.itemTemplatePort();
         this.auditPort = ports.auditPort();
         this.tradeOfferPort = ports.tradeOfferPort();
+        this.companionPort = ports.companionPort();
         this.tx = tx;
     }
 
@@ -104,6 +126,12 @@ public final class UseItemUseCase {
         if (item.quantity() - tradeOfferPort.offeredQuantity(t, characterId, inventoryItemId) < 1) {
             return UseItemResult.failed(Outcome.ITEM_IN_TRADE);
         }
+        if (template.get().useEffect() == ItemUseEffect.EVOLVE_PET) {
+            Optional<Outcome> refused = evolveEquippedPet(t, characterId);
+            if (refused.isPresent()) {
+                return UseItemResult.failed(refused.get());
+            }
+        }
 
         inventory.consumeOne(inventoryItemId);
         int remaining = inventory
@@ -119,6 +147,25 @@ public final class UseItemUseCase {
                 remaining,
                 template.get().useEffect(),
                 template.get().useValue());
+    }
+
+    /**
+     * ADR-078 — tiến hoá linh thú đang mặc, dưới khoá túi đồ rồi khoá dòng {@code pet_state}. Từ chối thì chưa ghi
+     * gì (viên đan chưa bị trừ); đồng ý thì ghi bậc mới, viên đan bị trừ ngay sau trong cùng transaction.
+     */
+    private Optional<Outcome> evolveEquippedPet(Transaction t, long characterId) {
+        Optional<PetProgress> pet = companionPort.lockEquippedPet(t, characterId);
+        if (pet.isEmpty()) {
+            return Optional.of(Outcome.NO_PET_EQUIPPED);
+        }
+        if (pet.get().stage() >= PetPolicy.MAX_STAGE) {
+            return Optional.of(Outcome.PET_ALREADY_EVOLVED);
+        }
+        if (pet.get().level() < PetPolicy.EVOLVE_LEVEL) {
+            return Optional.of(Outcome.PET_LEVEL_TOO_LOW);
+        }
+        companionPort.setPetStage(t, pet.get().inventoryItemId(), pet.get().stage() + 1);
+        return Optional.empty();
     }
 
     private static String detailJson(long inventoryItemId, long itemTemplateId) {

@@ -3,7 +3,7 @@ package dev.kage.character.domain;
 import java.util.Collection;
 import java.util.Map;
 
-/** Điểm công pháp + bậc chiêu (ADR-071) — hàm thuần. */
+/** Điểm công pháp + bậc chiêu (ADR-071) + bậc tâm pháp (ADR-077) — hàm thuần. */
 public final class SkillRankPolicy {
 
     public static final int MAX_RANK = 5;
@@ -25,6 +25,20 @@ public final class SkillRankPolicy {
             spent += Math.max(0, ranks.getOrDefault(code, 1) - 1);
         }
         return spent;
+    }
+
+    /** Tâm pháp bị động (ADR-077): mỗi bậc 1..5 tốn một điểm — vắng dòng = bậc 0, chưa học. */
+    public static int spentPassivePoints(Map<String, Integer> ranks, Collection<String> passiveCodes) {
+        int spent = 0;
+        for (String code : passiveCodes) {
+            spent += Math.clamp(ranks.getOrDefault(code, 0), 0, MAX_RANK);
+        }
+        return spent;
+    }
+
+    /** Bậc khi chưa có dòng nào: chiêu chủ động 1, tâm pháp 0 (ADR-077). */
+    public static int baseRank(boolean passive) {
+        return passive ? 0 : 1;
     }
 
     /** Hệ số con số chiêu theo bậc, tính bằng phần trăm: bậc 1 = 100, bậc 5 = 140. */
