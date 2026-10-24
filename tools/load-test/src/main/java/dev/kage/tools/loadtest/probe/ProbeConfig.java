@@ -199,7 +199,8 @@ public record ProbeConfig(
      *
      * @param abandonQuest mã nhiệm vụ cần bỏ; rỗng = không bỏ
      * @param claimAllMail lĩnh mọi thư chưa lĩnh (mỗi thư gửi hai lần cùng khoá idempotency)
-     * @param sendMail {@code nguoiNhan:soVang} — gửi một thư kèm vàng, HAI lần cùng khoá (ADR-058); rỗng = không
+     * @param sendMail {@code nguoiNhan:soVang[:maMau:soLuong:cap]} — gửi một thư kèm vàng (và một dòng vật phẩm,
+     *     ADR-083), HAI lần cùng khoá (ADR-058); rỗng = không
      * @param statSheet in bảng nhân vật (210/211)
      * @param leaderboards loại bảng xếp hạng cần in ({@code realm}, {@code arena}, {@code combat_power},
      *     {@code guild})

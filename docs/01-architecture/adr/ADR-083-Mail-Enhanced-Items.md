@@ -49,4 +49,4 @@ Client hiện "+N" sau dòng đính kèm.
 
 1. ✅ Thi hành 2026-10-24 (lô 20) — test Postgres `shouldCarryEnhanceLevelThroughMail` (gửi +7 ⇒ người nhận có +7;
    gửi cấp 0 khi chỉ có +7 ⇒ `ATTACHMENT_NOT_OWNED`).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24 (gameProbe `--sendMail=Benkei:0:10:1:7`, dạng đính kèm mới của probe): gửi trường kiếm +7 ⇒ `mail_item.enhance_level=7`, lần hai cùng khoá `DUPLICATE_REQUEST`; Benkei lĩnh ⇒ món +7 nằm ô RIÊNG (slot 1), không gộp chồng.

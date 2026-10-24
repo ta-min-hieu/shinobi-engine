@@ -50,4 +50,4 @@ intimacy, milestone}`; `FriendView.intimacy = 4`.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 20).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24 (`--lot20=friendGift:Benkei` ×2): lần 1 `OK` thân mật 10, vàng người tặng −100; lần 2 cùng ngày `ALREADY_GIFTED_TODAY`. Đặt thân mật 95 + xoá nhật ký ⇒ tặng `OK` thân mật 105 mốc 100 ⇒ thư hệ thống 500 linh thạch cho CẢ HAI (Benkei lĩnh được).

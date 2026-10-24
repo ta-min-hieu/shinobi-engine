@@ -49,4 +49,4 @@ cấp 1. Gateway đăng ký lại kết nối để mốc "EXP đã gửi" về 
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 20).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24 (tanthua44, SQL đặt level 100 + exp 495000 — cấp suy từ EXP lúc vào world nên chỉ đặt `level` là bị kéo về): `REBIRTH_OUTCOME_OK` số lần 1, gói EXP về cấp 1; lần hai `LEVEL_TOO_LOW`. Bảng nhân vật: trang bị +78 → +108 máu, công/thủ/kháng +4. Giết quái sau đó nhận EXP bình thường (mốc EXP đã gửi được xoá đúng). Đã trả nhân vật về Lv15 sau phép đo.

@@ -65,5 +65,5 @@ Mạch" hiện ở bảng đó; CHƯA gắn lên bảng tên nhân vật — đ�
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 20).
-2. ⏳ Kiểm sống bằng gameProbe (`--lot20=spiritVein`; đặt lịch về hiện tại bằng SQL dev).
+2. ✅ Kiểm sống 2026-10-24: mở khung bằng SQL, Kagemaru (bang Thanh Hu Thu) đứng X=26 ⇒ `spirit_vein_score` 2 điểm sau ~20 s; rút `duration_minutes` cho khung đóng ⇒ chốt `winner_guild_id=4`, `held_until` +7 ngày, thư 3000 + spirit_beast_pill cho thành viên, hàng đợi thư rỗng. Ghi chú: đổi lịch bằng SQL làm bộ hẹn chốt luôn khung "tuần trước" của lịch mới (rỗng, không người thắng) — vô hại, chỉ thêm một dòng `spirit_vein_settlement`.
 3. Bản sau (cần chủ dự án chọn): buff cho bang giữ, danh hiệu trên bảng tên, nhiều Linh Mạch.

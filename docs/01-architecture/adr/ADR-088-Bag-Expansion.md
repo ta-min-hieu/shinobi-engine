@@ -47,4 +47,4 @@ nên tự hiện sức chứa mới.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 20).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24 (`--useItemCode=bag_expansion_pouch`): `success=true`, túi mất món, `character_stat.bag_capacity` 20 → 25.

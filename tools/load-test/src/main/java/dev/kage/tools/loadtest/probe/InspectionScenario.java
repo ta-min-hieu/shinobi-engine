@@ -17,6 +17,7 @@ import dev.kage.protocol.LeaderboardEntry;
 import dev.kage.protocol.LeaderboardKind;
 import dev.kage.protocol.ListMailRequest;
 import dev.kage.protocol.ListMailResponse;
+import dev.kage.protocol.MailAttachmentView;
 import dev.kage.protocol.MailView;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SendMailCommand;
@@ -35,6 +36,8 @@ final class InspectionScenario {
 
     /** Ngân sách bỏ qua AoI event khi chờ 1 phản hồi cụ thể — cùng lý do đã ghi ở {@code QuestScenario}. */
     private static final int MAX_FRAMES_TO_SKIP = 2000;
+
+    private static final int MAIL_WITH_ATTACHMENT_PARTS = 5;
 
     /** Số dòng đầu bảng xếp hạng in ra — đủ thấy thứ tự mà không làm ngập báo cáo. */
     private static final int LEADERBOARD_ROWS_SHOWN = 5;
@@ -101,21 +104,33 @@ final class InspectionScenario {
         }
     }
 
-    /** ADR-058: cùng khoá gửi hai lần ⇒ lần hai phải là DUPLICATE_REQUEST, vàng trừ một lần. */
+    /**
+     * ADR-058: cùng khoá gửi hai lần ⇒ lần hai phải là DUPLICATE_REQUEST, vàng trừ một lần. Dạng thêm
+     * {@code nguoiNhan:soVang:maMau:soLuong:cap} đính kèm một dòng vật phẩm (ADR-083 — chở cấp cường hoá).
+     */
     private void sendMailTwice(String recipientAndGold) throws IOException {
-        String[] parts = recipientAndGold.split(":", 2);
-        if (parts.length != 2) {
-            throw new IllegalArgumentException("--sendMail cần dạng nguoiNhan:soVang, nhận '" + recipientAndGold + "'");
+        String[] parts = recipientAndGold.split(":", MAIL_WITH_ATTACHMENT_PARTS);
+        if (parts.length != 2 && parts.length != MAIL_WITH_ATTACHMENT_PARTS) {
+            throw new IllegalArgumentException(
+                    "--sendMail cần dạng nguoiNhan:soVang[:maMau:soLuong:cap], nhận '" + recipientAndGold + "'");
         }
-        SendMailCommand command = SendMailCommand.newBuilder()
+        SendMailCommand.Builder builder = SendMailCommand.newBuilder()
                 .setRecipientName(parts[0])
                 .setSubject("probe")
                 .setBody("probe ADR-058")
                 .setGoldAmount(Long.parseLong(parts[1]))
-                .setIdempotencyKey(UUID.randomUUID().toString())
-                .build();
-        session.note("gửi thư cho " + parts[0] + " kèm " + parts[1] + " linh thạch: lần 1 " + send(command)
-                + ", lần 2 cùng khoá " + send(command));
+                .setIdempotencyKey(UUID.randomUUID().toString());
+        String attachment = "";
+        if (parts.length == MAIL_WITH_ATTACHMENT_PARTS) {
+            builder.addAttachments(MailAttachmentView.newBuilder()
+                    .setItemTemplateId(Long.parseLong(parts[2]))
+                    .setQuantity(Integer.parseInt(parts[3]))
+                    .setEnhanceLevel(Integer.parseInt(parts[4])));
+            attachment = " + mẫu " + parts[2] + " x" + parts[3] + " +" + parts[4];
+        }
+        SendMailCommand command = builder.build();
+        session.note("gửi thư cho " + parts[0] + " kèm " + parts[1] + " linh thạch" + attachment + ": lần 1 "
+                + send(command) + ", lần 2 cùng khoá " + send(command));
     }
 
     private String send(SendMailCommand command) throws IOException {

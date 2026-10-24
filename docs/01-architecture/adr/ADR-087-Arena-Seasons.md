@@ -50,4 +50,4 @@ vòng gửi thì lượt sau gửi tiếp, không gửi đôi. Thông báo toàn
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 20).
-2. ⏳ Kiểm sống (đặt `ends_at` mùa 1 về quá khứ trên DB dev).
+2. ✅ Kiểm sống 2026-10-24: đặt `ends_at` mùa 1 về quá khứ ⇒ bộ hẹn (60 s) chốt: mùa 1 `closed_at`, mùa 2 mở 28 ngày; thư thưởng hạng 1 (10000 + spirit_beast_pill), hạng 2–3 (6000 + spirit_jade_fire) đúng bảng `pvp_season_reward`; điểm kéo nửa đường về 1000 (1031→1015, 999→1000, 970→985); hàng đợi `pvp_season_payout` rỗng sau khi gửi.

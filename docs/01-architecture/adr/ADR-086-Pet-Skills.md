@@ -46,4 +46,4 @@ tính đòn. Random chỉ ở server.
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 20).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24: đeo Huyền Quy, đứng chịu đòn thường bandit (13/đòn) ⇒ 2/30 đòn bị chắn còn 6 (~7%, kỳ vọng 10%). Linh Hồ CHƯA quan sát được trực tiếp (Kagemaru Lv41 giết bandit một nhát, sát thương bị kẹp theo máu còn lại) — cùng đường `Extras` → `CombatStatsComponent` với Huyền Quy, phủ bằng test đơn vị `PetSkills`.

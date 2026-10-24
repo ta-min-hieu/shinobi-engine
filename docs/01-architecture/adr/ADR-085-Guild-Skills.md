@@ -50,4 +50,4 @@ xong ⇒ tính lại chỉ số mọi thành viên đang online ngay. Vào/rời
 ## Việc cần làm tiếp theo
 
 1. ✅ Thi hành 2026-10-24 (lô 20).
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-24: bang chủ Kagemaru (bang cấp 1 ⇒ 2 điểm) nâng insight rồi vitality `OK`, bulwark `NO_POINTS`; máu tối đa 371 → 386 (+15/bậc vitality) ngay trên bảng nhân vật và giữ sau đăng nhập lại.
