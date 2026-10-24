@@ -12,19 +12,20 @@ class WorldBossDamageLedgerTest {
     @Test
     void shouldSumDamagePerCharacter_onlyForTrackedBosses() {
         WorldBossDamageLedger ledger = new WorldBossDamageLedger();
-        ledger.track(-10L, "sample_boss");
+        ledger.track(-10L, "sample_boss", 100);
 
-        ledger.record(-10L, 1L, 30);
-        ledger.record(-10L, 2L, 5);
-        ledger.record(-10L, 1L, 12);
-        ledger.record(-10L, -3L, 99); // quái khác đánh — bỏ qua
-        ledger.record(-10L, 2L, 0); // trượt — bỏ qua
-        ledger.record(-11L, 1L, 50); // quái thường — không có sổ
+        ledger.record(-10L, 1L, 30, 70);
+        ledger.record(-10L, 2L, 5, 65);
+        ledger.record(-10L, 1L, 12, 53);
+        ledger.record(-10L, -3L, 9, 44); // quái khác đánh — bỏ qua
+        ledger.record(-10L, 2L, 0, 44); // trượt — bỏ qua
+        ledger.record(-10L, 2L, 76, 0); // đòn kết liễu: chỉ 44 máu thật còn lại
+        ledger.record(-11L, 1L, 50, 0); // quái thường — không có sổ
 
         assertThat(ledger.close(-11L)).isEmpty();
         WorldBossDamageLedger.Defeat defeat = ledger.close(-10L).orElseThrow();
         assertThat(defeat.monsterCode()).isEqualTo("sample_boss");
-        assertThat(defeat.damageByCharacter()).isEqualTo(Map.of(1L, 42L, 2L, 5L));
+        assertThat(defeat.damageByCharacter()).isEqualTo(Map.of(1L, 42L, 2L, 5L + 44L));
         assertThat(ledger.close(-10L)).as("đóng một lần").isEmpty();
     }
 }

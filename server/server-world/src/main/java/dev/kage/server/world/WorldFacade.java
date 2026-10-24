@@ -1438,7 +1438,8 @@ public final class WorldFacade {
                     outcome.targetCurrentHp(),
                     outcome.targetDied());
 
-            worldBossLedger.record(outcome.targetEntityId(), outcome.attackerEntityId(), outcome.damage());
+            worldBossLedger.record(
+                    outcome.targetEntityId(), outcome.attackerEntityId(), outcome.damage(), outcome.targetCurrentHp());
             Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
             addIfCharacter(observers, outcome.attackerEntityId()); // người đánh luôn thấy đòn của chính mình.
             // PHÁT HIỆN THẬT (Phase 8 lát cắt 2, viết test E2E thật mới lộ ra): khi mục tiêu là
@@ -1614,7 +1615,8 @@ public final class WorldFacade {
                     outcome.targetDied(),
                     outcome.effectKind());
 
-            worldBossLedger.record(outcome.targetEntityId(), outcome.attackerEntityId(), outcome.damage());
+            worldBossLedger.record(
+                    outcome.targetEntityId(), outcome.attackerEntityId(), outcome.damage(), outcome.targetCurrentHp());
             Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
             observers.add(outcome.attackerEntityId()); // người dùng skill luôn thấy kết quả của chính mình.
             // Chỉ target dương (nhân vật) — xem giải thích đầy đủ ở handleCombatResults.
@@ -2004,7 +2006,7 @@ public final class WorldFacade {
 
         entitiesByMonsterId.put(monsterId, entity);
         if (command.worldBoss()) {
-            worldBossLedger.track(monsterId, bossCode);
+            worldBossLedger.track(monsterId, bossCode, loai.maxHp());
         }
         aoiDirty = true; // thực thể mới — xem syncAoiIfDirty
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
