@@ -11,6 +11,7 @@ import dev.kage.character.domain.ExperienceProgress;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.ItemStack;
+import dev.kage.party.domain.PartyFinderBoard;
 import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.CharacterAppearanceChangedEvent;
 import dev.kage.protocol.CharacterDespawnedEvent;
@@ -106,6 +107,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     /** ADR-071 — bậc chiêu cho mọi đường attach ({@link CharacterLoadout}). */
     final SkillRankSource skillRanks = new SkillRankSource();
+
+    /** Bảng tìm nhóm (ADR-082) — RAM, dùng chung mọi kết nối; tin hết hạn 10 phút. */
+    final PartyFinderBoard partyFinder = new PartyFinderBoard(java.time.Clock.systemUTC());
 
     ConnectedCharacterRegistry(
             InventoryFacade inventoryFacade,

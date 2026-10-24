@@ -74,6 +74,7 @@ public final class PartyPanel implements HudWindow {
     private Runnable onCreate;
     private Consumer<String> onInvite;
     private Runnable onLeave;
+    private Runnable onFinder;
     private Consumer<String> onKick;
     private LongConsumer onAcceptInvite;
     private LongConsumer onRejectInvite;
@@ -114,6 +115,10 @@ public final class PartyPanel implements HudWindow {
         window.add(memberList).width(PANEL_WIDTH_PX).padTop(8f).growX().row();
         window.add(inviteList).width(PANEL_WIDTH_PX).padTop(8f).growX().row();
         window.add(buildActionRow()).width(PANEL_WIDTH_PX).padTop(12f).growX().row();
+        window.add(button("party.action.finder", () -> fire(onFinder)))
+                .left()
+                .padTop(6f)
+                .row();
         window.add(buildDungeonRow()).width(PANEL_WIDTH_PX).padTop(12f).growX().row();
         // Cách ĐÓNG phải nằm ngay trên cửa sổ. Không có nó thì người chơi mở nhầm một cửa sổ che
         // giữa màn hình và không biết làm sao thoát ra — cùng loại bế tắc mà ESC của DialoguePanel
@@ -264,6 +269,11 @@ public final class PartyPanel implements HudWindow {
     /** Tên nhân vật gõ trong ô — server tự tra và trả {@code TARGET_NOT_FOUND} nếu sai (Điều 24). */
     public void setOnInvite(Consumer<String> listener) {
         this.onInvite = listener;
+    }
+
+    /** ADR-082 — nút "Bảng tìm nhóm". */
+    public void setOnFinder(Runnable listener) {
+        this.onFinder = listener;
     }
 
     public void setOnLeave(Runnable listener) {

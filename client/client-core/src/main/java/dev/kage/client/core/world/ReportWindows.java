@@ -32,7 +32,9 @@ record ReportWindows(
         ReportPanel craftingPanel,
         CraftingCoordinator crafting,
         ReportPanel guildShopPanel,
-        GuildShopCoordinator guildShop) {
+        GuildShopCoordinator guildShop,
+        ReportPanel partyFinderPanel,
+        PartyFinderCoordinator partyFinder) {
 
     /**
      * Luồng nền các cửa sổ này mượn: catalog vật phẩm (tên món), nhật ký chat (báo mở thành tựu, đã bán), và
@@ -56,6 +58,8 @@ record ReportWindows(
         ReportPanel craftingPanel = new ReportPanel(skin, "crafting.title", Input.Keys.UNKNOWN, List.of());
         // Không phím mở — cửa hàng bang mở từ nút trong cửa sổ Bang (ADR-080 D5).
         ReportPanel guildShopPanel = new ReportPanel(skin, "guildshop.title", Input.Keys.UNKNOWN, List.of());
+        // Không phím mở — bảng tìm nhóm mở từ nút trong cửa sổ Nhóm (ADR-082 D6).
+        ReportPanel partyFinderPanel = new ReportPanel(skin, "partyfinder.title", Input.Keys.UNKNOWN, List.of());
         return new ReportWindows(
                 sheetPanel,
                 new CharacterSheetCoordinator(sheetPanel, sender, feeds.itemCatalog()),
@@ -74,7 +78,9 @@ record ReportWindows(
                 craftingPanel,
                 new CraftingCoordinator(craftingPanel, sender, feeds.itemCatalog()),
                 guildShopPanel,
-                new GuildShopCoordinator(guildShopPanel, sender, feeds.itemCatalog()));
+                new GuildShopCoordinator(guildShopPanel, sender, feeds.itemCatalog()),
+                partyFinderPanel,
+                new PartyFinderCoordinator(partyFinderPanel, sender, localCharacterId));
     }
 
     /** Cổng phím CHUNG của các cửa sổ mở bằng phím ({@code PanelHub#noneOpen}); kho đồ không có phím. */

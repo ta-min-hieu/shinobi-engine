@@ -186,6 +186,7 @@ import dev.kage.protocol.InvitePartyMemberResponse;
 import dev.kage.protocol.ItemCatalogResponse;
 import dev.kage.protocol.ItemRewardView;
 import dev.kage.protocol.ItemSetProgressView;
+import dev.kage.protocol.JoinPartyFinderCommand;
 import dev.kage.protocol.JumpCommand;
 import dev.kage.protocol.KickGuildMemberCommand;
 import dev.kage.protocol.KickGuildMemberOutcome;
@@ -214,6 +215,7 @@ import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.ListMailRequest;
 import dev.kage.protocol.ListMailResponse;
 import dev.kage.protocol.ListMarketRequest;
+import dev.kage.protocol.ListPartyFinderRequest;
 import dev.kage.protocol.ListPartyMembersRequest;
 import dev.kage.protocol.ListPartyMembersResponse;
 import dev.kage.protocol.ListPendingFriendRequestsRequest;
@@ -243,6 +245,7 @@ import dev.kage.protocol.PendingPartyInviteView;
 import dev.kage.protocol.PetView;
 import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
+import dev.kage.protocol.PostPartyFinderCommand;
 import dev.kage.protocol.QuestStatusChangedEvent;
 import dev.kage.protocol.RejectFriendRequestCommand;
 import dev.kage.protocol.RejectFriendRequestOutcome;
@@ -256,6 +259,7 @@ import dev.kage.protocol.RejectPartyInviteResponse;
 import dev.kage.protocol.RemoveFriendCommand;
 import dev.kage.protocol.RemoveFriendOutcome;
 import dev.kage.protocol.RemoveFriendResponse;
+import dev.kage.protocol.RemovePartyFinderCommand;
 import dev.kage.protocol.RequestTradeCommand;
 import dev.kage.protocol.RequestTradeOutcome;
 import dev.kage.protocol.RequestTradeResponse;
@@ -429,6 +433,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final MarketCommands market;
     private final CraftingCommands crafting;
     private final GuildShopCommands guildShop;
+    private final PartyFinderCommands partyFinder;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -524,6 +529,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_CRAFT_ITEM_COMMAND_VALUE, this::handleCraftItemCommand),
             Map.entry(Opcode.OPCODE_LIST_GUILD_SHOP_REQUEST_VALUE, this::handleListGuildShopRequest),
             Map.entry(Opcode.OPCODE_BUY_GUILD_SHOP_ITEM_COMMAND_VALUE, this::handleBuyGuildShopItemCommand),
+            Map.entry(Opcode.OPCODE_LIST_PARTY_FINDER_REQUEST_VALUE, this::handleListPartyFinderRequest),
+            Map.entry(Opcode.OPCODE_POST_PARTY_FINDER_COMMAND_VALUE, this::handlePostPartyFinderCommand),
+            Map.entry(Opcode.OPCODE_JOIN_PARTY_FINDER_COMMAND_VALUE, this::handleJoinPartyFinderCommand),
+            Map.entry(Opcode.OPCODE_REMOVE_PARTY_FINDER_COMMAND_VALUE, this::handleRemovePartyFinderCommand),
             Map.entry(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, this::handleGetItemCatalogRequest),
             Map.entry(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, this::handleListQuestsRequest),
             Map.entry(Opcode.OPCODE_ABANDON_QUEST_COMMAND_VALUE, this::handleAbandonQuestCommand),
@@ -616,6 +625,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.market = new MarketCommands(facades.progression().marketFacade(), worldGateway.registry());
         this.crafting = new CraftingCommands(facades.progression().crafting(), characterFacade, npcProximity);
         this.guildShop = new GuildShopCommands(facades.progression().guildShop());
+        this.partyFinder = new PartyFinderCommands(
+                facades.contentFacades().socialFacades().partyFacade(),
+                characterFacade,
+                worldGateway.registry().partyFinder);
         this.authExecutor = authExecutor;
         this.chatExecutor = new SerialExecutor(authExecutor);
         this.networkMetrics = observability.networkMetrics();
@@ -1804,6 +1817,39 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 header.sequenceId(),
                 Opcode.OPCODE_BUY_GUILD_SHOP_ITEM_RESPONSE_VALUE,
                 characterId -> guildShop.buy(characterId, command));
+    }
+
+    /** ADR-082 — bảng tìm nhóm (RAM). */
+    private void handleListPartyFinderRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListPartyFinderRequest.parser().parseFrom(payload);
+        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_LIST_PARTY_FINDER_RESPONSE_VALUE, id -> partyFinder.list());
+    }
+
+    private void handlePostPartyFinderCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        PostPartyFinderCommand command = PostPartyFinderCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_POST_PARTY_FINDER_RESPONSE_VALUE,
+                characterId -> partyFinder.post(characterId, command));
+    }
+
+    private void handleJoinPartyFinderCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        JoinPartyFinderCommand command = JoinPartyFinderCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_JOIN_PARTY_FINDER_RESPONSE_VALUE,
+                characterId -> partyFinder.join(characterId, command));
+    }
+
+    private void handleRemovePartyFinderCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        RemovePartyFinderCommand.parser().parseFrom(payload);
+        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_REMOVE_PARTY_FINDER_RESPONSE_VALUE, partyFinder::remove);
     }
 
     private void handleCraftItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)

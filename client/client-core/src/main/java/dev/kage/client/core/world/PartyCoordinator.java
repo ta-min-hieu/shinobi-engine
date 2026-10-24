@@ -16,6 +16,7 @@ import dev.kage.protocol.GetMyPartyResponse;
 import dev.kage.protocol.InvitePartyMemberResponse;
 import dev.kage.protocol.KickPartyMemberResponse;
 import dev.kage.protocol.LeavePartyResponse;
+import dev.kage.protocol.ListPartyFinderRequest;
 import dev.kage.protocol.ListPartyMembersResponse;
 import dev.kage.protocol.ListPendingPartyInvitesResponse;
 import dev.kage.protocol.Opcode;
@@ -61,6 +62,7 @@ final class PartyCoordinator implements WindowFlow {
         panel.setOnCreate(sender::createParty);
         panel.setOnInvite(sender::invitePartyMember);
         panel.setOnLeave(sender::leaveParty);
+        panel.setOnFinder(this::openFinder);
         panel.setOnKick(sender::kickPartyMember);
         panel.setOnAcceptInvite(sender::acceptPartyInvite);
         panel.setOnRejectInvite(sender::rejectPartyInvite);
@@ -201,5 +203,12 @@ final class PartyCoordinator implements WindowFlow {
         controller.clear();
         panel.close();
         redraw();
+    }
+
+    /** ADR-082 — đóng cửa sổ Nhóm rồi hỏi bảng tìm nhóm; {@code PartyFinderCoordinator} mở cửa sổ khi có trả lời. */
+    private void openFinder() {
+        panel.close();
+        sender.sendReadRequest(
+                Opcode.OPCODE_LIST_PARTY_FINDER_REQUEST_VALUE, ListPartyFinderRequest.getDefaultInstance());
     }
 }

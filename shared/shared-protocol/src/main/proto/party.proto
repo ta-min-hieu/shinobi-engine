@@ -161,3 +161,79 @@ message PartyChangedEvent {
   PartyChangeReason reason = 1;
   int64 subject_character_id = 2;
 }
+
+// ===== ADR-082 — bảng tìm nhóm (chỉ RAM, tin hết hạn 10 phút). CHỈ THÊM. =====
+
+enum PartyGoal {
+  PARTY_GOAL_UNSPECIFIED = 0;
+  PARTY_GOAL_LEVELING = 1;
+  PARTY_GOAL_QUEST = 2;
+  PARTY_GOAL_DUNGEON = 3;
+  PARTY_GOAL_WORLD_BOSS = 4;
+}
+
+message PartyFinderListingView {
+  int64 leader_character_id = 1;
+  string leader_name = 2;
+  PartyGoal goal = 3;
+  int32 min_level = 4;
+  int64 expires_in_seconds = 5;
+}
+
+// Request: Client -> Server (OPCODE_LIST_PARTY_FINDER_REQUEST = 1319).
+message ListPartyFinderRequest {}
+
+// Response: Server -> Client (OPCODE_LIST_PARTY_FINDER_RESPONSE = 1320). Mới nhất trước.
+message ListPartyFinderResponse {
+  repeated PartyFinderListingView listings = 1;
+}
+
+// Command: Client -> Server (OPCODE_POST_PARTY_FINDER_COMMAND = 1321). Chưa có nhóm thì server lập nhóm trước.
+message PostPartyFinderCommand {
+  PartyGoal goal = 1;
+  int32 min_level = 2;
+}
+
+enum PostPartyFinderOutcome {
+  POST_PARTY_FINDER_OUTCOME_UNSPECIFIED = 0;
+  POST_PARTY_FINDER_OUTCOME_OK = 1;
+  POST_PARTY_FINDER_OUTCOME_NOT_LEADER = 2;
+  POST_PARTY_FINDER_OUTCOME_INVALID_GOAL = 3;
+}
+
+// Response: Server -> Client (OPCODE_POST_PARTY_FINDER_RESPONSE = 1322).
+message PostPartyFinderResponse {
+  PostPartyFinderOutcome outcome = 1;
+  ListPartyFinderResponse board = 2;
+}
+
+// Command: Client -> Server (OPCODE_JOIN_PARTY_FINDER_COMMAND = 1323). Vào ngay nếu đủ cấp và còn chỗ.
+message JoinPartyFinderCommand {
+  int64 leader_character_id = 1;
+}
+
+enum JoinPartyFinderOutcome {
+  JOIN_PARTY_FINDER_OUTCOME_UNSPECIFIED = 0;
+  JOIN_PARTY_FINDER_OUTCOME_OK = 1;
+  JOIN_PARTY_FINDER_OUTCOME_NOT_FOUND = 2;      // tin không còn (hết hạn/đã gỡ/nhóm giải tán)
+  JOIN_PARTY_FINDER_OUTCOME_LEVEL_TOO_LOW = 3;
+  JOIN_PARTY_FINDER_OUTCOME_ALREADY_IN_PARTY = 4;
+  JOIN_PARTY_FINDER_OUTCOME_PARTY_FULL = 5;
+  JOIN_PARTY_FINDER_OUTCOME_INVITE_PENDING = 6;  // đang có lời mời nhóm khác chờ trả lời
+  JOIN_PARTY_FINDER_OUTCOME_OWN_LISTING = 7;
+}
+
+// Response: Server -> Client (OPCODE_JOIN_PARTY_FINDER_RESPONSE = 1324).
+message JoinPartyFinderResponse {
+  JoinPartyFinderOutcome outcome = 1;
+  ListPartyFinderResponse board = 2;
+}
+
+// Command: Client -> Server (OPCODE_REMOVE_PARTY_FINDER_COMMAND = 1325). Gỡ tin của chính mình.
+message RemovePartyFinderCommand {}
+
+// Response: Server -> Client (OPCODE_REMOVE_PARTY_FINDER_RESPONSE = 1326).
+message RemovePartyFinderResponse {
+  bool removed = 1;
+  ListPartyFinderResponse board = 2;
+}
