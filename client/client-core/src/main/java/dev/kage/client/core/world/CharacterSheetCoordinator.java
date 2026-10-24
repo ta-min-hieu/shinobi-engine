@@ -14,6 +14,9 @@ import dev.kage.protocol.GetCharacterStatsResponse;
 import dev.kage.protocol.ItemSetProgressView;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PetView;
+import dev.kage.protocol.RebirthCommand;
+import dev.kage.protocol.RebirthOutcome;
+import dev.kage.protocol.RebirthResponse;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -25,6 +28,14 @@ final class CharacterSheetCoordinator implements WindowFlow {
 
     private static final float PERMILLE_PER_PERCENT = 10f;
 
+    /** ADR-089 — cấp tối đa (ExperienceCurve.MAX_LEVEL của server) và trần số lần chuyển thế; chỉ để bày nút. */
+    private static final int REBIRTH_LEVEL = 100;
+
+    private static final int MAX_REBIRTHS = 5;
+
+    /** Chỉ số dòng mang nút "Độ Kiếp" ({@code -1} = không có). */
+    private int rebirthRow = -1;
+
     private final ReportPanel panel;
     private final WorldCommandSender sender;
     private final ItemCatalogCoordinator itemCatalog;
@@ -35,7 +46,15 @@ final class CharacterSheetCoordinator implements WindowFlow {
         this.sender = sender;
         this.itemCatalog = itemCatalog;
         panel.setOnRefresh(this::request);
+        panel.setOnRowAction(this::onRowAction);
         panel.setStatus(text("charsheet.hint.open"));
+    }
+
+    /** ADR-089 — server kiểm lại cấp + số lần; client chỉ bày nút khi trông như đủ điều kiện. */
+    private void onRowAction(int rowIndex) {
+        if (rowIndex == rebirthRow) {
+            sender.sendReadRequest(Opcode.OPCODE_REBIRTH_COMMAND_VALUE, RebirthCommand.getDefaultInstance());
+        }
     }
 
     private void request() {
@@ -56,6 +75,20 @@ final class CharacterSheetCoordinator implements WindowFlow {
 
     @Override
     public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        if (frame.header().opcode() == Opcode.OPCODE_REBIRTH_RESPONSE_VALUE) {
+            RebirthOutcome outcome = RebirthResponse.parseFrom(frame.payload()).getOutcome();
+            panel.setStatus(text(
+                    switch (outcome) {
+                        case REBIRTH_OUTCOME_OK -> "charsheet.rebirth.ok";
+                        case REBIRTH_OUTCOME_LEVEL_TOO_LOW -> "charsheet.rebirth.level_too_low";
+                        case REBIRTH_OUTCOME_MAX_REBIRTHS -> "charsheet.rebirth.max";
+                        default -> "charsheet.rebirth.failed";
+                    }));
+            if (outcome == RebirthOutcome.REBIRTH_OUTCOME_OK) {
+                request();
+            }
+            return true;
+        }
         if (frame.header().opcode() != Opcode.OPCODE_GET_CHARACTER_STATS_RESPONSE_VALUE) {
             return false;
         }
@@ -89,6 +122,14 @@ final class CharacterSheetCoordinator implements WindowFlow {
         }
         if (stats.hasPet()) {
             rows.add(row(petLine(stats.getPet())));
+        }
+        rebirthRow = -1;
+        if (stats.getRebirthCount() > 0) {
+            rows.add(row(format("charsheet.row.rebirth", stats.getRebirthCount())));
+        }
+        if (stats.getLevel() >= REBIRTH_LEVEL && stats.getRebirthCount() < MAX_REBIRTHS) {
+            rebirthRow = rows.size();
+            rows.add(new ReportPanel.Row(text("charsheet.row.rebirth_ready"), false, "charsheet.action.rebirth"));
         }
         for (ItemSetProgressView set : stats.getItemSetsList()) {
             rows.add(row(format(

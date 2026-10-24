@@ -20,6 +20,7 @@ import dev.kage.protocol.DonateToGuildCommand;
 import dev.kage.protocol.DonateToGuildResponse;
 import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.GetMyGuildResponse;
+import dev.kage.protocol.GetSpiritVeinStatusRequest;
 import dev.kage.protocol.GuildProgressView;
 import dev.kage.protocol.KickGuildMemberResponse;
 import dev.kage.protocol.LeaveGuildResponse;
@@ -93,6 +94,7 @@ final class GuildCoordinator implements WindowFlow {
         panel.setOnDonate(this::donate);
         panel.setOnShop(this::openShop);
         panel.setOnSkills(this::openSkills);
+        panel.setOnSpiritVein(this::openSpiritVein);
         panel.setStatus(text("guild.hint.open"));
         refreshView();
     }
@@ -252,6 +254,13 @@ final class GuildCoordinator implements WindowFlow {
         panel.close();
         sender.sendReadRequest(
                 Opcode.OPCODE_LIST_GUILD_SKILLS_REQUEST_VALUE, ListGuildSkillsRequest.getDefaultInstance());
+    }
+
+    /** ADR-090 — đóng cửa sổ Bang rồi hỏi tình hình Linh Mạch; {@code SpiritVeinCoordinator} mở cửa sổ. */
+    private void openSpiritVein() {
+        panel.close();
+        sender.sendReadRequest(
+                Opcode.OPCODE_GET_SPIRIT_VEIN_STATUS_REQUEST_VALUE, GetSpiritVeinStatusRequest.getDefaultInstance());
     }
 
     private void submitName(String typed, Consumer<String> send) {

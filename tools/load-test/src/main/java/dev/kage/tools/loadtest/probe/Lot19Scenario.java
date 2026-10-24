@@ -60,6 +60,7 @@ final class Lot19Scenario {
         for (String step : plan.partyFinderSteps()) {
             partyFinderStep(step.strip());
         }
+        new Lot20Scenario(connection, session).run(plan.lot20Steps());
     }
 
     private ListRecipesResponse listRecipes() throws IOException {

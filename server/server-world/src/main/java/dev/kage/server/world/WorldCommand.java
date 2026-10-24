@@ -73,6 +73,9 @@ sealed interface WorldCommand {
      */
     record AreaChatMessageCommand(long characterId, String senderName, String body) implements WorldCommand {}
 
+    /** ADR-089 — Độ Kiếp Chuyển Thế: đặt cấp về {@code level} (lần DUY NHẤT cấp được lùi). */
+    record ResetCharacterLevelCommand(long characterId, int level) implements WorldCommand {}
+
     /**
      * Spawn một boss theo MÃ LOÀI (ADR-048 D6).
      *

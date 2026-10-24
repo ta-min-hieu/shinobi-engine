@@ -132,13 +132,9 @@ public final class GatewayBootstrap {
         server.shutdownNotice(shutdownNoticeFromEnvironment());
         // /health/ready còn đòi cổng game phục vụ được (dòng 62(i)) — server dựng SAU máy chủ metrics.
         worldContext.metricsHttpServer().addReadinessCheck(server::isServingGameTraffic);
-        MarketExpiryJanitor marketExpiry = new MarketExpiryJanitor(
-                facades.progression().marketFacade(),
-                facades.contentFacades().socialFacades().mailFacade(),
-                characterRegistry);
-        marketExpiry.start();
+        BackgroundJobs jobs = startBackgroundJobs(facades, characterRegistry, instanceRegistries.worldGateway());
         Runnable shutdown = shutdownSequence(
-                new ShutdownContext(server, worldContext, instanceRegistries, characterRegistry, marketExpiry),
+                new ShutdownContext(server, worldContext, instanceRegistries, characterRegistry, jobs),
                 positionPersister,
                 observability,
                 databaseBootstrap);
@@ -244,8 +240,9 @@ public final class GatewayBootstrap {
             ctx.instanceRegistries().arena().stopAll();
             ctx.characterRegistry().stop();
             positionPersister.stop();
-            // Hết hạn phường thị ghi DB + gửi thư — dừng TRƯỚC khi đóng pool (ADR-063 D4).
-            ctx.marketExpiry().stop();
+            // Hết hạn phường thị (ADR-063 D4) + Linh Mạch (ADR-090) ghi DB + gửi thư — dừng TRƯỚC khi đóng pool.
+            ctx.jobs().marketExpiry().stop();
+            ctx.jobs().spiritVeins().stop();
             ctx.worldContext().metricsHttpServer().stop();
             observability.tracing().shutdown();
             databaseBootstrap.shutdown();
@@ -261,7 +258,29 @@ public final class GatewayBootstrap {
             WorldContext worldContext,
             InstanceRegistries instanceRegistries,
             ConnectedCharacterRegistry characterRegistry,
-            MarketExpiryJanitor marketExpiry) {}
+            BackgroundJobs jobs) {}
+
+    /** Các luồng nền dựng SAU cổng game — cần {@link WorldGateway} hoặc chỉ chạm DB + thư. */
+    private record BackgroundJobs(MarketExpiryJanitor marketExpiry, SpiritVeinScheduler spiritVeins) {}
+
+    private static BackgroundJobs startBackgroundJobs(
+            GatewayFacades facades, ConnectedCharacterRegistry characterRegistry, WorldGateway worldGateway) {
+        MailFacade mail = facades.contentFacades().socialFacades().mailFacade();
+        MarketExpiryJanitor marketExpiry =
+                new MarketExpiryJanitor(facades.progression().marketFacade(), mail, characterRegistry);
+        marketExpiry.start();
+        SpiritVeinScheduler spiritVeins = new SpiritVeinScheduler(
+                new SpiritVeinScheduler.Deps(
+                        facades.progression().spiritVeins(),
+                        facades.contentFacades().socialFacades().guildFacade(),
+                        mail,
+                        characterRegistry,
+                        characterId -> worldGateway.dungeonInstanceRegistry().isInDungeon(characterId)
+                                || worldGateway.arenaInstanceRegistry().isInDuel(characterId)),
+                java.time.Clock.systemUTC());
+        spiritVeins.start();
+        return new BackgroundJobs(marketExpiry, spiritVeins);
+    }
 
     /**
      * Gộp {@link MainWorldChannelRegistry} + {@link MetricsHttpServer} — cả hai sinh ra CÙNG lúc
@@ -454,7 +473,9 @@ public final class GatewayBootstrap {
                 databaseBootstrap.wireGuildShopFacade(),
                 databaseBootstrap.wireWorldBossFacade(),
                 databaseBootstrap.wireFriendGiftFacade(),
-                databaseBootstrap.wireGuildSkillFacade());
+                databaseBootstrap.wireGuildSkillFacade(),
+                databaseBootstrap.wireRebirthFacade(),
+                databaseBootstrap.wireSpiritVeinFacade());
         return new GatewayFacades(
                 accountFacade,
                 characterFacade,
@@ -501,8 +522,9 @@ public final class GatewayBootstrap {
                         .findById(characterId)
                         .map(character -> FactionMapping.toElement(character.faction()))
                         .orElse(Element.NONE));
-        characterRegistry.skillRanks.bindGuildBonus(
-                characterId -> GuildSkillEffects.bonusOf(facades.progression().guildSkills(), characterId));
+        characterRegistry.skillRanks.bindGuildBonus(characterId -> RebirthEffects.plus(
+                GuildSkillEffects.bonusOf(facades.progression().guildSkills(), characterId),
+                facades.progression().rebirth().rebirthCountOf(characterId)));
     }
 
     /** Registry kết nối — kiêm WorldOutboundSink; EXP đánh quái nhân sự kiện (ADR-067) rồi kỹ năng bang (ADR-085). */

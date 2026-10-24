@@ -293,3 +293,31 @@ message UpgradeGuildSkillResponse {
   UpgradeGuildSkillOutcome outcome = 1;
   ListGuildSkillsResponse sheet = 2;
 }
+
+// ===== ADR-090 — Tranh đoạt Linh Mạch (bản đầu). CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_GET_SPIRIT_VEIN_STATUS_REQUEST = 731).
+message GetSpiritVeinStatusRequest {}
+
+// Điểm một bang trong khung đang mở.
+message SpiritVeinScoreView {
+  string guild_name = 1;
+  int32 points = 2;
+}
+
+message SpiritVeinView {
+  string code = 1;
+  string name_key = 2;                 // khoá i18n tên Linh Mạch
+  float min_x = 3;                     // dải X trên world chính tính là "trong Linh Mạch"
+  float max_x = 4;
+  bool active = 5;                     // khung tranh đoạt đang mở
+  int64 seconds_until_change = 6;      // active: tới lúc đóng; không: tới lúc mở khung sau
+  string holder_guild_name = 7;        // rỗng = chưa bang nào giữ
+  int64 held_until_epoch_seconds = 8;  // 0 khi không ai giữ
+  repeated SpiritVeinScoreView scores = 9;  // chỉ khi active, xếp theo điểm giảm dần
+}
+
+// Response: Server -> Client (OPCODE_GET_SPIRIT_VEIN_STATUS_RESPONSE = 732).
+message GetSpiritVeinStatusResponse {
+  repeated SpiritVeinView veins = 1;
+}

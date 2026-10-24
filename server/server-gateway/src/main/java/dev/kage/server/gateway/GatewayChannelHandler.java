@@ -177,6 +177,7 @@ import dev.kage.protocol.GetMyPartyRequest;
 import dev.kage.protocol.GetMyPartyResponse;
 import dev.kage.protocol.GetPvpRatingRequest;
 import dev.kage.protocol.GetPvpRatingResponse;
+import dev.kage.protocol.GetSpiritVeinStatusRequest;
 import dev.kage.protocol.GetTradeStatusRequest;
 import dev.kage.protocol.GetTradeStatusResponse;
 import dev.kage.protocol.GuildMemberView;
@@ -249,6 +250,8 @@ import dev.kage.protocol.PingCommand;
 import dev.kage.protocol.PongResponse;
 import dev.kage.protocol.PostPartyFinderCommand;
 import dev.kage.protocol.QuestStatusChangedEvent;
+import dev.kage.protocol.RebirthCommand;
+import dev.kage.protocol.RebirthResponse;
 import dev.kage.protocol.RejectFriendRequestCommand;
 import dev.kage.protocol.RejectFriendRequestOutcome;
 import dev.kage.protocol.RejectFriendRequestResponse;
@@ -441,6 +444,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final PartyFinderCommands partyFinder;
     private final FriendGiftCommands friendGifts;
     private final GuildSkillCommands guildSkills;
+    private final dev.kage.character.api.RebirthFacade rebirth;
+    private final SpiritVeinCommands spiritVeins;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -537,6 +542,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LIST_GUILD_SHOP_REQUEST_VALUE, this::handleListGuildShopRequest),
             Map.entry(Opcode.OPCODE_BUY_GUILD_SHOP_ITEM_COMMAND_VALUE, this::handleBuyGuildShopItemCommand),
             Map.entry(Opcode.OPCODE_LIST_GUILD_SKILLS_REQUEST_VALUE, this::handleListGuildSkillsRequest),
+            Map.entry(Opcode.OPCODE_REBIRTH_COMMAND_VALUE, this::handleRebirthCommand),
+            Map.entry(Opcode.OPCODE_GET_SPIRIT_VEIN_STATUS_REQUEST_VALUE, this::handleGetSpiritVeinStatusRequest),
             Map.entry(Opcode.OPCODE_UPGRADE_GUILD_SKILL_COMMAND_VALUE, this::handleUpgradeGuildSkillCommand),
             Map.entry(Opcode.OPCODE_LIST_PARTY_FINDER_REQUEST_VALUE, this::handleListPartyFinderRequest),
             Map.entry(Opcode.OPCODE_POST_PARTY_FINDER_COMMAND_VALUE, this::handlePostPartyFinderCommand),
@@ -636,6 +643,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.crafting = new CraftingCommands(facades.progression().crafting(), characterFacade, npcProximity);
         this.guildShop = new GuildShopCommands(facades.progression().guildShop());
         this.guildSkills = new GuildSkillCommands(facades.progression().guildSkills());
+        this.rebirth = facades.progression().rebirth();
+        this.spiritVeins = new SpiritVeinCommands(facades.progression().spiritVeins(), java.time.Clock.systemUTC());
         this.friendGifts = new FriendGiftCommands(
                 facades.progression().friendGifts(),
                 characterFacade,
@@ -1871,6 +1880,60 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         runStorage(ctx, header.sequenceId(), Opcode.OPCODE_REMOVE_PARTY_FINDER_RESPONSE_VALUE, partyFinder::remove);
     }
 
+    /**
+     * ADR-089 — Độ Kiếp Chuyển Thế. Thành công ⇒ world đặt cấp 1, chỉ số tính lại (kèm Đạo Vận), vạch EXP về 0. Đăng ký
+     * lại kết nối (cùng ngoại hình) để mốc "EXP đã gửi" về rỗng — không thì mọi gói EXP sau chuyển thế bị coi là gói
+     * đến muộn (tổng EXP nhỏ hơn mốc cũ) và bị bỏ tới lần đăng nhập sau.
+     */
+    private void handleRebirthCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        RebirthCommand.parser().parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long characterId = boundCharacterId;
+        if (characterId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        executeBlocking(ctx, sequenceId, () -> {
+            dev.kage.character.application.RebirthUseCase.Result result = rebirth.rebirth(characterId);
+            if (result.outcome() == dev.kage.character.domain.RebirthOutcome.OK) {
+                currentWorldFacadeIfPresent(characterId).ifPresent(world -> world.resetCharacterLevel(characterId, 1));
+                characterFacade.findById(characterId).ifPresent(character -> worldGateway
+                        .registry()
+                        .register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction()))));
+                applyEquipmentBonusAndComputeMaxHp(characterId);
+                send(
+                        ctx,
+                        Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE,
+                        0,
+                        dev.kage.protocol.ExperienceChangedEvent.newBuilder()
+                                .setLevel(1)
+                                .setTotalExp(0)
+                                .setExpIntoLevel(0)
+                                .setExpForNextLevel(dev.kage.character.domain.ExperienceCurve.expForNextLevel(1))
+                                .build()
+                                .toByteArray());
+            }
+            send(
+                    ctx,
+                    Opcode.OPCODE_REBIRTH_RESPONSE_VALUE,
+                    sequenceId,
+                    RebirthResponse.newBuilder()
+                            .setOutcome(dev.kage.protocol.RebirthOutcome.valueOf(
+                                    "REBIRTH_OUTCOME_" + result.outcome().name()))
+                            .setRebirthCount(result.rebirthCount())
+                            .build()
+                            .toByteArray());
+        });
+    }
+
+    /** ADR-090 — tình hình Linh Mạch. */
+    private void handleGetSpiritVeinStatusRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        GetSpiritVeinStatusRequest.parser().parseFrom(payload);
+        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_GET_SPIRIT_VEIN_STATUS_RESPONSE_VALUE, spiritVeins::status);
+    }
+
     /** ADR-085 — kỹ năng bang. */
     private void handleListGuildSkillsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
@@ -2316,7 +2379,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setCritDamagePercent(sheet.critDamagePercent())
                     .setCombatPower(sheet.combatPower())
                     .addAllItemSets(itemSetViews(characterId))
-                    .setMoveSpeedPercent(inventoryFacade.moveSpeedPercent(characterId));
+                    .setMoveSpeedPercent(inventoryFacade.moveSpeedPercent(characterId))
+                    .setRebirthCount(rebirth.rebirthCountOf(characterId));
             inventoryFacade
                     .equippedPet(characterId)
                     .ifPresent(pet -> response.setPet(PetView.newBuilder()

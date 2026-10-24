@@ -178,6 +178,7 @@ message GetCharacterStatsResponse {
   repeated ItemSetProgressView item_sets = 18; // ADR-065 — bộ pháp khí đang mặc ít nhất một món
   PetView pet = 19;               // ADR-072 — chỉ có khi đang mặc linh thú
   int32 move_speed_percent = 20;  // ADR-070 — tốc độ cộng thêm của phi kiếm
+  int32 rebirth_count = 21;       // ADR-089 — số lần đã Độ Kiếp Chuyển Thế (Đạo Vận đã nằm trong các tổng ở trên)
 }
 
 // ADR-072 — linh thú đang mặc.
@@ -198,4 +199,23 @@ message ItemSetProgressView {
   int32 bonus_def = 5;
   int32 bonus_res = 6;
   int32 bonus_hp = 7;
+}
+
+// ===== ADR-089 — Độ Kiếp Chuyển Thế: ở cấp tối đa, trùng tu từ cấp 1, giữ đồ, nhận Đạo Vận vĩnh viễn. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_REBIRTH_COMMAND = 212). Cấp + số lần đọc từ DB, không từ gói.
+message RebirthCommand {}
+
+enum RebirthOutcome {
+  REBIRTH_OUTCOME_UNSPECIFIED = 0;
+  REBIRTH_OUTCOME_OK = 1;
+  REBIRTH_OUTCOME_LEVEL_TOO_LOW = 2;
+  REBIRTH_OUTCOME_MAX_REBIRTHS = 3;
+  REBIRTH_OUTCOME_NOT_FOUND = 4;
+}
+
+// Response: Server -> Client (OPCODE_REBIRTH_RESPONSE = 213). Vạch EXP mới đi bằng ExperienceChangedEvent (208).
+message RebirthResponse {
+  RebirthOutcome outcome = 1;
+  int32 rebirth_count = 2;
 }

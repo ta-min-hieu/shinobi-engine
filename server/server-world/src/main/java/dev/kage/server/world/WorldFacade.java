@@ -718,6 +718,14 @@ public final class WorldFacade {
     }
 
     /**
+     * ADR-089 — chuyển thế: cấp về {@code level} dù thấp hơn cấp hiện tại. Máu tối đa theo cấp được tính lại ở lệnh
+     * {@link #applyEquipmentBonus} gateway gửi ngay sau (máu hiện tại giữ tỉ lệ như khi gỡ đồ).
+     */
+    public void resetCharacterLevel(long characterId, int level) {
+        inbox.add(new WorldCommand.ResetCharacterLevelCommand(characterId, level));
+    }
+
+    /**
      * Nhân vật vừa đổi hệ phái giữa phiên (quyết định chủ dự án 2026-10-11) — nguyên tố và passive
      * của hệ có hiệu lực NGAY trong World này. Trước đó chỉ ngoại hình đổi (ADR-045): người chơi thấy
      * hệ mới mà đánh, chịu đòn và bị xét chiêu như hệ cũ tới khi đăng nhập lại. Gọi từ
@@ -973,6 +981,7 @@ public final class WorldFacade {
                     handleChangeCharacterElement(c.characterId(), c.element());
                 case WorldCommand.SetSkillRanksCommand c -> handleSetSkillRanks(c.characterId(), c.ranks());
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c);
+                case WorldCommand.ResetCharacterLevelCommand c -> handleResetCharacterLevel(c.characterId(), c.level());
                 case WorldCommand.InboxBarrierCommand c -> c.onReached().run();
             }
         }
@@ -1292,6 +1301,24 @@ public final class WorldFacade {
      * không giữ hai bản cấp lệch nhau của cùng một nhân vật — một record mới mỗi lần LÊN CẤP, không
      * phải mỗi tick.
      */
+    private void handleResetCharacterLevel(long characterId, int level) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        CharacterBaseStats baseStats = baseStatsByCharacterId.get(characterId);
+        if (entity == null || baseStats == null) {
+            return; // không ở World này — lần attach kế đọc cấp từ DB.
+        }
+        LEVEL.get(entity).level = level;
+        baseStatsByCharacterId.put(
+                characterId,
+                new CharacterBaseStats(
+                        baseStats.str(),
+                        baseStats.agi(),
+                        baseStats.intelligence(),
+                        baseStats.vit(),
+                        baseStats.element(),
+                        level));
+    }
+
     private void handleRaiseCharacterLevel(long characterId, int level) {
         KEntity entity = entitiesByCharacterId.get(characterId);
         CharacterBaseStats baseStats = baseStatsByCharacterId.get(characterId);

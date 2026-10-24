@@ -120,6 +120,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-086](ADR-086-Pet-Skills.md) | Kỹ năng linh thú — Linh Hồ đánh thêm / Huyền Quy chắn, bậc 2 ×2 xác suất (không đổi protocol/schema) | ✅ **Accepted** *(2026-10-24, lô 20)* | ADR-072 |
 | [ADR-087](ADR-087-Arena-Seasons.md) | Mùa Luận Kiếm 28 ngày — chốt nguyên tử, hàng đợi thưởng thư, Elo kéo nửa đường về 1000 (V82) | ✅ **Accepted** *(2026-10-24, lô 20)* | feature-pvp |
 | [ADR-088](ADR-088-Bag-Expansion.md) | Mở rộng túi — sức chứa theo nhân vật 20→40, Túi Càn Khôn +5 (V83) | ✅ **Accepted** *(2026-10-24, lô 20)* | ADR-046 D5 |
+| [ADR-089](ADR-089-Rebirth.md) | Độ Kiếp Chuyển Thế — cấp 100 về cấp 1, Đạo Vận vĩnh viễn, tối đa 5 lần (212/213) | ✅ **Accepted** *(2026-10-24, lô 20)* | GDD §5 |
+| [ADR-090](ADR-090-Spirit-Vein-Contest.md) | Tranh đoạt Linh Mạch bản đầu — bang đông nhất trong vùng tích điểm, thắng giữ 7 ngày + thư thưởng (V84, 731/732) | ✅ **Accepted** *(2026-10-24, lô 20)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

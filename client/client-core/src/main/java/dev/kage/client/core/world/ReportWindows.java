@@ -36,7 +36,9 @@ record ReportWindows(
         ReportPanel partyFinderPanel,
         PartyFinderCoordinator partyFinder,
         ReportPanel guildSkillPanel,
-        GuildSkillCoordinator guildSkills) {
+        GuildSkillCoordinator guildSkills,
+        ReportPanel spiritVeinPanel,
+        SpiritVeinCoordinator spiritVeins) {
 
     /**
      * Luồng nền các cửa sổ này mượn: catalog vật phẩm (tên món), nhật ký chat (báo mở thành tựu, đã bán), và
@@ -64,6 +66,8 @@ record ReportWindows(
         ReportPanel partyFinderPanel = new ReportPanel(skin, "partyfinder.title", Input.Keys.UNKNOWN, List.of());
         // Không phím mở — kỹ năng bang mở từ nút trong cửa sổ Bang (ADR-085).
         ReportPanel guildSkillPanel = new ReportPanel(skin, "guildskill.title", Input.Keys.UNKNOWN, List.of());
+        // Không phím mở — Linh Mạch mở từ nút trong cửa sổ Bang (ADR-090).
+        ReportPanel spiritVeinPanel = new ReportPanel(skin, "spiritvein.title", Input.Keys.UNKNOWN, List.of());
         return new ReportWindows(
                 sheetPanel,
                 new CharacterSheetCoordinator(sheetPanel, sender, feeds.itemCatalog()),
@@ -86,7 +90,9 @@ record ReportWindows(
                 partyFinderPanel,
                 new PartyFinderCoordinator(partyFinderPanel, sender, localCharacterId),
                 guildSkillPanel,
-                new GuildSkillCoordinator(guildSkillPanel, sender));
+                new GuildSkillCoordinator(guildSkillPanel, sender),
+                spiritVeinPanel,
+                new SpiritVeinCoordinator(spiritVeinPanel, sender));
     }
 
     /** Cổng phím CHUNG của các cửa sổ mở bằng phím ({@code PanelHub#noneOpen}); kho đồ không có phím. */

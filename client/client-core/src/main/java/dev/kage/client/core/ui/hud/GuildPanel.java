@@ -125,6 +125,7 @@ public final class GuildPanel implements HudWindow {
     private Runnable onDonate;
     private Runnable onShop;
     private Runnable onSkills;
+    private Runnable onSpiritVein;
     private Runnable onOpened;
 
     /**
@@ -250,11 +251,16 @@ public final class GuildPanel implements HudWindow {
         footer.add(actionButton("guild.action.refresh", () -> fire(onOpened))).width(ROW_BUTTON_WIDTH_PX);
         section.add(footer).width(PANEL_WIDTH_PX).left().padTop(10f).row();
         // ADR-085 — hàng thứ hai: hàng đầu đã đủ năm nút trong bề rộng cửa sổ.
-        section.add(actionButton("guild.action.skills", () -> fire(onSkills)))
+        Table secondRow = new Table();
+        secondRow
+                .add(actionButton("guild.action.skills", () -> fire(onSkills)))
                 .width(ROW_BUTTON_WIDTH_PX)
-                .left()
-                .padTop(6f)
-                .row();
+                .padRight(6f);
+        // ADR-090 — Linh Mạch.
+        secondRow
+                .add(actionButton("guild.action.spirit_vein", () -> fire(onSpiritVein)))
+                .width(ROW_BUTTON_WIDTH_PX);
+        section.add(secondRow).width(PANEL_WIDTH_PX).left().padTop(6f).row();
         // Cách ĐÓNG phải nằm ngay trên cửa sổ, cùng lý do PartyPanel/FriendPanel đã có dòng này:
         // cửa sổ che giữa màn hình và chặn toàn bộ phím gameplay, mở nhầm mà không biết thoát ra là
         // một bế tắc thật.
@@ -417,6 +423,11 @@ public final class GuildPanel implements HudWindow {
     /** ADR-068 — nút "Góp" (một bậc linh thạch). */
     public void setOnDonate(Runnable listener) {
         this.onDonate = listener;
+    }
+
+    /** ADR-090 — nút "Linh Mạch". */
+    public void setOnSpiritVein(Runnable listener) {
+        this.onSpiritVein = listener;
     }
 
     /** ADR-085 — nút "Kỹ năng bang". */

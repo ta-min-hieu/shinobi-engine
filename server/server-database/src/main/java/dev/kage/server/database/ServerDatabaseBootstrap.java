@@ -13,11 +13,13 @@ import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.achievement.api.AchievementFacade;
 import dev.kage.achievement.application.AchievementUseCase;
 import dev.kage.character.api.CharacterFacade;
+import dev.kage.character.api.RebirthFacade;
 import dev.kage.character.api.SkillRankFacade;
 import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
 import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.application.ListCharactersUseCase;
+import dev.kage.character.application.RebirthUseCase;
 import dev.kage.character.application.SelectCharacterUseCase;
 import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.character.application.SkillRankUseCase;
@@ -49,6 +51,7 @@ import dev.kage.guild.api.GuildFacade;
 import dev.kage.guild.api.GuildProgressionFacade;
 import dev.kage.guild.api.GuildShopFacade;
 import dev.kage.guild.api.GuildSkillFacade;
+import dev.kage.guild.api.SpiritVeinFacade;
 import dev.kage.guild.application.ApproveGuildJoinRequestUseCase;
 import dev.kage.guild.application.CreateGuildUseCase;
 import dev.kage.guild.application.DisbandGuildUseCase;
@@ -114,6 +117,7 @@ import dev.kage.server.database.achievement.PostgresAchievementAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.character.PostgresFactionChangeAdapter;
+import dev.kage.server.database.character.PostgresRebirthAdapter;
 import dev.kage.server.database.character.PostgresSkillRankAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.chat.PostgresChatMuteAdapter;
@@ -132,6 +136,7 @@ import dev.kage.server.database.guild.PostgresGuildAdapter;
 import dev.kage.server.database.guild.PostgresGuildProgressionAdapter;
 import dev.kage.server.database.guild.PostgresGuildShopAdapter;
 import dev.kage.server.database.guild.PostgresGuildSkillAdapter;
+import dev.kage.server.database.guild.PostgresSpiritVeinAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresCompanionAdapter;
@@ -656,6 +661,12 @@ public final class ServerDatabaseBootstrap {
                 new PostgresCheckInAdapter(dataSource), sender, java.time.Clock.systemUTC()));
     }
 
+    /** Độ Kiếp Chuyển Thế (ADR-089). */
+    public RebirthFacade wireRebirthFacade() {
+        return new RebirthFacade(new RebirthUseCase(
+                new PostgresRebirthAdapter(dataSource), new JdbcCharacterTransactionRunner(dataSource)));
+    }
+
     /** Mùa Luận Kiếm (ADR-087). */
     public PvpSeasonFacade wirePvpSeasonFacade() {
         return new PvpSeasonFacade(new PostgresPvpSeasonAdapter(dataSource));
@@ -664,6 +675,11 @@ public final class ServerDatabaseBootstrap {
     /** Kỹ năng bang (ADR-085). */
     public GuildSkillFacade wireGuildSkillFacade() {
         return new GuildSkillFacade(new PostgresGuildSkillAdapter(dataSource));
+    }
+
+    /** Tranh đoạt Linh Mạch (ADR-090). */
+    public SpiritVeinFacade wireSpiritVeinFacade() {
+        return new SpiritVeinFacade(new PostgresSpiritVeinAdapter(dataSource));
     }
 
     /** Tặng quà bạn bè (ADR-084). */

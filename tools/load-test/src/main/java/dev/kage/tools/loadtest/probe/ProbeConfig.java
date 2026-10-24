@@ -276,19 +276,28 @@ public record ProbeConfig(
      * @param guildShopBuy {@code item_template_id} cần đổi ở cửa hàng bang
      * @param partyFinderSteps bước bảng tìm nhóm: {@code post:GOAL[:minLevel]}, {@code list}, {@code join:<id>},
      *     {@code remove}
+     * @param lot20Steps bước lô 20 (xem {@link Lot20Scenario})
      */
-    public record Lot19Plan(List<String> craftRecipes, List<String> guildShopBuy, List<String> partyFinderSteps) {
+    public record Lot19Plan(
+            List<String> craftRecipes,
+            List<String> guildShopBuy,
+            List<String> partyFinderSteps,
+            List<String> lot20Steps) {
 
         /** Danh sách bất biến — record không tự copy. */
         public Lot19Plan {
             craftRecipes = List.copyOf(craftRecipes);
             guildShopBuy = List.copyOf(guildShopBuy);
             partyFinderSteps = List.copyOf(partyFinderSteps);
+            lot20Steps = List.copyOf(lot20Steps);
         }
 
         /** {@code true} khi có ít nhất một bước cần chạy. */
         public boolean isRequested() {
-            return !craftRecipes.isEmpty() || !guildShopBuy.isEmpty() || !partyFinderSteps.isEmpty();
+            return !craftRecipes.isEmpty()
+                    || !guildShopBuy.isEmpty()
+                    || !partyFinderSteps.isEmpty()
+                    || !lot20Steps.isEmpty();
         }
     }
 
@@ -379,7 +388,12 @@ public record ProbeConfig(
                         raw.text("selectFaction", ""), raw.list("upgradeSkills"), raw.number("donateToGuild", 0L)),
                 economyPlan(raw),
                 inspectionPlan(raw),
-                new Lot19Plan(raw.list("craftRecipes"), raw.list("guildShopBuy"), raw.list("partyFinder")));
+                lot19Plan(raw));
+    }
+
+    private static Lot19Plan lot19Plan(CommandLineArguments raw) {
+        return new Lot19Plan(
+                raw.list("craftRecipes"), raw.list("guildShopBuy"), raw.list("partyFinder"), raw.list("lot20"));
     }
 
     private static TradePlan tradePlan(CommandLineArguments raw) {
