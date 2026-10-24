@@ -52,5 +52,5 @@ KHÔNG áp vào bế quan).
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 21 phần 2).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành 2026-10-24 (lô 21 phần 2) — test `SeclusionPolicyTest`, `DailyIntegrationTest`.
+2. ✅ Kiểm sống 2026-10-24: đặt `last_logout_at` lùi 3 giờ ⇒ vào world nhận dòng "Bế quan được 3 giờ 0 phút", quỹ 180 phút, x1 = 1.440 EXP (Lv41); nhận x2 ⇒ +2.880 EXP, trừ 2.050 linh thạch, `ExperienceChangedEvent` tới ngay, quỹ về 0. Bẫy đo: lệnh gửi ngay lúc vào world có thể tới TRƯỚC khi quỹ kịp tích (probe dùng `wait:3`).

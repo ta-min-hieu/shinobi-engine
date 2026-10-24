@@ -174,6 +174,7 @@ public final class InventoryPanel implements HudWindow {
         private Runnable onOfferSelected;
         private Runnable onEnhanceSelected;
         private Runnable onToggleProtection;
+        private Runnable onDismantleSelected;
         private IntConsumer onUnequip;
         private Runnable onOpened;
 
@@ -321,6 +322,10 @@ public final class InventoryPanel implements HudWindow {
         Label hint = new Label(text("inventory.hint.close"), skin.labelStyle);
         hint.setColor(SECTION_COLOR);
         row.add(hint).left().expandX().padRight(6f);
+        // ADR-097 — phân giải món đang chọn; ở hàng này vì hàng hành động đã kín bề rộng khung.
+        row.add(actionButton("inventory.action.dismantle", () -> fire(listeners.onDismantleSelected)))
+                .width(ACTION_BUTTON_WIDTH_PX)
+                .padRight(6f);
         row.add(actionButton("inventory.action.refresh", () -> fire(listeners.onOpened)))
                 .width(ACTION_BUTTON_WIDTH_PX);
         return row;
@@ -418,6 +423,11 @@ public final class InventoryPanel implements HudWindow {
     /** Người chơi bấm Mặc trên item ĐANG CHỌN — không mang id, coordinator tự biết đang chọn ai. */
     public void setOnEquipSelected(Runnable listener) {
         listeners.onEquipSelected = listener;
+    }
+
+    /** ADR-097 — nút "Phân giải" cho món đang chọn. */
+    public void setOnDismantleSelected(Runnable listener) {
+        listeners.onDismantleSelected = listener;
     }
 
     /** Người chơi bấm Bán trên item đang chọn. */

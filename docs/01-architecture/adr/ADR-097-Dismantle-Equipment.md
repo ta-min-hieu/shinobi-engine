@@ -50,5 +50,5 @@ herb_quantity}`.
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 21 phần 2).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành 2026-10-24 (lô 21 phần 2) — test `DailyIntegrationTest`.
+2. ✅ Kiểm sống 2026-10-24: áo tân thủ +4 ⇒ `OK` +420 linh thạch +2 Linh Thảo; linh thú ⇒ `NOT_DISMANTLABLE`; vũ khí đang mặc ⇒ `EQUIPPED`.

@@ -53,6 +53,6 @@ bao lâu) kèm nút Hái; kết quả hiện chữ nổi + dòng chat. Hình b�
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 21 phần 2).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành 2026-10-24 (lô 21 phần 2) — test `DailyIntegrationTest` (4 bụi seed).
+2. ✅ Kiểm sống 2026-10-24: Kagemaru ở x≈-9 thấy bụi #1 cách 0,4 m; hái ⇒ `STARTED` rồi 3 giây sau `HerbGatheredEvent GATHERED x1` (Linh Thảo 11→12); hái lại ⇒ `NOT_READY`, bụi báo chờ 180 giây. Trước khi có mẫu vị trí đầu tiên (≈1 giây sau vào world) bụi báo `-1`/`TOO_FAR` — đúng thiết kế.
 3. Bản sau: hình bụi trên bản đồ (cần art), thêm loại thảo dược.

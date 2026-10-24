@@ -111,9 +111,11 @@ import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.ClaimMailCommand;
 import dev.kage.protocol.ClaimMailOutcome;
 import dev.kage.protocol.ClaimMailResponse;
+import dev.kage.protocol.ClaimOnlineRewardCommand;
 import dev.kage.protocol.ClaimQuestRewardCommand;
 import dev.kage.protocol.ClaimQuestRewardOutcome;
 import dev.kage.protocol.ClaimQuestRewardResponse;
+import dev.kage.protocol.ClaimSeclusionCommand;
 import dev.kage.protocol.ConfirmTradeCommand;
 import dev.kage.protocol.ConfirmTradeOutcome;
 import dev.kage.protocol.ConfirmTradeResponse;
@@ -142,6 +144,7 @@ import dev.kage.protocol.DialogueOptionView;
 import dev.kage.protocol.DisbandGuildCommand;
 import dev.kage.protocol.DisbandGuildOutcome;
 import dev.kage.protocol.DisbandGuildResponse;
+import dev.kage.protocol.DismantleItemCommand;
 import dev.kage.protocol.DissolveDaoLuCommand;
 import dev.kage.protocol.DonateToGuildCommand;
 import dev.kage.protocol.DonateToGuildOutcome;
@@ -170,6 +173,7 @@ import dev.kage.protocol.Faction;
 import dev.kage.protocol.FriendOfflineEvent;
 import dev.kage.protocol.FriendOnlineEvent;
 import dev.kage.protocol.FriendView;
+import dev.kage.protocol.GatherHerbCommand;
 import dev.kage.protocol.GetCharacterStatsRequest;
 import dev.kage.protocol.GetCharacterStatsResponse;
 import dev.kage.protocol.GetItemCatalogRequest;
@@ -179,9 +183,11 @@ import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyGuildResponse;
 import dev.kage.protocol.GetMyPartyRequest;
 import dev.kage.protocol.GetMyPartyResponse;
+import dev.kage.protocol.GetOnlineRewardsRequest;
 import dev.kage.protocol.GetPvpRatingRequest;
 import dev.kage.protocol.GetPvpRatingResponse;
 import dev.kage.protocol.GetRelationshipsRequest;
+import dev.kage.protocol.GetSeclusionStatusRequest;
 import dev.kage.protocol.GetSpiritVeinStatusRequest;
 import dev.kage.protocol.GetTradeStatusRequest;
 import dev.kage.protocol.GetTradeStatusResponse;
@@ -219,6 +225,7 @@ import dev.kage.protocol.ListGuildMembersRequest;
 import dev.kage.protocol.ListGuildMembersResponse;
 import dev.kage.protocol.ListGuildShopRequest;
 import dev.kage.protocol.ListGuildSkillsRequest;
+import dev.kage.protocol.ListHerbNodesRequest;
 import dev.kage.protocol.ListInventoryRequest;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.ListMailRequest;
@@ -454,6 +461,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final PartyFinderCommands partyFinder;
     private final FriendGiftCommands friendGifts;
     private final RelationshipCommands relations;
+    private final DailyCommands daily;
     private final GuildSkillCommands guildSkills;
     private final dev.kage.character.api.RebirthFacade rebirth;
     private final SpiritVeinCommands spiritVeins;
@@ -633,6 +641,49 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             Opcode.OPCODE_DISSOLVE_DAO_LU_RESPONSE_VALUE,
                             (h, id, c) -> h.relations.daoLu().dissolve(id))),
             Map.entry(Opcode.OPCODE_SEND_EMOTE_COMMAND_VALUE, this::handleSendEmoteCommand),
+            // Lô 21 phần 2 — bế quan (ADR-095), online (ADR-096), phân giải (ADR-097), linh thảo (ADR-098).
+            Map.entry(
+                    Opcode.OPCODE_GET_SECLUSION_STATUS_REQUEST_VALUE,
+                    storageCommand(
+                            GetSeclusionStatusRequest.parser(),
+                            Opcode.OPCODE_GET_SECLUSION_STATUS_RESPONSE_VALUE,
+                            (h, id, c) -> h.daily.seclusionStatus(id))),
+            Map.entry(
+                    Opcode.OPCODE_CLAIM_SECLUSION_COMMAND_VALUE,
+                    storageCommand(
+                            ClaimSeclusionCommand.parser(),
+                            Opcode.OPCODE_CLAIM_SECLUSION_RESPONSE_VALUE,
+                            (h, id, c) -> h.daily.claimSeclusion(id, c.getDoubled()))),
+            Map.entry(
+                    Opcode.OPCODE_GET_ONLINE_REWARDS_REQUEST_VALUE,
+                    storageCommand(
+                            GetOnlineRewardsRequest.parser(),
+                            Opcode.OPCODE_GET_ONLINE_REWARDS_RESPONSE_VALUE,
+                            (h, id, c) -> h.daily.onlineRewards(id))),
+            Map.entry(
+                    Opcode.OPCODE_CLAIM_ONLINE_REWARD_COMMAND_VALUE,
+                    storageCommand(
+                            ClaimOnlineRewardCommand.parser(),
+                            Opcode.OPCODE_CLAIM_ONLINE_REWARD_RESPONSE_VALUE,
+                            (h, id, c) -> h.daily.claimOnlineReward(id, c.getMilestoneMinutes()))),
+            Map.entry(
+                    Opcode.OPCODE_DISMANTLE_ITEM_COMMAND_VALUE,
+                    storageCommand(
+                            DismantleItemCommand.parser(),
+                            Opcode.OPCODE_DISMANTLE_ITEM_RESPONSE_VALUE,
+                            (h, id, c) -> h.daily.dismantle(id, c.getItemId()))),
+            Map.entry(
+                    Opcode.OPCODE_LIST_HERB_NODES_REQUEST_VALUE,
+                    storageCommand(
+                            ListHerbNodesRequest.parser(),
+                            Opcode.OPCODE_LIST_HERB_NODES_RESPONSE_VALUE,
+                            (h, id, c) -> h.daily.herbs().list(id))),
+            Map.entry(
+                    Opcode.OPCODE_GATHER_HERB_COMMAND_VALUE,
+                    storageCommand(
+                            GatherHerbCommand.parser(),
+                            Opcode.OPCODE_GATHER_HERB_RESPONSE_VALUE,
+                            (h, id, c) -> h.daily.herbs().gather(id, c.getNodeId()))),
             Map.entry(Opcode.OPCODE_LIST_FRIENDS_REQUEST_VALUE, this::handleListFriendsRequest),
             Map.entry(
                     Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
@@ -723,6 +774,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 characterFacade,
                 worldGateway.registry().partyFinder);
         this.relations = RelationshipCommands.of(facades, characterFacade, worldGateway);
+        this.daily = DailyCommands.of(facades, worldGateway);
         this.authExecutor = authExecutor;
         this.chatExecutor = new SerialExecutor(authExecutor);
         this.networkMetrics = observability.networkMetrics();
@@ -999,6 +1051,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             claimDailyCheckIn(characterId);
             // ADR-062 D4 — mở bù mốc đã đạt + nạp danh hiệu cho chat; việc phụ, lỗi dừng bên trong.
             worldGateway.registry().achievements.onEnteredWorld(characterId, character.level());
+            // ADR-095/096 — quỹ bế quan + giờ vào world; việc phụ, lỗi dừng bên trong.
+            daily.onEnteredWorld(characterId);
         } catch (CharacterNotFoundException e) {
             // Cùng lỗi dù nhân vật không tồn tại hay thuộc account khác (fail secure — SECURITY.md §4).
             LOG.warn("Chọn nhân vật thất bại: không tìm thấy", e);
@@ -5409,7 +5463,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         CompletableFuture<Void> friendsNotified =
                 CompletableFuture.runAsync(() -> notifyFriendsPresenceChanged(characterId, false), authExecutor);
         handOverPartyLeadershipAfterDisconnect(characterId);
-        CompletableFuture.allOf(positionSaved, worldDrained, friendsNotified)
+        // ADR-095/096 — mốc thoát cho bế quan + giây online của phiên; chạm DB nên lên authExecutor.
+        CompletableFuture<Void> dailyRecorded =
+                CompletableFuture.runAsync(() -> daily.onLeftWorld(characterId), authExecutor);
+        CompletableFuture.allOf(positionSaved, worldDrained, friendsNotified, dailyRecorded)
                 .whenComplete((ignored, error) -> finishRelease(bound, error));
     }
 

@@ -13,6 +13,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.client.core.ui.hud.InventoryPanel;
 import dev.kage.client.core.ui.hud.ScrollingList;
 import dev.kage.client.core.ui.theme.KageI18n;
+import dev.kage.protocol.DismantleItemCommand;
 import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
@@ -133,6 +134,14 @@ final class InventoryCoordinator implements WindowFlow {
         panel.setOnEquipSelected(this::onEquipSelected);
         panel.setOnUseSelected(this::onUseSelected);
         panel.setOnSellSelected(this::onSellSelected);
+        // ADR-097 — kết quả về DailyCoordinator (báo chat + làm mới túi).
+        panel.setOnDismantleSelected(() -> controller
+                .selected()
+                .ifPresent(item -> sender.sendReadRequest(
+                        Opcode.OPCODE_DISMANTLE_ITEM_COMMAND_VALUE,
+                        DismantleItemCommand.newBuilder()
+                                .setItemId(item.itemId())
+                                .build())));
         panel.setOnOfferSelected(this::onOfferSelected);
         panel.setOnEnhanceSelected(this::onEnhanceSelected);
         panel.setOnToggleProtection(this::onToggleProtection);

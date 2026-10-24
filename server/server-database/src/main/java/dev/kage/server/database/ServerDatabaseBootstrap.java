@@ -14,6 +14,7 @@ import dev.kage.achievement.api.AchievementFacade;
 import dev.kage.achievement.application.AchievementUseCase;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.api.RebirthFacade;
+import dev.kage.character.api.SeclusionFacade;
 import dev.kage.character.api.SkillRankFacade;
 import dev.kage.character.application.CharacterUseCases;
 import dev.kage.character.application.CreateCharacterUseCase;
@@ -26,6 +27,7 @@ import dev.kage.character.application.SkillRankUseCase;
 import dev.kage.chat.api.ChatFacade;
 import dev.kage.chat.application.SendChatMessageUseCase;
 import dev.kage.checkin.api.CheckInFacade;
+import dev.kage.checkin.api.OnlineRewardFacade;
 import dev.kage.checkin.application.ClaimDailyCheckInUseCase;
 import dev.kage.checkin.domain.CheckInRewardSender;
 import dev.kage.crafting.api.CraftingFacade;
@@ -67,6 +69,7 @@ import dev.kage.guild.application.ListGuildMembersUseCase;
 import dev.kage.guild.application.ListPendingGuildJoinRequestsUseCase;
 import dev.kage.guild.application.RejectGuildJoinRequestUseCase;
 import dev.kage.guild.application.SendGuildJoinRequestUseCase;
+import dev.kage.inventory.api.DismantleFacade;
 import dev.kage.inventory.api.EquipmentUseCases;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.api.InventoryQueryUseCases;
@@ -121,10 +124,12 @@ import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.character.PostgresFactionChangeAdapter;
 import dev.kage.server.database.character.PostgresRebirthAdapter;
+import dev.kage.server.database.character.PostgresSeclusionAdapter;
 import dev.kage.server.database.character.PostgresSkillRankAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.chat.PostgresChatMuteAdapter;
 import dev.kage.server.database.checkin.PostgresCheckInAdapter;
+import dev.kage.server.database.checkin.PostgresOnlineTimeAdapter;
 import dev.kage.server.database.crafting.JdbcCraftingTransactionRunner;
 import dev.kage.server.database.crafting.PostgresCraftingWorkshopAdapter;
 import dev.kage.server.database.crafting.PostgresRecipeAdapter;
@@ -146,6 +151,7 @@ import dev.kage.server.database.guild.PostgresSpiritVeinAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresCompanionAdapter;
+import dev.kage.server.database.inventory.PostgresDismantleAdapter;
 import dev.kage.server.database.inventory.PostgresDropTableAdapter;
 import dev.kage.server.database.inventory.PostgresEquipmentAdapter;
 import dev.kage.server.database.inventory.PostgresGemAdapter;
@@ -197,6 +203,7 @@ import dev.kage.server.database.trade.PostgresTradeGoldAdapter;
 import dev.kage.server.database.trade.PostgresTradeIdempotencyAdapter;
 import dev.kage.server.database.trade.PostgresTradeInventoryAdapter;
 import dev.kage.server.database.trade.PostgresTradeSessionAdapter;
+import dev.kage.server.database.world.PostgresHerbNodeAdapter;
 import dev.kage.server.database.world.PostgresSafeZoneAdapter;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.shop.application.BuyItemUseCase;
@@ -213,6 +220,7 @@ import dev.kage.trade.application.SetTradeOfferUseCase;
 import dev.kage.trade.application.TradeOfferChanges;
 import dev.kage.trade.application.TradePorts;
 import dev.kage.trade.application.TradeUseCases;
+import dev.kage.world.api.HerbNodeFacade;
 import dev.kage.world.api.WorldGeometryFacade;
 
 /**
@@ -707,6 +715,26 @@ public final class ServerDatabaseBootstrap {
     /** Đạo lữ (ADR-094). */
     public DaoLuFacade wireDaoLuFacade() {
         return new DaoLuFacade(new PostgresDaoLuAdapter(dataSource), java.time.Clock.systemUTC());
+    }
+
+    /** Bế quan (ADR-095). */
+    public SeclusionFacade wireSeclusionFacade() {
+        return new SeclusionFacade(new PostgresSeclusionAdapter(dataSource), java.time.Clock.systemUTC());
+    }
+
+    /** Thưởng thời gian online (ADR-096). */
+    public OnlineRewardFacade wireOnlineRewardFacade() {
+        return new OnlineRewardFacade(new PostgresOnlineTimeAdapter(dataSource), java.time.Clock.systemUTC());
+    }
+
+    /** Phân giải pháp khí (ADR-097). */
+    public DismantleFacade wireDismantleFacade() {
+        return new DismantleFacade(new PostgresDismantleAdapter(dataSource));
+    }
+
+    /** Bụi linh thảo (ADR-098). */
+    public HerbNodeFacade wireHerbNodeFacade() {
+        return new HerbNodeFacade(new PostgresHerbNodeAdapter(dataSource));
     }
 
     /** Boss thế giới (ADR-081) — lịch, thưởng, sổ sát thương tích luỹ. */

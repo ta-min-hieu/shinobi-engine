@@ -48,5 +48,5 @@ danh). Số là PLACEHOLDER cân bằng.
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 21 phần 2).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành 2026-10-24 (lô 21 phần 2) — test `OnlineRewardPolicyTest` (nửa đêm giờ VN), `DailyIntegrationTest`.
+2. ✅ Kiểm sống 2026-10-24 (giây hôm nay đặt 650 bằng SQL): mốc 10 phút `OK` + thư 300 linh thạch; nhận lại `ALREADY_CLAIMED`; mốc 30 `NOT_REACHED`.

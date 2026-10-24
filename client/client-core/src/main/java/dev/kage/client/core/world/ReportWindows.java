@@ -40,9 +40,7 @@ record ReportWindows(
         GuildSkillCoordinator guildSkills,
         ReportPanel spiritVeinPanel,
         SpiritVeinCoordinator spiritVeins,
-        ReportPanel relationshipPanel,
-        RelationshipCoordinator relationships,
-        EmoteCoordinator emotes) {
+        CommunityWindows community) {
 
     /**
      * Luồng nền các cửa sổ này mượn: catalog vật phẩm (tên món), nhật ký chat (báo mở thành tựu, đã bán), và
@@ -71,9 +69,6 @@ record ReportWindows(
         ReportPanel partyFinderPanel = keyless(skin, "partyfinder.title");
         ReportPanel guildSkillPanel = keyless(skin, "guildskill.title");
         ReportPanel spiritVeinPanel = keyless(skin, "spiritvein.title");
-        // Phím Q — Quan hệ: sư đồ, đạo lữ, chặn (lô 21).
-        ReportPanel relationshipPanel =
-                new ReportPanel(skin, "relation.title", Input.Keys.Q, RelationshipCoordinator.TAB_KEYS);
         return new ReportWindows(
                 sheetPanel,
                 new CharacterSheetCoordinator(sheetPanel, sender, feeds.itemCatalog()),
@@ -99,9 +94,7 @@ record ReportWindows(
                 new GuildSkillCoordinator(guildSkillPanel, sender),
                 spiritVeinPanel,
                 new SpiritVeinCoordinator(spiritVeinPanel, sender),
-                relationshipPanel,
-                new RelationshipCoordinator(relationshipPanel, sender, feeds.chat()),
-                new EmoteCoordinator(sender, feeds.chat(), feeds.emoteDisplay()));
+                CommunityWindows.create(skin, sender, feeds));
     }
 
     /**
@@ -120,6 +113,6 @@ record ReportWindows(
         marketPanel.setCanOpen(noneOpen);
         gemPanel.setCanOpen(noneOpen);
         skillRankPanel.setCanOpen(noneOpen);
-        relationshipPanel.setCanOpen(noneOpen);
+        community.gateKeyOpening(noneOpen);
     }
 }

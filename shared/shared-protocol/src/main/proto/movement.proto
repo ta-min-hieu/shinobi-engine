@@ -182,3 +182,55 @@ message MovementModifierChangedEvent {
   float status_speed_multiplier = 1;
   bool immobilized = 2;
 }
+
+// ===== ADR-098 — hái linh thảo: bụi là dữ liệu (herb_node) + trạng thái RAM ở gateway; hái 3 giây do server đếm.
+// CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_LIST_HERB_NODES_REQUEST = 312).
+message ListHerbNodesRequest {
+}
+
+message HerbNodeView {
+  int64 node_id = 1;
+  string item_code = 2;
+  float x = 3;
+  float y = 4;
+  bool ready = 5;
+  int32 seconds_until_ready = 6;   // 0 khi sẵn
+  float distance = 7;              // khoảng cách theo X từ người hỏi (server đo); -1 = không ở world chính
+}
+
+// Response: Server -> Client (OPCODE_LIST_HERB_NODES_RESPONSE = 313).
+message ListHerbNodesResponse {
+  repeated HerbNodeView nodes = 1;
+}
+
+// Command: Client -> Server (OPCODE_GATHER_HERB_COMMAND = 314).
+message GatherHerbCommand {
+  int64 node_id = 1;
+}
+
+enum GatherHerbOutcome {
+  GATHER_HERB_OUTCOME_UNSPECIFIED = 0;
+  GATHER_HERB_OUTCOME_STARTED = 1;         // đứng yên 3 giây — kết quả tới qua HerbGatheredEvent
+  GATHER_HERB_OUTCOME_UNKNOWN_NODE = 2;
+  GATHER_HERB_OUTCOME_TOO_FAR = 3;         // cách bụi quá 2,5 m (hoặc chưa ở world chính)
+  GATHER_HERB_OUTCOME_NOT_READY = 4;       // đang hồi hoặc người khác đang hái
+  GATHER_HERB_OUTCOME_ALREADY_GATHERING = 5;
+  GATHER_HERB_OUTCOME_GATHERED = 6;        // chỉ trong HerbGatheredEvent
+  GATHER_HERB_OUTCOME_MOVED_AWAY = 7;      // chỉ trong HerbGatheredEvent
+  GATHER_HERB_OUTCOME_BAG_FULL = 8;        // chỉ trong HerbGatheredEvent
+}
+
+// Response: Server -> Client (OPCODE_GATHER_HERB_RESPONSE = 315).
+message GatherHerbResponse {
+  GatherHerbOutcome outcome = 1;
+}
+
+// Event: Server -> Client (OPCODE_HERB_GATHERED_EVENT = 316).
+message HerbGatheredEvent {
+  int64 node_id = 1;
+  GatherHerbOutcome outcome = 2;
+  int64 item_template_id = 3;
+  int32 quantity = 4;
+}

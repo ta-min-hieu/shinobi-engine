@@ -361,6 +361,8 @@ public final class GatewayBootstrap {
                 facades.progression().guildProgression(),
                 facades.contentFacades().socialFacades().mailFacade(),
                 (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
+        // ADR-098 — bụi linh thảo nạp một lần (config tĩnh); trạng thái sống trong RAM của registry.
+        characterRegistry.herbNodes.load(facades.progression().daily().herbs().listHerbNodes());
         characterRegistry.achievements.bind(
                 facades.progression().achievementFacade(),
                 (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
@@ -481,7 +483,12 @@ public final class GatewayBootstrap {
                 new RelationshipFacades(
                         databaseBootstrap.wireBlockFacade(),
                         databaseBootstrap.wireMentorshipFacade(),
-                        databaseBootstrap.wireDaoLuFacade()));
+                        databaseBootstrap.wireDaoLuFacade()),
+                new DailyFacades(
+                        databaseBootstrap.wireSeclusionFacade(),
+                        databaseBootstrap.wireOnlineRewardFacade(),
+                        databaseBootstrap.wireDismantleFacade(),
+                        databaseBootstrap.wireHerbNodeFacade()));
         return new GatewayFacades(
                 accountFacade,
                 characterFacade,

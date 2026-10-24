@@ -108,6 +108,12 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-071 — bậc chiêu cho mọi đường attach ({@link CharacterLoadout}). */
     final SkillRankSource skillRanks = new SkillRankSource();
 
+    /** Giờ vào world của người đang chơi (ADR-096) — RAM, dùng chung mọi kết nối. */
+    final OnlineSessions onlineSessions = new OnlineSessions();
+
+    /** Bụi linh thảo (ADR-098) — trạng thái sẵn/hồi/đang hái, RAM, dùng chung mọi kết nối. */
+    final HerbNodes herbNodes = new HerbNodes();
+
     /** Bảng tìm nhóm (ADR-082) — RAM, dùng chung mọi kết nối; tin hết hạn 10 phút. */
     final PartyFinderBoard partyFinder = new PartyFinderBoard(java.time.Clock.systemUTC());
 

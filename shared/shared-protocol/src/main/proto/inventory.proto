@@ -365,3 +365,27 @@ message SocketGemResponse {
   int32 pity_after = 3;          // hỏng tới mốc này thì lần kế chắc chắn thành công
   int32 max_hp = 4;
 }
+
+// ===== ADR-097 — phân giải pháp khí: món ở 7 ô chiến đấu ⇒ linh thạch + Linh Thảo. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_DISMANTLE_ITEM_COMMAND = 522).
+message DismantleItemCommand {
+  int64 item_id = 1;   // inventory_item.id của chính mình
+}
+
+enum DismantleItemOutcome {
+  DISMANTLE_ITEM_OUTCOME_UNSPECIFIED = 0;
+  DISMANTLE_ITEM_OUTCOME_OK = 1;
+  DISMANTLE_ITEM_OUTCOME_NOT_FOUND = 2;
+  DISMANTLE_ITEM_OUTCOME_NOT_DISMANTLABLE = 3;   // không phải pháp khí 7 ô chiến đấu (phi kiếm, linh thú, vật phẩm thường)
+  DISMANTLE_ITEM_OUTCOME_EQUIPPED = 4;
+  DISMANTLE_ITEM_OUTCOME_SOCKETED = 5;           // đang khảm Linh Ngọc — gỡ trước
+  DISMANTLE_ITEM_OUTCOME_ITEM_IN_TRADE = 6;
+}
+
+// Response: Server -> Client (OPCODE_DISMANTLE_ITEM_RESPONSE = 523).
+message DismantleItemResponse {
+  DismantleItemOutcome outcome = 1;
+  int64 gold = 2;
+  int32 herb_quantity = 3;
+}

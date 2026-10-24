@@ -219,3 +219,73 @@ message RebirthResponse {
   RebirthOutcome outcome = 1;
   int32 rebirth_count = 2;
 }
+
+// ===== ADR-095 — bế quan: quỹ phút offline (≤ 480) quy ra EXP lúc nhận; x2 trả linh thạch. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_GET_SECLUSION_STATUS_REQUEST = 214).
+message GetSeclusionStatusRequest {
+}
+
+// Response: Server -> Client (OPCODE_GET_SECLUSION_STATUS_RESPONSE = 215).
+message GetSeclusionStatusResponse {
+  int32 banked_minutes = 1;   // 0..480
+  int64 exp_single = 2;       // EXP nhận được nếu nhận x1 (theo cấp HIỆN TẠI)
+  int64 double_cost = 3;      // linh thạch để nhận x2
+}
+
+// Command: Client -> Server (OPCODE_CLAIM_SECLUSION_COMMAND = 216).
+message ClaimSeclusionCommand {
+  bool doubled = 1;
+}
+
+enum ClaimSeclusionOutcome {
+  CLAIM_SECLUSION_OUTCOME_UNSPECIFIED = 0;
+  CLAIM_SECLUSION_OUTCOME_OK = 1;
+  CLAIM_SECLUSION_OUTCOME_NOTHING_BANKED = 2;
+  CLAIM_SECLUSION_OUTCOME_INSUFFICIENT_GOLD = 3;
+}
+
+// Response: Server -> Client (OPCODE_CLAIM_SECLUSION_RESPONSE = 217). EXP mới tới qua ExperienceChangedEvent như mọi đường.
+message ClaimSeclusionResponse {
+  ClaimSeclusionOutcome outcome = 1;
+  int64 exp_gained = 2;
+}
+
+// ===== ADR-096 — thưởng thời gian online: mốc 10/30/60 phút mỗi ngày (giờ Việt Nam), quà qua thư. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_GET_ONLINE_REWARDS_REQUEST = 218).
+message GetOnlineRewardsRequest {
+}
+
+message OnlineRewardMilestoneView {
+  int32 minutes = 1;
+  bool reached = 2;
+  bool claimed = 3;
+  int64 gold = 4;
+  string item_code = 5;   // rỗng = không vật phẩm
+  int32 item_quantity = 6;
+}
+
+// Response: Server -> Client (OPCODE_GET_ONLINE_REWARDS_RESPONSE = 219).
+message GetOnlineRewardsResponse {
+  int32 seconds_today = 1;
+  repeated OnlineRewardMilestoneView milestones = 2;
+}
+
+// Command: Client -> Server (OPCODE_CLAIM_ONLINE_REWARD_COMMAND = 220).
+message ClaimOnlineRewardCommand {
+  int32 milestone_minutes = 1;
+}
+
+enum ClaimOnlineRewardOutcome {
+  CLAIM_ONLINE_REWARD_OUTCOME_UNSPECIFIED = 0;
+  CLAIM_ONLINE_REWARD_OUTCOME_OK = 1;              // quà đã gửi vào hòm thư
+  CLAIM_ONLINE_REWARD_OUTCOME_NOT_REACHED = 2;
+  CLAIM_ONLINE_REWARD_OUTCOME_ALREADY_CLAIMED = 3;
+  CLAIM_ONLINE_REWARD_OUTCOME_UNKNOWN_MILESTONE = 4;
+}
+
+// Response: Server -> Client (OPCODE_CLAIM_ONLINE_REWARD_RESPONSE = 221).
+message ClaimOnlineRewardResponse {
+  ClaimOnlineRewardOutcome outcome = 1;
+}

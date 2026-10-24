@@ -14,16 +14,31 @@ import dev.kage.protocol.AcceptDiscipleResponse;
 import dev.kage.protocol.BlockCharacterCommand;
 import dev.kage.protocol.BlockCharacterResponse;
 import dev.kage.protocol.ChatChannel;
+import dev.kage.protocol.ClaimOnlineRewardCommand;
+import dev.kage.protocol.ClaimOnlineRewardResponse;
+import dev.kage.protocol.ClaimSeclusionCommand;
+import dev.kage.protocol.ClaimSeclusionResponse;
+import dev.kage.protocol.DismantleItemCommand;
+import dev.kage.protocol.DismantleItemResponse;
 import dev.kage.protocol.DissolveDaoLuCommand;
 import dev.kage.protocol.DissolveDaoLuResponse;
 import dev.kage.protocol.Emote;
 import dev.kage.protocol.ErrorResponse;
+import dev.kage.protocol.GatherHerbCommand;
+import dev.kage.protocol.GatherHerbResponse;
+import dev.kage.protocol.GetOnlineRewardsRequest;
+import dev.kage.protocol.GetOnlineRewardsResponse;
 import dev.kage.protocol.GetRelationshipsRequest;
 import dev.kage.protocol.GetRelationshipsResponse;
+import dev.kage.protocol.GetSeclusionStatusRequest;
+import dev.kage.protocol.GetSeclusionStatusResponse;
+import dev.kage.protocol.HerbGatheredEvent;
 import dev.kage.protocol.InvitePartyMemberCommand;
 import dev.kage.protocol.InvitePartyMemberResponse;
 import dev.kage.protocol.LeaveMentorshipCommand;
 import dev.kage.protocol.LeaveMentorshipResponse;
+import dev.kage.protocol.ListHerbNodesRequest;
+import dev.kage.protocol.ListHerbNodesResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.ProposeDaoLuCommand;
 import dev.kage.protocol.ProposeDaoLuResponse;
@@ -176,8 +191,128 @@ final class Lot21Scenario {
                         InvitePartyMemberCommand.newBuilder().setTargetName(arg).build(),
                         Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE,
                         p -> InvitePartyMemberResponse.parseFrom(p).getOutcome().name());
+            default -> daily(verb, arg);
+        };
+    }
+
+    /** Lô 21 phần 2: bế quan, thưởng online, phân giải, linh thảo. */
+    private String daily(String verb, String arg) throws IOException {
+        return switch (verb) {
+            case "seclusion" ->
+                ask(
+                        Opcode.OPCODE_GET_SECLUSION_STATUS_REQUEST_VALUE,
+                        GetSeclusionStatusRequest.getDefaultInstance(),
+                        Opcode.OPCODE_GET_SECLUSION_STATUS_RESPONSE_VALUE,
+                        Lot21Scenario::describeSeclusion);
+            case "claimSeclusion" ->
+                ask(
+                        Opcode.OPCODE_CLAIM_SECLUSION_COMMAND_VALUE,
+                        ClaimSeclusionCommand.newBuilder()
+                                .setDoubled("x2".equals(arg))
+                                .build(),
+                        Opcode.OPCODE_CLAIM_SECLUSION_RESPONSE_VALUE,
+                        Lot21Scenario::describeSeclusionClaim);
+            case "online" ->
+                ask(
+                        Opcode.OPCODE_GET_ONLINE_REWARDS_REQUEST_VALUE,
+                        GetOnlineRewardsRequest.getDefaultInstance(),
+                        Opcode.OPCODE_GET_ONLINE_REWARDS_RESPONSE_VALUE,
+                        Lot21Scenario::describeOnline);
+            case "claimOnline" ->
+                ask(
+                        Opcode.OPCODE_CLAIM_ONLINE_REWARD_COMMAND_VALUE,
+                        ClaimOnlineRewardCommand.newBuilder()
+                                .setMilestoneMinutes(Integer.parseInt(arg))
+                                .build(),
+                        Opcode.OPCODE_CLAIM_ONLINE_REWARD_RESPONSE_VALUE,
+                        p -> ClaimOnlineRewardResponse.parseFrom(p).getOutcome().name());
+            case "dismantle" ->
+                ask(
+                        Opcode.OPCODE_DISMANTLE_ITEM_COMMAND_VALUE,
+                        DismantleItemCommand.newBuilder()
+                                .setItemId(Long.parseLong(arg))
+                                .build(),
+                        Opcode.OPCODE_DISMANTLE_ITEM_RESPONSE_VALUE,
+                        Lot21Scenario::describeDismantle);
+            case "herbs" ->
+                ask(
+                        Opcode.OPCODE_LIST_HERB_NODES_REQUEST_VALUE,
+                        ListHerbNodesRequest.getDefaultInstance(),
+                        Opcode.OPCODE_LIST_HERB_NODES_RESPONSE_VALUE,
+                        Lot21Scenario::describeHerbs);
+            case "gather" -> gather(Long.parseLong(arg));
+            case "wait" -> waitSeconds(Integer.parseInt(arg));
             default -> "bước không hiểu";
         };
+    }
+
+    private static String describeSeclusion(byte[] payload) throws InvalidProtocolBufferException {
+        GetSeclusionStatusResponse r = GetSeclusionStatusResponse.parseFrom(payload);
+        return "quỹ=" + r.getBankedMinutes() + "phút expX1=" + r.getExpSingle() + " phíX2=" + r.getDoubleCost();
+    }
+
+    private static String describeSeclusionClaim(byte[] payload) throws InvalidProtocolBufferException {
+        ClaimSeclusionResponse r = ClaimSeclusionResponse.parseFrom(payload);
+        return r.getOutcome() + " exp=" + r.getExpGained();
+    }
+
+    private static String describeOnline(byte[] payload) throws InvalidProtocolBufferException {
+        GetOnlineRewardsResponse r = GetOnlineRewardsResponse.parseFrom(payload);
+        StringBuilder line = new StringBuilder("giâyHômNay=" + r.getSecondsToday());
+        r.getMilestonesList().forEach(m -> line.append(" | ")
+                .append(m.getMinutes())
+                .append("p đạt=")
+                .append(m.getReached())
+                .append(" nhận=")
+                .append(m.getClaimed()));
+        return line.toString();
+    }
+
+    private static String describeDismantle(byte[] payload) throws InvalidProtocolBufferException {
+        DismantleItemResponse r = DismantleItemResponse.parseFrom(payload);
+        return r.getOutcome() + " vàng=" + r.getGold() + " thảo=" + r.getHerbQuantity();
+    }
+
+    private static String describeHerbs(byte[] payload) throws InvalidProtocolBufferException {
+        StringBuilder line = new StringBuilder();
+        ListHerbNodesResponse.parseFrom(payload)
+                .getNodesList()
+                .forEach(n -> line.append(String.format(
+                        Locale.ROOT,
+                        "| #%d x=%.0f cách=%.1f sẵn=%s chờ=%ds ",
+                        n.getNodeId(),
+                        n.getX(),
+                        n.getDistance(),
+                        n.getReady(),
+                        n.getSecondsUntilReady())));
+        return line.toString();
+    }
+
+    /** Chờ — để server kịp việc nền lúc vào world (quỹ bế quan, mẫu vị trí 1 Hz) trước bước sau. */
+    private static String waitSeconds(int seconds) {
+        try {
+            Thread.sleep(seconds * 1_000L);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return "bị ngắt";
+        }
+        return "đã chờ " + seconds + "s";
+    }
+
+    /** Hái rồi chờ {@code HerbGatheredEvent} (server đếm 3 giây). */
+    private String gather(long nodeId) throws IOException {
+        String started = ask(
+                Opcode.OPCODE_GATHER_HERB_COMMAND_VALUE,
+                GatherHerbCommand.newBuilder().setNodeId(nodeId).build(),
+                Opcode.OPCODE_GATHER_HERB_RESPONSE_VALUE,
+                p -> GatherHerbResponse.parseFrom(p).getOutcome().name());
+        if (!started.endsWith("STARTED")) {
+            return started;
+        }
+        HerbGatheredEvent event = HerbGatheredEvent.parseFrom(connection
+                .readUntilOpcode(Opcode.OPCODE_HERB_GATHERED_EVENT_VALUE, MAX_FRAMES_TO_SKIP)
+                .payload());
+        return started + " → " + event.getOutcome() + " x" + event.getQuantity();
     }
 
     @FunctionalInterface
