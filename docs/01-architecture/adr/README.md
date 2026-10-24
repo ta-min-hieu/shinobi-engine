@@ -112,6 +112,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-078](ADR-078-Pet-Evolution.md) | Linh thú tiến hoá bậc 2 (×150%) bằng Linh Thú Đan qua đường dùng vật phẩm (V75) | ✅ **Accepted** *(2026-10-24, lô 19)* | ADR-072 |
 | [ADR-079](ADR-079-Alchemy-Crafting.md) | Luyện đan — module `feature-crafting`, công thức DB (V76), lò ở trưởng lão, dải opcode 1800 | ✅ **Accepted** *(2026-10-24, lô 19)* | GDD §8/§10 |
 | [ADR-080](ADR-080-Guild-Shop.md) | Cửa hàng bang — đổi cống hiến (tích luỹ − đã tiêu) lấy vật phẩm theo cấp bang (V77, 723–726) | ✅ **Accepted** *(2026-10-24, lô 19)* | ADR-068 |
+| [ADR-081](ADR-081-World-Boss.md) | Boss thế giới định kỳ — lịch DB, sổ sát thương, thưởng thư theo hạng, thẻ "Diệt Yêu" (V78) | ✅ **Accepted** *(2026-10-24, lô 19)* | GDD §7 |
 | [ADR-082](ADR-082-Party-Finder.md) | Bảng tìm nhóm — tin RAM 10 phút, mục tiêu cố định, vào ngay (1319–1326) | ✅ **Accepted** *(2026-10-24, lô 19)* | feature-party |
 ---
 

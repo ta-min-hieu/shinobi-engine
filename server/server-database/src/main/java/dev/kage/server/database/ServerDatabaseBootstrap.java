@@ -84,6 +84,7 @@ import dev.kage.mail.application.SendMailUseCase;
 import dev.kage.market.api.MarketFacade;
 import dev.kage.market.application.MarketUseCase;
 import dev.kage.monster.api.MonsterFacade;
+import dev.kage.monster.api.WorldBossFacade;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.party.application.AcceptPartyInviteUseCase;
 import dev.kage.party.application.CreatePartyUseCase;
@@ -151,6 +152,7 @@ import dev.kage.server.database.market.PostgresMarketGoldAdapter;
 import dev.kage.server.database.market.PostgresMarketInventoryAdapter;
 import dev.kage.server.database.market.PostgresMarketRecordAdapter;
 import dev.kage.server.database.monster.PostgresMonsterCatalogAdapter;
+import dev.kage.server.database.monster.PostgresWorldBossAdapter;
 import dev.kage.server.database.party.PostgresPartyAdapter;
 import dev.kage.server.database.pvp.PostgresPvpRatingAdapter;
 import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
@@ -645,6 +647,11 @@ public final class ServerDatabaseBootstrap {
     public CheckInFacade wireCheckInFacade(CheckInRewardSender sender) {
         return new CheckInFacade(new ClaimDailyCheckInUseCase(
                 new PostgresCheckInAdapter(dataSource), sender, java.time.Clock.systemUTC()));
+    }
+
+    /** Boss thế giới (ADR-081) — lịch, thưởng, sổ sát thương tích luỹ. */
+    public WorldBossFacade wireWorldBossFacade() {
+        return new WorldBossFacade(new PostgresWorldBossAdapter(dataSource));
     }
 
     /** Cửa hàng bang (ADR-080). */

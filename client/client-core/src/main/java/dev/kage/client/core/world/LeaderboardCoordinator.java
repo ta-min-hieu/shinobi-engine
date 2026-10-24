@@ -26,13 +26,18 @@ final class LeaderboardCoordinator implements WindowFlow {
 
     /** Thứ tự tab trong {@link ReportPanel} — khớp danh sách khoá truyền vào constructor của panel. */
     static final List<String> TAB_KEYS = List.of(
-            "leaderboard.tab.realm", "leaderboard.tab.arena", "leaderboard.tab.combat_power", "leaderboard.tab.guild");
+            "leaderboard.tab.realm",
+            "leaderboard.tab.arena",
+            "leaderboard.tab.combat_power",
+            "leaderboard.tab.guild",
+            "leaderboard.tab.boss_damage");
 
     private static final List<LeaderboardKind> TAB_KINDS = List.of(
             LeaderboardKind.LEADERBOARD_KIND_REALM,
             LeaderboardKind.LEADERBOARD_KIND_ARENA,
             LeaderboardKind.LEADERBOARD_KIND_COMBAT_POWER,
-            LeaderboardKind.LEADERBOARD_KIND_GUILD);
+            LeaderboardKind.LEADERBOARD_KIND_GUILD,
+            LeaderboardKind.LEADERBOARD_KIND_BOSS_DAMAGE);
 
     private static final String FACTION_PREFIX = "FACTION_";
 
@@ -122,6 +127,7 @@ final class LeaderboardCoordinator implements WindowFlow {
         return switch (kind) {
             case LEADERBOARD_KIND_ARENA -> format("leaderboard.value.arena", value);
             case LEADERBOARD_KIND_COMBAT_POWER -> format("leaderboard.value.combat_power", value);
+            case LEADERBOARD_KIND_BOSS_DAMAGE -> format("leaderboard.value.boss_damage", value);
             default -> format("leaderboard.value.realm", value);
         };
     }

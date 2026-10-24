@@ -7,6 +7,7 @@ import dev.kage.gm.api.GameEventFacade;
 import dev.kage.guild.api.GuildProgressionFacade;
 import dev.kage.guild.api.GuildShopFacade;
 import dev.kage.market.api.MarketFacade;
+import dev.kage.monster.api.WorldBossFacade;
 
 /**
  * Facade của các tính năng gắn bó lô 16–17 (2026-10-18, 2026-10-21) — gom để {@link GatewayFacades} không phình thêm
@@ -19,7 +20,8 @@ record ProgressionFacades(
         GameEventFacade gameEvents,
         GuildProgressionFacade guildProgression,
         CraftingFacade crafting,
-        GuildShopFacade guildShop) {
+        GuildShopFacade guildShop,
+        WorldBossFacade worldBoss) {
 
     /** Composition không có các tính năng này (test). */
     static final ProgressionFacades DISABLED = new ProgressionFacades(
@@ -29,5 +31,6 @@ record ProgressionFacades(
             GameEventFacade.DISABLED,
             GuildProgressionFacade.DISABLED,
             CraftingFacade.DISABLED,
-            GuildShopFacade.DISABLED);
+            GuildShopFacade.DISABLED,
+            WorldBossFacade.DISABLED);
 }

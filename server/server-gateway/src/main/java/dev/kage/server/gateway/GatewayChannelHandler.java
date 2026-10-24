@@ -64,6 +64,7 @@ import dev.kage.inventory.domain.ItemSetProgress;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemUseEffect;
 import dev.kage.mail.api.MailFacade;
+import dev.kage.monster.api.WorldBossFacade;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.protocol.AbandonQuestCommand;
 import dev.kage.protocol.AbandonQuestOutcome;
@@ -433,6 +434,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final MarketCommands market;
     private final CraftingCommands crafting;
     private final GuildShopCommands guildShop;
+    private final WorldBossFacade worldBoss;
     private final PartyFinderCommands partyFinder;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
@@ -625,6 +627,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.market = new MarketCommands(facades.progression().marketFacade(), worldGateway.registry());
         this.crafting = new CraftingCommands(facades.progression().crafting(), characterFacade, npcProximity);
         this.guildShop = new GuildShopCommands(facades.progression().guildShop());
+        this.worldBoss = facades.progression().worldBoss();
         this.partyFinder = new PartyFinderCommands(
                 facades.contentFacades().socialFacades().partyFacade(),
                 characterFacade,
@@ -2321,6 +2324,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     case LEADERBOARD_KIND_ARENA -> LeaderboardCache.Kind.ARENA;
                     case LEADERBOARD_KIND_COMBAT_POWER -> LeaderboardCache.Kind.COMBAT_POWER;
                     case LEADERBOARD_KIND_GUILD -> LeaderboardCache.Kind.GUILD;
+                    case LEADERBOARD_KIND_BOSS_DAMAGE -> LeaderboardCache.Kind.BOSS_DAMAGE;
                     // UNSPECIFIED/lạ (client mới hơn server) ⇒ bảng cảnh giới, không lỗi.
                     default -> LeaderboardCache.Kind.REALM;
                 };
@@ -2329,7 +2333,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     characterFacade,
                     pvpFacade,
                     character -> statSheetOf(character.id()).combatPower(),
-                    guildProgression::rankGuilds));
+                    guildProgression::rankGuilds,
+                    () -> worldBoss.topDamage(LeaderboardCache.TOP_SIZE)));
             LeaderboardCache.Board board = cache.board(kind);
             GetLeaderboardResponse.Builder response = GetLeaderboardResponse.newBuilder()
                     .setKind(toProtoLeaderboardKind(kind))
@@ -2363,6 +2368,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case ARENA -> LeaderboardKind.LEADERBOARD_KIND_ARENA;
             case COMBAT_POWER -> LeaderboardKind.LEADERBOARD_KIND_COMBAT_POWER;
             case GUILD -> LeaderboardKind.LEADERBOARD_KIND_GUILD;
+            case BOSS_DAMAGE -> LeaderboardKind.LEADERBOARD_KIND_BOSS_DAMAGE;
         };
     }
 

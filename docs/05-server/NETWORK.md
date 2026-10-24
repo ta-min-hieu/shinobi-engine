@@ -93,7 +93,8 @@ Dải số cố định theo domain — tránh đụng độ khi nhiều ngườ
 | 1500–1599 | Dungeon |
 | 1600–1699 | Arena (PvP 1v1, Phase 8) |
 | 1700–1799 | Achievement / Title ([ADR-062](../01-architecture/adr/ADR-062-Achievements-And-Titles.md), 2026-10-18) |
-| 1800+ | Dự trữ — không dùng khi chưa cập nhật bảng này |
+| 1800–1899 | Crafting — luyện đan ([ADR-079](../01-architecture/adr/ADR-079-Alchemy-Crafting.md), 2026-10-24) |
+| 1900+ | Dự trữ — không dùng khi chưa cập nhật bảng này |
 
 **Nguồn chân lý thật**: `shared-protocol/src/main/proto/opcode_registry.proto`. Tài liệu này là bản tóm tắt — **lệch nhau thì file `.proto` thắng**.
 

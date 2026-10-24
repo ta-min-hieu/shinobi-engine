@@ -244,6 +244,8 @@ public final class GatewayBootstrap {
             // TRƯỚC khi đóng kết nối: từ đây rớt mạng giữa trận Arena là huỷ trận, không phải thua.
             ctx.instanceRegistries().arena().beginShutdown();
             ctx.server().stop();
+            // Lịch boss thế giới gửi thư/ghi sổ qua DB — dừng TRƯỚC khi đóng pool (ADR-081).
+            ctx.worldContext().worldBoss().stop();
             ctx.worldContext().mainWorldChannels().stopAll();
             ctx.instanceRegistries().dungeon().stopAll();
             ctx.instanceRegistries().arena().stopAll();
@@ -272,7 +274,10 @@ public final class GatewayBootstrap {
      * Gộp {@link MainWorldChannelRegistry} + {@link MetricsHttpServer} — cả hai sinh ra CÙNG lúc
      * trong {@link #startWorld}.
      */
-    private record WorldContext(MainWorldChannelRegistry mainWorldChannels, MetricsHttpServer metricsHttpServer) {}
+    private record WorldContext(
+            MainWorldChannelRegistry mainWorldChannels,
+            MetricsHttpServer metricsHttpServer,
+            WorldBossScheduler worldBoss) {}
 
     /**
      * Gộp Dungeon/Arena instance registry + {@link WorldGateway} — dựng cùng lúc,
@@ -415,9 +420,10 @@ public final class GatewayBootstrap {
         WorldFacade firstChannelFacade = new WorldFacade(
                 characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN), worldContent);
         firstChannelFacade.start();
+        WorldBossScheduler worldBoss = startWorldBoss(firstChannelFacade, databaseBootstrap, characterRegistry);
         MainWorldChannelRegistry mainWorldChannels =
                 new MainWorldChannelRegistry(characterRegistry, firstChannelFacade, meterRegistry, worldContent);
-        return new WorldContext(mainWorldChannels, metricsHttpServer);
+        return new WorldContext(mainWorldChannels, metricsHttpServer, worldBoss);
     }
 
     /**
@@ -450,7 +456,8 @@ public final class GatewayBootstrap {
                 databaseBootstrap.wireGameEventFacade(),
                 databaseBootstrap.wireGuildProgressionFacade(),
                 databaseBootstrap.wireCraftingFacade(),
-                databaseBootstrap.wireGuildShopFacade());
+                databaseBootstrap.wireGuildShopFacade(),
+                databaseBootstrap.wireWorldBossFacade());
         return new GatewayFacades(
                 accountFacade,
                 characterFacade,
@@ -458,6 +465,21 @@ public final class GatewayBootstrap {
                 contentFacades,
                 databaseBootstrap.wireGmFacade(),
                 progression);
+    }
+
+    /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
+    private static WorldBossScheduler startWorldBoss(
+            WorldFacade firstChannel, ServerDatabaseBootstrap databaseBootstrap, ConnectedCharacterRegistry registry) {
+        WorldBossScheduler scheduler = new WorldBossScheduler(
+                firstChannel,
+                new WorldBossScheduler.Deps(
+                        databaseBootstrap.wireWorldBossFacade(),
+                        databaseBootstrap.wireMailFacade(),
+                        databaseBootstrap.wireCharacterFacade(),
+                        registry),
+                java.time.Clock.systemUTC());
+        scheduler.start();
+        return scheduler;
     }
 
     /** Bậc chiêu + tâm pháp (ADR-071/077) — tâm pháp cần linh căn hiện tại đọc từ DB. */

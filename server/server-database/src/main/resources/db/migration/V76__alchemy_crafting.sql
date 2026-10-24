@@ -15,18 +15,20 @@ SELECT it.id, CASE it.code WHEN 'spirit_herb' THEN 200 ELSE 1500 END, CASE it.co
  WHERE it.code IN ('spirit_herb', 'demon_core')
    AND NOT EXISTS (SELECT 1 FROM shop_item si WHERE si.item_template_id = it.id);
 
--- Rơi đồ: Linh Thảo từ mọi bảng rơi đang có; Yêu Đan từ bảng của quái mạnh + boss.
+-- Rơi đồ: Linh Thảo từ mọi bảng rơi đang có; Yêu Đan từ bảng của quái mạnh + boss. TRỪ `trial_construct`: cỗ máy
+-- khảo hạch cố ý không rơi gì (V33 §1), và bù nhìn tập luyện (đứng yên, đánh mãi không chết người — không phải nơi cày nguyên liệu).
 INSERT INTO drop_table_entry (drop_table_id, item_template_id, drop_chance_percent, min_quantity, max_quantity)
 SELECT dt.id, it.id, 35, 1, 2
   FROM drop_table dt CROSS JOIN item_template it
  WHERE it.code = 'spirit_herb'
+   AND dt.code NOT IN ('trial_construct', 'training_dummy')
    AND NOT EXISTS (SELECT 1 FROM drop_table_entry e WHERE e.drop_table_id = dt.id AND e.item_template_id = it.id);
 
 INSERT INTO drop_table_entry (drop_table_id, item_template_id, drop_chance_percent, min_quantity, max_quantity)
 SELECT dt.id, it.id, CASE WHEN dt.code = 'sample_boss' THEN 100 ELSE 20 END, 1, CASE WHEN dt.code = 'sample_boss' THEN 3 ELSE 1 END
   FROM drop_table dt CROSS JOIN item_template it
  WHERE it.code = 'demon_core'
-   AND dt.code IN ('stone_ogre', 'wandering_bandit', 'blood_sand_enforcer', 'archive_warden', 'trial_construct', 'sample_boss')
+   AND dt.code IN ('stone_ogre', 'wandering_bandit', 'blood_sand_enforcer', 'archive_warden', 'sample_boss')
    AND NOT EXISTS (SELECT 1 FROM drop_table_entry e WHERE e.drop_table_id = dt.id AND e.item_template_id = it.id);
 
 CREATE TABLE crafting_recipe (

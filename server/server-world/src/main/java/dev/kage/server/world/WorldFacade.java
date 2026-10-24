@@ -247,6 +247,8 @@ public final class WorldFacade {
     private final float[] monsterRespawnCountdownSeconds;
     // monsterId -> chỉ số điểm spawn, để hồi sinh đúng chỗ cũ. Boss KHÔNG có entry ở đây.
     private final Map<Long, Integer> spawnIndexByMonsterId = new HashMap<>();
+    private final WorldBossDamageLedger worldBossLedger = new WorldBossDamageLedger();
+    private volatile WorldBossListener worldBossListener = WorldBossListener.NONE;
 
     private static float[] newAliveCountdowns(int spawnPointCount) {
         float[] countdowns = new float[spawnPointCount];
@@ -756,7 +758,20 @@ public final class WorldFacade {
      * @param bossCode mã trong {@code monster_template}, ví dụ {@code sample_boss}
      */
     public void spawnBoss(String bossCode) {
-        inbox.add(new WorldCommand.SpawnBossCommand(bossCode));
+        inbox.add(new WorldCommand.SpawnBossCommand(bossCode, BOSS_SPAWN_X, BOSS_SPAWN_Y, false));
+    }
+
+    /**
+     * Boss thế giới (ADR-081) — như {@link #spawnBoss} nhưng tại {@code (x, y)} và có sổ sát thương; lúc nó chết,
+     * {@link WorldBossListener} nhận sổ. Trần một con mỗi mã vẫn áp dụng (bỏ lệnh nếu con trước còn sống).
+     */
+    public void spawnWorldBoss(String bossCode, float x, float y) {
+        inbox.add(new WorldCommand.SpawnBossCommand(bossCode, x, y, true));
+    }
+
+    /** Ai nghe boss thế giới chết (ADR-081) — gọi TRÊN tick thread, phải trả về ngay (việc nặng sang luồng khác). */
+    public void setWorldBossListener(WorldBossListener listener) {
+        this.worldBossListener = listener;
     }
 
     /**
@@ -957,7 +972,7 @@ public final class WorldFacade {
                 case WorldCommand.ChangeCharacterElementCommand c ->
                     handleChangeCharacterElement(c.characterId(), c.element());
                 case WorldCommand.SetSkillRanksCommand c -> handleSetSkillRanks(c.characterId(), c.ranks());
-                case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c.bossCode());
+                case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c);
                 case WorldCommand.InboxBarrierCommand c -> c.onReached().run();
             }
         }
@@ -1423,6 +1438,7 @@ public final class WorldFacade {
                     outcome.targetCurrentHp(),
                     outcome.targetDied());
 
+            worldBossLedger.record(outcome.targetEntityId(), outcome.attackerEntityId(), outcome.damage());
             Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
             addIfCharacter(observers, outcome.attackerEntityId()); // người đánh luôn thấy đòn của chính mình.
             // PHÁT HIỆN THẬT (Phase 8 lát cắt 2, viết test E2E thật mới lộ ra): khi mục tiêu là
@@ -1598,6 +1614,7 @@ public final class WorldFacade {
                     outcome.targetDied(),
                     outcome.effectKind());
 
+            worldBossLedger.record(outcome.targetEntityId(), outcome.attackerEntityId(), outcome.damage());
             Set<Long> observers = aoiTracker.observersOf(outcome.targetEntityId());
             observers.add(outcome.attackerEntityId()); // người dùng skill luôn thấy kết quả của chính mình.
             // Chỉ target dương (nhân vật) — xem giải thích đầy đủ ở handleCombatResults.
@@ -1776,6 +1793,10 @@ public final class WorldFacade {
         if (killerEntityId > 0) {
             outboundSink.onMonsterKilled(killerEntityId, monsterCode, expReward);
         }
+        worldBossLedger
+                .close(monsterId)
+                .ifPresent(defeat ->
+                        worldBossListener.onWorldBossDefeated(defeat.monsterCode(), defeat.damageByCharacter()));
     }
 
     /** Đếm ngược hồi sinh RIÊNG cho từng điểm spawn — quái này chết không kéo theo quái khác. */
@@ -1944,7 +1965,8 @@ public final class WorldFacade {
      * <p>⚠️ Mọi chỉ số nay đọc từ catalog. World nhận catalog RỖNG (hầm ngục trước ADR-048) sẽ
      * không tra được mã ⇒ không spawn gì, và log nói rõ lý do thay vì im lặng.
      */
-    private void spawnBossEntity(String bossCode) {
+    private void spawnBossEntity(WorldCommand.SpawnBossCommand command) {
+        String bossCode = command.bossCode();
         MonsterCatalogSnapshot.MonsterSpecies loai =
                 monsterCatalog.find(bossCode).orElse(null);
         if (bossSpawnRefused(bossCode, loai)) {
@@ -1954,8 +1976,8 @@ public final class WorldFacade {
         long monsterId = nextMonsterOrNpcId--;
 
         PositionComponent position = new PositionComponent();
-        position.x = BOSS_SPAWN_X;
-        position.y = BOSS_SPAWN_Y;
+        position.x = command.x();
+        position.y = command.y();
         position.prevX = position.x;
         position.prevY = position.y;
         entity.add(position);
@@ -1973,7 +1995,7 @@ public final class WorldFacade {
         monsterIdComponent.monsterId = monsterId;
         entity.add(monsterIdComponent);
 
-        entity.add(newAiState(BOSS_SPAWN_X, BOSS_SPAWN_Y));
+        entity.add(newAiState(command.x(), command.y()));
         entity.add(toAiParams(loai.ai()));
         entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
         entity.add(new AttackCooldownComponent());
@@ -1981,6 +2003,9 @@ public final class WorldFacade {
         entity.add(newBossAi(loai.boss()));
 
         entitiesByMonsterId.put(monsterId, entity);
+        if (command.worldBoss()) {
+            worldBossLedger.track(monsterId, bossCode);
+        }
         aoiDirty = true; // thực thể mới — xem syncAoiIfDirty
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt spawnMonster).

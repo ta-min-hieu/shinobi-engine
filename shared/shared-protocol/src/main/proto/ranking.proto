@@ -18,6 +18,7 @@ enum LeaderboardKind {
   // ADR-068 — bang hội: name = TÊN BANG, level = cấp bang, value = kinh nghiệm bang, character_id = bang
   // chủ, faction để trống; own_rank = hạng bang của người hỏi.
   LEADERBOARD_KIND_GUILD = 4;
+  LEADERBOARD_KIND_BOSS_DAMAGE = 5; // ADR-081 — tổng sát thương lên boss thế giới; chỉ người đã từng gây sát thương
 }
 
 // Command: Client -> Server (OPCODE_GET_LEADERBOARD_REQUEST = 1202).

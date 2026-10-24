@@ -18,6 +18,7 @@ import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
 import dev.kage.guild.domain.GuildRank;
+import dev.kage.monster.domain.WorldBossPort;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.pvp.domain.PvpRating;
 
@@ -48,7 +49,9 @@ final class LeaderboardCache {
         ARENA,
         COMBAT_POWER,
         /** ADR-068 — bang hội theo kinh nghiệm bang; mỗi THÀNH VIÊN tra được hạng bang mình. */
-        GUILD
+        GUILD,
+        /** ADR-081 — tổng sát thương lên boss thế giới. */
+        BOSS_DAMAGE
     }
 
     /** Một dòng đã xếp hạng. {@code rank} bắt đầu từ 1. */
@@ -61,6 +64,7 @@ final class LeaderboardCache {
     private final PvpFacade pvpFacade;
     private final ToLongFunction<Character> combatPowerOf;
     private final Supplier<List<GuildRank>> guildRanks;
+    private final Supplier<List<WorldBossPort.DamageRank>> bossDamage;
     private final Clock clock;
     private final Map<Kind, Board> boards = new EnumMap<>(Kind.class);
     private final Map<Kind, Object> locks = new EnumMap<>(Kind.class);
@@ -70,13 +74,15 @@ final class LeaderboardCache {
             CharacterFacade characterFacade,
             PvpFacade pvpFacade,
             ToLongFunction<Character> combatPowerOf,
-            Supplier<List<GuildRank>> guildRanks) {}
+            Supplier<List<GuildRank>> guildRanks,
+            Supplier<List<WorldBossPort.DamageRank>> bossDamage) {}
 
     LeaderboardCache(Sources sources, Clock clock) {
         this.characterFacade = sources.characterFacade();
         this.pvpFacade = sources.pvpFacade();
         this.combatPowerOf = sources.combatPowerOf();
         this.guildRanks = sources.guildRanks();
+        this.bossDamage = sources.bossDamage();
         this.clock = clock;
         for (Kind kind : Kind.values()) {
             locks.put(kind, new Object());
@@ -112,6 +118,7 @@ final class LeaderboardCache {
                     case COMBAT_POWER -> rankByCombatPower(characters);
                     case ARENA -> rankByRating(characters);
                     case GUILD -> List.of();
+                    case BOSS_DAMAGE -> rankByBossDamage(characters);
                 };
         Map<Long, Row> byId = new HashMap<>();
         for (Row row : rows) {
@@ -166,6 +173,22 @@ final class LeaderboardCache {
             rows.add(row);
             for (long member : guild.memberIds()) {
                 byId.put(member, row);
+            }
+        }
+        return rows;
+    }
+
+    /** ADR-081 — {@code world_boss_damage} đã theo thứ tự của SQL; nhân vật đã xoá thì bỏ qua. */
+    private List<Row> rankByBossDamage(List<Character> characters) {
+        Map<Long, Character> byId = new HashMap<>();
+        for (Character c : characters) {
+            byId.put(c.id(), c);
+        }
+        List<Row> rows = new ArrayList<>();
+        for (WorldBossPort.DamageRank damage : bossDamage.get()) {
+            Character c = byId.get(damage.characterId());
+            if (c != null) {
+                rows.add(new Row(rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), damage.totalDamage()));
             }
         }
         return rows;

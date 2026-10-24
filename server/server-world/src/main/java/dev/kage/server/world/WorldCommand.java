@@ -83,7 +83,7 @@ sealed interface WorldCommand {
      *
      * @param bossCode mã trong {@code monster_template}, ví dụ {@code sample_boss}
      */
-    record SpawnBossCommand(String bossCode) implements WorldCommand {}
+    record SpawnBossCommand(String bossCode, float x, float y, boolean worldBoss) implements WorldCommand {}
 
     /**
      * Ngoại hình của {@code characterId} vừa đổi (đổi hệ phái — ADR-045). Command này CHỈ mang id:
