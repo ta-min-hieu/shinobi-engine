@@ -114,6 +114,7 @@ import dev.kage.protocol.ConfirmTradeOutcome;
 import dev.kage.protocol.ConfirmTradeResponse;
 import dev.kage.protocol.ConnectRequest;
 import dev.kage.protocol.ConnectResponse;
+import dev.kage.protocol.CraftItemCommand;
 import dev.kage.protocol.CreateCharacterRequest;
 import dev.kage.protocol.CreateCharacterResponse;
 import dev.kage.protocol.CreateGuildCommand;
@@ -221,6 +222,7 @@ import dev.kage.protocol.ListPendingPartyInvitesRequest;
 import dev.kage.protocol.ListPendingPartyInvitesResponse;
 import dev.kage.protocol.ListQuestsRequest;
 import dev.kage.protocol.ListQuestsResponse;
+import dev.kage.protocol.ListRecipesRequest;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.ListSkillRanksRequest;
@@ -423,6 +425,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final NpcProximity npcProximity;
     private final SectStorageCommands storage;
     private final MarketCommands market;
+    private final CraftingCommands crafting;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -514,6 +517,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_SET_ACTIVE_TITLE_COMMAND_VALUE, this::handleSetActiveTitleCommand),
             Map.entry(Opcode.OPCODE_DEPOSIT_ITEM_COMMAND_VALUE, this::handleDepositItemCommand),
             Map.entry(Opcode.OPCODE_WITHDRAW_ITEM_COMMAND_VALUE, this::handleWithdrawItemCommand),
+            Map.entry(Opcode.OPCODE_LIST_RECIPES_REQUEST_VALUE, this::handleListRecipesRequest),
+            Map.entry(Opcode.OPCODE_CRAFT_ITEM_COMMAND_VALUE, this::handleCraftItemCommand),
             Map.entry(Opcode.OPCODE_GET_ITEM_CATALOG_REQUEST_VALUE, this::handleGetItemCatalogRequest),
             Map.entry(Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE, this::handleListQuestsRequest),
             Map.entry(Opcode.OPCODE_ABANDON_QUEST_COMMAND_VALUE, this::handleAbandonQuestCommand),
@@ -604,6 +609,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 new NpcProximity(worldGateway.mainWorldChannels().worldContent().npcs(), this::mainWorldPositionOf);
         this.storage = new SectStorageCommands(inventoryFacade, npcProximity);
         this.market = new MarketCommands(facades.progression().marketFacade(), worldGateway.registry());
+        this.crafting = new CraftingCommands(facades.progression().crafting(), characterFacade, npcProximity);
         this.authExecutor = authExecutor;
         this.chatExecutor = new SerialExecutor(authExecutor);
         this.networkMetrics = observability.networkMetrics();
@@ -1770,6 +1776,23 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 characterId -> storage.deposit(characterId, command));
     }
 
+    /** ADR-079 — danh sách công thức lò đan (xem được ở bất cứ đâu; LUYỆN mới cần đứng gần lò). */
+    private void handleListRecipesRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListRecipesRequest.parser().parseFrom(payload);
+        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_LIST_RECIPES_RESPONSE_VALUE, characterId -> crafting.list());
+    }
+
+    private void handleCraftItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        CraftItemCommand command = CraftItemCommand.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_CRAFT_ITEM_RESPONSE_VALUE,
+                characterId -> crafting.craft(characterId, command));
+    }
+
     private void handleWithdrawItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
         WithdrawItemCommand command = WithdrawItemCommand.parseFrom(payload);
@@ -2635,12 +2658,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE,
                         sequenceId,
                         buildShopListingsResponse().toByteArray());
-            case DialogueFacade.SelectOptionResult.OpenStorage ignored ->
-                send(
-                        ctx,
-                        Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE,
-                        sequenceId,
-                        storage.list(characterId).toByteArray());
+            case DialogueFacade.SelectOptionResult.OpenStorage ignored -> sendStorage(ctx, sequenceId, characterId);
+            case DialogueFacade.SelectOptionResult.OpenCrafting ignored -> sendRecipes(ctx, sequenceId);
             case DialogueFacade.SelectOptionResult.Ended ignored ->
                 send(
                         ctx,
@@ -2657,6 +2676,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 send(ctx, Opcode.OPCODE_ACCEPT_QUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
             }
         }
+    }
+
+    /** Lựa chọn thoại "open_storage" (ADR-061). */
+    private void sendStorage(ChannelHandlerContext ctx, int sequenceId, long characterId) {
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE,
+                sequenceId,
+                storage.list(characterId).toByteArray());
+    }
+
+    /** Lựa chọn thoại "open_crafting" (ADR-079). */
+    private void sendRecipes(ChannelHandlerContext ctx, int sequenceId) {
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_RECIPES_RESPONSE_VALUE,
+                sequenceId,
+                crafting.list().toByteArray());
     }
 
     private static final Map<QuestFacade.AcceptResult, AcceptQuestOutcome> ACCEPT_QUEST_OUTCOME_MAPPING = Map.of(

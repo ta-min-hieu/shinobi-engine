@@ -110,6 +110,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-076](ADR-076-Mail-Postage.md) | Phí thư 10 + 1% vàng đính kèm (gold sink, không đổi schema/protocol) | ✅ **Accepted** *(2026-10-24, lô 19)* | GDD §7/§10 |
 | [ADR-077](ADR-077-Mental-Arts.md) | Tâm pháp bị động — 2/linh căn, bậc 0–5 bằng điểm công pháp (thêm field 7) | ✅ **Accepted** *(2026-10-24, lô 19)* | GDD §5 |
 | [ADR-078](ADR-078-Pet-Evolution.md) | Linh thú tiến hoá bậc 2 (×150%) bằng Linh Thú Đan qua đường dùng vật phẩm (V75) | ✅ **Accepted** *(2026-10-24, lô 19)* | ADR-072 |
+| [ADR-079](ADR-079-Alchemy-Crafting.md) | Luyện đan — module `feature-crafting`, công thức DB (V76), lò ở trưởng lão, dải opcode 1800 | ✅ **Accepted** *(2026-10-24, lô 19)* | GDD §8/§10 |
 ---
 
 ## ADR cần tạo (chưa viết)

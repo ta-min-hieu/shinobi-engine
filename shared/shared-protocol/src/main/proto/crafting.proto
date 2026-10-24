@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package kage.protocol;
+
+option java_multiple_files = true;
+option java_package = "dev.kage.protocol";
+
+// ADR-079 — luyện đan ở lò của trưởng lão Chu Hoành. Dải 1800–1899.
+
+// Request: Client -> Server (OPCODE_LIST_RECIPES_REQUEST = 1800). Lựa chọn thoại "open_crafting" cũng trả 1801.
+message ListRecipesRequest {}
+
+message RecipeMaterialView {
+  int64 item_template_id = 1;
+  int32 quantity = 2;
+}
+
+message RecipeView {
+  string code = 1;
+  int64 output_item_template_id = 2; // tên tra catalog vật phẩm (ADR-035)
+  int32 output_quantity = 3;
+  int64 gold_cost = 4;
+  int32 required_level = 5;
+  repeated RecipeMaterialView materials = 6;
+}
+
+// Response: Server -> Client (OPCODE_LIST_RECIPES_RESPONSE = 1801).
+message ListRecipesResponse {
+  repeated RecipeView recipes = 1;
+}
+
+// Command: Client -> Server (OPCODE_CRAFT_ITEM_COMMAND = 1802). Server kiểm đứng gần lò, cấp, nguyên liệu, vàng, túi.
+message CraftItemCommand {
+  string recipe_code = 1;
+}
+
+enum CraftItemOutcome {
+  CRAFT_ITEM_OUTCOME_UNSPECIFIED = 0;
+  CRAFT_ITEM_OUTCOME_OK = 1;
+  CRAFT_ITEM_OUTCOME_UNKNOWN_RECIPE = 2;
+  CRAFT_ITEM_OUTCOME_LEVEL_TOO_LOW = 3;
+  CRAFT_ITEM_OUTCOME_MISSING_MATERIALS = 4;
+  CRAFT_ITEM_OUTCOME_INSUFFICIENT_GOLD = 5;
+  CRAFT_ITEM_OUTCOME_BAG_FULL = 6;
+  CRAFT_ITEM_OUTCOME_TOO_FAR = 7;
+}
+
+// Response: Server -> Client (OPCODE_CRAFT_ITEM_RESPONSE = 1803).
+message CraftItemResponse {
+  CraftItemOutcome outcome = 1;
+}

@@ -17,7 +17,7 @@
 //
 // text_key/label_key là khoá i18n (client tự tra bản dịch), KHÔNG phải text hiển thị thẳng.
 // action của option là 1 trong: tên node khác trong cây này (điều hướng), "open_shop" (mở cửa
-// hàng toàn cục — GAMEPLAY.md §7.2), "end" (kết thúc hội thoại), "accept_quest:<code>" (nhận quest
+// hàng toàn cục — GAMEPLAY.md §7.2), "open_crafting" (lò đan — ADR-079), "end" (kết thúc hội thoại), "accept_quest:<code>" (nhận quest
 // — GAMEPLAY.md §9.3, gateway gọi QuestFacade.acceptQuest, feature-dialogue không biết feature-quest).
 //
 // ⚠️ Bốn lựa chọn của node `start` GIỮ NGUYÊN cả thứ tự lẫn action: `option_index` là VỊ TRÍ trong
@@ -81,6 +81,8 @@ if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS") {
             // Nhiệm vụ ngày (ADR-055, STORY §7) — đứng CUỐI, sau mọi nhánh chính tuyến, ngay trước "bye":
             // `bye` lùi một chỗ là CÓ CHỦ ĐÍCH (option_index là VỊ TRÍ), ghim ở TownElderDialogueTreeTest.
             { label_key: "dialogue.option.ask_daily_duty", action: "daily_duty" },
+            // ADR-079 — lò đan của trưởng lão: mở cửa sổ luyện đan (gateway gửi danh sách công thức).
+            { label_key: "dialogue.option.open_crafting", action: "open_crafting" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
     },

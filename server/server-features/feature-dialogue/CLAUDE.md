@@ -88,7 +88,7 @@ khớp `take_item` của script quest bằng tay.
 `optionIndex` là VỊ TRÍ trong node hiện tại, KHÔNG phải chuỗi `action` — server tự
 `getDialogueNodeUseCase.execute(npcCode, currentNodeId)` lại để tra action THẬT theo index, không
 tin action client tự khai (Điều 24, giống cách EnhanceItemCommand không tin tỉ lệ/chi phí từ client).
-Action đặc biệt: `DialogueOption.ACTION_OPEN_SHOP`/`ACTION_OPEN_STORAGE` (ADR-061, 2026-10-18)/`ACTION_END` (hằng số), còn lại coi là
+Action đặc biệt: `DialogueOption.ACTION_OPEN_SHOP`/`ACTION_OPEN_STORAGE` (ADR-061, 2026-10-18)/`ACTION_OPEN_CRAFTING` (ADR-079, 2026-10-24)/`ACTION_END` (hằng số), còn lại coi là
 `nodeId` kế tiếp (điều hướng tự do trong script, không giới hạn số node).
 
 ## Chưa kiểm tra khoảng cách thật (đứng gần NPC)

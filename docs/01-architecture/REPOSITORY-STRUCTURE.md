@@ -67,6 +67,7 @@ shinobi-engine/
 │       ├── feature-monster/        # ADR-037 — monster_template + monster_spawn
 │       ├── feature-achievement/    # ADR-062 — thành tựu + danh hiệu (bộ đếm mốc, danh hiệu đang đeo)
 │       ├── feature-checkin/        # ADR-060 — điểm danh hằng ngày (chu kỳ 7 ngày, quà qua thư hệ thống)
+│       ├── feature-crafting/       # ADR-079 — luyện đan (công thức DB, lò đan của trưởng lão)
 │       ├── feature-market/         # ADR-063 — phường thị (ký quỹ đồ, phí 5%, hết hạn trả thư)
 │       └── feature-gm/             # ADR-052 — quyền GM (gm_role) + audit (gm_audit_log) + parser /gm
 │

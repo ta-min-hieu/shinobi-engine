@@ -68,6 +68,7 @@ include(":server:server-features:feature-monster")
 include(":server:server-features:feature-world")   // ADR-046 D3 — hình học bản đồ (safe_zone)
 include(":server:server-features:feature-achievement") // ADR-062 — thành tựu + danh hiệu
 include(":server:server-features:feature-checkin")
+include(":server:server-features:feature-crafting")
 include(":server:server-features:feature-market")     // ADR-063 — phường thị // ADR-060 — điểm danh hằng ngày
 include(":server:server-features:feature-gm")      // ADR-052 — lệnh GM trong game (quyền + audit)
 

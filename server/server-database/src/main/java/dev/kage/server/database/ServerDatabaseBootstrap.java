@@ -26,6 +26,8 @@ import dev.kage.chat.application.SendChatMessageUseCase;
 import dev.kage.checkin.api.CheckInFacade;
 import dev.kage.checkin.application.ClaimDailyCheckInUseCase;
 import dev.kage.checkin.domain.CheckInRewardSender;
+import dev.kage.crafting.api.CraftingFacade;
+import dev.kage.crafting.application.CraftItemUseCase;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.api.NpcPlacementFacade;
 import dev.kage.dialogue.application.GetDialogueNodeUseCase;
@@ -110,6 +112,9 @@ import dev.kage.server.database.character.PostgresSkillRankAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.chat.PostgresChatMuteAdapter;
 import dev.kage.server.database.checkin.PostgresCheckInAdapter;
+import dev.kage.server.database.crafting.JdbcCraftingTransactionRunner;
+import dev.kage.server.database.crafting.PostgresCraftingWorkshopAdapter;
+import dev.kage.server.database.crafting.PostgresRecipeAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcPlacementAdapter;
 import dev.kage.server.database.dialogue.PostgresNpcTemplateAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
@@ -638,6 +643,14 @@ public final class ServerDatabaseBootstrap {
     public CheckInFacade wireCheckInFacade(CheckInRewardSender sender) {
         return new CheckInFacade(new ClaimDailyCheckInUseCase(
                 new PostgresCheckInAdapter(dataSource), sender, java.time.Clock.systemUTC()));
+    }
+
+    /** Luyện đan (ADR-079) — công thức đọc một lần, mỗi mẻ một transaction. */
+    public CraftingFacade wireCraftingFacade() {
+        return new CraftingFacade(new CraftItemUseCase(
+                new PostgresRecipeAdapter(dataSource),
+                new PostgresCraftingWorkshopAdapter(),
+                new JdbcCraftingTransactionRunner(dataSource)));
     }
 
     /** Đóng DB/Redis (SERVER.md §10 graceful shutdown, bước 5) — gọi sau khi tick/flush xong. */

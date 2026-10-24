@@ -33,10 +33,19 @@ final class MoveSpeedCoordinator implements WindowFlow {
         }
         if (opcode == Opcode.OPCODE_MOVEMENT_MODIFIER_CHANGED_EVENT_VALUE) {
             MovementModifierChangedEvent event = MovementModifierChangedEvent.parseFrom(frame.payload());
-            intents.onMovementModifier(event.getStatusSpeedMultiplier(), event.getImmobilized());
+            intents.onMovementModifier(sanitizedMultiplier(event.getStatusSpeedMultiplier()), event.getImmobilized());
             return true;
         }
         return false;
+    }
+
+    /**
+     * Hệ số tốc độ từ dây KHÔNG được tin mù (InboundPacketFuzzTest 2026-10-24): NaN/vô cực nhân vào dự đoán di chuyển
+     * làm vị trí của chính mình thành NaN vĩnh viễn. Server chỉ gửi 0..1 (làm chậm/choáng) — ngoài khoảng đó thì kẹp,
+     * không hữu hạn thì coi như không có hiệu ứng.
+     */
+    static float sanitizedMultiplier(float multiplier) {
+        return Float.isFinite(multiplier) ? Math.clamp(multiplier, 0f, 1f) : 1f;
     }
 
     /** Rời màn hình — vào lại world thì server báo lại; World mới không mang hiệu ứng cũ (ADR-073 D4). */

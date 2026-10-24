@@ -105,7 +105,10 @@ class ContentReferenceIntegrationTest {
             "spirit_fox",
             "spirit_turtle",
             // Lô 19 (2026-10-24) — Linh Thú Đan (ADR-078) lên trước art.
-            "spirit_beast_pill");
+            "spirit_beast_pill",
+            // ADR-079 — nguyên liệu luyện đan lên trước art.
+            "spirit_herb",
+            "demon_core");
 
     @Container
     static final PostgreSQLContainer POSTGRES =
@@ -309,6 +312,7 @@ class ContentReferenceIntegrationTest {
         return !DialogueOption.ACTION_END.equals(option.action())
                 && !DialogueOption.ACTION_OPEN_SHOP.equals(option.action())
                 && !DialogueOption.ACTION_OPEN_STORAGE.equals(option.action())
+                && !DialogueOption.ACTION_OPEN_CRAFTING.equals(option.action())
                 && !option.action().startsWith(DialogueOption.ACTION_ACCEPT_QUEST_PREFIX);
     }
 
