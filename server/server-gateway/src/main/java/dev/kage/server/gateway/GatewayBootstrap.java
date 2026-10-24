@@ -63,6 +63,11 @@ public final class GatewayBootstrap {
     // lát cắt persistence này (tinh chỉnh 1 chỗ khi có số liệu thật, giống MOVE_SPEED_MPS/AOI_RADIUS).
     private static final Duration POSITION_SAVE_INTERVAL = Duration.ofMinutes(5);
 
+    // ADR-099 — thưởng lần đầu hạ boss Bí Cảnh (PLACEHOLDER cân bằng).
+    private static final long FIRST_CLEAR_GOLD = 5_000L;
+    private static final String FIRST_CLEAR_ITEM_CODE = "demon_core";
+    private static final int FIRST_CLEAR_ITEM_QUANTITY = 3;
+
     private GatewayBootstrap() {}
 
     public static void main(String[] args) throws InterruptedException, SSLException {
@@ -243,6 +248,7 @@ public final class GatewayBootstrap {
             // Hết hạn phường thị (ADR-063 D4) + Linh Mạch (ADR-090) ghi DB + gửi thư — dừng TRƯỚC khi đóng pool.
             ctx.jobs().marketExpiry().stop();
             ctx.jobs().spiritVeins().stop();
+            ctx.jobs().waypoints().stop();
             ctx.worldContext().metricsHttpServer().stop();
             observability.tracing().shutdown();
             databaseBootstrap.shutdown();
@@ -261,7 +267,8 @@ public final class GatewayBootstrap {
             BackgroundJobs jobs) {}
 
     /** Các luồng nền dựng SAU cổng game — cần {@link WorldGateway} hoặc chỉ chạm DB + thư. */
-    private record BackgroundJobs(MarketExpiryJanitor marketExpiry, SpiritVeinScheduler spiritVeins) {}
+    private record BackgroundJobs(
+            MarketExpiryJanitor marketExpiry, SpiritVeinScheduler spiritVeins, WaypointScheduler waypoints) {}
 
     private static BackgroundJobs startBackgroundJobs(
             GatewayFacades facades, ConnectedCharacterRegistry characterRegistry, WorldGateway worldGateway) {
@@ -279,7 +286,14 @@ public final class GatewayBootstrap {
                                 || worldGateway.arenaInstanceRegistry().isInDuel(characterId)),
                 java.time.Clock.systemUTC());
         spiritVeins.start();
-        return new BackgroundJobs(marketExpiry, spiritVeins);
+        // ADR-100 — mở điểm truyền tống khi đứng gần lần đầu.
+        WaypointScheduler waypoints = new WaypointScheduler(
+                facades.progression().adventure().waypoints(),
+                characterRegistry,
+                characterId -> worldGateway.dungeonInstanceRegistry().isInDungeon(characterId)
+                        || worldGateway.arenaInstanceRegistry().isInDuel(characterId));
+        waypoints.start();
+        return new BackgroundJobs(marketExpiry, spiritVeins, waypoints);
     }
 
     /**
@@ -331,7 +345,8 @@ public final class GatewayBootstrap {
                 new DungeonInstanceRegistry.DungeonFacades(
                         facades.characterFacade(),
                         facades.contentFacades().socialFacades().partyFacade(),
-                        arenaInstanceRegistry::isInDuel),
+                        arenaInstanceRegistry::isInDuel,
+                        dungeonRewards(facades, characterRegistry)),
                 mainWorldChannels,
                 mainWorldChannels.worldContent());
         // Và chiều ngược: người ở hầm ngục không được vào trận đấu (2026-10-03).
@@ -361,8 +376,7 @@ public final class GatewayBootstrap {
                 facades.progression().guildProgression(),
                 facades.contentFacades().socialFacades().mailFacade(),
                 (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
-        // ADR-098 — bụi linh thảo nạp một lần (config tĩnh); trạng thái sống trong RAM của registry.
-        characterRegistry.herbNodes.load(facades.progression().daily().herbs().listHerbNodes());
+        bindLot21Hooks(characterRegistry, facades);
         characterRegistry.achievements.bind(
                 facades.progression().achievementFacade(),
                 (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
@@ -467,7 +481,20 @@ public final class GatewayBootstrap {
         SocialFacades socialFacades = new SocialFacades(
                 friendFacade, mailFacade, chatFacade, guildFacade, partyFacade, tradeFacade, pvpFacade);
         ContentFacades contentFacades = new ContentFacades(shopFacade, dialogueFacade, questFacade, socialFacades);
-        ProgressionFacades progression = new ProgressionFacades(
+        ProgressionFacades progression = progressionFacades(databaseBootstrap, mailFacade, inventoryFacade);
+        return new GatewayFacades(
+                accountFacade,
+                characterFacade,
+                inventoryFacade,
+                contentFacades,
+                databaseBootstrap.wireGmFacade(),
+                progression);
+    }
+
+    /** Facade các tính năng gắn bó (lô 16+) — tách khỏi {@link #wireFacades} vì trần {@code MethodLength}. */
+    private static ProgressionFacades progressionFacades(
+            ServerDatabaseBootstrap databaseBootstrap, MailFacade mailFacade, InventoryFacade inventoryFacade) {
+        return new ProgressionFacades(
                 databaseBootstrap.wireCheckInFacade(new CheckInMailSender(mailFacade, inventoryFacade)),
                 databaseBootstrap.wireAchievementFacade(),
                 databaseBootstrap.wireMarketFacade(),
@@ -488,14 +515,11 @@ public final class GatewayBootstrap {
                         databaseBootstrap.wireSeclusionFacade(),
                         databaseBootstrap.wireOnlineRewardFacade(),
                         databaseBootstrap.wireDismantleFacade(),
-                        databaseBootstrap.wireHerbNodeFacade()));
-        return new GatewayFacades(
-                accountFacade,
-                characterFacade,
-                inventoryFacade,
-                contentFacades,
-                databaseBootstrap.wireGmFacade(),
-                progression);
+                        databaseBootstrap.wireHerbNodeFacade()),
+                new AdventureFacades(
+                        databaseBootstrap.wireDungeonQuotaFacade(),
+                        databaseBootstrap.wireWaypointFacade(),
+                        databaseBootstrap.wireBountyFacade()));
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -534,6 +558,34 @@ public final class GatewayBootstrap {
                 facades.characterFacade(),
                 new BlockCommands(relationships.blocks(), relationships.daoLu(), facades.characterFacade()),
                 new PlayerNotices(facades.contentFacades().socialFacades().mailFacade(), characterRegistry));
+    }
+
+    /** Lô 21: bụi linh thảo nạp một lần (ADR-098); bảng truy nã đi theo lượt hạ quái (ADR-101). */
+    private static void bindLot21Hooks(ConnectedCharacterRegistry characterRegistry, GatewayFacades facades) {
+        characterRegistry.herbNodes.load(facades.progression().daily().herbs().listHerbNodes());
+        characterRegistry.bounties.bind(
+                facades.progression().adventure().bounties(), facades.characterFacade(), characterRegistry);
+    }
+
+    /** ADR-099 — lượt Bí Cảnh + thư thưởng lần đầu hạ boss (5.000 linh thạch + 3 Yêu Đan). */
+    private static DungeonRewards dungeonRewards(GatewayFacades facades, ConnectedCharacterRegistry registry) {
+        PlayerNotices notices =
+                new PlayerNotices(facades.contentFacades().socialFacades().mailFacade(), registry);
+        return new DungeonRewards(facades.progression().adventure().dungeonQuota(), characterId -> {
+            java.util.List<dev.kage.mail.api.MailFacade.AttachmentRequest> items =
+                    facades.inventoryFacade().itemCatalog().entries().stream()
+                            .filter(entry -> FIRST_CLEAR_ITEM_CODE.equals(entry.code()))
+                            .map(entry -> new dev.kage.mail.api.MailFacade.AttachmentRequest(
+                                    entry.id(), FIRST_CLEAR_ITEM_QUANTITY, 0))
+                            .toList();
+            notices.mail(
+                    characterId,
+                    new PlayerNotices.SystemMail(
+                            "Bí Cảnh / Dungeon",
+                            "Lần đầu hạ boss Bí Cảnh. / First dungeon boss clear.",
+                            FIRST_CLEAR_GOLD,
+                            items));
+        });
     }
 
     /** Bậc chiêu + tâm pháp (ADR-071/077) — tâm pháp cần linh căn hiện tại đọc từ DB. */

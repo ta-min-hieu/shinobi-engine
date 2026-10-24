@@ -39,5 +39,5 @@ lệnh GM `goto`, đích là toạ độ điểm. Dời hỏng sau khi đã tr�
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 21 phần 3).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành 2026-10-24 (lô 21 phần 3).
+2. ✅ Kiểm sống 2026-10-24: Kagemaru đi tới x=83 ⇒ dòng "Mở điểm truyền tống mới: spirit_vein"; `east_ridge` chưa mở ⇒ `NOT_UNLOCKED`; về `sect_gate` ⇒ `OK`, `WorldChangedEvent` lý do `TELEPORT` x=-5, phù 2→1.

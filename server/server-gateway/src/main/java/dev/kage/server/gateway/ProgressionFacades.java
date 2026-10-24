@@ -31,7 +31,8 @@ record ProgressionFacades(
         RebirthFacade rebirth,
         SpiritVeinFacade spiritVeins,
         RelationshipFacades relationships,
-        DailyFacades daily) {
+        DailyFacades daily,
+        AdventureFacades adventure) {
 
     /** Composition không có các tính năng này (test). */
     static final ProgressionFacades DISABLED = new ProgressionFacades(
@@ -48,5 +49,6 @@ record ProgressionFacades(
             RebirthFacade.DISABLED,
             SpiritVeinFacade.DISABLED,
             RelationshipFacades.DISABLED,
-            DailyFacades.DISABLED);
+            DailyFacades.DISABLED,
+            AdventureFacades.DISABLED);
 }

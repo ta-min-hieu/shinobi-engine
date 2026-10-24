@@ -111,6 +111,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** Giờ vào world của người đang chơi (ADR-096) — RAM, dùng chung mọi kết nối. */
     final OnlineSessions onlineSessions = new OnlineSessions();
 
+    /** ADR-101 — lượt hạ quái vào bảng truy nã; nối sau khi DB đã dựng. */
+    final BountyHooks bounties = new BountyHooks();
+
     /** Bụi linh thảo (ADR-098) — trạng thái sẵn/hồi/đang hái, RAM, dùng chung mọi kết nối. */
     final HerbNodes herbNodes = new HerbNodes();
 
@@ -622,6 +625,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 killerCharacterId,
                 monsterCode,
                 () -> guildProgress.onMonsterKilled(killerCharacterId));
+        lootExecutor.dispatch( // bảng truy nã (ADR-101) — chỉ người ra đòn cuối
+                KillRewardDispatcher.Step.BOUNTY,
+                killerCharacterId,
+                monsterCode,
+                () -> bounties.onMonsterKilled(killerCharacterId, monsterCode));
         // Phần của ĐỒNG ĐỘI (2026-10-11) — một việc RIÊNG, sau ba việc của người hạ: tra nhóm chạm DB,
         // và nó hỏng thì phần của người ra đòn cuối ở trên không được suy suyển.
         lootExecutor.dispatch(

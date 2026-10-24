@@ -7,6 +7,10 @@ import java.util.Locale;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.MessageLite;
 
+import dev.kage.protocol.AbandonBountyCommand;
+import dev.kage.protocol.AbandonBountyResponse;
+import dev.kage.protocol.AcceptBountyCommand;
+import dev.kage.protocol.AcceptBountyResponse;
 import dev.kage.protocol.AcceptDaoLuCommand;
 import dev.kage.protocol.AcceptDaoLuResponse;
 import dev.kage.protocol.AcceptDiscipleCommand;
@@ -23,9 +27,13 @@ import dev.kage.protocol.DismantleItemResponse;
 import dev.kage.protocol.DissolveDaoLuCommand;
 import dev.kage.protocol.DissolveDaoLuResponse;
 import dev.kage.protocol.Emote;
+import dev.kage.protocol.EnterDungeonCommand;
+import dev.kage.protocol.EnterDungeonResponse;
 import dev.kage.protocol.ErrorResponse;
 import dev.kage.protocol.GatherHerbCommand;
 import dev.kage.protocol.GatherHerbResponse;
+import dev.kage.protocol.GetBountyBoardRequest;
+import dev.kage.protocol.GetBountyBoardResponse;
 import dev.kage.protocol.GetOnlineRewardsRequest;
 import dev.kage.protocol.GetOnlineRewardsResponse;
 import dev.kage.protocol.GetRelationshipsRequest;
@@ -39,6 +47,8 @@ import dev.kage.protocol.LeaveMentorshipCommand;
 import dev.kage.protocol.LeaveMentorshipResponse;
 import dev.kage.protocol.ListHerbNodesRequest;
 import dev.kage.protocol.ListHerbNodesResponse;
+import dev.kage.protocol.ListWaypointsRequest;
+import dev.kage.protocol.ListWaypointsResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.ProposeDaoLuCommand;
 import dev.kage.protocol.ProposeDaoLuResponse;
@@ -51,6 +61,8 @@ import dev.kage.protocol.SendEmoteCommand;
 import dev.kage.protocol.SendEmoteResponse;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendFriendRequestResponse;
+import dev.kage.protocol.TeleportCommand;
+import dev.kage.protocol.TeleportResponse;
 import dev.kage.protocol.UnblockCharacterCommand;
 import dev.kage.protocol.UnblockCharacterResponse;
 import dev.kage.protocol.wire.PacketCodec;
@@ -242,8 +254,76 @@ final class Lot21Scenario {
                         Lot21Scenario::describeHerbs);
             case "gather" -> gather(Long.parseLong(arg));
             case "wait" -> waitSeconds(Integer.parseInt(arg));
+            default -> adventure(verb, arg);
+        };
+    }
+
+    /** Lô 21 phần 3: truyền tống, truy nã, lượt Bí Cảnh. */
+    private String adventure(String verb, String arg) throws IOException {
+        return switch (verb) {
+            case "waypoints" ->
+                ask(
+                        Opcode.OPCODE_LIST_WAYPOINTS_REQUEST_VALUE,
+                        ListWaypointsRequest.getDefaultInstance(),
+                        Opcode.OPCODE_LIST_WAYPOINTS_RESPONSE_VALUE,
+                        Lot21Scenario::describeWaypoints);
+            case "teleport" ->
+                ask(
+                        Opcode.OPCODE_TELEPORT_COMMAND_VALUE,
+                        TeleportCommand.newBuilder().setWaypointCode(arg).build(),
+                        Opcode.OPCODE_TELEPORT_RESPONSE_VALUE,
+                        p -> TeleportResponse.parseFrom(p).getOutcome().name());
+            case "bounty" ->
+                ask(
+                        Opcode.OPCODE_GET_BOUNTY_BOARD_REQUEST_VALUE,
+                        GetBountyBoardRequest.getDefaultInstance(),
+                        Opcode.OPCODE_GET_BOUNTY_BOARD_RESPONSE_VALUE,
+                        Lot21Scenario::describeBounty);
+            case "acceptBounty" ->
+                ask(
+                        Opcode.OPCODE_ACCEPT_BOUNTY_COMMAND_VALUE,
+                        AcceptBountyCommand.newBuilder().setBountyCode(arg).build(),
+                        Opcode.OPCODE_ACCEPT_BOUNTY_RESPONSE_VALUE,
+                        p -> AcceptBountyResponse.parseFrom(p).getOutcome().name());
+            case "abandonBounty" ->
+                ask(
+                        Opcode.OPCODE_ABANDON_BOUNTY_COMMAND_VALUE,
+                        AbandonBountyCommand.getDefaultInstance(),
+                        Opcode.OPCODE_ABANDON_BOUNTY_RESPONSE_VALUE,
+                        p -> "bỏ=" + AbandonBountyResponse.parseFrom(p).getAbandoned());
+            case "enterDungeon" ->
+                ask(
+                        Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE,
+                        EnterDungeonCommand.newBuilder().setDungeonCode(arg).build(),
+                        Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE,
+                        p -> {
+                            EnterDungeonResponse r = EnterDungeonResponse.parseFrom(p);
+                            return r.getOutcome() + " cònLượt=" + r.getEntriesLeft();
+                        });
             default -> "bước không hiểu";
         };
+    }
+
+    private static String describeWaypoints(byte[] payload) throws InvalidProtocolBufferException {
+        ListWaypointsResponse r = ListWaypointsResponse.parseFrom(payload);
+        StringBuilder line = new StringBuilder("phù=" + r.getTalismans());
+        r.getWaypointsList()
+                .forEach(w ->
+                        line.append(" | ").append(w.getCode()).append(" mở=").append(w.getOpen()));
+        return line.toString();
+    }
+
+    private static String describeBounty(byte[] payload) throws InvalidProtocolBufferException {
+        GetBountyBoardResponse r = GetBountyBoardResponse.parseFrom(payload);
+        StringBuilder line = new StringBuilder("xong=" + r.getCompletedToday() + "/" + r.getMaxPerDay() + " đangLàm="
+                + r.getActiveCode() + " " + r.getActiveProgress() + "/" + r.getActiveTarget());
+        r.getBountiesList().forEach(b -> line.append(" | ")
+                .append(b.getCode())
+                .append(' ')
+                .append(b.getMonsterCode())
+                .append(" x")
+                .append(b.getKillCount()));
+        return line.toString();
     }
 
     private static String describeSeclusion(byte[] payload) throws InvalidProtocolBufferException {

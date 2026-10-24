@@ -84,7 +84,13 @@ final class DungeonCoordinator implements WindowFlow {
 
     private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_ENTER_DUNGEON_RESPONSE_VALUE) {
-            settleEnter(EnterDungeonResponse.parseFrom(payload).getOutcome());
+            EnterDungeonResponse response = EnterDungeonResponse.parseFrom(payload);
+            settleEnter(response.getOutcome());
+            if (response.getOutcome() == EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_OK) {
+                // ADR-099 — lượt còn hôm nay.
+                notices.showSystemNotice(
+                        KageI18n.formatOrKey(i18n, "dungeon.notice.entries_left", response.getEntriesLeft()));
+            }
             return true;
         }
         if (opcode == Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE) {

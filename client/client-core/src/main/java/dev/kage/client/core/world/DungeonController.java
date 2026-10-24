@@ -123,7 +123,9 @@ final class DungeonController {
             EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON,
             "dungeon.error.unknown_dungeon",
             EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_IN_DUEL,
-            "dungeon.error.in_duel");
+            "dungeon.error.in_duel",
+            EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_DAILY_LIMIT_REACHED,
+            "dungeon.error.daily_limit");
 
     private static final Map<ExitDungeonOutcome, String> EXIT_MESSAGE_KEYS = Map.of(
             ExitDungeonOutcome.EXIT_DUNGEON_OUTCOME_OK, "dungeon.notice.exited",

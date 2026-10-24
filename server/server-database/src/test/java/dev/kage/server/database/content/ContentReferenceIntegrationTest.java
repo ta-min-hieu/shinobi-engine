@@ -110,7 +110,8 @@ class ContentReferenceIntegrationTest {
             "spirit_herb",
             "demon_core",
             // ADR-088 — Túi Càn Khôn lên trước art.
-            "bag_expansion_pouch");
+            "bag_expansion_pouch",
+            "teleport_talisman");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

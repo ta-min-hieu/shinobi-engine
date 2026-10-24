@@ -110,6 +110,7 @@ import dev.kage.party.application.PartyUseCases;
 import dev.kage.party.application.RejectPartyInviteUseCase;
 import dev.kage.pvp.api.PvpFacade;
 import dev.kage.pvp.api.PvpSeasonFacade;
+import dev.kage.quest.api.BountyFacade;
 import dev.kage.quest.api.QuestFacade;
 import dev.kage.quest.application.AbandonQuestUseCase;
 import dev.kage.quest.application.AcceptQuestUseCase;
@@ -180,6 +181,7 @@ import dev.kage.server.database.party.PostgresPartyAdapter;
 import dev.kage.server.database.pvp.PostgresPvpRatingAdapter;
 import dev.kage.server.database.pvp.PostgresPvpSeasonAdapter;
 import dev.kage.server.database.quest.JdbcQuestTransactionRunner;
+import dev.kage.server.database.quest.PostgresBountyAdapter;
 import dev.kage.server.database.quest.PostgresQuestAuditAdapter;
 import dev.kage.server.database.quest.PostgresQuestExpAdapter;
 import dev.kage.server.database.quest.PostgresQuestGoldAdapter;
@@ -203,8 +205,10 @@ import dev.kage.server.database.trade.PostgresTradeGoldAdapter;
 import dev.kage.server.database.trade.PostgresTradeIdempotencyAdapter;
 import dev.kage.server.database.trade.PostgresTradeInventoryAdapter;
 import dev.kage.server.database.trade.PostgresTradeSessionAdapter;
+import dev.kage.server.database.world.PostgresDungeonQuotaAdapter;
 import dev.kage.server.database.world.PostgresHerbNodeAdapter;
 import dev.kage.server.database.world.PostgresSafeZoneAdapter;
+import dev.kage.server.database.world.PostgresWaypointAdapter;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.shop.application.BuyItemUseCase;
 import dev.kage.shop.application.ListShopItemsUseCase;
@@ -220,7 +224,9 @@ import dev.kage.trade.application.SetTradeOfferUseCase;
 import dev.kage.trade.application.TradeOfferChanges;
 import dev.kage.trade.application.TradePorts;
 import dev.kage.trade.application.TradeUseCases;
+import dev.kage.world.api.DungeonQuotaFacade;
 import dev.kage.world.api.HerbNodeFacade;
+import dev.kage.world.api.WaypointFacade;
 import dev.kage.world.api.WorldGeometryFacade;
 
 /**
@@ -735,6 +741,21 @@ public final class ServerDatabaseBootstrap {
     /** Bụi linh thảo (ADR-098). */
     public HerbNodeFacade wireHerbNodeFacade() {
         return new HerbNodeFacade(new PostgresHerbNodeAdapter(dataSource));
+    }
+
+    /** Lượt Bí Cảnh + thưởng lần đầu (ADR-099). */
+    public DungeonQuotaFacade wireDungeonQuotaFacade() {
+        return new DungeonQuotaFacade(new PostgresDungeonQuotaAdapter(dataSource), java.time.Clock.systemUTC());
+    }
+
+    /** Điểm truyền tống (ADR-100). */
+    public WaypointFacade wireWaypointFacade() {
+        return new WaypointFacade(new PostgresWaypointAdapter(dataSource));
+    }
+
+    /** Bảng truy nã (ADR-101). */
+    public BountyFacade wireBountyFacade() {
+        return new BountyFacade(new PostgresBountyAdapter(dataSource), java.time.Clock.systemUTC());
     }
 
     /** Boss thế giới (ADR-081) — lịch, thưởng, sổ sát thương tích luỹ. */

@@ -19,9 +19,20 @@ final class DungeonOutboundSink implements WorldOutboundSink {
     /** ADR-051 D5 — {@code DungeonInstanceRegistry#handleCharacterDefeated}, xem đó về luồng. */
     private final LongConsumer onDefeated;
 
+    /** ADR-099 — hạ quái trong hầm ngục (người hạ, mã quái) — {@code DungeonInstanceRegistry} lọc boss. */
+    private final java.util.function.ObjLongConsumer<String> onKilled;
+
     DungeonOutboundSink(ConnectedCharacterRegistry registry, LongConsumer onDefeated) {
+        this(registry, onDefeated, (monsterCode, killerId) -> {});
+    }
+
+    DungeonOutboundSink(
+            ConnectedCharacterRegistry registry,
+            LongConsumer onDefeated,
+            java.util.function.ObjLongConsumer<String> onKilled) {
         this.registry = registry;
         this.onDefeated = onDefeated;
+        this.onKilled = onKilled;
     }
 
     @Override
@@ -62,6 +73,7 @@ final class DungeonOutboundSink implements WorldOutboundSink {
     @Override
     public void onMonsterKilled(long killerCharacterId, String monsterCode, long expReward) {
         registry.onMonsterKilled(killerCharacterId, monsterCode, expReward);
+        onKilled.accept(monsterCode, killerCharacterId);
     }
 
     @Override

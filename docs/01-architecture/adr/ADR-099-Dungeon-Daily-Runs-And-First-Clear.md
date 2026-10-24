@@ -41,5 +41,5 @@ entries_left = <n>` (lượt còn của người gửi sau lệnh). `protocolVer
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 21 phần 3).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành 2026-10-24 (lô 21 phần 3).
+2. ✅ Kiểm sống 2026-10-24: Benkei đặt 3 lượt đã dùng ⇒ Kagemaru vào ⇒ `DAILY_LIMIT_REACHED` (không trừ ai); xoá ⇒ `OK cònLượt=2`, cả hai `dungeon_entry` = 1. Hạ boss trong Bí Cảnh ⇒ `dungeon_first_clear` ghi cả hai, mỗi người một thư 5.000 linh thạch + 3 Yêu Đan.

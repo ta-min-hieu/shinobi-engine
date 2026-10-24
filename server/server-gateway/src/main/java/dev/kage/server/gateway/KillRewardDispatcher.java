@@ -44,7 +44,9 @@ final class KillRewardDispatcher {
         /** Bộ đếm thành tựu "hạ N quái" (ADR-062) — việc phụ. */
         ACHIEVEMENT,
         /** Nhiệm vụ bang tuần (ADR-069) — việc phụ. */
-        GUILD_WEEKLY
+        GUILD_WEEKLY,
+        /** Bảng truy nã (ADR-101) — việc phụ. */
+        BOUNTY
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(KillRewardDispatcher.class);

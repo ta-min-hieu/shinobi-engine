@@ -66,9 +66,11 @@ import dev.kage.inventory.domain.ItemUseEffect;
 import dev.kage.mail.api.MailFacade;
 import dev.kage.monster.api.WorldBossFacade;
 import dev.kage.party.api.PartyFacade;
+import dev.kage.protocol.AbandonBountyCommand;
 import dev.kage.protocol.AbandonQuestCommand;
 import dev.kage.protocol.AbandonQuestOutcome;
 import dev.kage.protocol.AbandonQuestResponse;
+import dev.kage.protocol.AcceptBountyCommand;
 import dev.kage.protocol.AcceptDaoLuCommand;
 import dev.kage.protocol.AcceptDiscipleCommand;
 import dev.kage.protocol.AcceptDuelCommand;
@@ -174,6 +176,7 @@ import dev.kage.protocol.FriendOfflineEvent;
 import dev.kage.protocol.FriendOnlineEvent;
 import dev.kage.protocol.FriendView;
 import dev.kage.protocol.GatherHerbCommand;
+import dev.kage.protocol.GetBountyBoardRequest;
 import dev.kage.protocol.GetCharacterStatsRequest;
 import dev.kage.protocol.GetCharacterStatsResponse;
 import dev.kage.protocol.GetItemCatalogRequest;
@@ -248,6 +251,7 @@ import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.ListSkillRanksRequest;
 import dev.kage.protocol.ListSkillRanksResponse;
 import dev.kage.protocol.ListStorageRequest;
+import dev.kage.protocol.ListWaypointsRequest;
 import dev.kage.protocol.MailAttachmentView;
 import dev.kage.protocol.MailView;
 import dev.kage.protocol.MoveCommand;
@@ -316,6 +320,7 @@ import dev.kage.protocol.SocketGemCommand;
 import dev.kage.protocol.SocketGemOutcome;
 import dev.kage.protocol.SocketGemResponse;
 import dev.kage.protocol.TalkToNpcCommand;
+import dev.kage.protocol.TeleportCommand;
 import dev.kage.protocol.TradeCloseReason;
 import dev.kage.protocol.TradeClosedEvent;
 import dev.kage.protocol.TradeOfferItemView;
@@ -462,6 +467,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final FriendGiftCommands friendGifts;
     private final RelationshipCommands relations;
     private final DailyCommands daily;
+    private final AdventureCommands adventure;
     private final GuildSkillCommands guildSkills;
     private final dev.kage.character.api.RebirthFacade rebirth;
     private final SpiritVeinCommands spiritVeins;
@@ -641,6 +647,37 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             Opcode.OPCODE_DISSOLVE_DAO_LU_RESPONSE_VALUE,
                             (h, id, c) -> h.relations.daoLu().dissolve(id))),
             Map.entry(Opcode.OPCODE_SEND_EMOTE_COMMAND_VALUE, this::handleSendEmoteCommand),
+            // Lô 21 phần 3 — truyền tống (ADR-100), truy nã (ADR-101).
+            Map.entry(
+                    Opcode.OPCODE_LIST_WAYPOINTS_REQUEST_VALUE,
+                    storageCommand(
+                            ListWaypointsRequest.parser(),
+                            Opcode.OPCODE_LIST_WAYPOINTS_RESPONSE_VALUE,
+                            (h, id, c) -> h.adventure.waypoints(id))),
+            Map.entry(
+                    Opcode.OPCODE_TELEPORT_COMMAND_VALUE,
+                    storageCommand(
+                            TeleportCommand.parser(),
+                            Opcode.OPCODE_TELEPORT_RESPONSE_VALUE,
+                            (h, id, c) -> h.adventure.teleport(id, c.getWaypointCode()))),
+            Map.entry(
+                    Opcode.OPCODE_GET_BOUNTY_BOARD_REQUEST_VALUE,
+                    storageCommand(
+                            GetBountyBoardRequest.parser(),
+                            Opcode.OPCODE_GET_BOUNTY_BOARD_RESPONSE_VALUE,
+                            (h, id, c) -> h.adventure.bountyBoard(id))),
+            Map.entry(
+                    Opcode.OPCODE_ACCEPT_BOUNTY_COMMAND_VALUE,
+                    storageCommand(
+                            AcceptBountyCommand.parser(),
+                            Opcode.OPCODE_ACCEPT_BOUNTY_RESPONSE_VALUE,
+                            (h, id, c) -> h.adventure.acceptBounty(id, c.getBountyCode()))),
+            Map.entry(
+                    Opcode.OPCODE_ABANDON_BOUNTY_COMMAND_VALUE,
+                    storageCommand(
+                            AbandonBountyCommand.parser(),
+                            Opcode.OPCODE_ABANDON_BOUNTY_RESPONSE_VALUE,
+                            (h, id, c) -> h.adventure.abandonBounty(id))),
             // Lô 21 phần 2 — bế quan (ADR-095), online (ADR-096), phân giải (ADR-097), linh thảo (ADR-098).
             Map.entry(
                     Opcode.OPCODE_GET_SECLUSION_STATUS_REQUEST_VALUE,
@@ -775,6 +812,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 worldGateway.registry().partyFinder);
         this.relations = RelationshipCommands.of(facades, characterFacade, worldGateway);
         this.daily = DailyCommands.of(facades, worldGateway);
+        this.adventure = AdventureCommands.of(facades, worldGateway);
         this.authExecutor = authExecutor;
         this.chatExecutor = new SerialExecutor(authExecutor);
         this.networkMetrics = observability.networkMetrics();
@@ -4092,9 +4130,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     case ALREADY_IN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_ALREADY_IN_DUNGEON;
                     case UNKNOWN_DUNGEON -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_UNKNOWN_DUNGEON;
                     case IN_DUEL -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_IN_DUEL;
+                    case DAILY_LIMIT_REACHED -> EnterDungeonOutcome.ENTER_DUNGEON_OUTCOME_DAILY_LIMIT_REACHED;
                 };
-        EnterDungeonResponse response =
-                EnterDungeonResponse.newBuilder().setOutcome(protoOutcome).build();
+        EnterDungeonResponse response = EnterDungeonResponse.newBuilder()
+                .setOutcome(protoOutcome)
+                .setEntriesLeft(worldGateway.dungeonInstanceRegistry().entriesLeft(characterId))
+                .build();
         // ⚠️ Response đi SAU khi mọi người đã được dời — và đó là BẮT BUỘC, không phải quán tính.
         // Mục "Phát hiện phụ" của ADR-047 đề xuất đảo lại (trả lời trước, dời sau) để đóng khe
         // response-vs-spawn của chính người gửi. Đã dựng thử 2026-09-13 và HAI test có sẵn bác ngay:

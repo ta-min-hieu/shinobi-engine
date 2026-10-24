@@ -151,3 +151,67 @@ message AbandonQuestResponse {
   AbandonQuestOutcome outcome = 1;
   string quest_code = 2;
 }
+
+// ===== ADR-101 — bảng truy nã: 3 truy nã mỗi ngày (giờ VN) chọn tất định theo ngày; hạ đủ số quái ⇒ tự trao thưởng;
+// 5 lần xong mỗi ngày; một truy nã đang làm. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_GET_BOUNTY_BOARD_REQUEST = 614).
+message GetBountyBoardRequest {
+}
+
+message BountyView {
+  string code = 1;
+  string monster_code = 2;
+  int32 kill_count = 3;
+  int64 reward_gold = 4;
+  int64 reward_exp = 5;
+  int32 min_level = 6;
+}
+
+// Response: Server -> Client (OPCODE_GET_BOUNTY_BOARD_RESPONSE = 615).
+message GetBountyBoardResponse {
+  repeated BountyView bounties = 1;
+  string active_code = 2;       // rỗng = không có truy nã đang làm
+  int32 active_progress = 3;
+  int32 active_target = 4;
+  int32 completed_today = 5;
+  int32 max_per_day = 6;
+}
+
+// Command: Client -> Server (OPCODE_ACCEPT_BOUNTY_COMMAND = 616).
+message AcceptBountyCommand {
+  string bounty_code = 1;
+}
+
+enum AcceptBountyOutcome {
+  ACCEPT_BOUNTY_OUTCOME_UNSPECIFIED = 0;
+  ACCEPT_BOUNTY_OUTCOME_OK = 1;
+  ACCEPT_BOUNTY_OUTCOME_NOT_ON_BOARD = 2;
+  ACCEPT_BOUNTY_OUTCOME_LEVEL_TOO_LOW = 3;
+  ACCEPT_BOUNTY_OUTCOME_ALREADY_ACTIVE = 4;
+  ACCEPT_BOUNTY_OUTCOME_DAILY_LIMIT_REACHED = 5;
+}
+
+// Response: Server -> Client (OPCODE_ACCEPT_BOUNTY_RESPONSE = 617).
+message AcceptBountyResponse {
+  AcceptBountyOutcome outcome = 1;
+}
+
+// Event: Server -> Client (OPCODE_BOUNTY_PROGRESS_EVENT = 618) — mỗi lần hạ đúng loài; completed ⇒ thưởng đã cộng.
+message BountyProgressEvent {
+  string bounty_code = 1;
+  int32 progress = 2;
+  int32 target = 3;
+  bool completed = 4;
+  int64 reward_gold = 5;
+  int64 reward_exp = 6;
+}
+
+// Command: Client -> Server (OPCODE_ABANDON_BOUNTY_COMMAND = 619) — bỏ truy nã đang làm (không tính lần xong).
+message AbandonBountyCommand {
+}
+
+// Response: Server -> Client (OPCODE_ABANDON_BOUNTY_RESPONSE = 620).
+message AbandonBountyResponse {
+  bool abandoned = 1;
+}

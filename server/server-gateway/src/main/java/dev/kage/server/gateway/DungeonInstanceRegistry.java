@@ -129,6 +129,9 @@ final class DungeonInstanceRegistry {
      */
     private final ExecutorService defeatExecutor = Executors.newVirtualThreadPerTaskExecutor();
 
+    /** ADR-099 — lượt mỗi ngày + thưởng lần đầu hạ boss. */
+    private final DungeonRewards rewards;
+
     /**
      * @param facades hai facade đi CHUNG một tham số vì trần Checkstyle {@code ParameterNumber} là
      *     4 và tham số thứ tư nay là {@code worldContent} (ADR-048) — cùng cách ADR-040 D6 gói quái
@@ -143,6 +146,7 @@ final class DungeonInstanceRegistry {
         this.characterFacade = facades.characterFacade();
         this.partyFacade = facades.partyFacade();
         this.inDuel = facades.inDuel();
+        this.rewards = facades.rewards();
         this.mainWorldChannels = mainWorldChannels;
         this.worldContent = worldContent;
         this.transfer = new WorldTransfer(registry);
@@ -153,11 +157,17 @@ final class DungeonInstanceRegistry {
      * này có đang ở đấu trường không" ({@code ArenaInstanceRegistry#isInDuel}, 2026-10-02): lượt kéo
      * cả nhóm KHÔNG được gắn một người đang đấu vào thêm World hầm ngục.
      */
-    record DungeonFacades(CharacterFacade characterFacade, PartyFacade partyFacade, LongPredicate inDuel) {
+    record DungeonFacades(
+            CharacterFacade characterFacade, PartyFacade partyFacade, LongPredicate inDuel, DungeonRewards rewards) {
 
         /** Không có đấu trường — chỉ cho test và dựng thử, nơi không ai đấu được. */
         DungeonFacades(CharacterFacade characterFacade, PartyFacade partyFacade) {
             this(characterFacade, partyFacade, characterId -> false);
+        }
+
+        /** Không giới hạn lượt, không thưởng lần đầu (ADR-099) — test. */
+        DungeonFacades(CharacterFacade characterFacade, PartyFacade partyFacade, LongPredicate inDuel) {
+            this(characterFacade, partyFacade, inDuel, DungeonRewards.NONE);
         }
     }
 
@@ -196,10 +206,8 @@ final class DungeonInstanceRegistry {
             return EnterOutcome.NOT_IN_PARTY;
         }
         List<PartyFacade.MemberView> members = partyFacade.listMembers(requestingCharacterId);
-        for (PartyFacade.MemberView member : members) {
-            if (!registry.isOnline(member.characterId())) {
-                return EnterOutcome.PARTY_MEMBER_OFFLINE;
-            }
+        if (!members.stream().allMatch(member -> registry.isOnline(member.characterId()))) {
+            return EnterOutcome.PARTY_MEMBER_OFFLINE;
         }
 
         // Đọc DB cho từng người TRƯỚC khi vào khoá — xem javadoc lớp.
@@ -209,6 +217,10 @@ final class DungeonInstanceRegistry {
             if (!isInDungeon(memberId)) {
                 entries.add(new PendingEntry(memberId, loadoutOf(memberId), returnPositionOf(memberId)));
             }
+        }
+        // ADR-099 — trừ lượt cho những người sắp được kéo vào; ai hết lượt thì cả nhóm bị từ chối.
+        if (rewards.anyExhausted(entries.stream().map(PendingEntry::characterId).toList(), dungeonCode)) {
+            return EnterOutcome.DAILY_LIMIT_REACHED;
         }
         Optional<AdmittedEntries> maybeAdmitted =
                 admitBuildingWorldIfNeeded(myParty.get().partyId(), entries);
@@ -542,6 +554,27 @@ final class DungeonInstanceRegistry {
         defeatExecutor.shutdown();
     }
 
+    /** Lượt Bí Cảnh còn hôm nay (ADR-099). Chạm DB. */
+    int entriesLeft(long characterId) {
+        return rewards.entriesLeft(characterId, DUNGEON_CODE);
+    }
+
+    /**
+     * ADR-099 — boss chết (tick thread của hầm ngục): chụp danh sách người trong instance rồi trao thưởng lần đầu trên
+     * Virtual Thread.
+     */
+    private void onMonsterKilled(String monsterCode, long killerCharacterId) {
+        if (!DUNGEON_BOSS_CODE.equals(monsterCode)) {
+            return;
+        }
+        List<Long> members;
+        synchronized (this) {
+            DungeonInstance instance = instanceByCharacterId.get(killerCharacterId);
+            members = instance == null ? List.of(killerCharacterId) : List.copyOf(instance.characterIds());
+        }
+        defeatExecutor.execute(() -> rewards.onBossKilled(members, DUNGEON_CODE));
+    }
+
     /** Dựng World hầm ngục, CHƯA start — gọi NGOÀI khoá, xem {@link #admitIntoInstance}. */
     private WorldFacade newDungeonWorld() {
         // ADR-048 — catalog PHẢI đi vào đây, nếu không `spawnBoss` tra không ra mã và hầm ngục
@@ -553,7 +586,7 @@ final class DungeonInstanceRegistry {
         // [-15, 5] phủ đúng điểm xuất hiện x=0 trong hầm ngục ⇒ boss không bao giờ đánh người đứng
         // yên. ADR-050 D8 để "vùng cho dungeon/arena" NGOÀI phạm vi. Xem DungeonWorldContentTest.
         WorldFacade facade = new WorldFacade(
-                new DungeonOutboundSink(registry, this::handleCharacterDefeated),
+                new DungeonOutboundSink(registry, this::handleCharacterDefeated, this::onMonsterKilled),
                 false,
                 TickMetricsPort.NO_OP,
                 WorldContentCatalog.ofMonsters(worldContent.monsters()));
@@ -624,7 +657,8 @@ final class DungeonInstanceRegistry {
         PARTY_MEMBER_OFFLINE,
         ALREADY_IN_DUNGEON,
         UNKNOWN_DUNGEON,
-        IN_DUEL
+        IN_DUEL,
+        DAILY_LIMIT_REACHED
     }
 
     enum ExitOutcome {

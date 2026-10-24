@@ -54,6 +54,18 @@ final class MainWorldRelocation {
         if (destination == null) {
             return Outcome.NO_POSITION;
         }
+        return relocate(moverId, anchorId, destination, WorldChangeReason.WORLD_CHANGE_REASON_GM_MOVED);
+    }
+
+    /**
+     * ADR-100 — dời {@code moverId} tới toạ độ {@code destination} trong CHÍNH khu vực đang đứng (truyền tống phù).
+     * Cùng thân với {@link #move}, người neo là chính họ.
+     */
+    Outcome moveTo(long moverId, PositionSnapshot destination, WorldChangeReason reason) {
+        return relocate(moverId, moverId, destination, reason);
+    }
+
+    private Outcome relocate(long moverId, long anchorId, PositionSnapshot destination, WorldChangeReason reason) {
         // Đọc DB TRƯỚC khi gỡ khỏi World — gỡ rồi mà đọc lỗi thì người dời kẹt ngoài mọi World.
         CharacterLoadout loadout = CharacterLoadout.load(characterFacade, registry, moverId);
         Optional<MainWorldChannelRegistry.PendingRelocation> pending = channels.beginRelocation(moverId, anchorId);
@@ -68,11 +80,7 @@ final class MainWorldRelocation {
                 attach -> transfer.move(
                         moverId,
                         () -> {},
-                        WorldTransfer.event(
-                                WorldKind.WORLD_KIND_MAIN,
-                                WorldChangeReason.WORLD_CHANGE_REASON_GM_MOVED,
-                                destination,
-                                loadout.maxHp()),
+                        WorldTransfer.event(WorldKind.WORLD_KIND_MAIN, reason, destination, loadout.maxHp()),
                         attach));
         if (!moved) {
             return Outcome.NOT_IN_MAIN_WORLD;

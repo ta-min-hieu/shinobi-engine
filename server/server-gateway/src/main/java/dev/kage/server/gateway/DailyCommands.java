@@ -44,7 +44,8 @@ final class DailyCommands {
             CharacterFacade characters,
             InventoryFacade inventory,
             ConnectedCharacterRegistry registry,
-            LongPredicate outsideMainWorld) {}
+            LongPredicate outsideMainWorld,
+            AdventureFacades adventure) {}
 
     private final Deps deps;
     private final PlayerNotices notices;
@@ -67,7 +68,8 @@ final class DailyCommands {
                         facades.inventoryFacade(),
                         worldGateway.registry(),
                         id -> worldGateway.dungeonInstanceRegistry().isInDungeon(id)
-                                || worldGateway.arenaInstanceRegistry().isInDuel(id)),
+                                || worldGateway.arenaInstanceRegistry().isInDuel(id),
+                        facades.progression().adventure()),
                 facades.contentFacades().socialFacades().mailFacade(),
                 Clock.systemUTC());
     }
@@ -105,6 +107,7 @@ final class DailyCommands {
         Optional<Instant> entered = deps.registry().onlineSessions.leave(characterId);
         try {
             deps.daily().seclusion().onLeftWorld(characterId);
+            deps.adventure().waypoints().forget(characterId);
             entered.ifPresent(at -> deps.daily().onlineRewards().onLeftWorld(characterId, at));
         } catch (RuntimeException e) {
             LOG.warn("Ghi mốc rời world (bế quan/online) lỗi: characterId={}", characterId, e);

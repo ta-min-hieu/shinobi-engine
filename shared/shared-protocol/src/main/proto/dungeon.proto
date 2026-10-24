@@ -27,10 +27,13 @@ enum EnterDungeonOutcome {
   // ALREADY_IN_DUNGEON — đọc sai lý do, và client coi đó là "đã ở trong bí cảnh". protocolVersion
   // KHÔNG tăng; chiều ngược là CHALLENGE_DUEL_OUTCOME_IN_DUNGEON (arena.proto).
   ENTER_DUNGEON_OUTCOME_IN_DUEL = 6;
+  // ADR-099 (2026-10-24, chỉ thêm): một người trong nhóm sắp được kéo vào đã dùng hết 3 lượt hôm nay.
+  ENTER_DUNGEON_OUTCOME_DAILY_LIMIT_REACHED = 7;
 }
 
 message EnterDungeonResponse {
   EnterDungeonOutcome outcome = 1;
+  int32 entries_left = 2; // ADR-099 — lượt Bí Cảnh còn hôm nay của người gửi, SAU lệnh này
 }
 
 // Rời dungeon hiện tại — không cần tham số, server tự tra nhân vật đang ở instance nào.

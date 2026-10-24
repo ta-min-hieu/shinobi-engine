@@ -39,5 +39,5 @@ completed}`.
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 21 phần 3).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành 2026-10-24 (lô 21 phần 3) — thêm 619/620 bỏ truy nã đang làm.
+2. ✅ Kiểm sống 2026-10-24: bảng hôm nay beast_slaying/ogre_hunt/raider_rout; `bandit_sweep` ⇒ `NOT_ON_BOARD`; nhận `ogre_hunt` `OK`, nhận lần hai `ALREADY_ACTIVE`; đặt tiến độ 4/5 bằng SQL rồi hạ một Thạch Yêu ⇒ `BountyProgressEvent` hoàn thành, +900 linh thạch, +700 EXP, dòng COMPLETED.

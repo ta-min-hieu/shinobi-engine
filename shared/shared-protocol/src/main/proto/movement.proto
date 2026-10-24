@@ -128,6 +128,7 @@ enum WorldChangeReason {
   WORLD_CHANGE_REASON_DEFEATED = 3;        // gục trong hầm ngục ⇒ đưa về world chính
   WORLD_CHANGE_REASON_DUEL_ENDED = 4;      // trận đấu chốt xong ⇒ về world chính
   WORLD_CHANGE_REASON_GM_MOVED = 5;        // ADR-052 — lệnh GM goto/summon dời người này trong world chính
+  WORLD_CHANGE_REASON_TELEPORT = 6;        // ADR-100 — Truyền Tống Phù tới một điểm truyền tống đã mở
 }
 
 // Event: Server -> Client (OPCODE_WORLD_CHANGED_EVENT, ADR-051). CHÍNH nhân vật nhận gói vừa được
@@ -233,4 +234,43 @@ message HerbGatheredEvent {
   GatherHerbOutcome outcome = 2;
   int64 item_template_id = 3;
   int32 quantity = 4;
+}
+
+// ===== ADR-100 — truyền tống phù: điểm (waypoint) mở khi đứng gần lần đầu; dùng một phù để dời tới điểm đã mở trong
+// cùng khu vực world chính (đường đổi World của ADR-051, lý do TELEPORT). CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_LIST_WAYPOINTS_REQUEST = 317).
+message ListWaypointsRequest {
+}
+
+message WaypointView {
+  string code = 1;
+  string name_key = 2;
+  float x = 3;
+  bool open = 4;
+}
+
+// Response: Server -> Client (OPCODE_LIST_WAYPOINTS_RESPONSE = 318).
+message ListWaypointsResponse {
+  repeated WaypointView waypoints = 1;
+  int32 talismans = 2;   // số Truyền Tống Phù trong túi
+}
+
+// Command: Client -> Server (OPCODE_TELEPORT_COMMAND = 319).
+message TeleportCommand {
+  string waypoint_code = 1;
+}
+
+enum TeleportOutcome {
+  TELEPORT_OUTCOME_UNSPECIFIED = 0;
+  TELEPORT_OUTCOME_OK = 1;
+  TELEPORT_OUTCOME_UNKNOWN_WAYPOINT = 2;
+  TELEPORT_OUTCOME_NOT_UNLOCKED = 3;
+  TELEPORT_OUTCOME_NO_TALISMAN = 4;
+  TELEPORT_OUTCOME_NOT_IN_MAIN_WORLD = 5;
+}
+
+// Response: Server -> Client (OPCODE_TELEPORT_RESPONSE = 320). OK ⇒ WorldChangedEvent (lý do TELEPORT) đã/đang tới.
+message TeleportResponse {
+  TeleportOutcome outcome = 1;
 }
