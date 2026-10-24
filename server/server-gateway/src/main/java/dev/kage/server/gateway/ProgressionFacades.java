@@ -7,6 +7,7 @@ import dev.kage.friend.api.FriendGiftFacade;
 import dev.kage.gm.api.GameEventFacade;
 import dev.kage.guild.api.GuildProgressionFacade;
 import dev.kage.guild.api.GuildShopFacade;
+import dev.kage.guild.api.GuildSkillFacade;
 import dev.kage.market.api.MarketFacade;
 import dev.kage.monster.api.WorldBossFacade;
 
@@ -23,7 +24,8 @@ record ProgressionFacades(
         CraftingFacade crafting,
         GuildShopFacade guildShop,
         WorldBossFacade worldBoss,
-        FriendGiftFacade friendGifts) {
+        FriendGiftFacade friendGifts,
+        GuildSkillFacade guildSkills) {
 
     /** Composition không có các tính năng này (test). */
     static final ProgressionFacades DISABLED = new ProgressionFacades(
@@ -35,5 +37,6 @@ record ProgressionFacades(
             CraftingFacade.DISABLED,
             GuildShopFacade.DISABLED,
             WorldBossFacade.DISABLED,
-            FriendGiftFacade.DISABLED);
+            FriendGiftFacade.DISABLED,
+            GuildSkillFacade.DISABLED);
 }

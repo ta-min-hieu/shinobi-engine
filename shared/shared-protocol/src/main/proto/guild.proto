@@ -251,3 +251,45 @@ message BuyGuildShopItemResponse {
   BuyGuildShopItemOutcome outcome = 1;
   ListGuildShopResponse shop = 2;
 }
+
+// ===== ADR-085 — kỹ năng bang: buff thụ động cho mọi thành viên, bang chủ nâng bằng điểm (cấp bang × 2). =====
+
+// Request: Client -> Server (OPCODE_LIST_GUILD_SKILLS_REQUEST = 727).
+message ListGuildSkillsRequest {}
+
+message GuildSkillView {
+  string code = 1;      // insight | vitality | bulwark — khoá i18n guildskill.name.<code>
+  int32 rank = 2;
+  int32 max_rank = 3;
+  int32 per_rank = 4;   // hiệu lực mỗi bậc (% EXP với insight, điểm chỉ số với hai kỹ năng kia)
+}
+
+// Response: Server -> Client (OPCODE_LIST_GUILD_SKILLS_RESPONSE = 728).
+message ListGuildSkillsResponse {
+  repeated GuildSkillView skills = 1;
+  bool in_guild = 2;
+  bool leader = 3;
+  int32 points_total = 4;
+  int32 points_available = 5;
+}
+
+// Command: Client -> Server (OPCODE_UPGRADE_GUILD_SKILL_COMMAND = 729). Chỉ bang chủ.
+message UpgradeGuildSkillCommand {
+  string code = 1;
+}
+
+enum UpgradeGuildSkillOutcome {
+  UPGRADE_GUILD_SKILL_OUTCOME_UNSPECIFIED = 0;
+  UPGRADE_GUILD_SKILL_OUTCOME_OK = 1;
+  UPGRADE_GUILD_SKILL_OUTCOME_NOT_IN_GUILD = 2;
+  UPGRADE_GUILD_SKILL_OUTCOME_NOT_LEADER = 3;
+  UPGRADE_GUILD_SKILL_OUTCOME_MAX_RANK = 4;
+  UPGRADE_GUILD_SKILL_OUTCOME_NO_POINTS = 5;
+  UPGRADE_GUILD_SKILL_OUTCOME_UNKNOWN_SKILL = 6;
+}
+
+// Response: Server -> Client (OPCODE_UPGRADE_GUILD_SKILL_RESPONSE = 730). sheet luôn là trạng thái MỚI NHẤT.
+message UpgradeGuildSkillResponse {
+  UpgradeGuildSkillOutcome outcome = 1;
+  ListGuildSkillsResponse sheet = 2;
+}

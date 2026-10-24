@@ -116,6 +116,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-082](ADR-082-Party-Finder.md) | Bảng tìm nhóm — tin RAM 10 phút, mục tiêu cố định, vào ngay (1319–1326) | ✅ **Accepted** *(2026-10-24, lô 19)* | feature-party |
 | [ADR-083](ADR-083-Mail-Enhanced-Items.md) | Thư chở món cường hoá giữ nguyên cấp (V79, thêm field) | ✅ **Accepted** *(2026-10-24, lô 20)* | feature-mail |
 | [ADR-084](ADR-084-Friend-Gifts.md) | Tặng quà bạn bè — thân mật theo cặp, mốc thưởng thư (V80, 1116/1117) | ✅ **Accepted** *(2026-10-24, lô 20)* | feature-friend |
+| [ADR-085](ADR-085-Guild-Skills.md) | Kỹ năng bang — Ngộ Tính/Cường Thể/Hộ Thể, điểm = cấp bang × 2 (V81, 727–730) | ✅ **Accepted** *(2026-10-24, lô 20)* | ADR-068 |
+| [ADR-086](ADR-086-Pet-Skills.md) | Kỹ năng linh thú — Linh Hồ đánh thêm / Huyền Quy chắn, bậc 2 ×2 xác suất (không đổi protocol/schema) | ✅ **Accepted** *(2026-10-24, lô 20)* | ADR-072 |
 ---
 
 ## ADR cần tạo (chưa viết)

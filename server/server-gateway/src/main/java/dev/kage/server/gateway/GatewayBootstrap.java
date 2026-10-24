@@ -111,15 +111,7 @@ public final class GatewayBootstrap {
 
         // characterRegistry là WorldOutboundSink thật — PHẢI tồn tại trước WorldFacade vì
         // WorldFacade cần sink lúc construct (SERVER.md §2: kết quả tick đi qua outbound queue).
-        ConnectedCharacterRegistry characterRegistry = new ConnectedCharacterRegistry(
-                facades.inventoryFacade(),
-                facades.contentFacades().questFacade(),
-                // ADR-067 — EXP đánh quái (cả phần đồng đội) nhân theo sự kiện đang chạy; thưởng quest không đi đây.
-                (characterId, amount) -> facades.characterFacade()
-                        .grantExperience(
-                                characterId,
-                                amount * facades.progression().gameEvents().multiplier(GameEventKind.EXP)),
-                metricsContext.networkMetrics());
+        ConnectedCharacterRegistry characterRegistry = newCharacterRegistry(facades, metricsContext);
         wireGoldChangeNotifications(databaseBootstrap, characterRegistry);
         bindSkillRanks(characterRegistry, databaseBootstrap, facades);
         WorldContext worldContext = startWorld(
@@ -458,7 +450,8 @@ public final class GatewayBootstrap {
                 databaseBootstrap.wireCraftingFacade(),
                 databaseBootstrap.wireGuildShopFacade(),
                 databaseBootstrap.wireWorldBossFacade(),
-                databaseBootstrap.wireFriendGiftFacade());
+                databaseBootstrap.wireFriendGiftFacade(),
+                databaseBootstrap.wireGuildSkillFacade());
         return new GatewayFacades(
                 accountFacade,
                 characterFacade,
@@ -493,5 +486,27 @@ public final class GatewayBootstrap {
                         .findById(characterId)
                         .map(character -> FactionMapping.toElement(character.faction()))
                         .orElse(Element.NONE));
+        characterRegistry.skillRanks.bindGuildBonus(
+                characterId -> GuildSkillEffects.bonusOf(facades.progression().guildSkills(), characterId));
+    }
+
+    /** Registry kết nối — kiêm WorldOutboundSink; EXP đánh quái nhân sự kiện (ADR-067) rồi kỹ năng bang (ADR-085). */
+    private static ConnectedCharacterRegistry newCharacterRegistry(
+            GatewayFacades facades, MetricsContext metricsContext) {
+        return new ConnectedCharacterRegistry(
+                facades.inventoryFacade(),
+                facades.contentFacades().questFacade(),
+                // ADR-067 — EXP đánh quái nhân theo sự kiện; ADR-085 — rồi theo Ngộ Tính của bang. Quest không đi đây.
+                (characterId, amount) -> facades.characterFacade()
+                        .grantExperience(
+                                characterId,
+                                GuildSkillEffects.boostedExp(
+                                        facades.progression().guildSkills(),
+                                        characterId,
+                                        amount
+                                                * facades.progression()
+                                                        .gameEvents()
+                                                        .multiplier(GameEventKind.EXP))),
+                metricsContext.networkMetrics());
     }
 }

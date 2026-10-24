@@ -201,6 +201,7 @@ final class CombatSystem extends IteratingKSystem {
         if (!POSITION.get(target).grounded) {
             result = new CombatConstants.AttackResult(true, false, 0);
         }
+        result = PetSkills.apply(result, COMBAT_STATS.get(attacker), COMBAT_STATS.get(target), random);
         int damageAfterShield = StatusEffects.absorbWithShield(STATUS_EFFECT.get(target), result.damage());
         targetHealth.current = Math.max(0, targetHealth.current - damageAfterShield);
         // ADR-046 D2 — CẢ HAI bên vừa dính tới chiến đấu, kể cả khi đòn này hụt: đứng cạnh một con

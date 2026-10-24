@@ -131,7 +131,12 @@ class CharacterStatusMovementTest {
     void flyingSwordShouldSpeedUpRunning_untilItIsTakenOff() {
         world.start();
         world.attachCharacter(new CharacterEntry(
-                1L, 0f, 0f, HOA_STATS, new EquipmentBonusSnapshot(0, 0, 0, 0, 35), SkillRankSnapshot.NONE));
+                1L,
+                0f,
+                0f,
+                HOA_STATS,
+                new EquipmentBonusSnapshot(0, 0, 0, 0, EquipmentBonusSnapshot.Extras.speed(35)),
+                SkillRankSnapshot.NONE));
         positionOf(1L);
         world.enqueueMoveCommand(1L, 1, 1f, 0f);
 

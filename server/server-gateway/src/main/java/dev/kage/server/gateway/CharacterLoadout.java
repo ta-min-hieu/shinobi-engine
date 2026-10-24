@@ -83,9 +83,9 @@ record CharacterLoadout(
      * Bản dịch {@code feature-inventory} → {@code server-world} (ADR-036 D2): server-world không
      * biết feature nào tồn tại (Điều 23), nên bản dịch phải nằm ở gateway — và chỉ MỘT bản.
      */
-    static EquipmentBonusSnapshot snapshotOf(EquipmentBonus bonus, int moveSpeedPercent) {
+    static EquipmentBonusSnapshot snapshotOf(EquipmentBonus bonus, EquipmentBonusSnapshot.Extras extras) {
         return new EquipmentBonusSnapshot(
-                bonus.bonusAtk(), bonus.bonusDef(), bonus.bonusRes(), bonus.bonusHp(), moveSpeedPercent);
+                bonus.bonusAtk(), bonus.bonusDef(), bonus.bonusRes(), bonus.bonusHp(), extras);
     }
 
     /** Lệnh attach KÈM trang bị tại {@code at} — mọi đường vào World đi qua đây. */

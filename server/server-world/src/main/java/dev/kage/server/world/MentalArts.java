@@ -63,6 +63,6 @@ public final class MentalArts {
             res += art.perRank().res() * rank;
             hp += art.perRank().hp() * rank;
         }
-        return new EquipmentBonusSnapshot(atk, def, res, hp, equipment.moveSpeedPercent());
+        return equipment.withStats(atk, def, res, hp);
     }
 }

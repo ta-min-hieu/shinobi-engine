@@ -482,6 +482,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(reports.craftingPanel(), reports.crafting());
         panels.register(reports.guildShopPanel(), reports.guildShop());
         panels.register(reports.partyFinderPanel(), reports.partyFinder());
+        panels.register(reports.guildSkillPanel(), reports.guildSkills());
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
         panels.register(friendPanel, friends);

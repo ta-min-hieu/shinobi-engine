@@ -9,7 +9,8 @@ import org.junit.jupiter.api.Test;
 /** ADR-077 — tâm pháp bị động cộng phẳng theo bậc, chỉ trên linh căn hiện tại. */
 class MentalArtsTest {
 
-    private static final EquipmentBonusSnapshot EQUIPMENT = new EquipmentBonusSnapshot(5, 4, 3, 20, 15);
+    private static final EquipmentBonusSnapshot EQUIPMENT =
+            new EquipmentBonusSnapshot(5, 4, 3, 20, EquipmentBonusSnapshot.Extras.speed(15));
 
     @Test
     void everyFactionShouldHaveExactlyTwoArts() {
@@ -24,7 +25,9 @@ class MentalArtsTest {
         EquipmentBonusSnapshot result = MentalArts.applyTo(
                 EQUIPMENT, Element.HOA, Map.of("hoa_liet_hoa_tam_kinh", 3, "hoa_hoa_linh_ho_the", 2));
 
-        assertThat(result).isEqualTo(new EquipmentBonusSnapshot(5 + 2 * 3, 4, 3, 20 + 10 * 2, 15));
+        assertThat(result)
+                .isEqualTo(new EquipmentBonusSnapshot(
+                        5 + 2 * 3, 4, 3, 20 + 10 * 2, EquipmentBonusSnapshot.Extras.speed(15)));
     }
 
     @Test

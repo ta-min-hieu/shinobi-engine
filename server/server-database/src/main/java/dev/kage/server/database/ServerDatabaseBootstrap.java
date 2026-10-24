@@ -48,6 +48,7 @@ import dev.kage.gm.domain.GameEventKind;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.guild.api.GuildProgressionFacade;
 import dev.kage.guild.api.GuildShopFacade;
+import dev.kage.guild.api.GuildSkillFacade;
 import dev.kage.guild.application.ApproveGuildJoinRequestUseCase;
 import dev.kage.guild.application.CreateGuildUseCase;
 import dev.kage.guild.application.DisbandGuildUseCase;
@@ -129,6 +130,7 @@ import dev.kage.server.database.gm.PostgresGmRoleAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
 import dev.kage.server.database.guild.PostgresGuildProgressionAdapter;
 import dev.kage.server.database.guild.PostgresGuildShopAdapter;
+import dev.kage.server.database.guild.PostgresGuildSkillAdapter;
 import dev.kage.server.database.inventory.JdbcInventoryTransactionRunner;
 import dev.kage.server.database.inventory.PostgresAuditAdapter;
 import dev.kage.server.database.inventory.PostgresCompanionAdapter;
@@ -650,6 +652,11 @@ public final class ServerDatabaseBootstrap {
     public CheckInFacade wireCheckInFacade(CheckInRewardSender sender) {
         return new CheckInFacade(new ClaimDailyCheckInUseCase(
                 new PostgresCheckInAdapter(dataSource), sender, java.time.Clock.systemUTC()));
+    }
+
+    /** Kỹ năng bang (ADR-085). */
+    public GuildSkillFacade wireGuildSkillFacade() {
+        return new GuildSkillFacade(new PostgresGuildSkillAdapter(dataSource));
     }
 
     /** Tặng quà bạn bè (ADR-084). */

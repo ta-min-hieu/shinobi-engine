@@ -211,6 +211,7 @@ import dev.kage.protocol.ListFriendsResponse;
 import dev.kage.protocol.ListGuildMembersRequest;
 import dev.kage.protocol.ListGuildMembersResponse;
 import dev.kage.protocol.ListGuildShopRequest;
+import dev.kage.protocol.ListGuildSkillsRequest;
 import dev.kage.protocol.ListInventoryRequest;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.ListMailRequest;
@@ -304,6 +305,7 @@ import dev.kage.protocol.TradeRequestedEvent;
 import dev.kage.protocol.TradeUpdatedEvent;
 import dev.kage.protocol.UnequipItemCommand;
 import dev.kage.protocol.UnequipItemResponse;
+import dev.kage.protocol.UpgradeGuildSkillCommand;
 import dev.kage.protocol.UpgradeSkillCommand;
 import dev.kage.protocol.UpgradeSkillOutcome;
 import dev.kage.protocol.UpgradeSkillResponse;
@@ -438,6 +440,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final WorldBossFacade worldBoss;
     private final PartyFinderCommands partyFinder;
     private final FriendGiftCommands friendGifts;
+    private final GuildSkillCommands guildSkills;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -533,6 +536,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_CRAFT_ITEM_COMMAND_VALUE, this::handleCraftItemCommand),
             Map.entry(Opcode.OPCODE_LIST_GUILD_SHOP_REQUEST_VALUE, this::handleListGuildShopRequest),
             Map.entry(Opcode.OPCODE_BUY_GUILD_SHOP_ITEM_COMMAND_VALUE, this::handleBuyGuildShopItemCommand),
+            Map.entry(Opcode.OPCODE_LIST_GUILD_SKILLS_REQUEST_VALUE, this::handleListGuildSkillsRequest),
+            Map.entry(Opcode.OPCODE_UPGRADE_GUILD_SKILL_COMMAND_VALUE, this::handleUpgradeGuildSkillCommand),
             Map.entry(Opcode.OPCODE_LIST_PARTY_FINDER_REQUEST_VALUE, this::handleListPartyFinderRequest),
             Map.entry(Opcode.OPCODE_POST_PARTY_FINDER_COMMAND_VALUE, this::handlePostPartyFinderCommand),
             Map.entry(Opcode.OPCODE_JOIN_PARTY_FINDER_COMMAND_VALUE, this::handleJoinPartyFinderCommand),
@@ -630,6 +635,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.market = new MarketCommands(facades.progression().marketFacade(), worldGateway.registry());
         this.crafting = new CraftingCommands(facades.progression().crafting(), characterFacade, npcProximity);
         this.guildShop = new GuildShopCommands(facades.progression().guildShop());
+        this.guildSkills = new GuildSkillCommands(facades.progression().guildSkills());
         this.friendGifts = new FriendGiftCommands(
                 facades.progression().friendGifts(),
                 characterFacade,
@@ -1861,6 +1867,26 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             throws InvalidProtocolBufferException {
         RemovePartyFinderCommand.parser().parseFrom(payload);
         runStorage(ctx, header.sequenceId(), Opcode.OPCODE_REMOVE_PARTY_FINDER_RESPONSE_VALUE, partyFinder::remove);
+    }
+
+    /** ADR-085 — kỹ năng bang. */
+    private void handleListGuildSkillsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        ListGuildSkillsRequest.parser().parseFrom(payload);
+        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_LIST_GUILD_SKILLS_RESPONSE_VALUE, guildSkills::list);
+    }
+
+    private void handleUpgradeGuildSkillCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        UpgradeGuildSkillCommand command = UpgradeGuildSkillCommand.parseFrom(payload);
+        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_UPGRADE_GUILD_SKILL_RESPONSE_VALUE, characterId -> {
+            GuildSkillCommands.Upgrade upgrade = guildSkills.upgrade(characterId, command);
+            if (upgrade.changed()) {
+                // Buff bang hiệu lực ngay cho mọi thành viên đang online — không chờ đăng nhập lại.
+                guildMemberIds(characterId).forEach(this::applyEquipmentBonusAndComputeMaxHp);
+            }
+            return upgrade.response();
+        });
     }
 
     /** ADR-084 — tặng quà bạn bè theo tên. */

@@ -28,6 +28,9 @@ final class SkillRankSource {
     // dựng registry không DB thì không có tâm pháp nào.
     private volatile LongFunction<Element> currentElement = characterId -> Element.NONE;
 
+    // ADR-085 — chỉ số cộng thêm từ kỹ năng bang; mặc định không có bang.
+    private volatile LongFunction<EquipmentBonusSnapshot> guildBonus = characterId -> EquipmentBonusSnapshot.NONE;
+
     /** Nối bản thật — một lần, lúc khởi động. */
     void bind(SkillRankFacade realFacade, LongFunction<Element> elementLookup) {
         this.facade = realFacade;
@@ -35,12 +38,22 @@ final class SkillRankSource {
     }
 
     /**
-     * {@code equipment} cộng tâm pháp bị động đã học của linh căn hiện tại (ADR-077) — đường DUY NHẤT gộp hai
+     * {@code equipment} cộng tâm pháp bị động đã học của linh căn hiện tại (ADR-077) và kỹ năng bang (ADR-085) — đường
+     * DUY NHẤT gộp hai
      * thứ, nên mọi chỗ áp chỉ số (vào world, mặc/gỡ đồ, linh thú lên cấp, đổi linh căn, bảng nhân vật) thấy
      * cùng một con số. Chạm DB: Virtual Thread.
      */
     EquipmentBonusSnapshot withMentalArts(long characterId, EquipmentBonusSnapshot equipment) {
-        return MentalArts.applyTo(equipment, currentElement.apply(characterId), facade.ranksOf(characterId));
+        EquipmentBonusSnapshot arts =
+                MentalArts.applyTo(equipment, currentElement.apply(characterId), facade.ranksOf(characterId));
+        EquipmentBonusSnapshot guild = guildBonus.apply(characterId);
+        return arts.withStats(
+                arts.atk() + guild.atk(), arts.def() + guild.def(), arts.res() + guild.res(), arts.hp() + guild.hp());
+    }
+
+    /** Nối kỹ năng bang (ADR-085) — một lần, lúc khởi động. */
+    void bindGuildBonus(LongFunction<EquipmentBonusSnapshot> lookup) {
+        this.guildBonus = lookup;
     }
 
     SkillRankFacade facade() {

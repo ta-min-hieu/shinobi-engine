@@ -1397,6 +1397,8 @@ public final class WorldFacade {
         combatStats.def = derived.def() + bonus.def();
         combatStats.res = derived.res() + bonus.res();
         MOVE_INTENT.get(entity).speedMultiplier = bonus.moveSpeedMultiplier();
+        combatStats.petStrikePermille = bonus.extras().petStrikePermille();
+        combatStats.petGuardPermille = bonus.extras().petGuardPermille();
         applyMaxHpBonus(entity, bonus.hp());
     }
 

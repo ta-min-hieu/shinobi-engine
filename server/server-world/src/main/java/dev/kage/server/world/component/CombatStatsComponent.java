@@ -23,4 +23,8 @@ public final class CombatStatsComponent implements Component {
     public float critPercent;
     public float critDamageMultiplier;
     public Element element;
+    /** ADR-086 — linh thú đang mặc: phần nghìn xác suất đòn thường gây thêm 50% (0 = không có). */
+    public int petStrikePermille;
+    /** ADR-086 — linh thú đang mặc: phần nghìn xác suất chắn nửa sát thương đòn thường nhận vào. */
+    public int petGuardPermille;
 }

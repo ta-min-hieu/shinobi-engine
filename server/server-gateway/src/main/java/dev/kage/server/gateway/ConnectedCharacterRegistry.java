@@ -724,7 +724,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 characterId,
                 CharacterLoadout.snapshotOf(
                         inventoryFacade.computeEquipmentBonus(characterId),
-                        inventoryFacade.moveSpeedPercent(characterId)));
+                        PetSkillEffects.extrasOf(inventoryFacade, characterId)));
     }
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {
