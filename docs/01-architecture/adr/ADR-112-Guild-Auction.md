@@ -53,4 +53,4 @@ dòng lô → kiểm còn mở, đủ mức → trừ vàng người mới → h
    Lô mở ở `DungeonRewards.onBossKilled` (thêm người ra đòn cuối). Mức trả tối thiểu: giá khởi điểm 100, sau đó +10%
    làm tròn LÊN. **Chi tiết AI tự chọn**: `guild_id` SET NULL chứ không CASCADE — bang giải tán giữa chừng thì vàng
    đang giữ vẫn về đúng người khi chốt; bảng rơi lô = 4 Linh Ngọc, 5 Tẩy Luyện Thạch, bùa bảo vệ.
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-25: Kagemaru (bang 4) hạ `sample_boss` ⇒ lô 1 mở (log `Mở lô đấu giá bang 1`). 99 `TOO_LOW`, 100 OK, tự trả lại `ALREADY_LEADING`; tanthua44 105 `TOO_LOW` (tối thiểu 110), 110 OK ⇒ vàng 100 của Kagemaru vào hàng đợi hoàn. Ép hết giờ bằng SQL ⇒ nhịp 30 giây chốt một lần: thư hoàn 100 cho Kagemaru, thư vật phẩm cho tanthua44, thư chia 110 cho người tham gia duy nhất (Kagemaru — tanthua44 không có mặt trong Bí Cảnh nên không được chia, đúng D1/D3); hàng đợi rỗng.

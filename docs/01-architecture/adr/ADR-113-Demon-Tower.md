@@ -48,4 +48,4 @@ nhất). Rời tháp giữa chừng dùng lại `ExitDungeonCommand` (1502) — 
    (quái thường không thuộc điểm spawn ⇒ không hồi sinh; tách `createMonsterEntity` dùng chung với `spawnMonster`).
    Con cuối chết ⇒ `TowerHooks` ghi tầng (UPSERT có điều kiện `best_floor < floor`, thưởng mốc trao đúng một lần) +
    gửi 1507 TRƯỚC khi đưa về world chính. Tab thứ 8 của cửa sổ E ⇒ hàng tab của `ReportPanel` nay xuống dòng mỗi 5 tab.
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-25 (gameProbe `enterTower,towerFight:<giây>`): Kagemaru qua tầng 1→6; mỗi tầng 1507 tới TRƯỚC 308 về world chính; `GetTowerStatus` lên dần 1..6 và bảng top có Kagemaru; thư mốc DUY NHẤT ở tầng 5 (1.000 linh thạch + 2 Tẩy Luyện Thạch), tầng 6 `rewarded=false`. Đang ở tháp mà bấm vào lại ⇒ `ALREADY_IN_DUNGEON`.

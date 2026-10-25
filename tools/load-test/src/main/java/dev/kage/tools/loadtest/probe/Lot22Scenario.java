@@ -47,8 +47,11 @@ final class Lot22Scenario {
 
     private final GameConnection connection;
 
+    private final Lot22Part3Scenario part3;
+
     Lot22Scenario(GameConnection connection) {
         this.connection = connection;
+        this.part3 = new Lot22Part3Scenario(connection);
     }
 
     /** Một bước; {@code "bước không hiểu"} nếu không thuộc lô 22. */
@@ -128,7 +131,7 @@ final class Lot22Scenario {
                         Opcode.OPCODE_LEAVE_SWORN_RESPONSE_VALUE,
                         p -> LeaveSwornResponse.parseFrom(p).getOutcome().name());
             case "swornChat" -> swornChat(arg);
-            default -> "bước không hiểu";
+            default -> part3.step(verb, arg);
         };
     }
 

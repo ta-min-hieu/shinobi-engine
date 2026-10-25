@@ -52,4 +52,4 @@ sau: gieo lại MỌI dòng không khoá, số dòng giữ nguyên. Mỗi dòng:
    **Chi tiết AI tự chọn ngoài D1–D5**: món đã tẩy chịu cùng luật món đã khảm — kho đồ, thư, phường thị TỪ CHỐI nó
    (`isSocketed`/SQL `NOT EXISTS item_refinement`), vì các đường đó dời đồ bằng xoá/tạo dòng và dòng tẩy sẽ mất theo.
    Phân giải vẫn cho (huỷ món là huỷ dòng). Giao dịch dời nguyên dòng nên giữ dòng tẩy.
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ Kiểm sống 2026-10-25 (gameProbe `--lot21=refines,refine:<id>:<dòng>`): Kagemaru 6 đá → tẩy vũ khí (ATK+5, còn 5) → giữ dòng 0 tẩy lại (dòng giữ nguyên, còn 2) → phi kiếm `NOT_REFINABLE`, giữ dòng 5 `INVALID_LOCK` (không trừ đá). Bảng nhân vật: công 99 khi xoá dòng (đối chứng) → 104 khi có dòng ATK+5. Audit `ITEM_REFINED` ghi dòng cũ/mới.
