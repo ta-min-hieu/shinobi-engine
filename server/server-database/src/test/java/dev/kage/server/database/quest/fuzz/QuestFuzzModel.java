@@ -145,6 +145,19 @@ final class QuestFuzzModel {
         return completed;
     }
 
+    /** ADR-114 — @return quest VỪA hoàn thành nhờ đoàn hộ tống tới nơi (vỡ thì không đổi gì ở tầng quest). */
+    List<String> escortFinished(String questCode, boolean arrived) {
+        QuestState state = quests.get(questCode);
+        if (!arrived
+                || state == null
+                || state.status() != QuestStatus.IN_PROGRESS
+                || !content.spec(questCode).isEscort()) {
+            return List.of();
+        }
+        quests.put(questCode, new QuestState(QuestStatus.COMPLETED, state.asked(), state.kills()));
+        return List.of(questCode);
+    }
+
     /** Lượt hạ quái KHÔNG đi qua quest (chỉ EXP) — nửa EXP của một lệnh hạ quái bị tách ra. */
     void monsterExpOnly(String monster) {
         exp += content.expOf(monster);

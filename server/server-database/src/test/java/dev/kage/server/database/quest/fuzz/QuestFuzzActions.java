@@ -84,6 +84,12 @@ final class QuestFuzzActions {
                         Optional.empty());
             case QuestFuzzOp.Dialogue dialogue -> executeDialogue(dialogue);
             case QuestFuzzOp.Claim claim -> executeClaim(claim);
+            case QuestFuzzOp.Escort escort ->
+                new Observed(
+                        codes(system.quest().onEscortFinished(characterId, escort.questCode(), escort.arrived())),
+                        escort.questCode(),
+                        "",
+                        Optional.empty());
         };
     }
 
@@ -175,6 +181,8 @@ final class QuestFuzzActions {
                 expectResult(model.accept(accept.questCode()).name(), observed);
             case QuestFuzzOp.Dialogue dialogue -> applyDialogue(model, dialogue, observed);
             case QuestFuzzOp.Claim claim -> applyClaim(model, claim, observed, tightBag);
+            case QuestFuzzOp.Escort escort ->
+                expectCompleted(model.escortFinished(escort.questCode(), escort.arrived()), observed);
         };
     }
 

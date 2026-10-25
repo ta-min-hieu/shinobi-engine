@@ -91,6 +91,12 @@ sealed interface WorldCommand {
     /** Một con quái thường tại {@code (x, y)}, KHÔNG thuộc điểm spawn nào nên không hồi sinh (ADR-113). */
     record SpawnOnceCommand(String monsterCode, float x, float y) implements WorldCommand {}
 
+    /** Bắt đầu đoàn hộ tống cho {@code characterId} (ADR-114). */
+    record StartEscortCommand(long characterId, EscortRoute route) implements WorldCommand {}
+
+    /** Huỷ đoàn hộ tống của {@code characterId} nếu có (ADR-114). */
+    record CancelEscortCommand(long characterId) implements WorldCommand {}
+
     /**
      * Ngoại hình của {@code characterId} vừa đổi (đổi hệ phái — ADR-045). Command này CHỈ mang id:
      * server-world không biết "hệ phái"/"bậc trang phục" là gì và không được biết (ngoại hình sống

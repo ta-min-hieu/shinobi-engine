@@ -2,6 +2,7 @@ package dev.kage.server.gateway;
 
 import dev.kage.guild.api.GuildWarFacade;
 import dev.kage.quest.api.BountyFacade;
+import dev.kage.quest.api.EscortRouteFacade;
 import dev.kage.world.api.DungeonQuotaFacade;
 import dev.kage.world.api.TowerFacade;
 import dev.kage.world.api.WaypointFacade;
@@ -12,7 +13,8 @@ record AdventureFacades(
         WaypointFacade waypoints,
         BountyFacade bounties,
         GuildWarFacade guildWars,
-        TowerFacade tower) {
+        TowerFacade tower,
+        EscortRouteFacade escortRoutes) {
 
     /** Composition không có các tính năng này (test) — Bí Cảnh không giới hạn lượt. */
     static final AdventureFacades DISABLED = new AdventureFacades(
@@ -20,5 +22,6 @@ record AdventureFacades(
             WaypointFacade.DISABLED,
             BountyFacade.DISABLED,
             GuildWarFacade.DISABLED,
-            TowerFacade.DISABLED);
+            TowerFacade.DISABLED,
+            EscortRouteFacade.DISABLED);
 }

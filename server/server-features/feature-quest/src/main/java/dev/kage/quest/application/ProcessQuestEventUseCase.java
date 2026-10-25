@@ -52,6 +52,8 @@ public final class ProcessQuestEventUseCase {
 
     private static final String MONSTER_KILLED_EVENT_TYPE = "monster_killed";
     private static final String NPC_TALKED_EVENT_TYPE = "npc_talked";
+    private static final String ESCORT_ARRIVED_EVENT_TYPE = "escort_arrived";
+    private static final String ESCORT_FAILED_EVENT_TYPE = "escort_failed";
 
     /** {@code audit_log.action} cho mỗi lần một quest lấy đồ khỏi túi — cạnh {@code QUEST_CLAIM}. */
     static final String ITEM_TAKEN_AUDIT_ACTION = "QUEST_ITEM_TAKEN";
@@ -112,6 +114,22 @@ public final class ProcessQuestEventUseCase {
      */
     public List<QuestStatusChange> npcTalked(long characterId, String npcCode) {
         return dispatch(characterId, Map.<String, Object>of("type", NPC_TALKED_EVENT_TYPE, "npc_code", npcCode));
+    }
+
+    /**
+     * ADR-114 D3 — đoàn hộ tống của quest {@code questCode} vừa tới nơi ({@code arrived}) hoặc thất bại. Sự kiện mang
+     * {@code quest_code}; script tự kiểm đúng quest của nó (Điều 27), như {@code npc_code} của {@link #npcTalked}.
+     *
+     * @return như {@link #monsterKilled}
+     */
+    public List<QuestStatusChange> escortFinished(long characterId, String questCode, boolean arrived) {
+        return dispatch(
+                characterId,
+                Map.<String, Object>of(
+                        "type",
+                        arrived ? ESCORT_ARRIVED_EVENT_TYPE : ESCORT_FAILED_EVENT_TYPE,
+                        "quest_code",
+                        questCode));
     }
 
     private List<QuestStatusChange> dispatch(long characterId, Map<String, Object> event) {

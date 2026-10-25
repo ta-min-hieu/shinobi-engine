@@ -1,5 +1,6 @@
 package dev.kage.client.core.world;
 
+import java.util.Locale;
 import java.util.Optional;
 
 import com.badlogic.gdx.utils.I18NBundle;
@@ -11,6 +12,7 @@ import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.DungeonEnteredEvent;
 import dev.kage.protocol.EnterDungeonOutcome;
 import dev.kage.protocol.EnterDungeonResponse;
+import dev.kage.protocol.EscortStateEvent;
 import dev.kage.protocol.ExitDungeonOutcome;
 import dev.kage.protocol.ExitDungeonResponse;
 import dev.kage.protocol.Opcode;
@@ -79,7 +81,33 @@ final class DungeonCoordinator implements WindowFlow {
      */
     @Override
     public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
+        if (frame.header().opcode() == Opcode.OPCODE_ESCORT_STATE_EVENT_VALUE) {
+            showEscort(EscortStateEvent.parseFrom(frame.payload()));
+            return true;
+        }
         return dispatch(frame.header().opcode(), frame.payload());
+    }
+
+    /**
+     * ADR-114 — đoàn hộ tống chưa có model (D5 cho phép "hộp tạm"): hiện bằng CHÍNH dải chữ thường trực của hầm ngục —
+     * đoàn chỉ có ở world chính, nơi dải đó trống. Kết thúc (tới nơi/vỡ/bỏ) thì trả dải về trạng thái hầm ngục; dòng
+     * báo kết quả do server gửi vào kênh hệ thống.
+     */
+    private void showEscort(EscortStateEvent event) {
+        String state = event.getState().toLowerCase(Locale.ROOT);
+        if (!"moving".equals(state) && !"waiting".equals(state)) {
+            refreshBanner();
+            return;
+        }
+        hud.setDungeonBanner(
+                KageI18n.formatOrKey(
+                        i18n,
+                        "escort.hud.banner",
+                        Math.round(event.getX()),
+                        Math.round(event.getEndX()),
+                        event.getHp(),
+                        event.getMaxHp()),
+                text("escort.hud." + state));
     }
 
     private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {

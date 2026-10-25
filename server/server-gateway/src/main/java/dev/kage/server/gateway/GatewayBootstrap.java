@@ -254,6 +254,7 @@ public final class GatewayBootstrap {
             ctx.characterRegistry().activity.stop();
             ctx.characterRegistry().collections.stop();
             ctx.characterRegistry().guildAuctions.stop();
+            ctx.characterRegistry().escorts.stop();
             ctx.worldContext().metricsHttpServer().stop();
             observability.tracing().shutdown();
             databaseBootstrap.shutdown();
@@ -470,6 +471,7 @@ public final class GatewayBootstrap {
                 characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN), worldContent);
         // ADR-102 D2 — luật PvP theo cặp (bang chiến) cho world chính; khu vực mở thêm nối ở MainWorldChannelRegistry.
         firstChannelFacade.usePlayerVersusPlayerRule(characterRegistry.guildWars.roster);
+        firstChannelFacade.useEscortListener(characterRegistry.escorts::onChanged); // ADR-114
         firstChannelFacade.start();
         WorldBossScheduler worldBoss = startWorldBoss(firstChannelFacade, databaseBootstrap, characterRegistry);
         MainWorldChannelRegistry mainWorldChannels =
@@ -542,7 +544,8 @@ public final class GatewayBootstrap {
                         databaseBootstrap.wireWaypointFacade(),
                         databaseBootstrap.wireBountyFacade(),
                         databaseBootstrap.wireGuildWarFacade(),
-                        databaseBootstrap.wireTowerFacade()),
+                        databaseBootstrap.wireTowerFacade(),
+                        databaseBootstrap.wireEscortRouteFacade()),
                 new ServiceDeskFacades(
                         databaseBootstrap.wireServerNoticeFacade(),
                         databaseBootstrap.wireGiftCodeFacade(),
@@ -596,6 +599,11 @@ public final class GatewayBootstrap {
     /** ADR-108/109 — mở trang sưu tầm thì áp lại chỉ số ngay, cùng đường linh thú lên cấp. */
     private static void bindCollections(
             ConnectedCharacterRegistry characterRegistry, GatewayFacades facades, WorldRouteLookup routes) {
+        characterRegistry.escorts.bind(new EscortHooks.Deps(
+                facades.contentFacades().questFacade(),
+                facades.progression().adventure().escortRoutes(),
+                new PlayerNotices(facades.contentFacades().socialFacades().mailFacade(), characterRegistry),
+                characterRegistry));
         characterRegistry.tower.bind(new TowerHooks.Deps(
                 facades.progression().adventure().tower(),
                 new PlayerNotices(facades.contentFacades().socialFacades().mailFacade(), characterRegistry),

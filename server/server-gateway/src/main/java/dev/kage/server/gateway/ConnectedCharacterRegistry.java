@@ -129,6 +129,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-113 — ghi tầng Trấn Yêu Tháp + thư mốc + báo client; nối sau khi DB đã dựng. */
     final TowerHooks tower = new TowerHooks();
 
+    /** ADR-114 — đoàn hộ tống: báo client 625 + sự kiện quest tới nơi/thất bại; nối sau khi DB đã dựng. */
+    final EscortHooks escorts = new EscortHooks();
+
     /** Bụi linh thảo (ADR-098) — trạng thái sẵn/hồi/đang hái, RAM, dùng chung mọi kết nối. */
     final HerbNodes herbNodes = new HerbNodes();
 

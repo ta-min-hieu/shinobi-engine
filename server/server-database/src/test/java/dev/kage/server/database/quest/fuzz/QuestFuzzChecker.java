@@ -118,7 +118,7 @@ final class QuestFuzzChecker {
 
     private static String expectedCounter(QuestFuzzSpec spec, QuestFuzzModel.QuestState state) {
         return switch (spec.counterKind()) {
-            case NONE -> "";
+            case NONE, ESCORT -> "";
             case FLAG -> String.valueOf(state.kills() >= 1);
             case COUNT, COUNT_UNTIL_TARGET -> String.valueOf(state.kills());
         };

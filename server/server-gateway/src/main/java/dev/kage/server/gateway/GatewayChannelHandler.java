@@ -2899,6 +2899,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         executeBlocking(ctx, sequenceId, () -> {
             QuestFacade.AbandonResult result = questFacade.abandonQuest(characterId, command.getQuestCode());
+            if (result == QuestFacade.AbandonResult.OK) { // ADR-114 — bỏ quest hộ tống thì đoàn biến mất
+                worldGateway.registry().escorts.onQuestAbandoned(characterId, currentWorldFacadeIfPresent(characterId));
+            }
             AbandonQuestResponse response = AbandonQuestResponse.newBuilder()
                     .setOutcome(
                             switch (result) {
@@ -3206,6 +3209,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 sendError(ctx, sequenceId, 404, "error.dialogue_option_not_found");
             case DialogueFacade.SelectOptionResult.AcceptQuest r -> {
                 QuestFacade.AcceptResult acceptResult = questFacade.acceptQuest(characterId, r.questCode());
+                if (acceptResult == QuestFacade.AcceptResult.OK) { // ADR-114 — quest hộ tống thì xếp đoàn
+                    worldGateway
+                            .registry()
+                            .escorts
+                            .onQuestAccepted(characterId, r.questCode(), currentWorldFacadeIfPresent(characterId));
+                }
                 AcceptQuestResponse response = AcceptQuestResponse.newBuilder()
                         .setOutcome(toProtoOutcome(acceptResult))
                         .build();

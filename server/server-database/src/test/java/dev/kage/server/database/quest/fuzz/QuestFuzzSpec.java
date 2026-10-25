@@ -37,7 +37,9 @@ record QuestFuzzSpec(
         /** Số nguyên, ngừng cộng khi chạm mốc ({@code first_cultivation_manual}). */
         COUNT_UNTIL_TARGET,
         /** Cờ boolean — {@code true} sau con đầu tiên. */
-        FLAG
+        FLAG,
+        /** Không hạ quái: xong bằng sự kiện {@code escort_arrived} do server sinh (ADR-114). */
+        ESCORT
     }
 
     record ItemTake(String itemCode, int quantity) {}
@@ -52,6 +54,15 @@ record QuestFuzzSpec(
 
     QuestFuzzSpec killing(String monsterCode, int target, CounterKind kind, String field) {
         return new QuestFuzzSpec(code, askNpc, monsterCode, target, kind, field, reportNpc, deliveries);
+    }
+
+    /** ADR-114 — quest hộ tống: chỉ sự kiện đoàn tới nơi làm nó xong. */
+    QuestFuzzSpec escorting() {
+        return new QuestFuzzSpec(code, askNpc, monster, kills, CounterKind.ESCORT, counterField, reportNpc, deliveries);
+    }
+
+    boolean isEscort() {
+        return counterKind == CounterKind.ESCORT;
     }
 
     QuestFuzzSpec askingFirst(String npcCode) {
@@ -139,5 +150,7 @@ record QuestFuzzSpec(
             // nên mô hình "CLAIMED là cuối" vẫn đúng.
             quest("daily_dummy_drill").killing("training_dummy", 5, CounterKind.COUNT, FELLED),
             quest("daily_mountain_patrol").killing("wandering_bandit", 3, CounterKind.COUNT, FELLED),
-            quest("daily_water_duty").askingFirst(SENIOR_SISTER).reportingTo(TOWN_ELDER));
+            quest("daily_water_duty").askingFirst(SENIOR_SISTER).reportingTo(TOWN_ELDER),
+            // ADR-114 — hộ tống: không sự kiện quái/NPC nào làm nó xong, chỉ `escort_arrived`.
+            quest("daily_caravan_escort").escorting());
 }

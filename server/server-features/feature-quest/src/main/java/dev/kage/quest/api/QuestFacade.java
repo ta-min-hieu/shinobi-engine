@@ -120,6 +120,13 @@ public final class QuestFacade {
                 characterId, () -> toStatusChanges(processQuestEventUseCase.npcTalked(characterId, npcCode)));
     }
 
+    /** ADR-114 — đoàn hộ tống tới nơi / thất bại; cùng khoá sự kiện của nhân vật. Trả như {@link #onMonsterKilled}. */
+    public List<QuestStatusChange> onEscortFinished(long characterId, String questCode, boolean arrived) {
+        return withEventLock(
+                characterId,
+                () -> toStatusChanges(processQuestEventUseCase.escortFinished(characterId, questCode, arrived)));
+    }
+
     /**
      * Bỏ quest đang làm (ADR-054) — xoá tiến độ, nhận lại được từ đầu. Đi qua CÙNG khoá sự kiện của
      * nhân vật: không chen giữa một lần {@code on_event} đang chạy (lần ghi compare-and-set tới sau

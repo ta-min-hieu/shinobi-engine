@@ -818,6 +818,12 @@ public final class ServerDatabaseBootstrap {
         return new DungeonQuotaFacade(new PostgresDungeonQuotaAdapter(dataSource), java.time.Clock.systemUTC());
     }
 
+    /** Tuyến hộ tống của quest (ADR-114). */
+    public dev.kage.quest.api.EscortRouteFacade wireEscortRouteFacade() {
+        return new dev.kage.quest.api.EscortRouteFacade(
+                new dev.kage.server.database.quest.PostgresEscortRouteAdapter(dataSource));
+    }
+
     /** Trấn Yêu Tháp (ADR-113). */
     public dev.kage.world.api.TowerFacade wireTowerFacade() {
         return new dev.kage.world.api.TowerFacade(new dev.kage.server.database.world.PostgresTowerAdapter(dataSource));

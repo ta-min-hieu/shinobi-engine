@@ -250,6 +250,14 @@ public final class WorldFacade {
     // Đếm ngược hồi sinh THEO TỪNG điểm spawn (< 0 = quái ở đó đang sống). Mảng cố định, không cấp
     // phát lại — cùng tinh thần "không allocation trong tick" (Điều 31).
     private final float[] monsterRespawnCountdownSeconds;
+
+    /** ADR-114 — đoàn hộ tống, chỉ đọc/ghi trên tick thread. */
+    private final EscortCaravans escorts = new EscortCaravans();
+    // volatile: nối từ luồng khởi động/mở khu vực, đọc trên tick thread.
+    private volatile EscortListener escortListener = EscortListener.NONE;
+    // Tạo MỘT lần (tham chiếu phương thức bắt `this` cấp phát mỗi lần đánh giá — không làm thế mỗi tick).
+    private final EscortCaravans.GuardLookup escortGuards = this::characterXOrNaN;
+    private final EscortCaravans.ThreatLookup escortThreats = this::engagedAttackNear;
     // monsterId -> chỉ số điểm spawn, để hồi sinh đúng chỗ cũ. Boss KHÔNG có entry ở đây.
     private final Map<Long, Integer> spawnIndexByMonsterId = new HashMap<>();
     private final WorldBossDamageLedger worldBossLedger = new WorldBossDamageLedger();
@@ -826,6 +834,24 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.SpawnOnceCommand(monsterCode, x, y));
     }
 
+    /**
+     * ADR-114 — bắt đầu đoàn hộ tống cho nhân vật (thay đoàn cũ nếu có). Đoàn báo qua
+     * {@link #useEscortListener}; người đó rời World này thì đoàn báo {@code ABANDONED} và biến mất.
+     */
+    public void startEscort(long characterId, EscortRoute route) {
+        inbox.add(new WorldCommand.StartEscortCommand(characterId, route));
+    }
+
+    /** ADR-114 — ai nghe đoàn hộ tống của World này (chỉ world chính nối). */
+    public void useEscortListener(EscortListener listener) {
+        escortListener = listener;
+    }
+
+    /** ADR-114 — huỷ đoàn của nhân vật (bỏ quest); không có đoàn thì thôi. */
+    public void cancelEscort(long characterId) {
+        inbox.add(new WorldCommand.CancelEscortCommand(characterId));
+    }
+
     /** Ai nghe boss thế giới chết (ADR-081) — gọi TRÊN tick thread, phải trả về ngay (việc nặng sang luồng khác). */
     public void setWorldBossListener(WorldBossListener listener) {
         this.worldBossListener = listener;
@@ -929,6 +955,7 @@ public final class WorldFacade {
         handleHealthChanges(drainHealthChangeQueue()); // ADR-046 D3 + D5
         announceMovementModifiers(locomotionSystem.drainChanges()); // ADR-073
         tickMonsterRespawn(WorldConstants.FIXED_DT);
+        escorts.tick(WorldConstants.FIXED_DT, escortGuards, escortThreats, escortListener); // ADR-114
         // O(n²) — chạy chậm hơn tick loop (WorldConstants.AOI_SYNC_INTERVAL_TICKS), xem
         // javadoc AreaOfInterestTracker + WorldConstants.AOI_SYNC_RATE_HZ. Combat/skill/boss
         // result ở trên KHÔNG bị ảnh hưởng — vẫn phát ngay mỗi tick qua observersOf().
@@ -1031,6 +1058,8 @@ public final class WorldFacade {
                 case WorldCommand.SetSkillRanksCommand c -> handleSetSkillRanks(c.characterId(), c.ranks());
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c);
                 case WorldCommand.SpawnOnceCommand c -> spawnOnce(c);
+                case WorldCommand.StartEscortCommand c -> escorts.start(c.characterId(), c.route(), escortListener);
+                case WorldCommand.CancelEscortCommand c -> escorts.cancel(c.characterId(), escortListener);
                 case WorldCommand.ResetCharacterLevelCommand c -> handleResetCharacterLevel(c.characterId(), c.level());
                 case WorldCommand.ObserversCommand c -> handleObservers(c.characterId(), c.action());
                 case WorldCommand.InboxBarrierCommand c -> c.onReached().run();
@@ -1113,6 +1142,7 @@ public final class WorldFacade {
         handleHealthChanges(drainHealthChangeQueue());
         KEntity entity = entitiesByCharacterId.remove(characterId);
         baseStatsByCharacterId.remove(characterId);
+        escorts.cancel(characterId, escortListener); // ADR-114 D3 — rời World là đoàn biến mất
         if (entity == null) {
             return;
         }
@@ -1925,6 +1955,23 @@ public final class WorldFacade {
         }
         long monsterId = createMonsterEntity(loai, spawn.posX(), spawn.posY());
         spawnIndexByMonsterId.put(monsterId, spawnIndex);
+    }
+
+    /** ADR-114 — vị trí X của nhân vật trong World này, {@link Float#NaN} nếu không có. */
+    private float characterXOrNaN(long characterId) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        return entity == null ? Float.NaN : POSITION.get(entity).x;
+    }
+
+    /** ADR-114 D2 — tổng công của quái ĐANG CÓ MỤC TIÊU trong {@code reach} mét quanh {@code x}. Không cấp phát. */
+    private int engagedAttackNear(float x, float reach) {
+        int total = 0;
+        for (KEntity monster : entitiesByMonsterId.values()) {
+            if (TARGET.get(monster).targetEntityId != 0L && Math.abs(POSITION.get(monster).x - x) <= reach) {
+                total += COMBAT_STATS.get(monster).atk;
+            }
+        }
+        return total;
     }
 
     /** ADR-113 — quái không thuộc điểm spawn nào ⇒ {@link #handleMonsterDeath} không lên lịch hồi sinh. */

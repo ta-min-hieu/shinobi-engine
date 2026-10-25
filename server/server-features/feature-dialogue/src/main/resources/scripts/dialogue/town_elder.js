@@ -341,6 +341,8 @@ if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS") {
             { label_key: "dialogue.option.accept_quest_daily_dummy_drill", action: "accept_quest:daily_dummy_drill" },
             { label_key: "dialogue.option.accept_quest_daily_mountain_patrol", action: "accept_quest:daily_mountain_patrol" },
             { label_key: "dialogue.option.accept_quest_daily_water_duty", action: "accept_quest:daily_water_duty" },
+            // ADR-114 — hộ tống xe linh thảo (x = 0 → 82).
+            { label_key: "dialogue.option.accept_quest_daily_caravan_escort", action: "accept_quest:daily_caravan_escort" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]

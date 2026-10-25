@@ -127,6 +127,25 @@ public interface WorldOutboundSink {
      */
     default void onMovementModifierChanged(long characterId, float statusSpeedMultiplier, boolean immobilized) {}
 
+    /** Trạng thái đoàn hộ tống (ADR-114). */
+    enum EscortState {
+        MOVING,
+        /** Người hộ tống đứng quá xa — đoàn đứng chờ. */
+        WAITING,
+        ARRIVED,
+        /** Đoàn hết máu. */
+        FAILED,
+        /** Người hộ tống rời World / ngắt kết nối / bỏ quest. */
+        ABANDONED
+    }
+
+    /**
+     * Ảnh chụp một đoàn hộ tống.
+     *
+     * @param routeCode mã tuyến ({@link EscortRoute#code()})
+     */
+    record EscortSnapshot(long characterId, String routeCode, float x, int hp, int maxHp, EscortState state) {}
+
     /**
      * Ảnh chụp vị trí sau khi xử lý {@code MoveCommand}/{@code JumpCommand} (ADR-033) — gộp tham số
      * (STATIC-ANALYSIS.md, checkstyle {@code ParameterNumberCheck} max=4). {@code z}/{@code

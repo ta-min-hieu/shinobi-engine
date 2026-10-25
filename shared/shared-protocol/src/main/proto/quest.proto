@@ -256,3 +256,17 @@ message BuyReputationItemResponse {
   BuyReputationItemOutcome outcome = 1;
   GetReputationResponse status = 2;
 }
+
+// ===== ADR-114 — nhiệm vụ hộ tống. CHỈ THÊM. =====
+
+// Event: Server -> Client (OPCODE_ESCORT_STATE_EVENT = 625). Gửi người hộ tống mỗi khi máu/trạng thái đoàn đổi và mỗi
+// 1 giây khi đang đi/đứng chờ. state: "MOVING" | "WAITING" | "ARRIVED" | "FAILED" | "ABANDONED" — ba giá trị sau là
+// cuối, đoàn biến mất.
+message EscortStateEvent {
+  string quest_code = 1;
+  float x = 2;
+  int32 hp = 3;
+  int32 max_hp = 4;
+  string state = 5;
+  float end_x = 6;
+}

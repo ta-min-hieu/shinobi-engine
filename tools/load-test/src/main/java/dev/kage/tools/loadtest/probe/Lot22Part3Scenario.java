@@ -17,6 +17,7 @@ import dev.kage.protocol.BidGuildAuctionResponse;
 import dev.kage.protocol.EnterTowerCommand;
 import dev.kage.protocol.EnterTowerResponse;
 import dev.kage.protocol.ErrorResponse;
+import dev.kage.protocol.EscortStateEvent;
 import dev.kage.protocol.GetTowerStatusRequest;
 import dev.kage.protocol.GetTowerStatusResponse;
 import dev.kage.protocol.ListGuildAuctionsRequest;
@@ -38,7 +39,7 @@ import dev.kage.tools.loadtest.GameConnection;
 /**
  * Các bước lô 22 phần 3 (đi qua {@code --lot21=}): {@code refines}, {@code refine:<itemId>:<dòng giữ, -1 = không>},
  * {@code auctions}, {@code bid:<lotId>:<số tiền>}, {@code tower}, {@code enterTower}, {@code towerFight:<giây>} (đánh
- * quái tầng tới khi server báo qua tầng).
+ * quái tầng tới khi server báo qua tầng), {@code escortWatch:<giây>} (in trạng thái đoàn hộ tống cuối cùng thấy).
  */
 final class Lot22Part3Scenario {
 
@@ -90,6 +91,7 @@ final class Lot22Part3Scenario {
                             return r.getOutcome() + " tầng=" + r.getFloor();
                         });
             case "towerFight" -> towerFight(Integer.parseInt(arg));
+            case "escortWatch" -> escortWatch(Integer.parseInt(arg));
             default -> "bước không hiểu";
         };
     }
@@ -246,6 +248,30 @@ final class Lot22Part3Scenario {
                 }
             }
         }
+    }
+
+    /** Đọc khung trong {@code seconds} giây, in trạng thái đoàn cuối cùng (và dừng sớm nếu đoàn tới nơi/thất bại). */
+    private String escortWatch(int seconds) throws IOException {
+        long deadline = System.currentTimeMillis() + seconds * MILLIS_PER_SECOND;
+        String last = "không thấy gói 625";
+        int events = 0;
+        while (System.currentTimeMillis() < deadline) {
+            PacketCodec.Frame frame;
+            try {
+                frame = connection.readFrame();
+            } catch (SocketTimeoutException quiet) {
+                continue;
+            }
+            if (frame.header().opcode() == Opcode.OPCODE_ESCORT_STATE_EVENT_VALUE) {
+                EscortStateEvent e = EscortStateEvent.parseFrom(frame.payload());
+                events++;
+                last = e.getState() + " x=" + Math.round(e.getX()) + " máu=" + e.getHp() + "/" + e.getMaxHp();
+                if (!"MOVING".equals(e.getState()) && !"WAITING".equals(e.getState())) {
+                    break;
+                }
+            }
+        }
+        return "gói=" + events + " cuối: " + last;
     }
 
     private static String describe(ListRefinementsResponse r) {

@@ -28,6 +28,9 @@ sealed interface QuestFuzzOp {
         }
     }
 
+    /** ADR-114 — đoàn hộ tống của {@code questCode} tới nơi ({@code arrived}) hoặc vỡ — sự kiện thế giới. */
+    record Escort(String questCode, boolean arrived) implements QuestFuzzOp {}
+
     /** {@code ClaimQuestRewardCommand} — lĩnh xong OK thì hoà giải vạch EXP như gateway. */
     record Claim(String questCode, String idempotencyKey) implements QuestFuzzOp {}
 }

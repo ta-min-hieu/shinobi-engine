@@ -46,5 +46,18 @@ mỗi khi máu/trạng thái đổi và mỗi 1 giây khi đang đi). Client v�
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 3).
+1. ✅ Thi hành 2026-10-25 (lô 22 phần 3). ⚠️ **Migration là V94** (không phải V91 như D1 ghi). server-world:
+   `EscortCaravans` (không phải entity ECS — không đánh, không bị nhắm, không vào AoI; danh sách duyệt theo chỉ số, không
+   cấp phát mỗi tick), `EscortRoute`, lệnh `startEscort`/`cancelEscort`, `EscortListener` nối riêng cho world chính
+   (`useEscortListener`) thay vì thêm phương thức vào sink của gateway (đúng trần PMD 80 của `ConnectedCharacterRegistry`).
+   Đoàn đi khi người hộ tống trong 6 m; mỗi 1 giây chịu tổng công của quái ĐANG CÓ MỤC TIÊU trong 2 m; rời World ⇒
+   `ABANDONED`. feature-quest: `EscortRoutePort`/`EscortRouteFacade`, `QuestFacade.onEscortFinished` (sự kiện
+   `escort_arrived`/`escort_failed` mang `quest_code`, qua khoá sự kiện). Gateway `EscortHooks`: nhận quest có tuyến ⇒
+   xếp đoàn; 625 mỗi lần đổi; tới nơi ⇒ 612 COMPLETED + dòng hệ thống; vỡ/rời ⇒ sự kiện thất bại + bỏ quest (ADR-054);
+   tự bỏ quest ⇒ huỷ đoàn lặng lẽ. Quest `daily_caravan_escort` (script + lựa chọn thoại Chu Hoành, 400 EXP / 80 linh
+   thạch — đề xuất cân bằng). Bộ fuzz quest có loại mục tiêu `ESCORT` + lệnh `Escort`.
+   **Lệch D5 (cần chủ dự án xem):** chưa vẽ hộp 3D tạm — đoàn hiện bằng dải chữ thường trực (dùng lại dải "đang ở Bí
+   Cảnh", trống ở world chính): vị trí/đích, máu xe, đang đi/đứng chờ. Vẽ hộp cần presenter mới trong client 3D.
+   ⚠️ Server khởi động lại giữa lúc hộ tống: quest ở lại IN_PROGRESS mà không có đoàn — người chơi bỏ quest (ADR-054) rồi
+   nhận lại.
 2. ⏳ Kiểm sống bằng gameProbe.

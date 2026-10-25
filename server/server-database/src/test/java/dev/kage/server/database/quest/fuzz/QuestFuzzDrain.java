@@ -71,6 +71,9 @@ final class QuestFuzzDrain {
         if (spec.hasAskStep()) {
             run.sequential(new QuestFuzzOp.Talk(spec.askNpc()));
         }
+        if (spec.isEscort()) {
+            run.sequential(new QuestFuzzOp.Escort(code, true));
+        }
         for (int i = 0; i < spec.kills() && isInProgress(code); i++) {
             run.sequential(new QuestFuzzOp.Kill(spec.monster()));
         }
