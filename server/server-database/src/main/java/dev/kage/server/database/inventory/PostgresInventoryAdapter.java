@@ -35,10 +35,11 @@ public final class PostgresInventoryAdapter implements InventoryPort {
 
     /** ADR-064 D5 — món đang khảm Linh Ngọc. */
     // ADR-072 D3 — linh thú đã có cấp (dòng pet_state) chịu cùng luật với món đã khảm: đường dời bằng xoá/tạo dòng
-    // sẽ làm mất nó.
+    // sẽ làm mất nó. ADR-111 — món đã tẩy luyện cũng vậy (dòng item_refinement CASCADE theo dòng túi).
     private static final String IS_SOCKETED = """
             SELECT (SELECT COUNT(*) FROM item_socket WHERE inventory_item_id = ?)
                  + (SELECT COUNT(*) FROM pet_state WHERE inventory_item_id = ?)
+                 + (SELECT COUNT(*) FROM item_refinement WHERE inventory_item_id = ?)
             """;
 
     // Đồ đang mặc không chiếm ô túi (quyết định chủ dự án 2026-10-11). `Inventory` chứa MỌI dòng
@@ -212,8 +213,8 @@ public final class PostgresInventoryAdapter implements InventoryPort {
 
     @Override
     public boolean isSocketed(Transaction tx, long itemId) {
-        return JdbcOperations.queryOne(
-                                ((JdbcTransaction) tx).connection(), IS_SOCKETED, rs -> rs.getInt(1), itemId, itemId)
+        Connection connection = ((JdbcTransaction) tx).connection();
+        return JdbcOperations.queryOne(connection, IS_SOCKETED, rs -> rs.getInt(1), itemId, itemId, itemId)
                         .orElse(0)
                 > 0;
     }

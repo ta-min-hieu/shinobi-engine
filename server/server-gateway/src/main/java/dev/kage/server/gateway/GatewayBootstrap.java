@@ -253,6 +253,7 @@ public final class GatewayBootstrap {
             ctx.characterRegistry().guildWars.stop();
             ctx.characterRegistry().activity.stop();
             ctx.characterRegistry().collections.stop();
+            ctx.characterRegistry().guildAuctions.stop();
             ctx.worldContext().metricsHttpServer().stop();
             observability.tracing().shutdown();
             databaseBootstrap.shutdown();
@@ -308,6 +309,7 @@ public final class GatewayBootstrap {
                         characterRegistry),
                 java.time.Clock.systemUTC());
         guildWars.start();
+        characterRegistry.guildAuctions.start(); // ADR-112 — dừng ở shutdownSequence
         return new BackgroundJobs(marketExpiry, spiritVeins, waypoints, guildWars);
     }
 
@@ -539,14 +541,18 @@ public final class GatewayBootstrap {
                         databaseBootstrap.wireDungeonQuotaFacade(),
                         databaseBootstrap.wireWaypointFacade(),
                         databaseBootstrap.wireBountyFacade(),
-                        databaseBootstrap.wireGuildWarFacade()),
+                        databaseBootstrap.wireGuildWarFacade(),
+                        databaseBootstrap.wireTowerFacade()),
                 new ServiceDeskFacades(
                         databaseBootstrap.wireServerNoticeFacade(),
                         databaseBootstrap.wireGiftCodeFacade(),
                         databaseBootstrap.wirePlayerReportFacade(),
                         databaseBootstrap.wireActivityFacade()),
                 new CollectionFacades(
-                        databaseBootstrap.wireBestiaryFacade(), databaseBootstrap.wireReputationFacade()));
+                        databaseBootstrap.wireBestiaryFacade(),
+                        databaseBootstrap.wireReputationFacade(),
+                        databaseBootstrap.wireRefinementFacade(),
+                        databaseBootstrap.wireGuildAuctionFacade()));
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -590,6 +596,15 @@ public final class GatewayBootstrap {
     /** ADR-108/109 — mở trang sưu tầm thì áp lại chỉ số ngay, cùng đường linh thú lên cấp. */
     private static void bindCollections(
             ConnectedCharacterRegistry characterRegistry, GatewayFacades facades, WorldRouteLookup routes) {
+        characterRegistry.tower.bind(new TowerHooks.Deps(
+                facades.progression().adventure().tower(),
+                new PlayerNotices(facades.contentFacades().socialFacades().mailFacade(), characterRegistry),
+                characterRegistry));
+        characterRegistry.guildAuctions.bind(new GuildAuctionHooks.Deps(
+                facades.progression().collections().guildAuctions(),
+                facades.contentFacades().socialFacades().guildFacade(),
+                facades.contentFacades().socialFacades().mailFacade(),
+                java.time.Clock.systemUTC()));
         characterRegistry.collections.bind(
                 facades.progression().collections(),
                 CollectionHooks.refreshing(
@@ -613,21 +628,22 @@ public final class GatewayBootstrap {
     private static DungeonRewards dungeonRewards(GatewayFacades facades, ConnectedCharacterRegistry registry) {
         PlayerNotices notices =
                 new PlayerNotices(facades.contentFacades().socialFacades().mailFacade(), registry);
-        return new DungeonRewards(facades.progression().adventure().dungeonQuota(), characterId -> {
-            java.util.List<dev.kage.mail.api.MailFacade.AttachmentRequest> items =
-                    facades.inventoryFacade().itemCatalog().entries().stream()
-                            .filter(entry -> FIRST_CLEAR_ITEM_CODE.equals(entry.code()))
-                            .map(entry -> new dev.kage.mail.api.MailFacade.AttachmentRequest(
-                                    entry.id(), FIRST_CLEAR_ITEM_QUANTITY, 0))
-                            .toList();
-            notices.mail(
-                    characterId,
-                    new PlayerNotices.SystemMail(
-                            "Bí Cảnh / Dungeon",
-                            "Lần đầu hạ boss Bí Cảnh. / First dungeon boss clear.",
-                            FIRST_CLEAR_GOLD,
-                            items));
-        });
+        return new DungeonRewards(
+                facades.progression().adventure().dungeonQuota(), registry.guildAuctions::onBossKilled, characterId -> {
+                    java.util.List<dev.kage.mail.api.MailFacade.AttachmentRequest> items =
+                            facades.inventoryFacade().itemCatalog().entries().stream()
+                                    .filter(entry -> FIRST_CLEAR_ITEM_CODE.equals(entry.code()))
+                                    .map(entry -> new dev.kage.mail.api.MailFacade.AttachmentRequest(
+                                            entry.id(), FIRST_CLEAR_ITEM_QUANTITY, 0))
+                                    .toList();
+                    notices.mail(
+                            characterId,
+                            new PlayerNotices.SystemMail(
+                                    "Bí Cảnh / Dungeon",
+                                    "Lần đầu hạ boss Bí Cảnh. / First dungeon boss clear.",
+                                    FIRST_CLEAR_GOLD,
+                                    items));
+                });
     }
 
     /** Bậc chiêu + tâm pháp (ADR-071/077) — tâm pháp cần linh căn hiện tại đọc từ DB. */
@@ -640,11 +656,13 @@ public final class GatewayBootstrap {
                         .findById(characterId)
                         .map(character -> FactionMapping.toElement(character.faction()))
                         .orElse(Element.NONE));
-        characterRegistry.skillRanks.bindGuildBonus(characterId -> BestiaryEffects.plus(
-                RebirthEffects.plus(
-                        GuildSkillEffects.bonusOf(facades.progression().guildSkills(), characterId),
-                        facades.progression().rebirth().rebirthCountOf(characterId)),
-                facades.progression().collections().bestiary().bonusOf(characterId)));
+        characterRegistry.skillRanks.bindGuildBonus(characterId -> RefinementEffects.plus(
+                BestiaryEffects.plus(
+                        RebirthEffects.plus(
+                                GuildSkillEffects.bonusOf(facades.progression().guildSkills(), characterId),
+                                facades.progression().rebirth().rebirthCountOf(characterId)),
+                        facades.progression().collections().bestiary().bonusOf(characterId)),
+                facades.progression().collections().refinement().wornBonusOf(characterId)));
     }
 
     private static java.util.List<Long> partyMembers(PartyFacade partyFacade, long characterId) {

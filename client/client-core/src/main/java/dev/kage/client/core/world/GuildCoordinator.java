@@ -264,6 +264,14 @@ final class GuildCoordinator implements WindowFlow {
         });
     }
 
+    /** ADR-112 — nút "Đấu giá": đóng cửa sổ Bang rồi mở bảng lô. */
+    void useGuildAuction(Runnable openAuction) {
+        panel.setOnAuction(() -> {
+            panel.close();
+            openAuction.run();
+        });
+    }
+
     /** ADR-090 — đóng cửa sổ Bang rồi hỏi tình hình Linh Mạch; {@code SpiritVeinCoordinator} mở cửa sổ. */
     private void openSpiritVein() {
         panel.close();

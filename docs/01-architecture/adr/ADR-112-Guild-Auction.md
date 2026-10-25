@@ -45,5 +45,12 @@ dòng lô → kiểm còn mở, đủ mức → trừ vàng người mới → h
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 3).
+1. ✅ Thi hành 2026-10-25 (lô 22 phần 3). ⚠️ **Migration là V92**, không phải V91 như D1 ghi (V91 đã thuộc ADR-111).
+   `GuildAuctionRules`/`GuildAuctionPort` (feature-guild), `PostgresGuildAuctionAdapter`: trả giá khoá dòng lô (không
+   khoá `guild` — giải tán bang khoá `guild` rồi SET NULL sang lô, cùng chiều), trừ vàng qua `GoldLedger`, xếp thư hoàn
+   tiền người bị vượt; chốt `FOR UPDATE SKIP LOCKED` + `settled_at IS NULL` (một lần). Hàng đợi thư `guild_auction_payout`
+   (id tự tăng; khoá chống trùng của thư suy từ id) — `GuildAuctionHooks` (nhịp 30 giây, cùng khuôn `GuildWarScheduler`).
+   Lô mở ở `DungeonRewards.onBossKilled` (thêm người ra đòn cuối). Mức trả tối thiểu: giá khởi điểm 100, sau đó +10%
+   làm tròn LÊN. **Chi tiết AI tự chọn**: `guild_id` SET NULL chứ không CASCADE — bang giải tán giữa chừng thì vàng
+   đang giữ vẫn về đúng người khi chốt; bảng rơi lô = 4 Linh Ngọc, 5 Tẩy Luyện Thạch, bùa bảo vệ.
 2. ⏳ Kiểm sống bằng gameProbe.

@@ -58,7 +58,8 @@ final class DailyCoordinator implements WindowFlow {
             "daily.tab.waypoints",
             "daily.tab.bounty",
             "daily.tab.activity",
-            "daily.tab.reputation");
+            "daily.tab.reputation",
+            "daily.tab.tower");
 
     private static final int TAB_SECLUSION = 0;
     private static final int TAB_ONLINE = 1;
@@ -66,6 +67,7 @@ final class DailyCoordinator implements WindowFlow {
     private static final int TAB_WAYPOINTS = 3;
     private static final int TAB_ACTIVITY = 5;
     private static final int TAB_REPUTATION = 6;
+    private static final int TAB_TOWER = 7;
     private static final int SECONDS_PER_MINUTE = 60;
     private static final int MINUTES_PER_HOUR = 60;
 
@@ -76,6 +78,7 @@ final class DailyCoordinator implements WindowFlow {
     private final List<Runnable> rowActions = new ArrayList<>();
     private final ActivityTab activity;
     private final ReputationTab reputation;
+    private final TowerTab tower;
     private int tab = TAB_SECLUSION;
 
     DailyCoordinator(ReportPanel panel, WorldCommandSender sender, ChatCoordinator chat) {
@@ -84,6 +87,7 @@ final class DailyCoordinator implements WindowFlow {
         this.chat = chat;
         this.activity = new ActivityTab(sender);
         this.reputation = new ReputationTab(sender);
+        this.tower = new TowerTab(sender);
         panel.setOnRefresh(this::request);
         panel.setOnTabSelected(index -> {
             tab = index;
@@ -109,6 +113,8 @@ final class DailyCoordinator implements WindowFlow {
             activity.request();
         } else if (tab == TAB_REPUTATION) {
             reputation.request();
+        } else if (tab == TAB_TOWER) {
+            tower.request();
         } else {
             send(Opcode.OPCODE_GET_BOUNTY_BOARD_REQUEST_VALUE, GetBountyBoardRequest.getDefaultInstance());
         }
@@ -128,12 +134,18 @@ final class DailyCoordinator implements WindowFlow {
         panel.close();
     }
 
+    /** Năng động (ADR-106), danh vọng (ADR-109), Trấn Yêu Tháp (ADR-113) — mỗi tab tự đọc gói của nó. */
+    private boolean dispatchSubTabs(int opcode, byte[] payload) throws InvalidProtocolBufferException {
+        return activity.dispatch(opcode, payload, r -> showTab(TAB_ACTIVITY, r), chat::showSystemNotice)
+                || reputation.dispatch(opcode, payload, r -> showTab(TAB_REPUTATION, r), chat::showSystemNotice)
+                || tower.dispatch(opcode, payload, r -> showTab(TAB_TOWER, r), chat::showSystemNotice);
+    }
+
     @Override
     public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
         int opcode = frame.header().opcode();
         byte[] payload = frame.payload();
-        if (activity.dispatch(opcode, payload, r -> showTab(TAB_ACTIVITY, r), chat::showSystemNotice)
-                || reputation.dispatch(opcode, payload, r -> showTab(TAB_REPUTATION, r), chat::showSystemNotice)) {
+        if (dispatchSubTabs(opcode, payload)) {
             return true;
         }
         if (opcode == Opcode.OPCODE_GET_SECLUSION_STATUS_RESPONSE_VALUE) {

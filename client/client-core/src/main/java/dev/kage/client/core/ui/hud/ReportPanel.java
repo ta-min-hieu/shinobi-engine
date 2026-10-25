@@ -41,6 +41,8 @@ public final class ReportPanel implements HudWindow {
     private static final float BUTTON_TEXT_PAD_PX = 14f;
     private static final float LIST_MAX_HEIGHT_PX = 364f;
     private static final float INPUT_WIDTH_PX = 180f;
+    /** Tab mỗi hàng: 5 × (96 + 6) = 510px vừa khung {@link #PANEL_WIDTH_PX}. */
+    private static final int TABS_PER_ROW = 5;
 
     private static final Color SECTION_COLOR = Color.valueOf("E0B860");
     private static final Color ROW_COLOR = Color.valueOf("F2F2F2");
@@ -108,6 +110,9 @@ public final class ReportPanel implements HudWindow {
         if (!this.tabKeys.isEmpty()) {
             for (int i = 0; i < this.tabKeys.size(); i++) {
                 int index = i;
+                if (i > 0 && i % TABS_PER_ROW == 0) {
+                    tabRow.row(); // cửa sổ Hằng ngày có 8 tab (lô 22) — một hàng tràn khỏi khung 520px
+                }
                 tabRow.add(button(this.tabKeys.get(i), () -> onTabSelected.accept(index)))
                         .minWidth(BUTTON_MIN_WIDTH_PX)
                         .padRight(6f);

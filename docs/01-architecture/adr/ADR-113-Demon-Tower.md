@@ -42,5 +42,10 @@ nhất). Rời tháp giữa chừng dùng lại `ExitDungeonCommand` (1502) — 
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 3).
+1. ✅ Thi hành 2026-10-25 (lô 22 phần 3). ⚠️ **Migration là V93**, không phải V91 như D1 ghi. Tháp đi CHUNG
+   `DungeonInstanceRegistry` (khoá instance `-characterId`, id nhóm luôn dương) thay vì một registry thứ tư — mọi
+   đường định tuyến/rớt mạng/gục/`ExitDungeonCommand` dùng lại nguyên vẹn. server-world thêm `spawnMonsterOnce`
+   (quái thường không thuộc điểm spawn ⇒ không hồi sinh; tách `createMonsterEntity` dùng chung với `spawnMonster`).
+   Con cuối chết ⇒ `TowerHooks` ghi tầng (UPSERT có điều kiện `best_floor < floor`, thưởng mốc trao đúng một lần) +
+   gửi 1507 TRƯỚC khi đưa về world chính. Tab thứ 8 của cửa sổ E ⇒ hàng tab của `ReportPanel` nay xuống dòng mỗi 5 tab.
 2. ⏳ Kiểm sống bằng gameProbe.

@@ -44,5 +44,12 @@ sau: gieo lại MỌI dòng không khoá, số dòng giữ nguyên. Mỗi dòng:
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 3).
+1. ✅ Thi hành 2026-10-25 (lô 22 phần 3). **Số hiệu migration là V91** đúng như D1. `RefinementPolicy` (gieo, giá,
+   biên độ) + `RefinementPort` (domain feature-inventory), `RefinementFacade`, `PostgresRefinementAdapter` (khoá túi
+   chung → khoá dòng món phải đang mặc ở ô có chỉ số → trừ đá qua `TemplateQuantityConsumer` → ghi đè dòng → audit
+   `ITEM_REFINED` kèm dòng cũ/mới). Chỉ số đi chuỗi `bindGuildBonus` (`RefinementEffects`, cạnh sổ sưu tầm) — chỉ món
+   ĐANG MẶC được cộng (SQL nối `equipment_slot`), nên tháo đồ là mất chỉ số ngay. Cửa sổ phím X (`RefinementCoordinator`).
+   **Chi tiết AI tự chọn ngoài D1–D5**: món đã tẩy chịu cùng luật món đã khảm — kho đồ, thư, phường thị TỪ CHỐI nó
+   (`isSocketed`/SQL `NOT EXISTS item_refinement`), vì các đường đó dời đồ bằng xoá/tạo dòng và dòng tẩy sẽ mất theo.
+   Phân giải vẫn cho (huỷ món là huỷ dòng). Giao dịch dời nguyên dòng nên giữ dòng tẩy.
 2. ⏳ Kiểm sống bằng gameProbe.

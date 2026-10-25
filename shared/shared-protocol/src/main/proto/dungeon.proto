@@ -70,3 +70,49 @@ message DungeonEnteredEvent {
   // nhìn); field nằm sẵn ở đây để lúc có đường đó thì không phải đổi protocol lần nữa.
   int64 initiator_character_id = 2;
 }
+
+// ===== ADR-113 — Trấn Yêu Tháp: World riêng một người, tầng mạnh dần. CHỈ THÊM. Rời giữa chừng dùng lại
+// ExitDungeonCommand (1502). =====
+
+// Command: Client -> Server (OPCODE_ENTER_TOWER_COMMAND = 1505). Luôn vào tầng cao nhất đã qua + 1.
+message EnterTowerCommand {}
+
+enum EnterTowerOutcome {
+  ENTER_TOWER_OUTCOME_UNSPECIFIED = 0;
+  ENTER_TOWER_OUTCOME_OK = 1;
+  ENTER_TOWER_OUTCOME_ALREADY_IN_DUNGEON = 2;   // đang ở Bí Cảnh/tháp
+  ENTER_TOWER_OUTCOME_IN_DUEL = 3;
+  ENTER_TOWER_OUTCOME_COMPLETED = 4;            // đã qua hết các tầng
+}
+
+// Response: Server -> Client (OPCODE_ENTER_TOWER_RESPONSE = 1506). Tới SAU WorldChangedEvent (308) như Bí Cảnh.
+message EnterTowerResponse {
+  EnterTowerOutcome outcome = 1;
+  int32 floor = 2;   // tầng vừa vào (0 nếu từ chối)
+}
+
+// Event: Server -> Client (OPCODE_TOWER_FLOOR_CLEARED_EVENT = 1507). Hạ hết quái một tầng; ngay sau đó server đưa về
+// world chính (308).
+message TowerFloorClearedEvent {
+  int32 floor = 1;
+  int32 best_floor = 2;
+  bool rewarded = 3;   // lần đầu qua tầng mốc — thưởng đã gửi qua thư
+}
+
+// Request: Client -> Server (OPCODE_GET_TOWER_STATUS_REQUEST = 1508).
+message GetTowerStatusRequest {}
+
+message TowerClimberView {
+  string character_name = 1;
+  int32 best_floor = 2;
+}
+
+// Response: Server -> Client (OPCODE_GET_TOWER_STATUS_RESPONSE = 1509).
+message GetTowerStatusResponse {
+  int32 best_floor = 1;
+  int32 next_floor = 2;            // 0 = đã qua hết
+  int32 top_floor = 3;             // số tầng của tháp
+  string next_monster_code = 4;
+  int32 next_monster_count = 5;
+  repeated TowerClimberView top = 6;
+}

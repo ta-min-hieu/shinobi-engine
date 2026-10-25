@@ -90,6 +90,8 @@ class ContentReferenceIntegrationTest {
      * đỏ, mà vẽ xong icon cho một món ở đây cũng đỏ — để danh sách không bao giờ nói dối.
      */
     private static final Set<String> ITEMS_KNOWN_TO_LACK_AN_ICON = Set.of(
+            // ADR-111 (2026-10-25) — Tẩy Luyện Thạch lên trước art.
+            "refine_stone",
             // ADR-107 (2026-10-25) — Linh Ngư, Linh Khoáng lên trước art.
             "spirit_fish",
             "spirit_ore",

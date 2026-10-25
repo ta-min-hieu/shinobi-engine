@@ -88,6 +88,9 @@ sealed interface WorldCommand {
      */
     record SpawnBossCommand(String bossCode, float x, float y, boolean worldBoss) implements WorldCommand {}
 
+    /** Một con quái thường tại {@code (x, y)}, KHÔNG thuộc điểm spawn nào nên không hồi sinh (ADR-113). */
+    record SpawnOnceCommand(String monsterCode, float x, float y) implements WorldCommand {}
+
     /**
      * Ngoại hình của {@code characterId} vừa đổi (đổi hệ phái — ADR-045). Command này CHỈ mang id:
      * server-world không biết "hệ phái"/"bậc trang phục" là gì và không được biết (ngoại hình sống

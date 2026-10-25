@@ -94,6 +94,7 @@ import dev.kage.protocol.ApproveGuildJoinRequestCommand;
 import dev.kage.protocol.ApproveGuildJoinRequestOutcome;
 import dev.kage.protocol.ApproveGuildJoinRequestResponse;
 import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.BidGuildAuctionCommand;
 import dev.kage.protocol.BlockCharacterCommand;
 import dev.kage.protocol.BuyGuildShopItemCommand;
 import dev.kage.protocol.BuyItemCommand;
@@ -166,6 +167,7 @@ import dev.kage.protocol.EnhanceOutcome;
 import dev.kage.protocol.EnterDungeonCommand;
 import dev.kage.protocol.EnterDungeonOutcome;
 import dev.kage.protocol.EnterDungeonResponse;
+import dev.kage.protocol.EnterTowerCommand;
 import dev.kage.protocol.EquipItemCommand;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
@@ -202,6 +204,7 @@ import dev.kage.protocol.GetRelationshipsRequest;
 import dev.kage.protocol.GetReputationRequest;
 import dev.kage.protocol.GetSeclusionStatusRequest;
 import dev.kage.protocol.GetSpiritVeinStatusRequest;
+import dev.kage.protocol.GetTowerStatusRequest;
 import dev.kage.protocol.GetTradeStatusRequest;
 import dev.kage.protocol.GetTradeStatusResponse;
 import dev.kage.protocol.GuildMemberView;
@@ -236,6 +239,7 @@ import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
 import dev.kage.protocol.ListFriendsRequest;
 import dev.kage.protocol.ListFriendsResponse;
+import dev.kage.protocol.ListGuildAuctionsRequest;
 import dev.kage.protocol.ListGuildMembersRequest;
 import dev.kage.protocol.ListGuildMembersResponse;
 import dev.kage.protocol.ListGuildShopRequest;
@@ -258,6 +262,7 @@ import dev.kage.protocol.ListPendingPartyInvitesResponse;
 import dev.kage.protocol.ListQuestsRequest;
 import dev.kage.protocol.ListQuestsResponse;
 import dev.kage.protocol.ListRecipesRequest;
+import dev.kage.protocol.ListRefinementsRequest;
 import dev.kage.protocol.ListShopItemsRequest;
 import dev.kage.protocol.ListShopItemsResponse;
 import dev.kage.protocol.ListSkillRanksRequest;
@@ -283,6 +288,7 @@ import dev.kage.protocol.QuestStatusChangedEvent;
 import dev.kage.protocol.RebirthCommand;
 import dev.kage.protocol.RebirthResponse;
 import dev.kage.protocol.RedeemGiftCodeCommand;
+import dev.kage.protocol.RefineItemCommand;
 import dev.kage.protocol.RejectFriendRequestCommand;
 import dev.kage.protocol.RejectFriendRequestOutcome;
 import dev.kage.protocol.RejectFriendRequestResponse;
@@ -664,6 +670,44 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             Opcode.OPCODE_DISSOLVE_DAO_LU_RESPONSE_VALUE,
                             (h, id, c) -> h.relations.daoLu().dissolve(id))),
             Map.entry(Opcode.OPCODE_SEND_EMOTE_COMMAND_VALUE, this::handleSendEmoteCommand),
+            // Lô 22 phần 3 — tẩy luyện (ADR-111), đấu giá bang (ADR-112), Trấn Yêu Tháp (ADR-113).
+            Map.entry(
+                    Opcode.OPCODE_ENTER_TOWER_COMMAND_VALUE,
+                    storageCommand(
+                            EnterTowerCommand.parser(),
+                            Opcode.OPCODE_ENTER_TOWER_RESPONSE_VALUE,
+                            (h, id, c) -> h.tower().enter(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_TOWER_STATUS_REQUEST_VALUE,
+                    storageCommand(
+                            GetTowerStatusRequest.parser(),
+                            Opcode.OPCODE_GET_TOWER_STATUS_RESPONSE_VALUE,
+                            (h, id, c) -> h.tower().status(id))),
+            Map.entry(
+                    Opcode.OPCODE_LIST_GUILD_AUCTIONS_REQUEST_VALUE,
+                    storageCommand(
+                            ListGuildAuctionsRequest.parser(),
+                            Opcode.OPCODE_LIST_GUILD_AUCTIONS_RESPONSE_VALUE,
+                            (h, id, c) -> h.collections.guildAuctions(id))),
+            Map.entry(
+                    Opcode.OPCODE_BID_GUILD_AUCTION_COMMAND_VALUE,
+                    storageCommand(
+                            BidGuildAuctionCommand.parser(),
+                            Opcode.OPCODE_BID_GUILD_AUCTION_RESPONSE_VALUE,
+                            (h, id, c) -> h.collections.bidGuildAuction(id, c.getLotId(), c.getAmount()))),
+            Map.entry(
+                    Opcode.OPCODE_LIST_REFINEMENTS_REQUEST_VALUE,
+                    storageCommand(
+                            ListRefinementsRequest.parser(),
+                            Opcode.OPCODE_LIST_REFINEMENTS_RESPONSE_VALUE,
+                            (h, id, c) -> h.collections.refinements(id))),
+            Map.entry(
+                    Opcode.OPCODE_REFINE_ITEM_COMMAND_VALUE,
+                    storageCommand(
+                            RefineItemCommand.parser(),
+                            Opcode.OPCODE_REFINE_ITEM_RESPONSE_VALUE,
+                            (h, id, c) -> h.collections.refine(
+                                    id, c.getItemId(), c.getLockedLine(), h::applyEquipmentBonusAndComputeMaxHp))),
             // Lô 22 phần 2 — sổ sưu tầm (ADR-108), danh vọng (ADR-109), kết nghĩa (ADR-110).
             Map.entry(
                     Opcode.OPCODE_GET_BESTIARY_REQUEST_VALUE,
@@ -2283,6 +2327,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 header.sequenceId(),
                 Opcode.OPCODE_WITHDRAW_ITEM_RESPONSE_VALUE,
                 characterId -> storage.withdraw(characterId, command));
+    }
+
+    /** ADR-113 — lệnh tháp; dựng mỗi lệnh (rẻ, không phải đường game loop) để constructor không vượt MethodLength. */
+    private TowerCommands tower() {
+        return new TowerCommands(worldGateway.registry(), worldGateway.dungeonInstanceRegistry());
     }
 
     /** ADR-064 — khảm Linh Ngọc. Trừ vàng + random ⇒ khoá chống trùng bắt buộc. */

@@ -818,6 +818,14 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.SpawnBossCommand(bossCode, x, y, true));
     }
 
+    /**
+     * Một con quái theo MÃ LOÀI tại {@code (x, y)}, không hồi sinh (ADR-113 — tầng Trấn Yêu Tháp). Khác
+     * {@link #spawnBoss}: không đòi loài là boss và không có trần một con mỗi mã. Mã không có trong catalog ⇒ bỏ qua.
+     */
+    public void spawnMonsterOnce(String monsterCode, float x, float y) {
+        inbox.add(new WorldCommand.SpawnOnceCommand(monsterCode, x, y));
+    }
+
     /** Ai nghe boss thế giới chết (ADR-081) — gọi TRÊN tick thread, phải trả về ngay (việc nặng sang luồng khác). */
     public void setWorldBossListener(WorldBossListener listener) {
         this.worldBossListener = listener;
@@ -1022,6 +1030,7 @@ public final class WorldFacade {
                     handleChangeCharacterElement(c.characterId(), c.element());
                 case WorldCommand.SetSkillRanksCommand c -> handleSetSkillRanks(c.characterId(), c.ranks());
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c);
+                case WorldCommand.SpawnOnceCommand c -> spawnOnce(c);
                 case WorldCommand.ResetCharacterLevelCommand c -> handleResetCharacterLevel(c.characterId(), c.level());
                 case WorldCommand.ObserversCommand c -> handleObservers(c.characterId(), c.action());
                 case WorldCommand.InboxBarrierCommand c -> c.onReached().run();
@@ -1914,13 +1923,29 @@ public final class WorldFacade {
             // catalog được dựng tay không nhất quán — bỏ qua an toàn thay vì làm chết tick thread.
             return;
         }
+        long monsterId = createMonsterEntity(loai, spawn.posX(), spawn.posY());
+        spawnIndexByMonsterId.put(monsterId, spawnIndex);
+    }
+
+    /** ADR-113 — quái không thuộc điểm spawn nào ⇒ {@link #handleMonsterDeath} không lên lịch hồi sinh. */
+    private void spawnOnce(WorldCommand.SpawnOnceCommand command) {
+        MonsterCatalogSnapshot.MonsterSpecies loai =
+                monsterCatalog.find(command.monsterCode()).orElse(null);
+        if (loai == null) {
+            LOG.error("Không spawn được quái '{}': không có trong catalog của World này", command.monsterCode());
+            return;
+        }
+        createMonsterEntity(loai, command.x(), command.y());
+    }
+
+    /** Dựng thực thể quái của {@code loai} tại {@code (spawnX, spawnY)}; trả {@code monsterId}. */
+    private long createMonsterEntity(MonsterCatalogSnapshot.MonsterSpecies loai, float spawnX, float spawnY) {
         KEntity entity = ecsWorld.createEntity();
         long monsterId = nextMonsterOrNpcId--;
-        float spawnX = spawn.posX();
 
         PositionComponent position = new PositionComponent();
         position.x = spawnX;
-        position.y = spawn.posY();
+        position.y = spawnY;
         position.prevX = position.x;
         position.prevY = position.y;
         entity.add(position);
@@ -1938,7 +1963,7 @@ public final class WorldFacade {
         monsterIdComponent.monsterId = monsterId;
         entity.add(monsterIdComponent);
 
-        entity.add(newAiState(spawnX, spawn.posY()));
+        entity.add(newAiState(spawnX, spawnY));
         entity.add(toAiParams(loai.ai())); // ADR-039 — tham số FSM THEO LOÀI, không còn hằng số chung
         entity.add(new TargetComponent()); // AiSystem ghi khi Chase/Attack; CombatSystem đọc để đánh trả
         entity.add(new AttackCooldownComponent());
@@ -1947,9 +1972,9 @@ public final class WorldFacade {
 
         entitiesByMonsterId.put(monsterId, entity);
         aoiDirty = true; // thực thể mới — xem syncAoiIfDirty
-        spawnIndexByMonsterId.put(monsterId, spawnIndex);
         // AoI sync() ở CHÍNH tick này tự phát hiện nhân vật đã ở gần + gửi MonsterSpawnedEvent —
         // không cần thông báo thủ công (giống hệt attach nhân vật, xem AreaOfInterestTracker).
+        return monsterId;
     }
 
     /**

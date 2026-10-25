@@ -123,6 +123,12 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-102 — ảnh chụp ai đang chiến với ai (luật PvP của world chính) + đếm lần hạ; nối sau khi DB đã dựng. */
     final GuildWarHooks guildWars = new GuildWarHooks();
 
+    /** ADR-112 — mở lô đấu giá khi boss Bí Cảnh chết + nhịp chốt/gửi thư; nối sau khi DB đã dựng. */
+    final GuildAuctionHooks guildAuctions = new GuildAuctionHooks();
+
+    /** ADR-113 — ghi tầng Trấn Yêu Tháp + thư mốc + báo client; nối sau khi DB đã dựng. */
+    final TowerHooks tower = new TowerHooks();
+
     /** Bụi linh thảo (ADR-098) — trạng thái sẵn/hồi/đang hái, RAM, dùng chung mọi kết nối. */
     final HerbNodes herbNodes = new HerbNodes();
 

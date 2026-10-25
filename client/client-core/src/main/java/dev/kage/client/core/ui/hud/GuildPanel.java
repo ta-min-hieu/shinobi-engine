@@ -127,6 +127,7 @@ public final class GuildPanel implements HudWindow {
     private Runnable onSkills;
     private Runnable onSpiritVein;
     private Runnable onGuildWar;
+    private Runnable onAuction;
     private Runnable onOpened;
 
     /**
@@ -251,7 +252,18 @@ public final class GuildPanel implements HudWindow {
                 .padRight(6f);
         footer.add(actionButton("guild.action.refresh", () -> fire(onOpened))).width(ROW_BUTTON_WIDTH_PX);
         section.add(footer).width(PANEL_WIDTH_PX).left().padTop(10f).row();
-        // ADR-085 — hàng thứ hai: hàng đầu đã đủ năm nút trong bề rộng cửa sổ.
+        section.add(buildSecondRow()).width(PANEL_WIDTH_PX).left().padTop(6f).row();
+        // Cách ĐÓNG phải nằm ngay trên cửa sổ, cùng lý do PartyPanel/FriendPanel đã có dòng này:
+        // cửa sổ che giữa màn hình và chặn toàn bộ phím gameplay, mở nhầm mà không biết thoát ra là
+        // một bế tắc thật.
+        Label hint = new Label(text("guild.hint.close"), skin.labelStyle);
+        hint.setColor(SECTION_COLOR);
+        section.add(hint).width(PANEL_WIDTH_PX).left().padTop(8f).row();
+        return section;
+    }
+
+    /** ADR-085 — hàng nút thứ hai: hàng đầu đã đủ năm nút trong bề rộng cửa sổ. */
+    private Table buildSecondRow() {
         Table secondRow = new Table();
         secondRow
                 .add(actionButton("guild.action.skills", () -> fire(onSkills)))
@@ -265,15 +277,13 @@ public final class GuildPanel implements HudWindow {
         // ADR-102 — bang chiến.
         secondRow
                 .add(actionButton("guild.action.guild_war", () -> fire(onGuildWar)))
+                .width(ROW_BUTTON_WIDTH_PX)
+                .padRight(6f);
+        // ADR-112 — đấu giá bang.
+        secondRow
+                .add(actionButton("guild.action.auction", () -> fire(onAuction)))
                 .width(ROW_BUTTON_WIDTH_PX);
-        section.add(secondRow).width(PANEL_WIDTH_PX).left().padTop(6f).row();
-        // Cách ĐÓNG phải nằm ngay trên cửa sổ, cùng lý do PartyPanel/FriendPanel đã có dòng này:
-        // cửa sổ che giữa màn hình và chặn toàn bộ phím gameplay, mở nhầm mà không biết thoát ra là
-        // một bế tắc thật.
-        Label hint = new Label(text("guild.hint.close"), skin.labelStyle);
-        hint.setColor(SECTION_COLOR);
-        section.add(hint).width(PANEL_WIDTH_PX).left().padTop(8f).row();
-        return section;
+        return secondRow;
     }
 
     private Label sectionTitle(String key) {
@@ -439,6 +449,11 @@ public final class GuildPanel implements HudWindow {
     /** Nút "Bang chiến" (ADR-102). */
     public void setOnGuildWar(Runnable listener) {
         this.onGuildWar = listener;
+    }
+
+    /** Nút "Đấu giá" (ADR-112). */
+    public void setOnAuction(Runnable listener) {
+        this.onAuction = listener;
     }
 
     /** ADR-085 — nút "Kỹ năng bang". */

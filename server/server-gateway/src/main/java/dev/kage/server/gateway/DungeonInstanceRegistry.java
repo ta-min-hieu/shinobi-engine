@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -13,6 +14,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Consumer;
 import java.util.function.LongPredicate;
 
 import org.slf4j.Logger;
@@ -75,6 +77,12 @@ final class DungeonInstanceRegistry {
 
     private static final String DUNGEON_CODE = "sample_dungeon";
 
+    /** ADR-113 — mã "hầm ngục" của Trấn Yêu Tháp (chỉ để báo client; không có lượt mỗi ngày). */
+    private static final String TOWER_CODE = "demon_tower";
+
+    private static final float TOWER_FIRST_MONSTER_X = 6f;
+    private static final float TOWER_MONSTER_SPACING = 2f;
+
     /**
      * Boss của hầm ngục mẫu — mã trong {@code monster_template} (ADR-048).
      *
@@ -108,6 +116,12 @@ final class DungeonInstanceRegistry {
     private final Map<Long, DungeonInstance> instancesByPartyId = new HashMap<>();
     private final Map<Long, DungeonInstance> instanceByCharacterId = new HashMap<>();
     private final Map<Long, PositionSnapshot> returnPositionByCharacterId = new HashMap<>();
+
+    /**
+     * ADR-113 — lượt leo Trấn Yêu Tháp đang chạy: một người một World, khoá instance là {@code -characterId} (id nhóm
+     * luôn dương nên không bao giờ trùng). Chỉ đọc/ghi trong khoá.
+     */
+    private final Map<Long, TowerRun> towerRunsByCharacterId = new HashMap<>();
 
     /** Người đã qua nửa đầu lượt rời, đang chờ World hầm ngục im — xem {@link #beginExit}. */
     private final Set<Long> exitingCharacterIds = new HashSet<>();
@@ -225,8 +239,8 @@ final class DungeonInstanceRegistry {
         }
         // ADR-106 — mỗi lượt Bí Cảnh vừa trừ là một lần "đi Bí Cảnh" trong lịch hoạt động.
         entries.forEach(entry -> registry.activity.record(entry.characterId(), ActivityFacade.Activity.DUNGEON_RUN));
-        Optional<AdmittedEntries> maybeAdmitted =
-                admitBuildingWorldIfNeeded(myParty.get().partyId(), entries);
+        Optional<AdmittedEntries> maybeAdmitted = admitBuildingWorldIfNeeded(
+                myParty.get().partyId(), entries, world -> world.spawnBoss(DUNGEON_BOSS_CODE));
         if (maybeAdmitted.isEmpty()) {
             // Không còn ai để dời: đồng đội vừa kéo cả nhóm vào trước (người gửi đã ở trong — cùng
             // kết quả với lượt thắng), hoặc ai cũng vừa rớt mạng (không còn ai đọc response).
@@ -250,11 +264,52 @@ final class DungeonInstanceRegistry {
         }
     }
 
+    /**
+     * ADR-113 — vào Trấn Yêu Tháp: dời một mình người gửi vào World riêng có {@code floor.monsterCount()} con quái
+     * không hồi sinh. Hạ hết ⇒ {@code registry.tower} ghi tầng và người đó được đưa về world chính (xem
+     * {@link #onMonsterKilled}). Chết/rời giữa chừng ⇒ đường rời hầm ngục như thường, không mất gì.
+     */
+    EnterOutcome enterTower(long characterId, TowerFloorPlan floor) {
+        Optional<EnterOutcome> busy = busyElsewhere(characterId);
+        if (busy.isPresent()) {
+            return busy.get();
+        }
+        PendingEntry entry = new PendingEntry(characterId, loadoutOf(characterId), returnPositionOf(characterId));
+        synchronized (this) {
+            towerRunsByCharacterId.put(characterId, new TowerRun(floor.floor(), floor.monsterCount()));
+        }
+        Optional<AdmittedEntries> maybeAdmitted =
+                admitBuildingWorldIfNeeded(-characterId, List.of(entry), world -> spawnFloor(world, floor));
+        if (maybeAdmitted.isEmpty()) {
+            synchronized (this) {
+                towerRunsByCharacterId.remove(characterId);
+            }
+            return EnterOutcome.OK;
+        }
+        AdmittedEntries admitted = maybeAdmitted.get();
+        awaitOldWorldSilent(
+                CompletableFuture.allOf(admitted.mainWorldDrained().toArray(CompletableFuture[]::new)), characterId);
+        finishEnter(admitted, TOWER_CODE, characterId);
+        resyncLevels(admitted);
+        return EnterOutcome.OK;
+    }
+
+    /** Tầng tháp cần dựng: số tầng + loài + số con (đọc DB ngoài khoá, ở gateway). */
+    record TowerFloorPlan(int floor, String monsterCode, int monsterCount) {}
+
+    private static void spawnFloor(WorldFacade world, TowerFloorPlan floor) {
+        for (int i = 0; i < floor.monsterCount(); i++) {
+            world.spawnMonsterOnce(
+                    floor.monsterCode(), TOWER_FIRST_MONSTER_X + i * TOWER_MONSTER_SPACING, DUNGEON_ENTRY_SPAWN_Y);
+        }
+    }
+
     /** Thử nhận vào instance; nhóm chưa có instance thì dựng World NGOÀI khoá rồi thử lại (2026-10-02). */
-    private Optional<AdmittedEntries> admitBuildingWorldIfNeeded(long partyId, List<PendingEntry> entries) {
-        AdmitAttempt attempt = admitIntoInstance(partyId, entries, Optional.empty());
+    private Optional<AdmittedEntries> admitBuildingWorldIfNeeded(
+            long partyId, List<PendingEntry> entries, Consumer<WorldFacade> populate) {
+        AdmitAttempt attempt = admitIntoInstance(partyId, entries, Optional.empty(), populate);
         if (attempt.needsWorld()) {
-            attempt = admitIntoInstance(partyId, entries, Optional.of(newDungeonWorld()));
+            attempt = admitIntoInstance(partyId, entries, Optional.of(newDungeonWorld()), populate);
         }
         return attempt.admitted();
     }
@@ -290,7 +345,7 @@ final class DungeonInstanceRegistry {
      * {@code start()} — bỏ đi là xong.
      */
     private synchronized AdmitAttempt admitIntoInstance(
-            long partyId, List<PendingEntry> entries, Optional<WorldFacade> spare) {
+            long partyId, List<PendingEntry> entries, Optional<WorldFacade> spare, Consumer<WorldFacade> populate) {
         List<PendingEntry> admitted = new ArrayList<>(entries.size());
         for (PendingEntry entry : entries) {
             if (isAdmissible(entry.characterId())) {
@@ -305,7 +360,7 @@ final class DungeonInstanceRegistry {
             if (spare.isEmpty()) {
                 return AdmitAttempt.NEEDS_WORLD;
             }
-            instance = startInstance(partyId, spare.get());
+            instance = startInstance(partyId, spare.get(), populate);
             instancesByPartyId.put(partyId, instance);
         }
         List<CompletableFuture<Void>> drained = new ArrayList<>(admitted.size());
@@ -554,6 +609,7 @@ final class DungeonInstanceRegistry {
         instanceByCharacterId.clear();
         returnPositionByCharacterId.clear();
         exitingCharacterIds.clear();
+        towerRunsByCharacterId.clear();
         defeatExecutor.shutdown();
     }
 
@@ -567,6 +623,15 @@ final class DungeonInstanceRegistry {
      * Virtual Thread.
      */
     private void onMonsterKilled(String monsterCode, long killerCharacterId) {
+        OptionalInt clearedFloor = towerFloorClearedBy(killerCharacterId);
+        if (clearedFloor.isPresent()) {
+            // ADR-113 — hạ con cuối của tầng: ghi tầng + thư mốc (DB) rồi đưa về world chính, ngoài tick thread.
+            defeatExecutor.execute(() -> {
+                registry.tower.onFloorCleared(killerCharacterId, clearedFloor.getAsInt());
+                exitDungeon(killerCharacterId, WorldChangeReason.WORLD_CHANGE_REASON_REQUESTED);
+            });
+            return;
+        }
         if (!DUNGEON_BOSS_CODE.equals(monsterCode)) {
             return;
         }
@@ -575,7 +640,32 @@ final class DungeonInstanceRegistry {
             DungeonInstance instance = instanceByCharacterId.get(killerCharacterId);
             members = instance == null ? List.of(killerCharacterId) : List.copyOf(instance.characterIds());
         }
-        defeatExecutor.execute(() -> rewards.onBossKilled(members, DUNGEON_CODE));
+        defeatExecutor.execute(() -> rewards.onBossKilled(killerCharacterId, members, DUNGEON_CODE));
+    }
+
+    /** Một con quái của tầng tháp vừa chết dưới tay {@code killerCharacterId}; có giá trị khi đó là con cuối. */
+    private synchronized OptionalInt towerFloorClearedBy(long killerCharacterId) {
+        TowerRun run = towerRunsByCharacterId.get(killerCharacterId);
+        if (run == null) {
+            return OptionalInt.empty();
+        }
+        run.remaining--;
+        if (run.remaining > 0) {
+            return OptionalInt.empty();
+        }
+        towerRunsByCharacterId.remove(killerCharacterId);
+        return OptionalInt.of(run.floor);
+    }
+
+    /** Tầng đang leo + số quái còn sống — chỉ đọc/ghi trong khoá. */
+    private static final class TowerRun {
+        private final int floor;
+        private int remaining;
+
+        TowerRun(int floor, int remaining) {
+            this.floor = floor;
+            this.remaining = remaining;
+        }
     }
 
     /** Dựng World hầm ngục, CHƯA start — gọi NGOÀI khoá, xem {@link #admitIntoInstance}. */
@@ -597,12 +687,16 @@ final class DungeonInstanceRegistry {
         return facade;
     }
 
-    /** Start World đã dựng sẵn + gọi boss — rẻ (chỉ xếp lịch tick + xếp lệnh), chạy được trong khoá. */
-    private static DungeonInstance startInstance(long partyId, WorldFacade dungeonFacade) {
+    /**
+     * Start World đã dựng sẵn + gọi nội dung (boss Bí Cảnh, hoặc quái tầng tháp — ADR-113) — rẻ (chỉ xếp lịch tick +
+     * xếp lệnh), chạy được trong khoá.
+     */
+    private static DungeonInstance startInstance(
+            long partyId, WorldFacade dungeonFacade, Consumer<WorldFacade> populate) {
         dungeonFacade.start();
         // Phase 8 lát cắt 2 — NƠI DUY NHẤT "dungeon" và "boss" được nối với nhau; WorldFacade vẫn
         // không biết khái niệm "dungeon" (chỉ biết "có ai bảo spawn boss hay không").
-        dungeonFacade.spawnBoss(DUNGEON_BOSS_CODE);
+        populate.accept(dungeonFacade);
         return new DungeonInstance(partyId, dungeonFacade);
     }
 
@@ -635,6 +729,7 @@ final class DungeonInstanceRegistry {
      * chặn sau đó (kết nối vừa rớt) thì mốc chờ cả {@code stop()} đang dở.
      */
     private void leaveInstance(long characterId, DungeonInstance instance) {
+        towerRunsByCharacterId.remove(characterId);
         instance.characterIds().remove(characterId);
         instanceByCharacterId.remove(characterId);
         if (instance.characterIds().isEmpty()) {

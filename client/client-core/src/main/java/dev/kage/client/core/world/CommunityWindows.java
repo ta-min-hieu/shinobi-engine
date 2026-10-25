@@ -23,7 +23,11 @@ record CommunityWindows(
         ReportPanel noticePanel,
         ServiceDeskCoordinator serviceDesk,
         ReportPanel bestiaryPanel,
-        BestiaryCoordinator bestiary) {
+        BestiaryCoordinator bestiary,
+        ReportPanel refinementPanel,
+        RefinementCoordinator refinement,
+        ReportPanel auctionPanel,
+        GuildAuctionCoordinator auctions) {
 
     static CommunityWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         ReportPanel relationshipPanel =
@@ -35,6 +39,10 @@ record CommunityWindows(
         ReportPanel noticePanel = new ReportPanel(skin, "notice.title", Input.Keys.UNKNOWN, List.of());
         // Sổ sưu tầm yêu thú (ADR-108) — phím Y (N đã là của giao dịch).
         ReportPanel bestiaryPanel = new ReportPanel(skin, "bestiary.title", Input.Keys.Y, List.of());
+        // Tẩy luyện pháp khí (ADR-111) — phím X.
+        ReportPanel refinementPanel = new ReportPanel(skin, "refine.title", Input.Keys.X, List.of());
+        // Đấu giá bang (ADR-112) — mở từ nút trong cửa sổ Bang, không phím.
+        ReportPanel auctionPanel = new ReportPanel(skin, "auction.title", Input.Keys.UNKNOWN, List.of());
         return new CommunityWindows(
                 relationshipPanel,
                 new RelationshipCoordinator(relationshipPanel, sender, feeds.chat()),
@@ -46,7 +54,23 @@ record CommunityWindows(
                 noticePanel,
                 new ServiceDeskCoordinator(noticePanel, sender, feeds.chat()),
                 bestiaryPanel,
-                new BestiaryCoordinator(bestiaryPanel, sender));
+                new BestiaryCoordinator(bestiaryPanel, sender),
+                refinementPanel,
+                new RefinementCoordinator(refinementPanel, sender, feeds),
+                auctionPanel,
+                new GuildAuctionCoordinator(auctionPanel, sender, feeds));
+    }
+
+    /** Đăng ký mọi cửa sổ ở đây vào hub — tách khỏi {@code WorldScreen#registerPanels} (trần {@code MethodLength}). */
+    void registerInto(PanelHub panels) {
+        panels.register(relationshipPanel, relationships);
+        panels.register(dailyPanel, daily);
+        panels.register(emotes);
+        panels.register(guildWarPanel, guildWars);
+        panels.register(noticePanel, serviceDesk);
+        panels.register(bestiaryPanel, bestiary);
+        panels.register(refinementPanel, refinement);
+        panels.register(auctionPanel, auctions);
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */
@@ -54,5 +78,6 @@ record CommunityWindows(
         relationshipPanel.setCanOpen(noneOpen);
         dailyPanel.setCanOpen(noneOpen);
         bestiaryPanel.setCanOpen(noneOpen);
+        refinementPanel.setCanOpen(noneOpen);
     }
 }

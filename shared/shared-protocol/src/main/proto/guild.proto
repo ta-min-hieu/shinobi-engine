@@ -365,3 +365,49 @@ message GetGuildWarStatusResponse {
   repeated GuildWarView wars = 1;
   int64 declare_cost_gold = 2;
 }
+
+// ===== ADR-112 — đấu giá bang: lô từ boss Bí Cảnh, 30 phút, vàng giữ chỗ, chốt nguyên tử. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_LIST_GUILD_AUCTIONS_REQUEST = 737).
+message ListGuildAuctionsRequest {}
+
+// Một lô còn mở của bang người hỏi.
+message GuildAuctionLotView {
+  int64 lot_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int64 current_bid = 4;           // 0 = chưa ai trả
+  string leader_name = 5;          // rỗng = chưa ai trả
+  bool leading_is_me = 6;
+  int64 seconds_left = 7;
+  int64 minimum_bid = 8;           // mức thấp nhất được trả lúc này (server tính)
+  int32 participants = 9;          // số người chia tiền khi chốt
+}
+
+// Response: Server -> Client (OPCODE_LIST_GUILD_AUCTIONS_RESPONSE = 738).
+message ListGuildAuctionsResponse {
+  repeated GuildAuctionLotView lots = 1;
+}
+
+// Command: Client -> Server (OPCODE_BID_GUILD_AUCTION_COMMAND = 739). Trả giá bằng vàng của chính mình; bị trả vượt thì
+// hoàn qua thư.
+message BidGuildAuctionCommand {
+  int64 lot_id = 1;
+  int64 amount = 2;
+}
+
+enum BidGuildAuctionOutcome {
+  BID_GUILD_AUCTION_OUTCOME_UNSPECIFIED = 0;
+  BID_GUILD_AUCTION_OUTCOME_OK = 1;
+  BID_GUILD_AUCTION_OUTCOME_NOT_FOUND = 2;          // không có lô này trong bang của bạn
+  BID_GUILD_AUCTION_OUTCOME_CLOSED = 3;
+  BID_GUILD_AUCTION_OUTCOME_TOO_LOW = 4;
+  BID_GUILD_AUCTION_OUTCOME_ALREADY_LEADING = 5;
+  BID_GUILD_AUCTION_OUTCOME_INSUFFICIENT_GOLD = 6;
+}
+
+// Response: Server -> Client (OPCODE_BID_GUILD_AUCTION_RESPONSE = 740). status là danh sách sau lần trả.
+message BidGuildAuctionResponse {
+  BidGuildAuctionOutcome outcome = 1;
+  ListGuildAuctionsResponse status = 2;
+}

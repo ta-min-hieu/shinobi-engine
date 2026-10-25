@@ -59,6 +59,7 @@ import dev.kage.gm.api.GmFacade;
 import dev.kage.gm.api.PlayerReportFacade;
 import dev.kage.gm.api.ServerNoticeFacade;
 import dev.kage.gm.domain.GameEventKind;
+import dev.kage.guild.api.GuildAuctionFacade;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.guild.api.GuildProgressionFacade;
 import dev.kage.guild.api.GuildShopFacade;
@@ -83,6 +84,7 @@ import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.api.InventoryQueryUseCases;
 import dev.kage.inventory.api.ItemAcquisitionUseCases;
 import dev.kage.inventory.api.ItemActionUseCases;
+import dev.kage.inventory.api.RefinementFacade;
 import dev.kage.inventory.application.AddItemUseCase;
 import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EnhanceItemUseCase;
@@ -160,6 +162,7 @@ import dev.kage.server.database.gm.PostgresGmRoleAdapter;
 import dev.kage.server.database.gm.PostgresPlayerReportAdapter;
 import dev.kage.server.database.gm.PostgresServerNoticeAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
+import dev.kage.server.database.guild.PostgresGuildAuctionAdapter;
 import dev.kage.server.database.guild.PostgresGuildProgressionAdapter;
 import dev.kage.server.database.guild.PostgresGuildShopAdapter;
 import dev.kage.server.database.guild.PostgresGuildSkillAdapter;
@@ -178,6 +181,7 @@ import dev.kage.server.database.inventory.PostgresInventoryIdempotencyAdapter;
 import dev.kage.server.database.inventory.PostgresInventoryTradeOfferAdapter;
 import dev.kage.server.database.inventory.PostgresItemSetAdapter;
 import dev.kage.server.database.inventory.PostgresItemTemplateAdapter;
+import dev.kage.server.database.inventory.PostgresRefinementAdapter;
 import dev.kage.server.database.inventory.PostgresStorageAdapter;
 import dev.kage.server.database.inventory.ThreadLocalGemRoll;
 import dev.kage.server.database.mail.JdbcMailTransactionRunner;
@@ -723,6 +727,11 @@ public final class ServerDatabaseBootstrap {
         return new BestiaryFacade(new PostgresBestiaryAdapter(dataSource), java.time.Clock.systemUTC());
     }
 
+    /** Tẩy luyện pháp khí (ADR-111) — dòng gieo bằng random của luồng đang gọi. */
+    public RefinementFacade wireRefinementFacade() {
+        return new RefinementFacade(new PostgresRefinementAdapter(dataSource, ThreadLocalGemRoll.INSTANCE));
+    }
+
     /** Danh vọng tông môn (ADR-109). */
     public ReputationFacade wireReputationFacade() {
         return new ReputationFacade(new PostgresReputationAdapter(dataSource));
@@ -756,6 +765,11 @@ public final class ServerDatabaseBootstrap {
     /** Bang chiến (ADR-102). */
     public GuildWarFacade wireGuildWarFacade() {
         return new GuildWarFacade(new PostgresGuildWarAdapter(dataSource));
+    }
+
+    /** Đấu giá bang (ADR-112) — vật phẩm của lô gieo bằng random của luồng đang gọi. */
+    public GuildAuctionFacade wireGuildAuctionFacade() {
+        return new GuildAuctionFacade(new PostgresGuildAuctionAdapter(dataSource, ThreadLocalGemRoll.INSTANCE));
     }
 
     /** Tặng quà bạn bè (ADR-084). */
@@ -802,6 +816,11 @@ public final class ServerDatabaseBootstrap {
     /** Lượt Bí Cảnh + thưởng lần đầu (ADR-099). */
     public DungeonQuotaFacade wireDungeonQuotaFacade() {
         return new DungeonQuotaFacade(new PostgresDungeonQuotaAdapter(dataSource), java.time.Clock.systemUTC());
+    }
+
+    /** Trấn Yêu Tháp (ADR-113). */
+    public dev.kage.world.api.TowerFacade wireTowerFacade() {
+        return new dev.kage.world.api.TowerFacade(new dev.kage.server.database.world.PostgresTowerAdapter(dataSource));
     }
 
     /** Điểm truyền tống (ADR-100). */
