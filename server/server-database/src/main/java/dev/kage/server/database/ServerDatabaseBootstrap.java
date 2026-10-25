@@ -26,6 +26,7 @@ import dev.kage.character.application.SelectFactionUseCase;
 import dev.kage.character.application.SkillRankUseCase;
 import dev.kage.chat.api.ChatFacade;
 import dev.kage.chat.application.SendChatMessageUseCase;
+import dev.kage.checkin.api.ActivityFacade;
 import dev.kage.checkin.api.CheckInFacade;
 import dev.kage.checkin.api.OnlineRewardFacade;
 import dev.kage.checkin.application.ClaimDailyCheckInUseCase;
@@ -50,7 +51,10 @@ import dev.kage.friend.application.RejectFriendRequestUseCase;
 import dev.kage.friend.application.RemoveFriendUseCase;
 import dev.kage.friend.application.SendFriendRequestUseCase;
 import dev.kage.gm.api.GameEventFacade;
+import dev.kage.gm.api.GiftCodeFacade;
 import dev.kage.gm.api.GmFacade;
+import dev.kage.gm.api.PlayerReportFacade;
+import dev.kage.gm.api.ServerNoticeFacade;
 import dev.kage.gm.domain.GameEventKind;
 import dev.kage.guild.api.GuildFacade;
 import dev.kage.guild.api.GuildProgressionFacade;
@@ -130,6 +134,7 @@ import dev.kage.server.database.character.PostgresSeclusionAdapter;
 import dev.kage.server.database.character.PostgresSkillRankAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.chat.PostgresChatMuteAdapter;
+import dev.kage.server.database.checkin.PostgresActivityAdapter;
 import dev.kage.server.database.checkin.PostgresCheckInAdapter;
 import dev.kage.server.database.checkin.PostgresOnlineTimeAdapter;
 import dev.kage.server.database.crafting.JdbcCraftingTransactionRunner;
@@ -143,8 +148,11 @@ import dev.kage.server.database.friend.PostgresFriendAdapter;
 import dev.kage.server.database.friend.PostgresFriendGiftAdapter;
 import dev.kage.server.database.friend.PostgresMentorshipAdapter;
 import dev.kage.server.database.gm.PostgresGameEventAdapter;
+import dev.kage.server.database.gm.PostgresGiftCodeAdapter;
 import dev.kage.server.database.gm.PostgresGmAuditAdapter;
 import dev.kage.server.database.gm.PostgresGmRoleAdapter;
+import dev.kage.server.database.gm.PostgresPlayerReportAdapter;
+import dev.kage.server.database.gm.PostgresServerNoticeAdapter;
 import dev.kage.server.database.guild.PostgresGuildAdapter;
 import dev.kage.server.database.guild.PostgresGuildProgressionAdapter;
 import dev.kage.server.database.guild.PostgresGuildShopAdapter;
@@ -702,6 +710,26 @@ public final class ServerDatabaseBootstrap {
     /** Tranh đoạt Linh Mạch (ADR-090). */
     public SpiritVeinFacade wireSpiritVeinFacade() {
         return new SpiritVeinFacade(new PostgresSpiritVeinAdapter(dataSource));
+    }
+
+    /** Thông báo server (ADR-103) — nạp một lần, giữ trong RAM. */
+    public ServerNoticeFacade wireServerNoticeFacade() {
+        return new ServerNoticeFacade(new PostgresServerNoticeAdapter(dataSource));
+    }
+
+    /** Mã quà (ADR-104). */
+    public GiftCodeFacade wireGiftCodeFacade() {
+        return new GiftCodeFacade(new PostgresGiftCodeAdapter(dataSource));
+    }
+
+    /** Báo cáo người chơi (ADR-105). */
+    public PlayerReportFacade wirePlayerReportFacade() {
+        return new PlayerReportFacade(new PostgresPlayerReportAdapter(dataSource), java.time.Clock.systemUTC());
+    }
+
+    /** Lịch hoạt động + điểm năng động (ADR-106). */
+    public ActivityFacade wireActivityFacade() {
+        return new ActivityFacade(new PostgresActivityAdapter(dataSource), java.time.Clock.systemUTC());
     }
 
     /** Bang chiến (ADR-102). */

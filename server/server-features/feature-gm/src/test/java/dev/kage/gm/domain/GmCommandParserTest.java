@@ -35,6 +35,36 @@ class GmCommandParserTest {
         assertThat(ok("/gm SUMMON A")).isEqualTo(new GmCommand.Summon("A"));
     }
 
+    /** Lô 22 — bàn trực (ADR-103/104/105). */
+    @Test
+    void shouldParseTheServiceDeskCommands() {
+        assertThat(ok("/gm motd Bảo trì   lúc 22h")).isEqualTo(new GmCommand.Motd("Bảo trì lúc 22h"));
+        assertThat(ok("/gm motd OFF")).isEqualTo(new GmCommand.Motd(""));
+        assertThat(ok("/gm code tet2027 5000 spirit_herb 3 100 7"))
+                .isEqualTo(new GmCommand.CreateGiftCode("TET2027", 5000L, "spirit_herb", 3, 100, 7));
+        assertThat(ok("/gm code VANG 1000 - 0 1 1"))
+                .isEqualTo(new GmCommand.CreateGiftCode("VANG", 1000L, "", 0, 1, 1));
+        assertThat(ok("/gm reports")).isEqualTo(new GmCommand.Reports());
+        assertThat(ok("/gm report 12")).isEqualTo(new GmCommand.ShowReport(12L));
+        assertThat(ok("/gm resolve 12")).isEqualTo(new GmCommand.ResolveReport(12L));
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "/gm code AB 100 - 0 1 1", // mã quá ngắn
+                "/gm code GOOD 0 - 0 1 1", // không có quà
+                "/gm code GOOD 100 - 0 0 1", // 0 lượt
+                "/gm code GOOD 100 - 0 1 366", // quá 365 ngày
+                "/gm code GOOD 100 Bad-Item 1 1 1",
+                "/gm report abc",
+                "/gm resolve 0",
+                "/gm motd"
+            })
+    void shouldRejectMalformedServiceDeskCommands(String line) {
+        assertThat(GmCommandParser.parse(line)).isInstanceOf(GmCommandParser.Parsed.Invalid.class);
+    }
+
     @ParameterizedTest
     @ValueSource(
             strings = {

@@ -39,5 +39,9 @@ ADMIN gõ là nội dung người dùng, không phải khoá i18n (cùng ngoại
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 1).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành (lô 22 phần 1, 2026-10-25): V89 `server_notice`; `ServerNoticeFacade` giữ bản sao RAM (vào world không
+   chạm DB); `GmCommand.Motd` qua nhánh `GmCommand.Desk` → `GmDeskCommands`; opcode 7; client `ServiceDeskCoordinator`
+   (dòng chat + cửa sổ "Thông báo").
+2. ✅ Kiểm sống gameProbe 2026-10-25: `/gm motd …` (ADMIN) ⇒ `Server notice set`, gói 7 phát ngay cho người đặt; Benkei
+   vào world sau đó nhận gói 7 (27 byte) ngay sau `SelectCharacterResponse`; `/gm motd off` xoá. ⚠️ Chữ có dấu gõ qua
+   THAM SỐ DÒNG LỆNH của probe trên Windows bị JVM đổi thành `?` (codepage) — lỗi công cụ, client thật gõ qua ô chat.

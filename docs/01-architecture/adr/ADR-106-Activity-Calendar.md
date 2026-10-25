@@ -44,5 +44,9 @@ qua thư hệ thống với khoá chống trùng (nhân vật, ngày, mốc).
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 1).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành (lô 22 phần 1, 2026-10-25): V89 tham số + tiến độ + nhận rương; `ActivityHooks` (Virtual Thread, việc
+   phụ) móc vào điểm danh, mốc online, xong truy nã, trừ lượt Bí Cảnh, lĩnh nhiệm vụ ngày (`QuestFacade#isDailyQuest`),
+   hái xong bụi; opcode 222–225; tab "Năng động" (`ActivityTab`) trong cửa sổ E.
+2. ✅ Kiểm sống gameProbe 2026-10-25 (tanthua44): điểm danh lần đầu trong ngày ⇒ `check_in 1/1` (10 điểm); hái bụi #1 ⇒
+   15; rương 20 khi 15 điểm ⇒ `NOT_AVAILABLE`; hái bụi #2 ⇒ 20 ⇒ rương 20 OK + thư 500, nhận lại ⇒ `NOT_AVAILABLE`.
+   Chưa kiểm sống: Bí Cảnh (cần cả nhóm online), mốc online (10 phút), truy nã/nhiệm vụ ngày — đều một dòng gọi cùng hook.

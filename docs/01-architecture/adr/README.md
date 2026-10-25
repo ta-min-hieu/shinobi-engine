@@ -138,6 +138,10 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-104](ADR-104-Gift-Codes.md) | Mã quà tặng | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
 | [ADR-105](ADR-105-Player-Reports.md) | Báo cáo người chơi | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
 | [ADR-106](ADR-106-Activity-Calendar.md) | Lịch hoạt động + điểm năng động | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-107](ADR-107-Fishing-And-Mining.md) | Câu cá và khai khoáng | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-108](ADR-108-Bestiary.md) | Sổ sưu tầm yêu thú | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-109](ADR-109-Sect-Reputation.md) | Danh vọng tông môn | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-110](ADR-110-Sworn-Brotherhood.md) | Kết nghĩa huynh đệ | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

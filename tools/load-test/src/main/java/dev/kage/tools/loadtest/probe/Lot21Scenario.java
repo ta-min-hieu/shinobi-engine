@@ -94,10 +94,12 @@ final class Lot21Scenario {
 
     private final GameConnection connection;
     private final ProbeSession session;
+    private final Lot22Scenario lot22;
 
     Lot21Scenario(GameConnection connection, ProbeSession session) {
         this.connection = connection;
         this.session = session;
+        this.lot22 = new Lot22Scenario(connection);
     }
 
     void run(List<String> steps) throws IOException {
@@ -335,7 +337,7 @@ final class Lot21Scenario {
                         Opcode.OPCODE_GET_GUILD_WAR_STATUS_RESPONSE_VALUE,
                         Lot21Scenario::describeGuildWars);
             case "hitPlayer" -> hitPlayer(Long.parseLong(arg));
-            default -> "bước không hiểu";
+            default -> lot22.step(verb, arg);
         };
     }
 

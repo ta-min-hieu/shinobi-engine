@@ -44,5 +44,9 @@ quà đi bằng thư). Kết quả: OK, UNKNOWN_CODE, EXPIRED, USED_UP, ALREADY_
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 1).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành (lô 22 phần 1, 2026-10-25): V89 `gift_code` + `gift_code_redemption`; `/gm code …`; `/giftcode <MÃ>` ở
+   client; opcode 909/910; trần 10 lần/phút (RAM).
+2. ✅ Kiểm sống gameProbe 2026-10-25: tạo `TET2027` (5.000 + 3 Linh Thảo, 2 lượt) ⇒ tạo lại ⇒ `already exists`; Kagemaru
+   đổi bằng chữ thường `tet2027` ⇒ OK + thư 5.000, đổi lại ⇒ `ALREADY_REDEEMED`; Benkei ⇒ OK (lượt 2/2); tanthua44 ⇒
+   `USED_UP`; mã lạ ⇒ `UNKNOWN_CODE`. `mailed = true`, audit GM `code OK`. Test Postgres phủ nhánh hết hạn + gửi lại
+   thư khi `mailed = false`.

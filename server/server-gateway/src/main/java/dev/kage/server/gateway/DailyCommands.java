@@ -13,6 +13,7 @@ import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.api.SeclusionFacade;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.SeclusionPort;
+import dev.kage.checkin.api.ActivityFacade;
 import dev.kage.checkin.api.OnlineRewardFacade;
 import dev.kage.checkin.domain.OnlineRewardPolicy;
 import dev.kage.inventory.api.InventoryFacade;
@@ -159,6 +160,8 @@ final class DailyCommands {
     ClaimOnlineRewardResponse claimOnlineReward(long characterId, int minutes) {
         OnlineRewardFacade.ClaimResult result =
                 deps.daily().onlineRewards().claim(characterId, minutes, enteredAt(characterId));
+        result.milestone()
+                .ifPresent(m -> deps.registry().activity.record(characterId, ActivityFacade.Activity.ONLINE_REWARD));
         result.milestone()
                 .ifPresent(m -> notices.mail(
                         characterId,

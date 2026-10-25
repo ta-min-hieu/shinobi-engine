@@ -101,7 +101,8 @@ class GmCommandRouterDatabaseTest {
                     RELOCATIONS.add(new long[] {mover, anchor});
                     return MainWorldRelocation.Outcome.OK;
                 },
-                facades.progression().gameEvents());
+                facades.progression().gameEvents(),
+                ServiceDeskCommands.of(facades, registry).gmDesk(facades.inventoryFacade()));
     }
 
     @Test

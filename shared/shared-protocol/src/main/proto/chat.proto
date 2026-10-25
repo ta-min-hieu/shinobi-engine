@@ -93,3 +93,35 @@ message EmoteEvent {
   int64 character_id = 1;
   Emote emote = 2;
 }
+
+// ===== ADR-105 (2026-10-25) — báo cáo người chơi. CHỈ THÊM. =====
+
+enum ReportReason {
+  REPORT_REASON_UNSPECIFIED = 0;
+  REPORT_REASON_CHAT = 1;
+  REPORT_REASON_CHEAT = 2;
+  REPORT_REASON_SCAM = 3;
+  REPORT_REASON_OTHER = 4;
+}
+
+// Command: Client -> Server (OPCODE_REPORT_PLAYER_COMMAND = 806). Client gõ /report <tên> <lý do> [ghi chú].
+message ReportPlayerCommand {
+  string target_name = 1;
+  ReportReason reason = 2;
+  string note = 3;   // ≤ 200 ký tự, server cắt phần thừa
+}
+
+enum ReportPlayerOutcome {
+  REPORT_PLAYER_OUTCOME_UNSPECIFIED = 0;
+  REPORT_PLAYER_OUTCOME_OK = 1;
+  REPORT_PLAYER_OUTCOME_UNKNOWN_TARGET = 2;
+  REPORT_PLAYER_OUTCOME_SELF = 3;
+  REPORT_PLAYER_OUTCOME_DAILY_LIMIT = 4;        // đã gửi đủ 5 báo cáo hôm nay
+  REPORT_PLAYER_OUTCOME_ALREADY_REPORTED = 5;   // đã báo cáo người này hôm nay
+  REPORT_PLAYER_OUTCOME_INVALID_REASON = 6;
+}
+
+// Response: Server -> Client (OPCODE_REPORT_PLAYER_RESPONSE = 807).
+message ReportPlayerResponse {
+  ReportPlayerOutcome outcome = 1;
+}

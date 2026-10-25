@@ -52,12 +52,18 @@ import dev.kage.protocol.wire.PacketCodec;
 final class DailyCoordinator implements WindowFlow {
 
     static final List<String> TAB_KEYS = List.of(
-            "daily.tab.seclusion", "daily.tab.online", "daily.tab.herbs", "daily.tab.waypoints", "daily.tab.bounty");
+            "daily.tab.seclusion",
+            "daily.tab.online",
+            "daily.tab.herbs",
+            "daily.tab.waypoints",
+            "daily.tab.bounty",
+            "daily.tab.activity");
 
     private static final int TAB_SECLUSION = 0;
     private static final int TAB_ONLINE = 1;
     private static final int TAB_HERBS = 2;
     private static final int TAB_WAYPOINTS = 3;
+    private static final int TAB_ACTIVITY = 5;
     private static final int SECONDS_PER_MINUTE = 60;
     private static final int MINUTES_PER_HOUR = 60;
 
@@ -66,12 +72,14 @@ final class DailyCoordinator implements WindowFlow {
     private final ChatCoordinator chat;
     private final I18NBundle i18n = KageI18n.load();
     private final List<Runnable> rowActions = new ArrayList<>();
+    private final ActivityTab activity;
     private int tab = TAB_SECLUSION;
 
     DailyCoordinator(ReportPanel panel, WorldCommandSender sender, ChatCoordinator chat) {
         this.panel = panel;
         this.sender = sender;
         this.chat = chat;
+        this.activity = new ActivityTab(sender);
         panel.setOnRefresh(this::request);
         panel.setOnTabSelected(index -> {
             tab = index;
@@ -93,6 +101,8 @@ final class DailyCoordinator implements WindowFlow {
             send(Opcode.OPCODE_LIST_HERB_NODES_REQUEST_VALUE, ListHerbNodesRequest.getDefaultInstance());
         } else if (tab == TAB_WAYPOINTS) {
             send(Opcode.OPCODE_LIST_WAYPOINTS_REQUEST_VALUE, ListWaypointsRequest.getDefaultInstance());
+        } else if (tab == TAB_ACTIVITY) {
+            activity.request();
         } else {
             send(Opcode.OPCODE_GET_BOUNTY_BOARD_REQUEST_VALUE, GetBountyBoardRequest.getDefaultInstance());
         }
@@ -116,6 +126,9 @@ final class DailyCoordinator implements WindowFlow {
     public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
         int opcode = frame.header().opcode();
         byte[] payload = frame.payload();
+        if (activity.dispatch(opcode, payload, this::showActivity, chat::showSystemNotice)) {
+            return true;
+        }
         if (opcode == Opcode.OPCODE_GET_SECLUSION_STATUS_RESPONSE_VALUE) {
             showSeclusion(GetSeclusionStatusResponse.parseFrom(payload));
         } else if (opcode == Opcode.OPCODE_GET_ONLINE_REWARDS_RESPONSE_VALUE) {
@@ -204,6 +217,17 @@ final class DailyCoordinator implements WindowFlow {
 
     private String outcomeText(String prefix, Enum<?> outcome) {
         return text(prefix + suffix(outcome.name()));
+    }
+
+    /** ADR-106 — chỉ vẽ khi đang ở tab Năng động (trả lời có thể tới sau khi người chơi đã đổi tab). */
+    private void showActivity(ActivityTab.Rendered rendered) {
+        if (tab != TAB_ACTIVITY) {
+            return;
+        }
+        panel.setStatus(rendered.status());
+        rowActions.clear();
+        rowActions.addAll(rendered.actions());
+        panel.setRows(rendered.rows());
     }
 
     private void showSeclusion(GetSeclusionStatusResponse status) {

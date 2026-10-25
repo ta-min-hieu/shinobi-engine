@@ -44,6 +44,11 @@ public final class ClaimQuestRewardUseCase {
         this.tx = tx;
     }
 
+    /** Quest {@code questCode} là nhiệm vụ ngày (ADR-055) — để gateway cộng điểm năng động (ADR-106). */
+    public boolean isDaily(String questCode) {
+        return templatePort.findByCode(questCode).map(QuestTemplate::isDaily).orElse(false);
+    }
+
     public ClaimResult execute(long characterId, String questCode, String idempotencyKey) {
         // questCode đến thẳng từ packet. U+0000 không thể có trong quest_template.code — và Postgres
         // từ chối nó ngay cả ở câu SELECT, nên trước 2026-10-02 client nhận 500 thay vì "không có".

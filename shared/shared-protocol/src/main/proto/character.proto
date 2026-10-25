@@ -289,3 +289,50 @@ enum ClaimOnlineRewardOutcome {
 message ClaimOnlineRewardResponse {
   ClaimOnlineRewardOutcome outcome = 1;
 }
+
+// ===== ADR-106 (2026-10-25) — lịch hoạt động + điểm năng động. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_GET_ACTIVITY_REQUEST = 222).
+message GetActivityRequest {}
+
+message ActivityView {
+  string code = 1;
+  string name_key = 2;     // khoá i18n tên việc
+  int32 count = 3;         // số lần đã làm hôm nay (có thể vượt max_count)
+  int32 max_count = 4;
+  int32 points_each = 5;
+  int32 points = 6;        // điểm đã tính (kẹp ở trần)
+}
+
+message ActivityChestView {
+  int32 milestone = 1;
+  int64 gold = 2;
+  int64 item_template_id = 3;   // 0 = chỉ vàng
+  int32 quantity = 4;
+  bool reached = 5;
+  bool claimed = 6;
+}
+
+// Response: Server -> Client (OPCODE_GET_ACTIVITY_RESPONSE = 223).
+message GetActivityResponse {
+  repeated ActivityView activities = 1;
+  int32 points = 2;
+  repeated ActivityChestView chests = 3;
+}
+
+// Command: Client -> Server (OPCODE_CLAIM_ACTIVITY_CHEST_COMMAND = 224).
+message ClaimActivityChestCommand {
+  int32 milestone = 1;
+}
+
+enum ClaimActivityChestOutcome {
+  CLAIM_ACTIVITY_CHEST_OUTCOME_UNSPECIFIED = 0;
+  CLAIM_ACTIVITY_CHEST_OUTCOME_OK = 1;           // rương đã gửi vào hòm thư
+  CLAIM_ACTIVITY_CHEST_OUTCOME_NOT_AVAILABLE = 2; // chưa đủ điểm, đã nhận, hoặc mốc lạ
+}
+
+// Response: Server -> Client (OPCODE_CLAIM_ACTIVITY_CHEST_RESPONSE = 225). status = trạng thái MỚI NHẤT.
+message ClaimActivityChestResponse {
+  ClaimActivityChestOutcome outcome = 1;
+  GetActivityResponse status = 2;
+}

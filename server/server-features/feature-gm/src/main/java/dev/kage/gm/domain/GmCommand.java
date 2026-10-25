@@ -185,4 +185,81 @@ public sealed interface GmCommand {
             return minutes == 0;
         }
     }
+
+    /**
+     * Lệnh "bàn trực" lô 22 — thông báo server (ADR-103), mã quà (ADR-104), báo cáo người chơi (ADR-105). Gom thành
+     * một nhánh để bộ định tuyến chỉ thêm MỘT {@code case}.
+     */
+    sealed interface Desk extends GmCommand {}
+
+    /** Đặt thông báo server; {@code text} rỗng = xoá ({@code /gm motd off}). ADMIN — chữ hiện cho mọi người. */
+    record Motd(String text) implements Desk {
+        @Override
+        public String name() {
+            return "motd";
+        }
+
+        @Override
+        public GmRole requiredRole() {
+            return GmRole.ADMIN;
+        }
+
+        /** Lệnh xoá. */
+        public boolean clears() {
+            return text.isEmpty();
+        }
+    }
+
+    /** Tạo mã quà — tạo tài sản từ không khí ⇒ ADMIN, cùng lý do {@link Give}. {@code itemCode} rỗng = chỉ vàng. */
+    record CreateGiftCode(String code, long gold, String itemCode, int quantity, int maxUses, int days)
+            implements Desk {
+        @Override
+        public String name() {
+            return "code";
+        }
+
+        @Override
+        public GmRole requiredRole() {
+            return GmRole.ADMIN;
+        }
+    }
+
+    /** Liệt kê báo cáo chưa xử lý. */
+    record Reports() implements Desk {
+        @Override
+        public String name() {
+            return "reports";
+        }
+
+        @Override
+        public GmRole requiredRole() {
+            return GmRole.GM;
+        }
+    }
+
+    /** Xem một báo cáo (kèm trích chat). */
+    record ShowReport(long reportId) implements Desk {
+        @Override
+        public String name() {
+            return "report";
+        }
+
+        @Override
+        public GmRole requiredRole() {
+            return GmRole.GM;
+        }
+    }
+
+    /** Đánh dấu một báo cáo đã xử lý. */
+    record ResolveReport(long reportId) implements Desk {
+        @Override
+        public String name() {
+            return "resolve";
+        }
+
+        @Override
+        public GmRole requiredRole() {
+            return GmRole.GM;
+        }
+    }
 }

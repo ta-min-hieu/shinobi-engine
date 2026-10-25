@@ -159,6 +159,11 @@ public final class QuestFacade {
         return new ClaimResult(outcome, result.expGranted(), result.goldGranted(), items);
     }
 
+    /** Quest là nhiệm vụ ngày (ADR-055) — gateway dùng để cộng điểm năng động (ADR-106). */
+    public boolean isDailyQuest(String questCode) {
+        return claimQuestRewardUseCase.isDaily(questCode);
+    }
+
     /**
      * Nhật ký nhiệm vụ (ADR-035 Decision-4) — GỒM CẢ quest đã CLAIMED.
      *

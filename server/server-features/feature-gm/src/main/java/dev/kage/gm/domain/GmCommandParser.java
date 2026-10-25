@@ -69,7 +69,13 @@ public final class GmCommandParser {
             Map.entry("give", GmCommandParser::give),
             Map.entry("gold", GmCommandParser::gold),
             Map.entry("inspect", words -> oneTarget(words, "inspect <name>", GmCommand.Inspect::new)),
-            Map.entry("event", GmCommandParser::event));
+            Map.entry("event", GmCommandParser::event),
+            // Lô 22 — bàn trực (ADR-103/104/105).
+            Map.entry("motd", GmDeskCommandParser::motd),
+            Map.entry("code", GmDeskCommandParser::code),
+            Map.entry("reports", words -> new Parsed.Ok(new GmCommand.Reports())),
+            Map.entry("report", words -> GmDeskCommandParser.reportId(words, false)),
+            Map.entry("resolve", words -> GmDeskCommandParser.reportId(words, true)));
 
     private static Parsed oneTarget(String[] words, String usage, Function<String, GmCommand> make) {
         return words.length == 2 ? new Parsed.Ok(make.apply(words[1])) : invalid(usage);
@@ -144,16 +150,16 @@ public final class GmCommandParser {
         return new Parsed.Ok(new GmCommand.Announce(text));
     }
 
-    private static boolean isItemCode(String code) {
+    static boolean isItemCode(String code) {
         return code.length() <= 32
                 && code.chars().allMatch(c -> (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_');
     }
 
-    private static Parsed invalid(String usage) {
+    static Parsed invalid(String usage) {
         return new Parsed.Invalid("Usage: /gm " + usage);
     }
 
-    private static int parseInt(String raw) {
+    static int parseInt(String raw) {
         try {
             return Integer.parseInt(raw);
         } catch (NumberFormatException e) {
@@ -161,7 +167,7 @@ public final class GmCommandParser {
         }
     }
 
-    private static long parseLong(String raw) {
+    static long parseLong(String raw) {
         try {
             return Long.parseLong(raw);
         } catch (NumberFormatException e) {

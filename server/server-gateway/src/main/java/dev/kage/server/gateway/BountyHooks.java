@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.kage.character.api.CharacterFacade;
+import dev.kage.checkin.api.ActivityFacade;
 import dev.kage.protocol.BountyProgressEvent;
 import dev.kage.protocol.Opcode;
 import dev.kage.quest.api.BountyFacade;
@@ -46,6 +47,7 @@ final class BountyHooks {
             BountyPort.Progress p = progress.get();
             if (p.completed()) {
                 target.sendExperience(killerCharacterId, characters.syncExperienceAfterQuestReward(killerCharacterId));
+                target.activity.record(killerCharacterId, ActivityFacade.Activity.BOUNTY); // ADR-106
             }
             target.sendToCharacterIfOnline(
                     killerCharacterId,

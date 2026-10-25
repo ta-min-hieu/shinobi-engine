@@ -45,6 +45,7 @@ import dev.kage.character.domain.IdempotencyKeyReusedException;
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.character.domain.SkillRankPolicy;
 import dev.kage.chat.api.ChatFacade;
+import dev.kage.checkin.api.ActivityFacade;
 import dev.kage.dialogue.api.DialogueFacade;
 import dev.kage.dialogue.domain.DialogueNode;
 import dev.kage.dialogue.domain.DialogueOption;
@@ -110,6 +111,7 @@ import dev.kage.protocol.ChallengeDuelResponse;
 import dev.kage.protocol.CharacterSummary;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
+import dev.kage.protocol.ClaimActivityChestCommand;
 import dev.kage.protocol.ClaimMailCommand;
 import dev.kage.protocol.ClaimMailOutcome;
 import dev.kage.protocol.ClaimMailResponse;
@@ -177,6 +179,7 @@ import dev.kage.protocol.FriendOfflineEvent;
 import dev.kage.protocol.FriendOnlineEvent;
 import dev.kage.protocol.FriendView;
 import dev.kage.protocol.GatherHerbCommand;
+import dev.kage.protocol.GetActivityRequest;
 import dev.kage.protocol.GetBountyBoardRequest;
 import dev.kage.protocol.GetCharacterStatsRequest;
 import dev.kage.protocol.GetCharacterStatsResponse;
@@ -272,6 +275,7 @@ import dev.kage.protocol.ProposeDaoLuCommand;
 import dev.kage.protocol.QuestStatusChangedEvent;
 import dev.kage.protocol.RebirthCommand;
 import dev.kage.protocol.RebirthResponse;
+import dev.kage.protocol.RedeemGiftCodeCommand;
 import dev.kage.protocol.RejectFriendRequestCommand;
 import dev.kage.protocol.RejectFriendRequestOutcome;
 import dev.kage.protocol.RejectFriendRequestResponse;
@@ -285,6 +289,7 @@ import dev.kage.protocol.RemoveFriendCommand;
 import dev.kage.protocol.RemoveFriendOutcome;
 import dev.kage.protocol.RemoveFriendResponse;
 import dev.kage.protocol.RemovePartyFinderCommand;
+import dev.kage.protocol.ReportPlayerCommand;
 import dev.kage.protocol.RequestMentorCommand;
 import dev.kage.protocol.RequestTradeCommand;
 import dev.kage.protocol.RequestTradeOutcome;
@@ -474,6 +479,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final dev.kage.character.api.RebirthFacade rebirth;
     private final SpiritVeinCommands spiritVeins;
     private final GuildWarCommands guildWars;
+    private final ServiceDeskCommands serviceDesk;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -650,6 +656,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             Opcode.OPCODE_DISSOLVE_DAO_LU_RESPONSE_VALUE,
                             (h, id, c) -> h.relations.daoLu().dissolve(id))),
             Map.entry(Opcode.OPCODE_SEND_EMOTE_COMMAND_VALUE, this::handleSendEmoteCommand),
+            // Lô 22 phần 1 — mã quà (ADR-104), báo cáo (ADR-105), lịch hoạt động (ADR-106).
+            Map.entry(
+                    Opcode.OPCODE_REDEEM_GIFT_CODE_COMMAND_VALUE,
+                    storageCommand(
+                            RedeemGiftCodeCommand.parser(),
+                            Opcode.OPCODE_REDEEM_GIFT_CODE_RESPONSE_VALUE,
+                            (h, id, c) -> h.serviceDesk.redeem(id, c.getCode()))),
+            Map.entry(
+                    Opcode.OPCODE_REPORT_PLAYER_COMMAND_VALUE,
+                    storageCommand(
+                            ReportPlayerCommand.parser(),
+                            Opcode.OPCODE_REPORT_PLAYER_RESPONSE_VALUE,
+                            (h, id, c) -> h.serviceDesk.report(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_ACTIVITY_REQUEST_VALUE,
+                    storageCommand(
+                            GetActivityRequest.parser(),
+                            Opcode.OPCODE_GET_ACTIVITY_RESPONSE_VALUE,
+                            (h, id, c) -> h.serviceDesk.activity(id))),
+            Map.entry(
+                    Opcode.OPCODE_CLAIM_ACTIVITY_CHEST_COMMAND_VALUE,
+                    storageCommand(
+                            ClaimActivityChestCommand.parser(),
+                            Opcode.OPCODE_CLAIM_ACTIVITY_CHEST_RESPONSE_VALUE,
+                            (h, id, c) -> h.serviceDesk.claimChest(id, c.getMilestone()))),
             // Lô 21 phần 4 — bang chiến (ADR-102).
             Map.entry(
                     Opcode.OPCODE_DECLARE_GUILD_WAR_COMMAND_VALUE,
@@ -817,6 +848,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.rebirth = facades.progression().rebirth();
         this.spiritVeins = new SpiritVeinCommands(facades.progression().spiritVeins(), java.time.Clock.systemUTC());
         this.guildWars = GuildWarCommands.of(facades, worldGateway.registry());
+        this.serviceDesk = ServiceDeskCommands.of(facades, worldGateway.registry());
         this.friendGifts = new FriendGiftCommands(
                 facades.progression().friendGifts(),
                 characterFacade,
@@ -1108,6 +1140,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             worldGateway.registry().achievements.onEnteredWorld(characterId, character.level());
             // ADR-095/096 — quỹ bế quan + giờ vào world; việc phụ, lỗi dừng bên trong.
             daily.onEnteredWorld(characterId);
+            // ADR-103 — thông báo server (RAM, không chạm DB).
+            serviceDesk.sendNoticeOnEnter(characterId);
         } catch (CharacterNotFoundException e) {
             // Cùng lỗi dù nhân vật không tồn tại hay thuộc account khác (fail secure — SECURITY.md §4).
             LOG.warn("Chọn nhân vật thất bại: không tìm thấy", e);
@@ -1163,6 +1197,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                         .build()
                                         .toByteArray());
                 worldGateway.registry().achievements.onCheckedIn(characterId);
+                worldGateway.registry().activity.record(characterId, ActivityFacade.Activity.CHECK_IN);
             }
         } catch (RuntimeException e) {
             LOG.error("Điểm danh lỗi: characterId={}", characterId, e);
@@ -2738,7 +2773,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                 .maxHp(),
                         new MainWorldRelocation(
                                 worldGateway.mainWorldChannels(), worldGateway.registry(), characterFacade)::move,
-                        gameEvents),
+                        gameEvents,
+                        serviceDesk.gmDesk(inventoryFacade)),
                 GmConfig.current(),
                 java.time.Clock.systemUTC());
     }
@@ -3164,6 +3200,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .registry()
                     .sendExperience(characterId, characterFacade.syncExperienceAfterQuestReward(characterId));
             worldGateway.registry().achievements.onQuestRewardClaimed(characterId);
+            if (questFacade.isDailyQuest(command.getQuestCode())) {
+                worldGateway.registry().activity.record(characterId, ActivityFacade.Activity.DAILY_QUEST);
+            }
         }
     }
 

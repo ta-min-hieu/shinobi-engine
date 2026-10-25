@@ -19,7 +19,9 @@ record CommunityWindows(
         ReportPanel dailyPanel,
         DailyCoordinator daily,
         ReportPanel guildWarPanel,
-        GuildWarCoordinator guildWars) {
+        GuildWarCoordinator guildWars,
+        ReportPanel noticePanel,
+        ServiceDeskCoordinator serviceDesk) {
 
     static CommunityWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         ReportPanel relationshipPanel =
@@ -27,6 +29,8 @@ record CommunityWindows(
         ReportPanel dailyPanel = new ReportPanel(skin, "daily.title", Input.Keys.E, DailyCoordinator.TAB_KEYS);
         // Bang chiến (ADR-102) — không phím, mở từ nút cửa sổ Bang.
         ReportPanel guildWarPanel = new ReportPanel(skin, "guildwar.title", Input.Keys.UNKNOWN, List.of());
+        // Thông báo server (ADR-103) — tự mở khi server gửi, không phím.
+        ReportPanel noticePanel = new ReportPanel(skin, "notice.title", Input.Keys.UNKNOWN, List.of());
         return new CommunityWindows(
                 relationshipPanel,
                 new RelationshipCoordinator(relationshipPanel, sender, feeds.chat()),
@@ -34,7 +38,9 @@ record CommunityWindows(
                 dailyPanel,
                 new DailyCoordinator(dailyPanel, sender, feeds.chat()),
                 guildWarPanel,
-                new GuildWarCoordinator(guildWarPanel, sender, feeds.chat()));
+                new GuildWarCoordinator(guildWarPanel, sender, feeds.chat()),
+                noticePanel,
+                new ServiceDeskCoordinator(noticePanel, sender, feeds.chat()));
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

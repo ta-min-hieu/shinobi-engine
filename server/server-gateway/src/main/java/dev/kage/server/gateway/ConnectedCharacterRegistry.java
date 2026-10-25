@@ -114,6 +114,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-101 — lượt hạ quái vào bảng truy nã; nối sau khi DB đã dựng. */
     final BountyHooks bounties = new BountyHooks();
 
+    /** ADR-106 — cộng điểm năng động khi một việc hằng ngày thành công; nối sau khi DB đã dựng. */
+    final ActivityHooks activity = new ActivityHooks();
+
     /** ADR-102 — ảnh chụp ai đang chiến với ai (luật PvP của world chính) + đếm lần hạ; nối sau khi DB đã dựng. */
     final GuildWarHooks guildWars = new GuildWarHooks();
 

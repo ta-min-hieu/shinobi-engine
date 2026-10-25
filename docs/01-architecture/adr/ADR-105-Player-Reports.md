@@ -41,5 +41,8 @@ resolve <id>` đánh dấu đã xử lý.
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 1).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành (lô 22 phần 1, 2026-10-25): V89 `player_report`; trích chat bằng `INSERT … SELECT json_agg` từ
+   `audit_log`; `/report` ở client; `/gm reports|report|resolve`; opcode 806/807.
+2. ✅ Kiểm sống gameProbe 2026-10-25: Benkei báo cáo Kagemaru ⇒ OK; lần hai (lý do khác) ⇒ `ALREADY_REPORTED`; tự báo
+   cáo ⇒ `SELF`; tên lạ ⇒ `UNKNOWN_TARGET`. Kagemaru (ADMIN) `/gm reports` thấy `#1 chat target=3 by=4`, `/gm report 1`
+   in kèm trích chat nguyên văn, `/gm resolve 1` ⇒ Resolved, lần hai ⇒ `No open report`. Trần 5/ngày phủ ở test Postgres.

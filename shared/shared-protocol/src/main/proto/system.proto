@@ -51,3 +51,10 @@ message ErrorResponse {
 // ngay). Không có field — chỉ là tín hiệu, chưa có cơ chế đếm ngược 30s (follow-up).
 message ServerShuttingDownEvent {
 }
+
+// ADR-103 (2026-10-25) — thông báo server. Event: Server -> Client (OPCODE_SERVER_NOTICE_EVENT = 7). Gửi ngay sau
+// SelectCharacterResponse khi có thông báo, và cho mọi người online khi ADMIN đặt mới. body = chữ ADMIN gõ (nội dung
+// người dùng, không phải khoá i18n — cùng ngoại lệ /gm announce).
+message ServerNoticeEvent {
+  string body = 1;
+}

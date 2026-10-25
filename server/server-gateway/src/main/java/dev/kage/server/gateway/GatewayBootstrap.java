@@ -251,6 +251,7 @@ public final class GatewayBootstrap {
             ctx.jobs().waypoints().stop();
             ctx.jobs().guildWars().stop();
             ctx.characterRegistry().guildWars.stop();
+            ctx.characterRegistry().activity.stop();
             ctx.worldContext().metricsHttpServer().stop();
             observability.tracing().shutdown();
             databaseBootstrap.shutdown();
@@ -535,7 +536,12 @@ public final class GatewayBootstrap {
                         databaseBootstrap.wireDungeonQuotaFacade(),
                         databaseBootstrap.wireWaypointFacade(),
                         databaseBootstrap.wireBountyFacade(),
-                        databaseBootstrap.wireGuildWarFacade()));
+                        databaseBootstrap.wireGuildWarFacade()),
+                new ServiceDeskFacades(
+                        databaseBootstrap.wireServerNoticeFacade(),
+                        databaseBootstrap.wireGiftCodeFacade(),
+                        databaseBootstrap.wirePlayerReportFacade(),
+                        databaseBootstrap.wireActivityFacade()));
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -582,6 +588,7 @@ public final class GatewayBootstrap {
         characterRegistry.bounties.bind(
                 facades.progression().adventure().bounties(), facades.characterFacade(), characterRegistry);
         characterRegistry.guildWars.bind(facades.progression().adventure().guildWars(), java.time.Clock.systemUTC());
+        characterRegistry.activity.bind(facades.progression().serviceDesk().activity());
     }
 
     /** ADR-099 — lượt Bí Cảnh + thư thưởng lần đầu hạ boss (5.000 linh thạch + 3 Yêu Đan). */

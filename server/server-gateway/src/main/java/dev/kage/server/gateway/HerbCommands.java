@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.checkin.api.ActivityFacade;
 import dev.kage.inventory.api.InventoryFacade;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.protocol.GatherHerbOutcome;
@@ -100,6 +101,9 @@ final class HerbCommands {
                     characterId, node.id(), outcome == GatherHerbOutcome.GATHER_HERB_OUTCOME_GATHERED, clock.instant());
         }
         boolean gathered = outcome == GatherHerbOutcome.GATHER_HERB_OUTCOME_GATHERED;
+        if (gathered) {
+            registry.activity.record(characterId, ActivityFacade.Activity.HERB_GATHER); // ADR-106
+        }
         registry.sendToCharacterIfOnline(
                 characterId,
                 Opcode.OPCODE_HERB_GATHERED_EVENT_VALUE,

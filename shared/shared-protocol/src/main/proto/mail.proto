@@ -119,3 +119,25 @@ message DeleteMailResponse {
 message NewMailEvent {
   int64 mail_id = 1;
 }
+
+// ===== ADR-104 (2026-10-25) — mã quà tặng. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_REDEEM_GIFT_CODE_COMMAND = 909). Client gõ /giftcode <MÃ>.
+message RedeemGiftCodeCommand {
+  string code = 1;
+}
+
+enum RedeemGiftCodeOutcome {
+  REDEEM_GIFT_CODE_OUTCOME_UNSPECIFIED = 0;
+  REDEEM_GIFT_CODE_OUTCOME_OK = 1;              // quà đã gửi vào hòm thư
+  REDEEM_GIFT_CODE_OUTCOME_UNKNOWN_CODE = 2;
+  REDEEM_GIFT_CODE_OUTCOME_EXPIRED = 3;
+  REDEEM_GIFT_CODE_OUTCOME_USED_UP = 4;
+  REDEEM_GIFT_CODE_OUTCOME_ALREADY_REDEEMED = 5;
+  REDEEM_GIFT_CODE_OUTCOME_MAIL_FAILED = 6;     // đã ghi lượt đổi nhưng thư chưa gửi được — gõ lại mã để gửi lại
+}
+
+// Response: Server -> Client (OPCODE_REDEEM_GIFT_CODE_RESPONSE = 910).
+message RedeemGiftCodeResponse {
+  RedeemGiftCodeOutcome outcome = 1;
+}

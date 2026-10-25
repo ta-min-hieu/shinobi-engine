@@ -77,7 +77,8 @@ final class GmCommandRouter {
             LongFunction<Optional<WorldFacade>> worldOf,
             LongToIntFunction maxHpOf,
             Relocator relocator,
-            GameEventFacade events) {}
+            GameEventFacade events,
+            GmDeskCommands desk) {}
 
     /** Dời một nhân vật tới chỗ người khác đứng trong world chính — {@link MainWorldRelocation#move}. */
     @FunctionalInterface
@@ -214,12 +215,14 @@ final class GmCommandRouter {
             case GmCommand.Give give -> give(target.orElseThrow(), give.itemCode(), give.quantity(), ticket);
             case GmCommand.Gold gold -> gold(target.orElseThrow(), gold.amount(), ticket);
             case GmCommand.Event event -> event(event, ticket);
+            case GmCommand.Desk desk -> deps.desk().run(desk, actor.characterId(), ticket);
         };
     }
 
     private static String help(GmFacade.AuditTicket ticket) {
         ticket.finish(GmOutcome.OK, "{}");
-        return "GM: help who inspect kick mute unmute announce heal goto summon | ADMIN: give gold event";
+        return "GM: help who inspect kick mute unmute announce heal goto summon reports report resolve"
+                + " | ADMIN: give gold event motd code";
     }
 
     private String who(Character target, GmFacade.AuditTicket ticket) {

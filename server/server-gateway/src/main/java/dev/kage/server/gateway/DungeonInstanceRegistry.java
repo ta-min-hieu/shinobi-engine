@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.checkin.api.ActivityFacade;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.protocol.DungeonEnteredEvent;
 import dev.kage.protocol.Opcode;
@@ -222,6 +223,8 @@ final class DungeonInstanceRegistry {
         if (rewards.anyExhausted(entries.stream().map(PendingEntry::characterId).toList(), dungeonCode)) {
             return EnterOutcome.DAILY_LIMIT_REACHED;
         }
+        // ADR-106 — mỗi lượt Bí Cảnh vừa trừ là một lần "đi Bí Cảnh" trong lịch hoạt động.
+        entries.forEach(entry -> registry.activity.record(entry.characterId(), ActivityFacade.Activity.DUNGEON_RUN));
         Optional<AdmittedEntries> maybeAdmitted =
                 admitBuildingWorldIfNeeded(myParty.get().partyId(), entries);
         if (maybeAdmitted.isEmpty()) {
