@@ -21,7 +21,9 @@ record CommunityWindows(
         ReportPanel guildWarPanel,
         GuildWarCoordinator guildWars,
         ReportPanel noticePanel,
-        ServiceDeskCoordinator serviceDesk) {
+        ServiceDeskCoordinator serviceDesk,
+        ReportPanel bestiaryPanel,
+        BestiaryCoordinator bestiary) {
 
     static CommunityWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         ReportPanel relationshipPanel =
@@ -31,6 +33,8 @@ record CommunityWindows(
         ReportPanel guildWarPanel = new ReportPanel(skin, "guildwar.title", Input.Keys.UNKNOWN, List.of());
         // Thông báo server (ADR-103) — tự mở khi server gửi, không phím.
         ReportPanel noticePanel = new ReportPanel(skin, "notice.title", Input.Keys.UNKNOWN, List.of());
+        // Sổ sưu tầm yêu thú (ADR-108) — phím Y (N đã là của giao dịch).
+        ReportPanel bestiaryPanel = new ReportPanel(skin, "bestiary.title", Input.Keys.Y, List.of());
         return new CommunityWindows(
                 relationshipPanel,
                 new RelationshipCoordinator(relationshipPanel, sender, feeds.chat()),
@@ -40,12 +44,15 @@ record CommunityWindows(
                 guildWarPanel,
                 new GuildWarCoordinator(guildWarPanel, sender, feeds.chat()),
                 noticePanel,
-                new ServiceDeskCoordinator(noticePanel, sender, feeds.chat()));
+                new ServiceDeskCoordinator(noticePanel, sender, feeds.chat()),
+                bestiaryPanel,
+                new BestiaryCoordinator(bestiaryPanel, sender));
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */
     void gateKeyOpening(java.util.function.BooleanSupplier noneOpen) {
         relationshipPanel.setCanOpen(noneOpen);
         dailyPanel.setCanOpen(noneOpen);
+        bestiaryPanel.setCanOpen(noneOpen);
     }
 }

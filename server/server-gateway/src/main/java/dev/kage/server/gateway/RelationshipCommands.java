@@ -11,7 +11,13 @@ record RelationshipCommands(
         MentorshipCommands mentorship,
         DaoLuCommands daoLu,
         EmoteCommands emotes,
-        RelationshipQuery query) {
+        RelationshipQuery query,
+        SwornCommands sworn) {
+
+    /** Nhóm kết nghĩa của một người (gồm người đó) — cho kênh chat kết nghĩa (ADR-110). */
+    java.util.List<Long> swornMembersOf(long characterId) {
+        return query.swornMembersOf(characterId);
+    }
 
     static RelationshipCommands of(GatewayFacades facades, CharacterFacade characters, WorldGateway worldGateway) {
         RelationshipFacades relationships = facades.progression().relationships();
@@ -23,6 +29,7 @@ record RelationshipCommands(
                 new MentorshipCommands(relationships.mentorship(), characters, blocks, notices),
                 new DaoLuCommands(relationships.daoLu(), characters, blocks, notices),
                 new EmoteCommands(worldGateway.registry(), System::currentTimeMillis),
-                new RelationshipQuery(relationships, characters, worldGateway.registry()::isOnline));
+                new RelationshipQuery(relationships, characters, worldGateway.registry()::isOnline),
+                new SwornCommands(relationships.sworn(), characters, blocks, notices));
     }
 }

@@ -142,6 +142,10 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-108](ADR-108-Bestiary.md) | Sổ sưu tầm yêu thú | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
 | [ADR-109](ADR-109-Sect-Reputation.md) | Danh vọng tông môn | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
 | [ADR-110](ADR-110-Sworn-Brotherhood.md) | Kết nghĩa huynh đệ | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-111](ADR-111-Equipment-Refinement.md) | Tẩy luyện pháp khí | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-112](ADR-112-Guild-Auction.md) | Đấu giá bang | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-113](ADR-113-Demon-Tower.md) | Trấn Yêu Tháp | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-114](ADR-114-Escort-Quests.md) | Nhiệm vụ hộ tống | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

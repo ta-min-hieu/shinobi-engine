@@ -57,13 +57,15 @@ final class DailyCoordinator implements WindowFlow {
             "daily.tab.herbs",
             "daily.tab.waypoints",
             "daily.tab.bounty",
-            "daily.tab.activity");
+            "daily.tab.activity",
+            "daily.tab.reputation");
 
     private static final int TAB_SECLUSION = 0;
     private static final int TAB_ONLINE = 1;
     private static final int TAB_HERBS = 2;
     private static final int TAB_WAYPOINTS = 3;
     private static final int TAB_ACTIVITY = 5;
+    private static final int TAB_REPUTATION = 6;
     private static final int SECONDS_PER_MINUTE = 60;
     private static final int MINUTES_PER_HOUR = 60;
 
@@ -73,6 +75,7 @@ final class DailyCoordinator implements WindowFlow {
     private final I18NBundle i18n = KageI18n.load();
     private final List<Runnable> rowActions = new ArrayList<>();
     private final ActivityTab activity;
+    private final ReputationTab reputation;
     private int tab = TAB_SECLUSION;
 
     DailyCoordinator(ReportPanel panel, WorldCommandSender sender, ChatCoordinator chat) {
@@ -80,6 +83,7 @@ final class DailyCoordinator implements WindowFlow {
         this.sender = sender;
         this.chat = chat;
         this.activity = new ActivityTab(sender);
+        this.reputation = new ReputationTab(sender);
         panel.setOnRefresh(this::request);
         panel.setOnTabSelected(index -> {
             tab = index;
@@ -103,6 +107,8 @@ final class DailyCoordinator implements WindowFlow {
             send(Opcode.OPCODE_LIST_WAYPOINTS_REQUEST_VALUE, ListWaypointsRequest.getDefaultInstance());
         } else if (tab == TAB_ACTIVITY) {
             activity.request();
+        } else if (tab == TAB_REPUTATION) {
+            reputation.request();
         } else {
             send(Opcode.OPCODE_GET_BOUNTY_BOARD_REQUEST_VALUE, GetBountyBoardRequest.getDefaultInstance());
         }
@@ -126,7 +132,8 @@ final class DailyCoordinator implements WindowFlow {
     public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
         int opcode = frame.header().opcode();
         byte[] payload = frame.payload();
-        if (activity.dispatch(opcode, payload, this::showActivity, chat::showSystemNotice)) {
+        if (activity.dispatch(opcode, payload, r -> showTab(TAB_ACTIVITY, r), chat::showSystemNotice)
+                || reputation.dispatch(opcode, payload, r -> showTab(TAB_REPUTATION, r), chat::showSystemNotice)) {
             return true;
         }
         if (opcode == Opcode.OPCODE_GET_SECLUSION_STATUS_RESPONSE_VALUE) {
@@ -219,9 +226,9 @@ final class DailyCoordinator implements WindowFlow {
         return text(prefix + suffix(outcome.name()));
     }
 
-    /** ADR-106 — chỉ vẽ khi đang ở tab Năng động (trả lời có thể tới sau khi người chơi đã đổi tab). */
-    private void showActivity(ActivityTab.Rendered rendered) {
-        if (tab != TAB_ACTIVITY) {
+    /** ADR-106/109 — chỉ vẽ khi đang ở đúng tab (trả lời có thể tới sau khi người chơi đã đổi tab). */
+    private void showTab(int forTab, ActivityTab.Rendered rendered) {
+        if (tab != forTab) {
             return;
         }
         panel.setStatus(rendered.status());
@@ -301,7 +308,9 @@ final class DailyCoordinator implements WindowFlow {
                             text("item." + node.getItemCode() + ".name"),
                             Math.round(node.getX()),
                             where,
-                            state),
+                            state,
+                            text("daily.herb.kind." + node.getKind().toLowerCase(Locale.ROOT)),
+                            node.getGatherSeconds()),
                     node.getReady() ? "daily.action.gather" : "",
                     () -> send(
                             Opcode.OPCODE_GATHER_HERB_COMMAND_VALUE,

@@ -199,6 +199,8 @@ message HerbNodeView {
   bool ready = 5;
   int32 seconds_until_ready = 6;   // 0 khi sẵn
   float distance = 7;              // khoảng cách theo X từ người hỏi (server đo); -1 = không ở world chính
+  string kind = 8;                 // ADR-107: HERB | FISH | ORE
+  int32 gather_seconds = 9;        // ADR-107: số giây đứng thu
 }
 
 // Response: Server -> Client (OPCODE_LIST_HERB_NODES_RESPONSE = 313).

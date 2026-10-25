@@ -45,7 +45,7 @@ final class KillRewardDispatcher {
         ACHIEVEMENT,
         /** Nhiệm vụ bang tuần (ADR-069) — việc phụ. */
         GUILD_WEEKLY,
-        /** Bảng truy nã (ADR-101) — việc phụ. */
+        /** Bảng truy nã (ADR-101) + sổ sưu tầm (ADR-108) — việc phụ. */
         BOUNTY
     }
 

@@ -451,12 +451,14 @@ final class Lot21Scenario {
                 .getNodesList()
                 .forEach(n -> line.append(String.format(
                         Locale.ROOT,
-                        "| #%d x=%.0f cách=%.1f sẵn=%s chờ=%ds ",
+                        "| #%d %s x=%.0f cách=%.1f sẵn=%s chờ=%ds thu=%ds ",
                         n.getNodeId(),
+                        n.getKind(),
                         n.getX(),
                         n.getDistance(),
                         n.getReady(),
-                        n.getSecondsUntilReady())));
+                        n.getSecondsUntilReady(),
+                        n.getGatherSeconds())));
         return line.toString();
     }
 
@@ -519,6 +521,8 @@ final class Lot21Scenario {
         line.append("] đạoLữ=").append(response.hasDaoLu() ? brief(response.getDaoLu()) : "-");
         line.append(" chặn=[");
         response.getBlockedList().forEach(view -> line.append(view.getName()).append(' '));
+        line.append("] kếtNghĩa=[");
+        response.getSwornList().forEach(view -> line.append(view.getName()).append(' '));
         return line.append(']').toString();
     }
 

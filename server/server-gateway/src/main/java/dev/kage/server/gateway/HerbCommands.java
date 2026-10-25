@@ -24,19 +24,17 @@ import dev.kage.protocol.Opcode;
 import dev.kage.world.domain.HerbNode;
 
 /**
- * Hái linh thảo (ADR-098 D3) — server giữ bụi, tự đếm {@link #GATHER_SECONDS} giây rồi kiểm lại vị trí và cấp vật phẩm.
+ * Thu thập (ADR-098 D3, ADR-107) — bụi linh thảo, bờ câu, mạch khoáng: server giữ điểm, tự đếm
+ * {@code gather_seconds} giây của ĐIỂM ĐÓ rồi kiểm lại vị trí và cấp vật phẩm.
  * Vị trí là mẫu world chính của registry; người đang ở hầm ngục/đấu trường không hái được. Bộ hẹn giờ dùng chung một
  * luồng nền của JDK ({@link CompletableFuture#delayedExecutor}), việc cấp đồ chạy trên Virtual Thread.
  */
 final class HerbCommands {
 
-    /** Đứng yên ngần này giây để hái xong. */
-    static final long GATHER_SECONDS = 3L;
-
     private static final Logger LOG = LoggerFactory.getLogger(HerbCommands.class);
 
-    private static final Executor DELAYED = CompletableFuture.delayedExecutor(
-            GATHER_SECONDS, TimeUnit.SECONDS, Executors.newVirtualThreadPerTaskExecutor());
+    // Việc cấp đồ sau khi đếm xong chạy trên Virtual Thread; bộ đếm là luồng hẹn giờ dùng chung của JDK.
+    private static final Executor GRANTS = Executors.newVirtualThreadPerTaskExecutor();
 
     private final ConnectedCharacterRegistry registry;
     private final InventoryFacade inventory;
@@ -66,7 +64,9 @@ final class HerbCommands {
                     .setY(node.y())
                     .setReady(view.ready())
                     .setSecondsUntilReady((int) view.secondsUntilReady())
-                    .setDistance(distanceOrUnknown(characterId, node)));
+                    .setDistance(distanceOrUnknown(characterId, node))
+                    .setKind(node.kind())
+                    .setGatherSeconds(node.gatherSeconds()));
         }
         return response.build();
     }
@@ -76,7 +76,9 @@ final class HerbCommands {
         float distance = node.map(n -> distanceTo(characterId, n)).orElse(Float.MAX_VALUE);
         GatherHerbOutcome outcome = registry.herbNodes.tryStart(characterId, nodeId, distance, clock.instant());
         if (outcome == GatherHerbOutcome.GATHER_HERB_OUTCOME_STARTED) {
-            DELAYED.execute(() -> finish(characterId, node.orElseThrow()));
+            HerbNode started = node.orElseThrow();
+            CompletableFuture.delayedExecutor(started.gatherSeconds(), TimeUnit.SECONDS, GRANTS)
+                    .execute(() -> finish(characterId, started));
         }
         return GatherHerbResponse.newBuilder().setOutcome(outcome).build();
     }

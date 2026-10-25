@@ -6,6 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import com.badlogic.gdx.utils.I18NBundle;
@@ -48,10 +49,12 @@ import dev.kage.protocol.wire.PacketCodec;
  */
 final class RelationshipCoordinator implements WindowFlow {
 
-    static final List<String> TAB_KEYS = List.of("relation.tab.mentor", "relation.tab.daolu", "relation.tab.block");
+    static final List<String> TAB_KEYS =
+            List.of("relation.tab.mentor", "relation.tab.daolu", "relation.tab.block", "relation.tab.sworn");
 
     private static final int TAB_MENTOR = 0;
     private static final int TAB_DAO_LU = 1;
+    private static final int TAB_SWORN = 3;
 
     private final ReportPanel panel;
     private final WorldCommandSender sender;
@@ -68,11 +71,13 @@ final class RelationshipCoordinator implements WindowFlow {
 
     private GetRelationshipsResponse current = GetRelationshipsResponse.getDefaultInstance();
     private int tab = TAB_MENTOR;
+    private final SwornTab sworn;
 
     RelationshipCoordinator(ReportPanel panel, WorldCommandSender sender, ChatCoordinator chat) {
         this.panel = panel;
         this.sender = sender;
         this.chat = chat;
+        this.sworn = new SwornTab(sender, chat);
         panel.enableInput("relation.input.name");
         panel.setOnRefresh(this::request);
         panel.setOnTabSelected(index -> {
@@ -145,6 +150,12 @@ final class RelationshipCoordinator implements WindowFlow {
             render();
             return true;
         }
+        Optional<String> swornLine = sworn.dispatch(opcode, payload);
+        if (swornLine.isPresent()) {
+            notice(swornLine.get());
+            request();
+            return true;
+        }
         return dispatchOutcome(opcode, payload);
     }
 
@@ -199,6 +210,9 @@ final class RelationshipCoordinator implements WindowFlow {
         } else if (tab == TAB_DAO_LU) {
             panel.setStatus(text("relation.hint.daolu"));
             daoLuRows(rows);
+        } else if (tab == TAB_SWORN) {
+            panel.setStatus(text("relation.hint.sworn"));
+            sworn.rows(current, panel::inputText, (label, actionKey, action) -> add(rows, label, actionKey, action));
         } else {
             panel.setStatus(text("relation.hint.block"));
             blockRows(rows);
@@ -360,6 +374,7 @@ final class RelationshipCoordinator implements WindowFlow {
         panel.close();
         pendingDisciples.clear();
         pendingProposals.clear();
+        sworn.reset();
         current = GetRelationshipsResponse.getDefaultInstance();
     }
 }

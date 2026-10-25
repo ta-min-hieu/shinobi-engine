@@ -24,13 +24,13 @@ cuối (cùng đường thưởng hạ quái, ADR-101) cộng 1 trên Virtual Th
 **D4 — Giao thức, chỉ thêm**: 226/227 `GetBestiaryRequest`/`Response{entries[]}` (mã quái, tên/lore key, đã hạ / cần,
 mở chưa, thưởng).
 
-**D5 — Client**: cửa sổ "Sổ sưu tầm" phím **N**: mỗi loài một dòng; trang đã mở hiện lời lore.
+**D5 — Client**: cửa sổ "Sổ sưu tầm" phím **Y** (N đã là của giao dịch): mỗi loài một dòng; trang đã mở hiện lời lore.
 
 ## Technical Decisions
 
 | # | Quyết định | Trạng thái |
 |---|---|---|
-| 1 | Sổ theo loài, mốc hạ, chỉ số cộng phẳng vĩnh viễn, cửa sổ phím N | Accepted |
+| 1 | Sổ theo loài, mốc hạ, chỉ số cộng phẳng vĩnh viễn, cửa sổ phím Y | Accepted |
 
 ## ADR cần tạo
 
@@ -42,5 +42,8 @@ mở chưa, thưởng).
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 2).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành (lô 22 phần 2, 2026-10-25): V90 `bestiary_entry` (12 loài) + `character_bestiary`; bước BOUNTY của đường
+   thưởng hạ quái gọi thêm `CollectionHooks.onMonsterKilled`; mở trang ⇒ dòng hệ thống + áp lại chỉ số
+   (`BestiaryEffects` trong ống thưởng bang/Đạo Vận); opcode 226/227; cửa sổ phím Y.
+2. ✅ Kiểm sống gameProbe 2026-10-25: đặt sẵn 49 lần hạ bù nhìn, Kagemaru hạ con thứ 50 ⇒ dòng "Mở trang sưu tầm:
+   training_dummy (+10 HP)"; `unlocked_at` ghi; vào lại world máu tối đa 388 → **398**.

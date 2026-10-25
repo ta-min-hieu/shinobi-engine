@@ -17,6 +17,7 @@ import java.util.concurrent.TimeUnit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import dev.kage.achievement.domain.ReputationRules;
 import dev.kage.guild.api.GuildWarFacade;
 import dev.kage.guild.domain.GuildWar;
 import dev.kage.guild.domain.GuildWarPort;
@@ -161,6 +162,10 @@ final class GuildWarScheduler {
                         key);
         boolean delivered = outcome.result() == MailFacade.SendResult.OK
                 || outcome.result() == MailFacade.SendResult.DUPLICATE_REQUEST;
+        if (outcome.result() == MailFacade.SendResult.OK) {
+            // ADR-109 — danh vọng cho thành viên bang thắng; chỉ khi thư VỪA gửi, không cộng lại khi gửi lại.
+            deps.registry().collections.addReputation(payout.characterId(), ReputationRules.GUILD_WAR_WIN_POINTS);
+        }
         if (!delivered) {
             LOG.warn(
                     "Thư thưởng bang chiến chưa gửi được, thử lại nhịp sau: characterId={} — {}",

@@ -221,6 +221,7 @@ final class ChatCoordinator implements WindowFlow {
             case CHAT_CHANNEL_PRIVATE -> "chat.channel.private";
             case CHAT_CHANNEL_GUILD -> "chat.channel.guild";
             case CHAT_CHANNEL_PARTY -> "chat.channel.party";
+            case CHAT_CHANNEL_SWORN -> "chat.channel.sworn";
             // Không gửi được nhưng NHẬN được: server mới hơn client thêm kênh mới, hoặc dòng hệ
             // thống (không thuộc kênh nào). Cả hai đều cần một cái tên để không vỡ bố cục.
             case CHAT_CHANNEL_UNSPECIFIED, UNRECOGNIZED -> "chat.channel.system";
@@ -231,7 +232,8 @@ final class ChatCoordinator implements WindowFlow {
         return switch (channel) {
             case CHAT_CHANNEL_AREA -> ChatPanel.LineKind.AREA;
             case CHAT_CHANNEL_PRIVATE -> ChatPanel.LineKind.PRIVATE;
-            case CHAT_CHANNEL_WORLD, CHAT_CHANNEL_GUILD, CHAT_CHANNEL_PARTY -> ChatPanel.LineKind.WORLD;
+            case CHAT_CHANNEL_WORLD, CHAT_CHANNEL_GUILD, CHAT_CHANNEL_PARTY, CHAT_CHANNEL_SWORN ->
+                ChatPanel.LineKind.WORLD;
             case CHAT_CHANNEL_UNSPECIFIED, UNRECOGNIZED -> ChatPanel.LineKind.SYSTEM;
         };
     }

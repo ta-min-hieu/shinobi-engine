@@ -43,5 +43,9 @@ phẩm (túi đầy ⇒ rollback). Seed 5 món theo bậc.
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 2).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành (lô 22 phần 2, 2026-10-25): V90 `character_reputation` + `reputation_shop_item` (5 món theo bậc); nguồn
+   điểm: lĩnh nhiệm vụ ngày +10, xong truy nã +5, thư thắng bang chiến +20 (chỉ khi thư VỪA gửi); opcode 621–624; tab
+   "Danh vọng" (`ReputationTab`).
+2. ✅ Kiểm sống gameProbe 2026-10-25: đặt sẵn 120 điểm (bậc 1 Sơ Hiển): mua Truyền Tống Phù (60, bậc 1) ⇒ OK còn 60; Linh
+   Thú Đan (bậc 2) ⇒ `TIER_TOO_LOW`; hai Hồi Khí Đan ⇒ OK còn 20; 3 dòng audit `REPUTATION_SHOP_BUY`. Nguồn điểm tự
+   nhiên chưa kiểm sống (cùng dòng gọi với điểm năng động đã kiểm).

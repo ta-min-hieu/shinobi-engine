@@ -252,6 +252,7 @@ public final class GatewayBootstrap {
             ctx.jobs().guildWars().stop();
             ctx.characterRegistry().guildWars.stop();
             ctx.characterRegistry().activity.stop();
+            ctx.characterRegistry().collections.stop();
             ctx.worldContext().metricsHttpServer().stop();
             observability.tracing().shutdown();
             databaseBootstrap.shutdown();
@@ -386,6 +387,7 @@ public final class GatewayBootstrap {
                 id -> routes.find(id)
                         .ifPresent(world -> world.applyEquipmentBonus(id, characterRegistry.equipmentBonusOf(id))),
                 (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
+        bindCollections(characterRegistry, facades, routes);
         characterRegistry.guildProgress.bind(
                 facades.progression().guildProgression(),
                 facades.contentFacades().socialFacades().mailFacade(),
@@ -526,7 +528,8 @@ public final class GatewayBootstrap {
                 new RelationshipFacades(
                         databaseBootstrap.wireBlockFacade(),
                         databaseBootstrap.wireMentorshipFacade(),
-                        databaseBootstrap.wireDaoLuFacade()),
+                        databaseBootstrap.wireDaoLuFacade(),
+                        databaseBootstrap.wireSwornFacade()),
                 new DailyFacades(
                         databaseBootstrap.wireSeclusionFacade(),
                         databaseBootstrap.wireOnlineRewardFacade(),
@@ -541,7 +544,9 @@ public final class GatewayBootstrap {
                         databaseBootstrap.wireServerNoticeFacade(),
                         databaseBootstrap.wireGiftCodeFacade(),
                         databaseBootstrap.wirePlayerReportFacade(),
-                        databaseBootstrap.wireActivityFacade()));
+                        databaseBootstrap.wireActivityFacade()),
+                new CollectionFacades(
+                        databaseBootstrap.wireBestiaryFacade(), databaseBootstrap.wireReputationFacade()));
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -580,6 +585,19 @@ public final class GatewayBootstrap {
                 facades.characterFacade(),
                 new BlockCommands(relationships.blocks(), relationships.daoLu(), facades.characterFacade()),
                 new PlayerNotices(facades.contentFacades().socialFacades().mailFacade(), characterRegistry));
+    }
+
+    /** ADR-108/109 — mở trang sưu tầm thì áp lại chỉ số ngay, cùng đường linh thú lên cấp. */
+    private static void bindCollections(
+            ConnectedCharacterRegistry characterRegistry, GatewayFacades facades, WorldRouteLookup routes) {
+        characterRegistry.collections.bind(
+                facades.progression().collections(),
+                CollectionHooks.refreshing(
+                        id -> routes.find(id)
+                                .ifPresent(
+                                        world -> world.applyEquipmentBonus(id, characterRegistry.equipmentBonusOf(id))),
+                        new PlayerNotices(
+                                facades.contentFacades().socialFacades().mailFacade(), characterRegistry)));
     }
 
     /** Lô 21: bụi linh thảo nạp một lần (ADR-098); bảng truy nã đi theo lượt hạ quái (ADR-101). */
@@ -622,9 +640,17 @@ public final class GatewayBootstrap {
                         .findById(characterId)
                         .map(character -> FactionMapping.toElement(character.faction()))
                         .orElse(Element.NONE));
-        characterRegistry.skillRanks.bindGuildBonus(characterId -> RebirthEffects.plus(
-                GuildSkillEffects.bonusOf(facades.progression().guildSkills(), characterId),
-                facades.progression().rebirth().rebirthCountOf(characterId)));
+        characterRegistry.skillRanks.bindGuildBonus(characterId -> BestiaryEffects.plus(
+                RebirthEffects.plus(
+                        GuildSkillEffects.bonusOf(facades.progression().guildSkills(), characterId),
+                        facades.progression().rebirth().rebirthCountOf(characterId)),
+                facades.progression().collections().bestiary().bonusOf(characterId)));
+    }
+
+    private static java.util.List<Long> partyMembers(PartyFacade partyFacade, long characterId) {
+        return partyFacade.listMembers(characterId).stream()
+                .map(PartyFacade.MemberView::characterId)
+                .toList();
     }
 
     /**
@@ -641,19 +667,23 @@ public final class GatewayBootstrap {
                 (characterId, amount) -> facades.characterFacade()
                         .grantExperience(
                                 characterId,
-                                DaoLuEffects.boostedExp(
-                                        facades.progression().relationships().daoLu(),
+                                SwornEffects.boostedExp(
+                                        facades.progression().relationships().sworn(),
                                         characterId,
-                                        GuildSkillEffects.boostedExp(
-                                                facades.progression().guildSkills(),
+                                        DaoLuEffects.boostedExp(
+                                                facades.progression()
+                                                        .relationships()
+                                                        .daoLu(),
                                                 characterId,
-                                                amount
-                                                        * facades.progression()
-                                                                .gameEvents()
-                                                                .multiplier(GameEventKind.EXP)),
-                                        id -> partyFacade.listMembers(id).stream()
-                                                .map(PartyFacade.MemberView::characterId)
-                                                .toList())),
+                                                GuildSkillEffects.boostedExp(
+                                                        facades.progression().guildSkills(),
+                                                        characterId,
+                                                        amount
+                                                                * facades.progression()
+                                                                        .gameEvents()
+                                                                        .multiplier(GameEventKind.EXP)),
+                                                id -> partyMembers(partyFacade, id)),
+                                        id -> partyMembers(partyFacade, id))),
                 metricsContext.networkMetrics());
     }
 }

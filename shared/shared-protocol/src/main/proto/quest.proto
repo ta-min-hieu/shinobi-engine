@@ -215,3 +215,44 @@ message AbandonBountyCommand {
 message AbandonBountyResponse {
   bool abandoned = 1;
 }
+
+// ===== ADR-109 (2026-10-25) — danh vọng tông môn. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_GET_REPUTATION_REQUEST = 621).
+message GetReputationRequest {}
+
+message ReputationShopItemView {
+  int64 item_template_id = 1;
+  string item_code = 2;
+  int32 price = 3;            // điểm danh vọng
+  int32 required_tier = 4;    // 0..4
+}
+
+// Response: Server -> Client (OPCODE_GET_REPUTATION_RESPONSE = 622).
+message GetReputationResponse {
+  int64 earned = 1;           // tích luỹ — quyết bậc, không tụt khi tiêu
+  int64 available = 2;        // còn tiêu được
+  int32 tier = 3;             // 0 Vô Danh .. 4 Danh Trấn Tông Môn
+  int64 next_tier_at = 4;     // 0 = đã bậc cao nhất
+  repeated ReputationShopItemView items = 5;
+}
+
+// Command: Client -> Server (OPCODE_BUY_REPUTATION_ITEM_COMMAND = 623).
+message BuyReputationItemCommand {
+  int64 item_template_id = 1;
+}
+
+enum BuyReputationItemOutcome {
+  BUY_REPUTATION_ITEM_OUTCOME_UNSPECIFIED = 0;
+  BUY_REPUTATION_ITEM_OUTCOME_OK = 1;
+  BUY_REPUTATION_ITEM_OUTCOME_UNKNOWN_ITEM = 2;
+  BUY_REPUTATION_ITEM_OUTCOME_TIER_TOO_LOW = 3;
+  BUY_REPUTATION_ITEM_OUTCOME_NOT_ENOUGH_REPUTATION = 4;
+  BUY_REPUTATION_ITEM_OUTCOME_BAG_FULL = 5;
+}
+
+// Response: Server -> Client (OPCODE_BUY_REPUTATION_ITEM_RESPONSE = 624). status = trạng thái MỚI NHẤT.
+message BuyReputationItemResponse {
+  BuyReputationItemOutcome outcome = 1;
+  GetReputationResponse status = 2;
+}

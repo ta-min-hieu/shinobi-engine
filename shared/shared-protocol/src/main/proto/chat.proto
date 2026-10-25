@@ -17,6 +17,7 @@ enum ChatChannel {
   CHAT_CHANNEL_AREA = 3;
   CHAT_CHANNEL_GUILD = 4;
   CHAT_CHANNEL_PARTY = 5;
+  CHAT_CHANNEL_SWORN = 6;   // ADR-110 (2026-10-25) — huynh đệ kết nghĩa
 }
 
 // Command: Client -> Server (OPCODE_SEND_CHAT_MESSAGE_COMMAND). target_name CHỈ có ý nghĩa khi
@@ -39,6 +40,7 @@ enum SendChatMessageOutcome {
   SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD = 8; // GUILD: người gửi chưa vào bang nào
   SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY = 9; // PARTY: người gửi chưa vào party nào
   SEND_CHAT_MESSAGE_OUTCOME_MUTED = 10; // ADR-052 (2026-10-18, chỉ thêm): tài khoản đang bị GM khoá chat
+  SEND_CHAT_MESSAGE_OUTCOME_NOT_SWORN = 11; // ADR-110 (2026-10-25, chỉ thêm): SWORN mà chưa kết nghĩa
 }
 
 // Response: Server -> Client (OPCODE_SEND_CHAT_MESSAGE_RESPONSE).

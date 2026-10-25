@@ -114,6 +114,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-101 — lượt hạ quái vào bảng truy nã; nối sau khi DB đã dựng. */
     final BountyHooks bounties = new BountyHooks();
 
+    /** ADR-108/109 — sổ sưu tầm (bước riêng của đường hạ quái) + danh vọng; nối sau khi DB đã dựng. */
+    final CollectionHooks collections = new CollectionHooks();
+
     /** ADR-106 — cộng điểm năng động khi một việc hằng ngày thành công; nối sau khi DB đã dựng. */
     final ActivityHooks activity = new ActivityHooks();
 
@@ -632,11 +635,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 killerCharacterId,
                 monsterCode,
                 () -> guildProgress.onMonsterKilled(killerCharacterId));
-        lootExecutor.dispatch( // bảng truy nã (ADR-101) — chỉ người ra đòn cuối
-                KillRewardDispatcher.Step.BOUNTY,
-                killerCharacterId,
-                monsterCode,
-                () -> bounties.onMonsterKilled(killerCharacterId, monsterCode));
+        lootExecutor.dispatch( // truy nã (ADR-101) + sổ sưu tầm (ADR-108) — chỉ người ra đòn cuối; mỗi bên tự nuốt lỗi
+                KillRewardDispatcher.Step.BOUNTY, killerCharacterId, monsterCode, () -> {
+                    bounties.onMonsterKilled(killerCharacterId, monsterCode);
+                    collections.onMonsterKilled(killerCharacterId, monsterCode);
+                });
         // Phần của ĐỒNG ĐỘI (2026-10-11) — một việc RIÊNG, sau ba việc của người hạ: tra nhóm chạm DB,
         // và nó hỏng thì phần của người ra đòn cuối ở trên không được suy suyển.
         lootExecutor.dispatch(

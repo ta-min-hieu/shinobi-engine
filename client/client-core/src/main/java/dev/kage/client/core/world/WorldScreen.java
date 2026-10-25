@@ -494,6 +494,7 @@ public final class WorldScreen implements GameScreen {
         GuildWarCoordinator guildWars = reports.community().guildWars();
         panels.register(reports.community().guildWarPanel(), guildWars);
         panels.register(reports.community().noticePanel(), reports.community().serviceDesk());
+        panels.register(reports.community().bestiaryPanel(), reports.community().bestiary());
         guild.useGuildWar(guildWars::open);
         duelTargeting.useGuildWar(
                 guildWars::isMyWarActive, dev.kage.client.core.ui.theme.KageI18n.textOrKey(i18n, "guildwar.target"));

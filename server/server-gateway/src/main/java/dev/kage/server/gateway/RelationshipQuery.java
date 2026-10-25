@@ -35,7 +35,17 @@ final class RelationshipQuery {
         for (long blockedId : relationships.blocks().blockedBy(characterId)) {
             view(blockedId).ifPresent(response::addBlocked);
         }
+        for (long brotherId : relationships.sworn().membersOf(characterId)) {
+            if (brotherId != characterId) {
+                view(brotherId).ifPresent(response::addSworn);
+            }
+        }
         return response.build();
+    }
+
+    /** Nhóm kết nghĩa (gồm chính người hỏi) — cho kênh chat kết nghĩa. */
+    java.util.List<Long> swornMembersOf(long characterId) {
+        return relationships.sworn().membersOf(characterId);
     }
 
     private Optional<RelationMemberView> view(long characterId) {

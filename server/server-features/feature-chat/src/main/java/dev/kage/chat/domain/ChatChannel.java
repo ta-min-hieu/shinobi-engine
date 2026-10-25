@@ -10,5 +10,7 @@ public enum ChatChannel {
     PRIVATE,
     AREA,
     GUILD,
-    PARTY
+    PARTY,
+    /** ADR-110 (2026-10-25) — huynh đệ kết nghĩa. */
+    SWORN
 }

@@ -12,7 +12,8 @@ import dev.kage.world.domain.HerbNodePort;
 public final class PostgresHerbNodeAdapter implements HerbNodePort {
 
     private static final String LIST = """
-            SELECT h.id, h.code, h.x, h.y, h.item_template_id, it.code, h.quantity, h.respawn_seconds
+            SELECT h.id, h.code, h.x, h.y, h.item_template_id, it.code, h.quantity, h.respawn_seconds, h.kind,
+                   h.gather_seconds
               FROM herb_node h
               JOIN item_template it ON it.id = h.item_template_id
              ORDER BY h.id
@@ -37,6 +38,8 @@ public final class PostgresHerbNodeAdapter implements HerbNodePort {
                         rs.getLong(5),
                         rs.getString(6),
                         rs.getInt(7),
-                        rs.getInt(8)));
+                        rs.getInt(8),
+                        rs.getString(9),
+                        rs.getInt(10)));
     }
 }

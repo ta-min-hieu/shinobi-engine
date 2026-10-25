@@ -5,6 +5,7 @@ import java.util.Optional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import dev.kage.achievement.domain.ReputationRules;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.checkin.api.ActivityFacade;
 import dev.kage.protocol.BountyProgressEvent;
@@ -48,6 +49,7 @@ final class BountyHooks {
             if (p.completed()) {
                 target.sendExperience(killerCharacterId, characters.syncExperienceAfterQuestReward(killerCharacterId));
                 target.activity.record(killerCharacterId, ActivityFacade.Activity.BOUNTY); // ADR-106
+                target.collections.addReputation(killerCharacterId, ReputationRules.BOUNTY_POINTS); // ADR-109
             }
             target.sendToCharacterIfOnline(
                     killerCharacterId,

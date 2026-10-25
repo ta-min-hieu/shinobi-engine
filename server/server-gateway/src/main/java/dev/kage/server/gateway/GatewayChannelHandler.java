@@ -31,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import dev.kage.account.api.AccountFacade;
 import dev.kage.account.application.LoginResult;
+import dev.kage.achievement.domain.ReputationRules;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.application.CharacterLimitExceededException;
 import dev.kage.character.application.CharacterNotFoundException;
@@ -85,6 +86,7 @@ import dev.kage.protocol.AcceptPartyInviteOutcome;
 import dev.kage.protocol.AcceptPartyInviteResponse;
 import dev.kage.protocol.AcceptQuestOutcome;
 import dev.kage.protocol.AcceptQuestResponse;
+import dev.kage.protocol.AcceptSwornCommand;
 import dev.kage.protocol.AcceptTradeRequestCommand;
 import dev.kage.protocol.AcceptTradeRequestOutcome;
 import dev.kage.protocol.AcceptTradeRequestResponse;
@@ -98,6 +100,7 @@ import dev.kage.protocol.BuyItemCommand;
 import dev.kage.protocol.BuyItemResponse;
 import dev.kage.protocol.BuyListingCommand;
 import dev.kage.protocol.BuyOutcome;
+import dev.kage.protocol.BuyReputationItemCommand;
 import dev.kage.protocol.CancelFriendRequestCommand;
 import dev.kage.protocol.CancelFriendRequestOutcome;
 import dev.kage.protocol.CancelFriendRequestResponse;
@@ -180,6 +183,7 @@ import dev.kage.protocol.FriendOnlineEvent;
 import dev.kage.protocol.FriendView;
 import dev.kage.protocol.GatherHerbCommand;
 import dev.kage.protocol.GetActivityRequest;
+import dev.kage.protocol.GetBestiaryRequest;
 import dev.kage.protocol.GetBountyBoardRequest;
 import dev.kage.protocol.GetCharacterStatsRequest;
 import dev.kage.protocol.GetCharacterStatsResponse;
@@ -195,6 +199,7 @@ import dev.kage.protocol.GetOnlineRewardsRequest;
 import dev.kage.protocol.GetPvpRatingRequest;
 import dev.kage.protocol.GetPvpRatingResponse;
 import dev.kage.protocol.GetRelationshipsRequest;
+import dev.kage.protocol.GetReputationRequest;
 import dev.kage.protocol.GetSeclusionStatusRequest;
 import dev.kage.protocol.GetSpiritVeinStatusRequest;
 import dev.kage.protocol.GetTradeStatusRequest;
@@ -204,6 +209,7 @@ import dev.kage.protocol.InventoryItemView;
 import dev.kage.protocol.InvitePartyMemberCommand;
 import dev.kage.protocol.InvitePartyMemberOutcome;
 import dev.kage.protocol.InvitePartyMemberResponse;
+import dev.kage.protocol.InviteSwornCommand;
 import dev.kage.protocol.ItemCatalogResponse;
 import dev.kage.protocol.ItemRewardView;
 import dev.kage.protocol.ItemSetProgressView;
@@ -224,6 +230,7 @@ import dev.kage.protocol.LeaveMentorshipCommand;
 import dev.kage.protocol.LeavePartyCommand;
 import dev.kage.protocol.LeavePartyOutcome;
 import dev.kage.protocol.LeavePartyResponse;
+import dev.kage.protocol.LeaveSwornCommand;
 import dev.kage.protocol.ListAchievementsRequest;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
@@ -480,6 +487,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final SpiritVeinCommands spiritVeins;
     private final GuildWarCommands guildWars;
     private final ServiceDeskCommands serviceDesk;
+    private final CollectionCommands collections;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -656,6 +664,43 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             Opcode.OPCODE_DISSOLVE_DAO_LU_RESPONSE_VALUE,
                             (h, id, c) -> h.relations.daoLu().dissolve(id))),
             Map.entry(Opcode.OPCODE_SEND_EMOTE_COMMAND_VALUE, this::handleSendEmoteCommand),
+            // Lô 22 phần 2 — sổ sưu tầm (ADR-108), danh vọng (ADR-109), kết nghĩa (ADR-110).
+            Map.entry(
+                    Opcode.OPCODE_GET_BESTIARY_REQUEST_VALUE,
+                    storageCommand(
+                            GetBestiaryRequest.parser(),
+                            Opcode.OPCODE_GET_BESTIARY_RESPONSE_VALUE,
+                            (h, id, c) -> h.collections.bestiary(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_REPUTATION_REQUEST_VALUE,
+                    storageCommand(
+                            GetReputationRequest.parser(),
+                            Opcode.OPCODE_GET_REPUTATION_RESPONSE_VALUE,
+                            (h, id, c) -> h.collections.reputation(id))),
+            Map.entry(
+                    Opcode.OPCODE_BUY_REPUTATION_ITEM_COMMAND_VALUE,
+                    storageCommand(
+                            BuyReputationItemCommand.parser(),
+                            Opcode.OPCODE_BUY_REPUTATION_ITEM_RESPONSE_VALUE,
+                            (h, id, c) -> h.collections.buy(id, c.getItemTemplateId()))),
+            Map.entry(
+                    Opcode.OPCODE_INVITE_SWORN_COMMAND_VALUE,
+                    storageCommand(
+                            InviteSwornCommand.parser(),
+                            Opcode.OPCODE_INVITE_SWORN_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.sworn().invite(id, c.getTargetName()))),
+            Map.entry(
+                    Opcode.OPCODE_ACCEPT_SWORN_COMMAND_VALUE,
+                    storageCommand(
+                            AcceptSwornCommand.parser(),
+                            Opcode.OPCODE_ACCEPT_SWORN_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.sworn().accept(id, c.getInviterName()))),
+            Map.entry(
+                    Opcode.OPCODE_LEAVE_SWORN_COMMAND_VALUE,
+                    storageCommand(
+                            LeaveSwornCommand.parser(),
+                            Opcode.OPCODE_LEAVE_SWORN_RESPONSE_VALUE,
+                            (h, id, c) -> h.relations.sworn().leave(id))),
             // Lô 22 phần 1 — mã quà (ADR-104), báo cáo (ADR-105), lịch hoạt động (ADR-106).
             Map.entry(
                     Opcode.OPCODE_REDEEM_GIFT_CODE_COMMAND_VALUE,
@@ -849,6 +894,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.spiritVeins = new SpiritVeinCommands(facades.progression().spiritVeins(), java.time.Clock.systemUTC());
         this.guildWars = GuildWarCommands.of(facades, worldGateway.registry());
         this.serviceDesk = ServiceDeskCommands.of(facades, worldGateway.registry());
+        this.collections = new CollectionCommands(facades.progression().collections(), inventoryFacade);
         this.friendGifts = new FriendGiftCommands(
                 facades.progression().friendGifts(),
                 characterFacade,
@@ -3202,6 +3248,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             worldGateway.registry().achievements.onQuestRewardClaimed(characterId);
             if (questFacade.isDailyQuest(command.getQuestCode())) {
                 worldGateway.registry().activity.record(characterId, ActivityFacade.Activity.DAILY_QUEST);
+                worldGateway
+                        .registry()
+                        .collections
+                        .addReputation(characterId, ReputationRules.DAILY_QUEST_POINTS); // ADR-109
             }
         }
     }
@@ -5085,6 +5135,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY);
             return false;
         }
+        if (domainChannel == dev.kage.chat.domain.ChatChannel.SWORN
+                && relations.swornMembersOf(characterId).isEmpty()) {
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_SWORN);
+            return false;
+        }
         return true;
     }
 
@@ -5132,6 +5187,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         partyFacade.listMembers(ctx.characterId()).stream()
                                 .map(m -> m.characterId())
                                 .toList());
+            // ADR-110 — huynh đệ kết nghĩa đang online (gồm người gửi).
+            case SWORN ->
+                broadcastToGroup(ChatChannel.CHAT_CHANNEL_SWORN, ctx, relations.swornMembersOf(ctx.characterId()));
             default -> throw new IllegalStateException("ChatChannel không xử lý: " + domainChannel);
         }
     }
@@ -5175,6 +5233,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case CHAT_CHANNEL_AREA -> Optional.of(dev.kage.chat.domain.ChatChannel.AREA);
             case CHAT_CHANNEL_GUILD -> Optional.of(dev.kage.chat.domain.ChatChannel.GUILD);
             case CHAT_CHANNEL_PARTY -> Optional.of(dev.kage.chat.domain.ChatChannel.PARTY);
+            case CHAT_CHANNEL_SWORN -> Optional.of(dev.kage.chat.domain.ChatChannel.SWORN);
             default -> Optional.empty();
         };
     }

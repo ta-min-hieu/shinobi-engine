@@ -336,3 +336,23 @@ message ClaimActivityChestResponse {
   ClaimActivityChestOutcome outcome = 1;
   GetActivityResponse status = 2;
 }
+
+// ===== ADR-108 (2026-10-25) — sổ sưu tầm yêu thú. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_GET_BESTIARY_REQUEST = 226).
+message GetBestiaryRequest {}
+
+message BestiaryEntryView {
+  string monster_code = 1;   // tên hiển thị: khoá i18n monster.<code>.name ở client
+  string lore_key = 2;       // khoá i18n lời sưu tầm (chỉ hiện khi unlocked)
+  int32 kills = 3;
+  int32 kills_required = 4;
+  bool unlocked = 5;
+  string bonus_stat = 6;     // ATK | DEF | RES | HP
+  int32 bonus_value = 7;
+}
+
+// Response: Server -> Client (OPCODE_GET_BESTIARY_RESPONSE = 227).
+message GetBestiaryResponse {
+  repeated BestiaryEntryView entries = 1;
+}

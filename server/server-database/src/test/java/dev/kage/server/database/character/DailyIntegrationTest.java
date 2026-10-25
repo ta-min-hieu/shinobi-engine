@@ -142,7 +142,9 @@ class DailyIntegrationTest {
 
     @Test
     void herbNodesShouldBeSeeded() {
+        // V86 bốn bụi linh thảo; V90 (ADR-107) thêm hai bờ câu + hai mạch khoáng cùng bảng.
         assertThat(new PostgresHerbNodeAdapter(dataSource).listHerbNodes())
+                .filteredOn(node -> node.kind().equals("HERB"))
                 .hasSize(4)
                 .allSatisfy(node -> assertThat(node.itemCode()).isEqualTo("spirit_herb"));
     }

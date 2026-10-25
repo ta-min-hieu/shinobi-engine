@@ -46,5 +46,10 @@ trong `GetRelationshipsResponse` (field mới `sworn`).
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 2).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành (lô 22 phần 2, 2026-10-25): V90 `sworn_group/sworn_member`; `SwornFacade` (lời mời RAM 5 phút, nhớ đệm
+   nhóm); `SwornEffects` +5% EXP sau thưởng đạo lữ; `CHAT_CHANNEL_SWORN = 6` + outcome `NOT_SWORN = 11`; opcode
+   1138–1144; `GetRelationshipsResponse.sworn`; tab "Kết nghĩa" + `/kn <chữ>`.
+2. ✅ Kiểm sống gameProbe 2026-10-25 (Kagemaru + Benkei, thân mật 300): chat kết nghĩa trước khi kết ⇒ `NOT_SWORN`; mời ⇒
+   OK, Benkei nhận gói 1140 rồi nhận lời ⇒ OK; vàng Kagemaru 80.174 → 77.174 (lập nhóm 3.000); hai bên thấy nhau trong
+   `kếtNghĩa=[…]`; tin `/kn` tới cả hai chiều; Benkei rời ⇒ OK, rời lần hai ⇒ `NOT_SWORN`, nhóm 2 người tự giải tán (0
+   dòng). +5% EXP cùng nhóm chưa đo sống (Benkei Lv10 không cùng party lúc kiểm).

@@ -11,6 +11,8 @@ import redis.clients.jedis.RedisClient;
 import dev.kage.account.api.AccountFacade;
 import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.achievement.api.AchievementFacade;
+import dev.kage.achievement.api.BestiaryFacade;
+import dev.kage.achievement.api.ReputationFacade;
 import dev.kage.achievement.application.AchievementUseCase;
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.api.RebirthFacade;
@@ -41,6 +43,7 @@ import dev.kage.friend.api.DaoLuFacade;
 import dev.kage.friend.api.FriendFacade;
 import dev.kage.friend.api.FriendGiftFacade;
 import dev.kage.friend.api.MentorshipFacade;
+import dev.kage.friend.api.SwornFacade;
 import dev.kage.friend.application.AcceptFriendRequestUseCase;
 import dev.kage.friend.application.FriendGiftUseCase;
 import dev.kage.friend.application.FriendRequestCooldowns;
@@ -126,6 +129,8 @@ import dev.kage.quest.application.QuestRewardPorts;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.achievement.PostgresAchievementAdapter;
+import dev.kage.server.database.achievement.PostgresBestiaryAdapter;
+import dev.kage.server.database.achievement.PostgresReputationAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 import dev.kage.server.database.character.PostgresFactionChangeAdapter;
@@ -147,6 +152,7 @@ import dev.kage.server.database.friend.PostgresDaoLuAdapter;
 import dev.kage.server.database.friend.PostgresFriendAdapter;
 import dev.kage.server.database.friend.PostgresFriendGiftAdapter;
 import dev.kage.server.database.friend.PostgresMentorshipAdapter;
+import dev.kage.server.database.friend.PostgresSwornAdapter;
 import dev.kage.server.database.gm.PostgresGameEventAdapter;
 import dev.kage.server.database.gm.PostgresGiftCodeAdapter;
 import dev.kage.server.database.gm.PostgresGmAuditAdapter;
@@ -710,6 +716,21 @@ public final class ServerDatabaseBootstrap {
     /** Tranh đoạt Linh Mạch (ADR-090). */
     public SpiritVeinFacade wireSpiritVeinFacade() {
         return new SpiritVeinFacade(new PostgresSpiritVeinAdapter(dataSource));
+    }
+
+    /** Sổ sưu tầm yêu thú (ADR-108). */
+    public BestiaryFacade wireBestiaryFacade() {
+        return new BestiaryFacade(new PostgresBestiaryAdapter(dataSource), java.time.Clock.systemUTC());
+    }
+
+    /** Danh vọng tông môn (ADR-109). */
+    public ReputationFacade wireReputationFacade() {
+        return new ReputationFacade(new PostgresReputationAdapter(dataSource));
+    }
+
+    /** Kết nghĩa huynh đệ (ADR-110). */
+    public SwornFacade wireSwornFacade() {
+        return new SwornFacade(new PostgresSwornAdapter(dataSource), java.time.Clock.systemUTC());
     }
 
     /** Thông báo server (ADR-103) — nạp một lần, giữ trong RAM. */

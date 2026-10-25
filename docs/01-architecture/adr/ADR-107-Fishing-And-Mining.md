@@ -16,8 +16,8 @@
 `gather_seconds` của điểm thay cho hằng 3 giây. Seed: 2 bờ câu (5 giây, `spirit_fish`), 2 mạch khoáng (4 giây,
 `spirit_ore`), hồi 240 giây. Số là PLACEHOLDER.
 
-**D2 — Vật phẩm mới**: `spirit_fish` (Linh Ngư) và `spirit_ore` (Linh Khoáng Thạch) — nguyên liệu xếp chồng 99, bán được
-cho cửa hàng. Thêm 2 công thức luyện đan: Hồi Khí Đan cũ (`minor_healing_pill`) thêm cách luyện từ 2 Linh Ngư + 1 Linh
+**D2 — Vật phẩm mới**: `spirit_fish` (Linh Ngư) và `spirit_ore` (Linh Khoáng Thạch) — nguyên liệu xếp chồng 99 (không bán ở cửa
+hàng: `shop_item` là hàng hai chiều, bán ra thì cũng mua vào được). Thêm 2 công thức luyện đan: Hồi Khí Đan cũ (`minor_healing_pill`) thêm cách luyện từ 2 Linh Ngư + 1 Linh
 Thảo; Bùa Hộ Linh (`enhance_protection_charm`) từ 5 Linh Khoáng + 2 Linh Thảo.
 
 **D3 — Giao thức, chỉ thêm field**: `HerbNodeView` thêm `kind` (string) và `gather_seconds`; không opcode mới,
@@ -42,5 +42,8 @@ Hái/câu/đào đều tính vào việc `herb_gather` của lịch hoạt độ
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 22 phần 2).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành (lô 22 phần 2, 2026-10-25): V90 `herb_node.kind/gather_seconds`, 2 bờ câu + 2 mạch khoáng, Linh Ngư/Linh
+   Khoáng, 2 công thức; `HerbCommands` đếm theo `gather_seconds` của từng điểm; `HerbNodeView` thêm `kind`,
+   `gather_seconds`; tab "Thu thập".
+2. ✅ Kiểm sống gameProbe 2026-10-25: `herbs` liệt kê 8 điểm kèm loại + số giây (HERB 3s, FISH 5s, ORE 4s); Kagemaru đứng
+   x=2 câu ở `sect_pond_fishing` ⇒ +1 `spirit_fish` trong túi; câu lại ngay ⇒ `NOT_READY` (hồi 240s).

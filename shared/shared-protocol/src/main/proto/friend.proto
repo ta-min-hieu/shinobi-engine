@@ -210,6 +210,7 @@ message GetRelationshipsResponse {
   repeated RelationMemberView disciples = 2;
   RelationMemberView dao_lu = 3;               // không set = chưa có đạo lữ
   repeated RelationMemberView blocked = 4;
+  repeated RelationMemberView sworn = 5;      // ADR-110 — huynh đệ kết nghĩa (không gồm chính mình)
 }
 
 // ===== ADR-093 — sư đồ. CHỈ THÊM. Đồ đệ (< Lv30) bái sư người Lv>=40; sư phụ nhận tối đa 3 đồ đệ. Đồ đệ chạm
@@ -316,4 +317,52 @@ message DissolveDaoLuCommand {
 // Response: Server -> Client (OPCODE_DISSOLVE_DAO_LU_RESPONSE = 1137).
 message DissolveDaoLuResponse {
   DaoLuOutcome outcome = 1;
+}
+
+// ===== ADR-110 (2026-10-25) — kết nghĩa huynh đệ. CHỈ THÊM. =====
+
+enum SwornOutcome {
+  SWORN_OUTCOME_UNSPECIFIED = 0;
+  SWORN_OUTCOME_OK = 1;
+  SWORN_OUTCOME_TARGET_NOT_FOUND = 2;
+  SWORN_OUTCOME_CANNOT_TARGET_SELF = 3;
+  SWORN_OUTCOME_INTIMACY_TOO_LOW = 4;       // cần thân mật >= 300
+  SWORN_OUTCOME_ALREADY_SWORN = 5;          // người được mời đã ở nhóm khác
+  SWORN_OUTCOME_GROUP_FULL = 6;             // nhóm đã đủ 5 người
+  SWORN_OUTCOME_NO_PENDING_INVITE = 7;
+  SWORN_OUTCOME_INSUFFICIENT_GOLD = 8;      // người mời thiếu vàng (3.000 lập nhóm / 1.000 thêm người)
+  SWORN_OUTCOME_NOT_SWORN = 9;
+}
+
+// Command: Client -> Server (OPCODE_INVITE_SWORN_COMMAND = 1138).
+message InviteSwornCommand {
+  string target_name = 1;
+}
+
+// Response: Server -> Client (OPCODE_INVITE_SWORN_RESPONSE = 1139).
+message InviteSwornResponse {
+  SwornOutcome outcome = 1;
+}
+
+// Event: Server -> Client (OPCODE_SWORN_INVITE_EVENT = 1140) — gửi người được mời nếu đang online.
+message SwornInviteEvent {
+  string inviter_name = 1;
+}
+
+// Command: Client -> Server (OPCODE_ACCEPT_SWORN_COMMAND = 1141).
+message AcceptSwornCommand {
+  string inviter_name = 1;
+}
+
+// Response: Server -> Client (OPCODE_ACCEPT_SWORN_RESPONSE = 1142).
+message AcceptSwornResponse {
+  SwornOutcome outcome = 1;
+}
+
+// Command: Client -> Server (OPCODE_LEAVE_SWORN_COMMAND = 1143).
+message LeaveSwornCommand {}
+
+// Response: Server -> Client (OPCODE_LEAVE_SWORN_RESPONSE = 1144).
+message LeaveSwornResponse {
+  SwornOutcome outcome = 1;
 }

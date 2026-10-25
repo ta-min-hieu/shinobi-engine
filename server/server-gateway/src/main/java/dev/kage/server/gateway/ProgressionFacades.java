@@ -33,7 +33,8 @@ record ProgressionFacades(
         RelationshipFacades relationships,
         DailyFacades daily,
         AdventureFacades adventure,
-        ServiceDeskFacades serviceDesk) {
+        ServiceDeskFacades serviceDesk,
+        CollectionFacades collections) {
 
     /** Composition không có các tính năng này (test). */
     static final ProgressionFacades DISABLED = new ProgressionFacades(
@@ -52,5 +53,6 @@ record ProgressionFacades(
             RelationshipFacades.DISABLED,
             DailyFacades.DISABLED,
             AdventureFacades.DISABLED,
-            ServiceDeskFacades.DISABLED);
+            ServiceDeskFacades.DISABLED,
+            CollectionFacades.DISABLED);
 }

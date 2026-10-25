@@ -90,6 +90,9 @@ class ContentReferenceIntegrationTest {
      * đỏ, mà vẽ xong icon cho một món ở đây cũng đỏ — để danh sách không bao giờ nói dối.
      */
     private static final Set<String> ITEMS_KNOWN_TO_LACK_AN_ICON = Set.of(
+            // ADR-107 (2026-10-25) — Linh Ngư, Linh Khoáng lên trước art.
+            "spirit_fish",
+            "spirit_ore",
             "outer_sect_tally",
             "blood_sand_talisman",
             // ADR-064 (2026-10-18) — bốn Linh Ngọc lên trước art; icon dựng từ .blend là việc riêng.
