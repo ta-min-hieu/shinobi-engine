@@ -1,5 +1,6 @@
 package dev.kage.client.core.world;
 
+import java.util.function.BooleanSupplier;
 import java.util.function.LongConsumer;
 import java.util.function.LongPredicate;
 
@@ -54,6 +55,12 @@ final class DuelTargeting implements DuelCoordinator.DuelListener {
 
     /** Đang ở World đấu trường theo gói 308 gần nhất. Vào world lần đầu luôn là world chính. */
     private boolean inArena;
+
+    /** Bang mình đang trong giờ bang chiến (ADR-102) — mặc định không bao giờ. */
+    private BooleanSupplier guildWarActive = () -> false;
+
+    /** Nhãn mục tiêu khi nhắm người chơi trong bang chiến — server không gửi tên trong gói spawn. */
+    private String guildWarTargetName = "";
 
     /**
      * @param combat nơi giữ mục tiêu hiện tại của HUD
@@ -112,11 +119,33 @@ final class DuelTargeting implements DuelCoordinator.DuelListener {
      *     caller không chuyển tiếp sang luồng thách đấu
      */
     boolean onCharacterClicked(long characterId) {
-        if (!inArena || characterId == NO_OPPONENT) {
+        if (characterId == NO_OPPONENT) {
             return false;
+        }
+        if (!inArena) {
+            return onCharacterClickedInGuildWar(characterId);
         }
         if (characterId == opponentId && combat.selectCharacterTarget(opponentId, opponentDisplayName)) {
             setTargetSender.accept(opponentId);
+        }
+        return true;
+    }
+
+    /**
+     * Nối bang chiến (ADR-102 D6): trong giờ chiến, click một người chơi ở world chính là NHẮM họ — server mới là nơi
+     * quyết họ có phải người bang đối địch và có đứng ngoài vùng an toàn không.
+     */
+    void useGuildWar(BooleanSupplier active, String targetName) {
+        this.guildWarActive = active;
+        this.guildWarTargetName = targetName;
+    }
+
+    private boolean onCharacterClickedInGuildWar(long characterId) {
+        if (!guildWarActive.getAsBoolean()) {
+            return false;
+        }
+        if (combat.selectCharacterTarget(characterId, guildWarTargetName)) {
+            setTargetSender.accept(characterId);
         }
         return true;
     }

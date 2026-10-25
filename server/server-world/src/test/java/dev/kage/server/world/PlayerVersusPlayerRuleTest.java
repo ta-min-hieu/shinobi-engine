@@ -27,6 +27,8 @@ class PlayerVersusPlayerRuleTest {
     private static final long ATTACKER = 1L;
     private static final long VICTIM = 2L;
     private static final long SETTLE_MILLIS = 600L;
+    private static final float WAR_X = 12f;
+    private static final float SAFE_X = 3f;
 
     private record Hit(long attacker, long target, String skillCode) {}
 
@@ -95,6 +97,49 @@ class PlayerVersusPlayerRuleTest {
                 () -> hitsBy(ATTACKER).stream().anyMatch(hit -> hit.skillCode().isEmpty()));
         awaitTrue(
                 () -> hitsBy(ATTACKER).stream().anyMatch(hit -> !hit.skillCode().isEmpty()));
+    }
+
+    /** ADR-102 D2 — world chính: cặp bang đang chiến đánh được nhau, cả đòn thường lẫn chiêu. */
+    @Test
+    void shouldLetGuildsAtWarFight_outsideSafeZones() {
+        startGuildWarWorld(WAR_X);
+
+        world.setTarget(ATTACKER, VICTIM);
+        world.attack(ATTACKER);
+        world.useSkill(ATTACKER, SkillConstants.FIREBALL_SKILL_CODE, VICTIM);
+
+        awaitTrue(
+                () -> hitsBy(ATTACKER).stream().anyMatch(hit -> hit.skillCode().isEmpty()));
+        awaitTrue(
+                () -> hitsBy(ATTACKER).stream().anyMatch(hit -> !hit.skillCode().isEmpty()));
+    }
+
+    /** ADR-102 D2 — cùng cặp đang chiến nhưng đứng trong vùng an toàn: không đòn nào ra. */
+    @Test
+    void shouldNotLetGuildsAtWarFight_insideASafeZone() {
+        startGuildWarWorld(SAFE_X);
+
+        world.setTarget(ATTACKER, VICTIM);
+        world.attack(ATTACKER);
+        world.useSkill(ATTACKER, SkillConstants.FIREBALL_SKILL_CODE, VICTIM);
+        sleepQuietly(SETTLE_MILLIS);
+
+        assertThat(hitsBy(ATTACKER)).isEmpty();
+    }
+
+    /** Luật chỉ cho cặp (ATTACKER → VICTIM); vùng an toàn phủ [0, 7]. */
+    private void startGuildWarWorld(float x) {
+        WorldContentCatalog content = new WorldContentCatalog(
+                MonsterCatalogSnapshot.EMPTY,
+                NpcCatalogSnapshot.EMPTY,
+                new SafeZoneCatalogSnapshot(List.of(new SafeZoneCatalogSnapshot.SafeZoneDefinition(
+                        TestWorldContents.TEST_ZONE_CODE, 0f, -10f, 7f, 10f, false))));
+        world = new WorldFacade(sink, false, TickMetricsPort.NO_OP, content);
+        world.usePlayerVersusPlayerRule((attacker, target) -> attacker == ATTACKER && target == VICTIM);
+        world.start();
+        world.attachCharacter(ATTACKER, x, 0f, FIRE);
+        world.attachCharacter(VICTIM, x + 0.5f, 0f, FIRE);
+        sleepQuietly(100);
     }
 
     private void startWorld(boolean arena, CharacterBaseStats attackerStats) {

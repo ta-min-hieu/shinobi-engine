@@ -31,6 +31,30 @@ thắng nhận thư **2.000 linh thạch**; hoà không ai nhận. Báo toàn se
 
 **D6 — Client**: nút "Bang chiến" trong cửa sổ Bang (G) mở bảng trạng thái + ô tên bang + nút Tuyên chiến.
 
+## Thi hành (2026-10-25, lô 21 phần 4)
+
+- **DB (V88)**: `guild_war` (hai phe, `starts_at`/`ends_at`, `kills_a`/`kills_b`, `settled_at`, `winner_guild_id`) +
+  `guild_war_payout` (hàng đợi thư, cùng khuôn Linh Mạch). Bang giải tán ⇒ CASCADE xoá trận.
+- **Tuyên** (`PostgresGuildWarAdapter#declare`): một giao dịch — bang chủ? bang đích tồn tại/khác bang mình? khoá HAI
+  dòng `guild` theo `id` tăng dần (giữ luật "dòng `guild` trước" của feature-guild) → không bang nào có trận chưa chốt →
+  cặp không đánh nhau trong 24 giờ qua → trừ 10.000 qua `GoldLedger` (`gold.reason.guild_war`) → chèn trận + audit
+  `GUILD_WAR_DECLARED`. Báo toàn server ngay.
+- **PvP theo cặp** (D2): `CombatSystem`/`SkillSystem` hỏi `PlayerVersusPlayerRule.allows(attacker, target)` thay cho
+  `BooleanSupplier` cả World. `WorldFacade#allowsPlayerVersusPlayer`: đấu trường ⇒ luôn đúng; còn lại ⇒ luật bang chiến
+  VÀ cả hai không đứng trong vùng an toàn nào (`TriggerZoneMembershipComponent` rỗng). Luật bang chiến là
+  `GuildWarRoster` (gateway) — mảng nguyên thuỷ đã sắp xếp + tìm nhị phân, không boxing/cấp phát trên tick thread; mọi
+  khu vực world chính dùng chung một roster.
+- **Luồng nền** `GuildWarScheduler` mỗi 10 giây: dựng lại roster từ các trận đang trong giờ, báo "khai chiến" một lần
+  mỗi trận, chốt trận hết giờ (`SELECT … FOR UPDATE` dòng chưa chốt ⇒ đúng một lần), gửi thư 2.000 với khoá chống trùng
+  suy từ (trận, nhân vật).
+- **Đếm hạ** (D3): `ConnectedCharacterRegistry#onCharacterDefeated` (tick thread) → `GuildWarHooks` lọc bằng roster rồi
+  đẩy `recordKill` sang Virtual Thread; SQL tự kiểm lại hai người thuộc hai bang đang trong giờ chiến với nhau.
+- **Client** (D6): nút "Bang chiến" hàng hai cửa sổ Bang → `GuildWarCoordinator` (bảng trận, ô tên bang, dòng Tuyên
+  chiến). Trong giờ chiến của bang mình, click một người chơi ở world chính là NHẮM họ (`DuelTargeting#useGuildWar`) —
+  ngoài giờ vẫn là mở lời Luận Kiếm như cũ. Client hỏi lại tình hình khi mở cửa sổ, về world chính, nhận thông tin bang,
+  hoặc thấy tin hệ thống về bang chiến.
+- **Probe**: `--lot21=declareWar:<bang>,warStatus,hitPlayer:<id>`.
+
 ## Technical Decisions
 
 | # | Quyết định | Trạng thái |
@@ -43,5 +67,11 @@ thắng nhận thư **2.000 linh thạch**; hoà không ai nhận. Báo toàn se
 
 ## Việc cần làm tiếp theo
 
-1. ⏳ Thi hành (lô 21 phần 4).
-2. ⏳ Kiểm sống bằng gameProbe.
+1. ✅ Thi hành (lô 21 phần 4, 2026-10-25).
+2. ✅ Kiểm sống bằng gameProbe 2026-10-25 (DB dev V88, Kagemaru bang "Thanh Hu Thu" vs Benkei bang "HuyetSat"):
+   tuyên OK (vàng 90.174 → 80.174, audit `GUILD_WAR_DECLARED`); tên sai ⇒ `UNKNOWN_GUILD`; tuyên lần hai ⇒
+   `ALREADY_AT_WAR`. Đối chứng trận CHƯA mở (x=−44, ngoài vùng an toàn): 0/3 đòn trúng. Dời `starts_at` về hiện tại
+   (rút ngắn 5 phút chờ cho phép đo): 2 đòn hạ Benkei, điểm 1:0 trong `warStatus`. Cả hai đứng trong `sect_grounds`
+   trong giờ chiến: 0/3 trúng, điểm giữ 1:0. Dời `ends_at` về hiện tại: chốt một lần (winner = bang Kagemaru), thư
+   "Bang chiến / Guild war" 2.000 tới Kagemaru, hàng đợi rỗng. Bẫy công cụ gặp: bước `hitPlayer` bản đầu đếm cả đòn QUÁI
+   đánh mục tiêu (Benkei chết vì quái gần x=160) — nay chỉ đếm người đánh id dương.

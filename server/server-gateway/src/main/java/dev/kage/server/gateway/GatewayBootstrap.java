@@ -249,6 +249,8 @@ public final class GatewayBootstrap {
             ctx.jobs().marketExpiry().stop();
             ctx.jobs().spiritVeins().stop();
             ctx.jobs().waypoints().stop();
+            ctx.jobs().guildWars().stop();
+            ctx.characterRegistry().guildWars.stop();
             ctx.worldContext().metricsHttpServer().stop();
             observability.tracing().shutdown();
             databaseBootstrap.shutdown();
@@ -268,7 +270,10 @@ public final class GatewayBootstrap {
 
     /** Các luồng nền dựng SAU cổng game — cần {@link WorldGateway} hoặc chỉ chạm DB + thư. */
     private record BackgroundJobs(
-            MarketExpiryJanitor marketExpiry, SpiritVeinScheduler spiritVeins, WaypointScheduler waypoints) {}
+            MarketExpiryJanitor marketExpiry,
+            SpiritVeinScheduler spiritVeins,
+            WaypointScheduler waypoints,
+            GuildWarScheduler guildWars) {}
 
     private static BackgroundJobs startBackgroundJobs(
             GatewayFacades facades, ConnectedCharacterRegistry characterRegistry, WorldGateway worldGateway) {
@@ -293,7 +298,15 @@ public final class GatewayBootstrap {
                 characterId -> worldGateway.dungeonInstanceRegistry().isInDungeon(characterId)
                         || worldGateway.arenaInstanceRegistry().isInDuel(characterId));
         waypoints.start();
-        return new BackgroundJobs(marketExpiry, spiritVeins, waypoints);
+        GuildWarScheduler guildWars = new GuildWarScheduler(
+                new GuildWarScheduler.Deps(
+                        facades.progression().adventure().guildWars(),
+                        characterRegistry.guildWars.roster,
+                        mail,
+                        characterRegistry),
+                java.time.Clock.systemUTC());
+        guildWars.start();
+        return new BackgroundJobs(marketExpiry, spiritVeins, waypoints, guildWars);
     }
 
     /**
@@ -450,6 +463,8 @@ public final class GatewayBootstrap {
                 MonsterSpawnPoint.MAIN_WORLD_CODE);
         WorldFacade firstChannelFacade = new WorldFacade(
                 characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN), worldContent);
+        // ADR-102 D2 — luật PvP theo cặp (bang chiến) cho world chính; khu vực mở thêm nối ở MainWorldChannelRegistry.
+        firstChannelFacade.usePlayerVersusPlayerRule(characterRegistry.guildWars.roster);
         firstChannelFacade.start();
         WorldBossScheduler worldBoss = startWorldBoss(firstChannelFacade, databaseBootstrap, characterRegistry);
         MainWorldChannelRegistry mainWorldChannels =
@@ -519,7 +534,8 @@ public final class GatewayBootstrap {
                 new AdventureFacades(
                         databaseBootstrap.wireDungeonQuotaFacade(),
                         databaseBootstrap.wireWaypointFacade(),
-                        databaseBootstrap.wireBountyFacade()));
+                        databaseBootstrap.wireBountyFacade(),
+                        databaseBootstrap.wireGuildWarFacade()));
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -565,6 +581,7 @@ public final class GatewayBootstrap {
         characterRegistry.herbNodes.load(facades.progression().daily().herbs().listHerbNodes());
         characterRegistry.bounties.bind(
                 facades.progression().adventure().bounties(), facades.characterFacade(), characterRegistry);
+        characterRegistry.guildWars.bind(facades.progression().adventure().guildWars(), java.time.Clock.systemUTC());
     }
 
     /** ADR-099 — lượt Bí Cảnh + thư thưởng lần đầu hạ boss (5.000 linh thạch + 3 Yêu Đan). */

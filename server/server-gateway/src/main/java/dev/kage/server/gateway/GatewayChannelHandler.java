@@ -133,6 +133,7 @@ import dev.kage.protocol.CreateListingCommand;
 import dev.kage.protocol.CreatePartyCommand;
 import dev.kage.protocol.CreatePartyOutcome;
 import dev.kage.protocol.CreatePartyResponse;
+import dev.kage.protocol.DeclareGuildWarCommand;
 import dev.kage.protocol.DeclineDuelCommand;
 import dev.kage.protocol.DeclineDuelOutcome;
 import dev.kage.protocol.DeclineDuelResponse;
@@ -179,6 +180,7 @@ import dev.kage.protocol.GatherHerbCommand;
 import dev.kage.protocol.GetBountyBoardRequest;
 import dev.kage.protocol.GetCharacterStatsRequest;
 import dev.kage.protocol.GetCharacterStatsResponse;
+import dev.kage.protocol.GetGuildWarStatusRequest;
 import dev.kage.protocol.GetItemCatalogRequest;
 import dev.kage.protocol.GetLeaderboardRequest;
 import dev.kage.protocol.GetLeaderboardResponse;
@@ -471,6 +473,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final GuildSkillCommands guildSkills;
     private final dev.kage.character.api.RebirthFacade rebirth;
     private final SpiritVeinCommands spiritVeins;
+    private final GuildWarCommands guildWars;
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -647,6 +650,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             Opcode.OPCODE_DISSOLVE_DAO_LU_RESPONSE_VALUE,
                             (h, id, c) -> h.relations.daoLu().dissolve(id))),
             Map.entry(Opcode.OPCODE_SEND_EMOTE_COMMAND_VALUE, this::handleSendEmoteCommand),
+            // Lô 21 phần 4 — bang chiến (ADR-102).
+            Map.entry(
+                    Opcode.OPCODE_DECLARE_GUILD_WAR_COMMAND_VALUE,
+                    storageCommand(
+                            DeclareGuildWarCommand.parser(),
+                            Opcode.OPCODE_DECLARE_GUILD_WAR_RESPONSE_VALUE,
+                            (h, id, c) -> h.guildWars.declare(id, c.getTargetGuildName()))),
+            Map.entry(
+                    Opcode.OPCODE_GET_GUILD_WAR_STATUS_REQUEST_VALUE,
+                    storageCommand(
+                            GetGuildWarStatusRequest.parser(),
+                            Opcode.OPCODE_GET_GUILD_WAR_STATUS_RESPONSE_VALUE,
+                            (h, id, c) -> h.guildWars.status(id))),
             // Lô 21 phần 3 — truyền tống (ADR-100), truy nã (ADR-101).
             Map.entry(
                     Opcode.OPCODE_LIST_WAYPOINTS_REQUEST_VALUE,
@@ -800,6 +816,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.guildSkills = new GuildSkillCommands(facades.progression().guildSkills());
         this.rebirth = facades.progression().rebirth();
         this.spiritVeins = new SpiritVeinCommands(facades.progression().spiritVeins(), java.time.Clock.systemUTC());
+        this.guildWars = GuildWarCommands.of(facades, worldGateway.registry());
         this.friendGifts = new FriendGiftCommands(
                 facades.progression().friendGifts(),
                 characterFacade,

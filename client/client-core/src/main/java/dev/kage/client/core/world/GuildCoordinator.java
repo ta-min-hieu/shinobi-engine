@@ -256,6 +256,14 @@ final class GuildCoordinator implements WindowFlow {
                 Opcode.OPCODE_LIST_GUILD_SKILLS_REQUEST_VALUE, ListGuildSkillsRequest.getDefaultInstance());
     }
 
+    /** ADR-102 — nút "Bang chiến": đóng cửa sổ Bang rồi để {@code GuildWarCoordinator} mở cửa sổ của nó. */
+    void useGuildWar(Runnable openGuildWar) {
+        panel.setOnGuildWar(() -> {
+            panel.close();
+            openGuildWar.run();
+        });
+    }
+
     /** ADR-090 — đóng cửa sổ Bang rồi hỏi tình hình Linh Mạch; {@code SpiritVeinCoordinator} mở cửa sổ. */
     private void openSpiritVein() {
         panel.close();

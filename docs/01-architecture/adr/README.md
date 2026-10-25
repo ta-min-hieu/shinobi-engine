@@ -133,7 +133,11 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-099](ADR-099-Dungeon-Daily-Runs-And-First-Clear.md) | Bí Cảnh — 3 lượt/ngày, thư thưởng lần đầu hạ boss (V87) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-047 |
 | [ADR-100](ADR-100-Teleport-Talisman.md) | Truyền tống phù — điểm mở khi đứng gần, phù tiêu hao, dời qua đường ADR-051 (V87, 317–320) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-052 |
 | [ADR-101](ADR-101-Bounty-Board.md) | Bảng truy nã — 3 truy nã/ngày tất định, 5 lần xong/ngày (V87, 614–618) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-055 |
-| [ADR-102](ADR-102-Guild-War.md) | Bang chiến — PvP theo cặp ngoài vùng an toàn, 60 phút, đếm lần hạ (733–736) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-090 |
+| [ADR-102](ADR-102-Guild-War.md) | Bang chiến — PvP theo cặp ngoài vùng an toàn, 60 phút, đếm lần hạ (V88, 733–736) | ✅ **Accepted** *(2026-10-24, lô 21)* | ADR-090 |
+| [ADR-103](ADR-103-Server-Notice.md) | Thông báo server khi đăng nhập (MOTD) | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-104](ADR-104-Gift-Codes.md) | Mã quà tặng | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-105](ADR-105-Player-Reports.md) | Báo cáo người chơi | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-106](ADR-106-Activity-Calendar.md) | Lịch hoạt động + điểm năng động | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

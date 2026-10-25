@@ -410,6 +410,7 @@ final class MainWorldChannelRegistry {
         WorldFacade facade =
                 new WorldFacade(registry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG), content);
         facade.rememberSkillCooldownsIn(skillCooldowns);
+        facade.usePlayerVersusPlayerRule(registry.guildWars.roster); // ADR-102 D2 — cùng luật khu vực #1
         return facade;
     }
 

@@ -1,6 +1,7 @@
 package dev.kage.tools.loadtest.probe;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.List;
 import java.util.Locale;
 
@@ -15,6 +16,8 @@ import dev.kage.protocol.AcceptDaoLuCommand;
 import dev.kage.protocol.AcceptDaoLuResponse;
 import dev.kage.protocol.AcceptDiscipleCommand;
 import dev.kage.protocol.AcceptDiscipleResponse;
+import dev.kage.protocol.AttackCommand;
+import dev.kage.protocol.AttackResultEvent;
 import dev.kage.protocol.BlockCharacterCommand;
 import dev.kage.protocol.BlockCharacterResponse;
 import dev.kage.protocol.ChatChannel;
@@ -22,6 +25,8 @@ import dev.kage.protocol.ClaimOnlineRewardCommand;
 import dev.kage.protocol.ClaimOnlineRewardResponse;
 import dev.kage.protocol.ClaimSeclusionCommand;
 import dev.kage.protocol.ClaimSeclusionResponse;
+import dev.kage.protocol.DeclareGuildWarCommand;
+import dev.kage.protocol.DeclareGuildWarResponse;
 import dev.kage.protocol.DismantleItemCommand;
 import dev.kage.protocol.DismantleItemResponse;
 import dev.kage.protocol.DissolveDaoLuCommand;
@@ -34,6 +39,8 @@ import dev.kage.protocol.GatherHerbCommand;
 import dev.kage.protocol.GatherHerbResponse;
 import dev.kage.protocol.GetBountyBoardRequest;
 import dev.kage.protocol.GetBountyBoardResponse;
+import dev.kage.protocol.GetGuildWarStatusRequest;
+import dev.kage.protocol.GetGuildWarStatusResponse;
 import dev.kage.protocol.GetOnlineRewardsRequest;
 import dev.kage.protocol.GetOnlineRewardsResponse;
 import dev.kage.protocol.GetRelationshipsRequest;
@@ -61,6 +68,7 @@ import dev.kage.protocol.SendEmoteCommand;
 import dev.kage.protocol.SendEmoteResponse;
 import dev.kage.protocol.SendFriendRequestCommand;
 import dev.kage.protocol.SendFriendRequestResponse;
+import dev.kage.protocol.SetTargetCommand;
 import dev.kage.protocol.TeleportCommand;
 import dev.kage.protocol.TeleportResponse;
 import dev.kage.protocol.UnblockCharacterCommand;
@@ -73,11 +81,16 @@ import dev.kage.tools.loadtest.GameConnection;
  * chuỗi: {@code block:<tên>}, {@code unblock:<tên>}, {@code relations}, {@code emote:<GREET|BOW|...>},
  * {@code requestMentor:<tên>}, {@code acceptDisciple:<tên>}, {@code leaveMentor:<tên>}, {@code proposeDaoLu:<tên>},
  * {@code acceptDaoLu:<tên>}, {@code dissolveDaoLu}; và ba bước kiểm chặn: {@code whisper:<tên>},
- * {@code friendRequest:<tên>}, {@code partyInvite:<tên>} (in ra lỗi {@code error.blocked} nếu bị chặn).
+ * {@code friendRequest:<tên>}, {@code partyInvite:<tên>} (in ra lỗi {@code error.blocked} nếu bị chặn). Phần 4 — bang
+ * chiến (ADR-102): {@code declareWar:<tên bang>}, {@code warStatus}, {@code hitPlayer:<characterId>} (3 đòn thường, đếm
+ * đòn trúng).
  */
 final class Lot21Scenario {
 
     private static final int MAX_FRAMES_TO_SKIP = 2000;
+    private static final int HIT_ATTEMPTS = 3;
+    // Hơn hồi chiêu đánh thường 1 giây — nhanh hơn thì nửa số nhát bị server bỏ (bẫy probe đã ghi sổ).
+    private static final long HIT_SPACING_MILLIS = 1_300L;
 
     private final GameConnection connection;
     private final ProbeSession session;
@@ -300,8 +313,85 @@ final class Lot21Scenario {
                             EnterDungeonResponse r = EnterDungeonResponse.parseFrom(p);
                             return r.getOutcome() + " cònLượt=" + r.getEntriesLeft();
                         });
+            default -> guildWar(verb, arg);
+        };
+    }
+
+    /** Lô 21 phần 4: bang chiến (ADR-102) — tuyên, xem tình hình, đánh thử một người chơi. */
+    private String guildWar(String verb, String arg) throws IOException {
+        return switch (verb) {
+            case "declareWar" ->
+                ask(
+                        Opcode.OPCODE_DECLARE_GUILD_WAR_COMMAND_VALUE,
+                        DeclareGuildWarCommand.newBuilder()
+                                .setTargetGuildName(arg)
+                                .build(),
+                        Opcode.OPCODE_DECLARE_GUILD_WAR_RESPONSE_VALUE,
+                        p -> DeclareGuildWarResponse.parseFrom(p).getOutcome().name());
+            case "warStatus" ->
+                ask(
+                        Opcode.OPCODE_GET_GUILD_WAR_STATUS_REQUEST_VALUE,
+                        GetGuildWarStatusRequest.getDefaultInstance(),
+                        Opcode.OPCODE_GET_GUILD_WAR_STATUS_RESPONSE_VALUE,
+                        Lot21Scenario::describeGuildWars);
+            case "hitPlayer" -> hitPlayer(Long.parseLong(arg));
             default -> "bước không hiểu";
         };
+    }
+
+    private static String describeGuildWars(byte[] payload) throws InvalidProtocolBufferException {
+        GetGuildWarStatusResponse r = GetGuildWarStatusResponse.parseFrom(payload);
+        StringBuilder line = new StringBuilder("giá=" + r.getDeclareCostGold() + " trận=" + r.getWarsCount());
+        r.getWarsList().forEach(w -> line.append(" | ")
+                .append(w.getAttackerGuildName())
+                .append(' ')
+                .append(w.getAttackerKills())
+                .append(':')
+                .append(w.getDefenderKills())
+                .append(' ')
+                .append(w.getDefenderGuildName())
+                .append(" đangĐánh=")
+                .append(w.getActive())
+                .append(" còn=")
+                .append(w.getSecondsUntilChange())
+                .append("s củaMình=")
+                .append(w.getMine()));
+        return line.toString();
+    }
+
+    /** Nhắm một người chơi rồi ra {@link #HIT_ATTEMPTS} đòn thường cách nhau hơn hồi chiêu; đếm đòn TRÚNG họ. */
+    private String hitPlayer(long targetId) throws IOException {
+        connection.send(
+                Opcode.OPCODE_SET_TARGET_COMMAND_VALUE,
+                SetTargetCommand.newBuilder()
+                        .setTargetEntityId(targetId)
+                        .build()
+                        .toByteArray());
+        int landed = 0;
+        boolean died = false;
+        for (int attempt = 0; attempt < HIT_ATTEMPTS; attempt++) {
+            connection.send(
+                    Opcode.OPCODE_ATTACK_COMMAND_VALUE,
+                    AttackCommand.getDefaultInstance().toByteArray());
+            long until = System.currentTimeMillis() + HIT_SPACING_MILLIS;
+            while (System.currentTimeMillis() < until) {
+                PacketCodec.Frame frame;
+                try {
+                    frame = connection.readFrame();
+                } catch (SocketTimeoutException quiet) {
+                    break;
+                }
+                if (frame.header().opcode() == Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE) {
+                    AttackResultEvent hit = AttackResultEvent.parseFrom(frame.payload());
+                    if (hit.getTargetEntityId() == targetId
+                            && hit.getAttackerEntityId() > 0) { // quái (id âm) không tính
+                        landed++;
+                        died |= hit.getTargetDied();
+                    }
+                }
+            }
+        }
+        return "trúng=" + landed + "/" + HIT_ATTEMPTS + " hạ=" + died;
     }
 
     private static String describeWaypoints(byte[] payload) throws InvalidProtocolBufferException {

@@ -126,6 +126,7 @@ public final class GuildPanel implements HudWindow {
     private Runnable onShop;
     private Runnable onSkills;
     private Runnable onSpiritVein;
+    private Runnable onGuildWar;
     private Runnable onOpened;
 
     /**
@@ -259,6 +260,11 @@ public final class GuildPanel implements HudWindow {
         // ADR-090 — Linh Mạch.
         secondRow
                 .add(actionButton("guild.action.spirit_vein", () -> fire(onSpiritVein)))
+                .width(ROW_BUTTON_WIDTH_PX)
+                .padRight(6f);
+        // ADR-102 — bang chiến.
+        secondRow
+                .add(actionButton("guild.action.guild_war", () -> fire(onGuildWar)))
                 .width(ROW_BUTTON_WIDTH_PX);
         section.add(secondRow).width(PANEL_WIDTH_PX).left().padTop(6f).row();
         // Cách ĐÓNG phải nằm ngay trên cửa sổ, cùng lý do PartyPanel/FriendPanel đã có dòng này:
@@ -428,6 +434,11 @@ public final class GuildPanel implements HudWindow {
     /** ADR-090 — nút "Linh Mạch". */
     public void setOnSpiritVein(Runnable listener) {
         this.onSpiritVein = listener;
+    }
+
+    /** Nút "Bang chiến" (ADR-102). */
+    public void setOnGuildWar(Runnable listener) {
+        this.onGuildWar = listener;
     }
 
     /** ADR-085 — nút "Kỹ năng bang". */

@@ -114,6 +114,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-101 — lượt hạ quái vào bảng truy nã; nối sau khi DB đã dựng. */
     final BountyHooks bounties = new BountyHooks();
 
+    /** ADR-102 — ảnh chụp ai đang chiến với ai (luật PvP của world chính) + đếm lần hạ; nối sau khi DB đã dựng. */
+    final GuildWarHooks guildWars = new GuildWarHooks();
+
     /** Bụi linh thảo (ADR-098) — trạng thái sẵn/hồi/đang hái, RAM, dùng chung mọi kết nối. */
     final HerbNodes herbNodes = new HerbNodes();
 
@@ -570,7 +573,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      */
     @Override
     public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
-        // Không làm gì — WorldFacade tự gọi onCharacterRespawned, xem javadoc phía trên.
+        // Hồi sinh: WorldFacade tự gọi onCharacterRespawned, xem javadoc phía trên. Ở đây chỉ đếm bang chiến (ADR-102).
+        guildWars.onCharacterDefeated(defeatedCharacterId, killerEntityId);
     }
 
     @Override

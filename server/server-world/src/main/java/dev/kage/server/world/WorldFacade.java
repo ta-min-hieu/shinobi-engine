@@ -83,6 +83,8 @@ public final class WorldFacade {
     private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<VelocityComponent> VELOCITY = ComponentMapper.getFor(VelocityComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
+    private static final ComponentMapper<TriggerZoneMembershipComponent> ZONE_MEMBERSHIP =
+            ComponentMapper.getFor(TriggerZoneMembershipComponent.class);
     private static final ComponentMapper<SkillRankComponent> SKILL_RANK =
             ComponentMapper.getFor(SkillRankComponent.class);
     private static final ComponentMapper<MonsterComponent> MONSTER = ComponentMapper.getFor(MonsterComponent.class);
@@ -199,6 +201,9 @@ public final class WorldFacade {
      * <p>{@code volatile}: ghi trên luồng dựng World (gateway), đọc trên tick thread.
      */
     private volatile boolean pvpAllowed;
+
+    // ADR-102 — ai đang chiến với ai (ảnh chụp RAM do gateway dựng lại); world chính nối qua usePlayerVersusPlayerRule.
+    private volatile PlayerVersusPlayerRule guildWarRule = PlayerVersusPlayerRule.NOBODY;
 
     /**
      * Sổ hồi chiêu sống lâu hơn thực thể (README dòng 37iii) — mặc định là sổ không nhớ gì, xem
@@ -396,10 +401,10 @@ public final class WorldFacade {
         this.tickMetricsPort = wiring.tickMetricsPort();
         this.systemTimingListener = tickMetricsPort::recordSystemDuration;
         this.aoiTracker = new AreaOfInterestTracker(outboundSink);
-        this.combatSystem = new CombatSystem(this::lookupEntity, this::isPvpAllowed, random);
+        this.combatSystem = new CombatSystem(this::lookupEntity, this::allowsPlayerVersusPlayer, random);
         this.healthRegenSystem = new HealthRegenSystem(this::isPvpAllowed);
         this.aiSystem = new AiSystem(entitiesByCharacterId::values, this::lookupEntity, random);
-        this.skillSystem = new SkillSystem(this::lookupEntity, this::isPvpAllowed, random);
+        this.skillSystem = new SkillSystem(this::lookupEntity, this::allowsPlayerVersusPlayer, random);
         this.bossAiSystem = new BossAiSystem(this::lookupEntity, random);
         // Thứ tự ĐÚNG ECS.md §6 (InputCommandSystem -> AISystem -> MovementSystem -> ... ->
         // CombatSystem): AI set vận tốc/mục tiêu trước, Movement tích luỹ vị trí, Combat mới xét
@@ -617,6 +622,34 @@ public final class WorldFacade {
 
     private boolean isPvpAllowed() {
         return pvpAllowed;
+    }
+
+    /**
+     * Nối luật bang chiến (ADR-102 D2) — CHỈ world chính gọi; gọi lại được bất kỳ lúc nào (đọc {@code volatile} mỗi
+     * lần xét).
+     */
+    public void usePlayerVersusPlayerRule(PlayerVersusPlayerRule rule) {
+        guildWarRule = rule;
+    }
+
+    /**
+     * ADR-102 D2 — luật PvP theo cặp mà {@code CombatSystem}/{@code SkillSystem} hỏi: đấu trường cho mọi cặp; còn lại
+     * chỉ cặp mà luật bang chiến cho VÀ cả hai đứng ngoài mọi vùng an toàn. Chạy trên tick thread, không cấp phát.
+     */
+    private boolean allowsPlayerVersusPlayer(long attackerId, long targetId) {
+        if (pvpAllowed) {
+            return true;
+        }
+        return guildWarRule.allows(attackerId, targetId) && outsideSafeZones(attackerId) && outsideSafeZones(targetId);
+    }
+
+    private boolean outsideSafeZones(long characterId) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        if (entity == null) {
+            return false;
+        }
+        TriggerZoneMembershipComponent zones = ZONE_MEMBERSHIP.get(entity);
+        return zones == null || zones.occupiedZoneIds.isEmpty();
     }
 
     /**

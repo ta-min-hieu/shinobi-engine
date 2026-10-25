@@ -93,7 +93,7 @@ final class SkillSystem extends IteratingKSystem {
             ComponentMapper.getFor(CombatRecencyComponent.class);
 
     private final LongFunction<KEntity> entityLookup;
-    private final BooleanSupplier pvpAllowed;
+    private final PlayerVersusPlayerRule pvpRule;
     private final RandomGenerator random;
     private final ScriptSandbox scriptSandbox = new ScriptSandbox(SkillConstants.SCRIPT_MAX_STATEMENTS);
     private final Map<String, String> scriptsByCode;
@@ -112,7 +112,12 @@ final class SkillSystem extends IteratingKSystem {
      * truyền nguồn của World (seed cố định ở test thuộc tính, xem {@link ThreadLocalRandomSource}).
      */
     SkillSystem(LongFunction<KEntity> entityLookup, BooleanSupplier pvpAllowed, RandomGenerator random) {
-        this(entityLookup, pvpAllowed, def -> loadScript(def.scriptResource()), random);
+        this(entityLookup, (attackerId, targetId) -> pvpAllowed.getAsBoolean(), random);
+    }
+
+    /** Như trên nhưng PvP xét theo CẶP người (ADR-102 D2) — {@link WorldFacade} dùng bản này. */
+    SkillSystem(LongFunction<KEntity> entityLookup, PlayerVersusPlayerRule pvpRule, RandomGenerator random) {
+        this(entityLookup, pvpRule, def -> loadScript(def.scriptResource()), random);
     }
 
     /**
@@ -123,17 +128,21 @@ final class SkillSystem extends IteratingKSystem {
             LongFunction<KEntity> entityLookup,
             BooleanSupplier pvpAllowed,
             Function<SkillDefinition, String> scriptSource) {
-        this(entityLookup, pvpAllowed, scriptSource, ThreadLocalRandomSource.INSTANCE);
+        this(
+                entityLookup,
+                (attackerId, targetId) -> pvpAllowed.getAsBoolean(),
+                scriptSource,
+                ThreadLocalRandomSource.INSTANCE);
     }
 
     private SkillSystem(
             LongFunction<KEntity> entityLookup,
-            BooleanSupplier pvpAllowed,
+            PlayerVersusPlayerRule pvpRule,
             Function<SkillDefinition, String> scriptSource,
             RandomGenerator random) {
         super(Family.all(SkillCooldownComponent.class).get());
         this.entityLookup = entityLookup;
-        this.pvpAllowed = pvpAllowed;
+        this.pvpRule = pvpRule;
         this.random = random;
         this.scriptsByCode =
                 SkillRegistry.BY_CODE.values().stream().collect(Collectors.toMap(SkillDefinition::code, scriptSource));
@@ -261,9 +270,9 @@ final class SkillSystem extends IteratingKSystem {
         if (definition.targetKind() != SkillTargetKind.ENEMY) {
             return true;
         }
-        // ENEMY lên người chơi khác (ID dương) ngoài Arena — cả damage lẫn debuff/stun đều là gây
-        // hại (2026-09-24, tạm thời — xem WorldFacade#pvpAllowed). ALLY (hồi máu/khiên) vẫn được.
-        return resolvedTargetId != casterId && (resolvedTargetId <= 0 || pvpAllowed.getAsBoolean());
+        // ENEMY lên người chơi khác (ID dương) — cả damage lẫn debuff/stun đều là gây hại, nên đi qua
+        // luật PvP theo cặp (ADR-102 D2, xem WorldFacade#allowsPlayerVersusPlayer). ALLY (hồi máu/khiên) vẫn được.
+        return resolvedTargetId != casterId && (resolvedTargetId <= 0 || pvpRule.allows(casterId, resolvedTargetId));
     }
 
     /** @return {@code null} nếu mục tiêu không hợp lệ theo {@code definition.targetKind()} (bỏ qua âm thầm). */

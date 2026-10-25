@@ -490,6 +490,12 @@ public final class WorldScreen implements GameScreen {
                 reports.community().relationshipPanel(), reports.community().relationships());
         panels.register(reports.community().dailyPanel(), reports.community().daily());
         panels.register(reports.community().emotes());
+        // ADR-102 — cửa sổ bang chiến mở từ nút cửa sổ Bang; đang chiến thì click người chơi là nhắm họ.
+        GuildWarCoordinator guildWars = reports.community().guildWars();
+        panels.register(reports.community().guildWarPanel(), guildWars);
+        guild.useGuildWar(guildWars::open);
+        duelTargeting.useGuildWar(
+                guildWars::isMyWarActive, dev.kage.client.core.ui.theme.KageI18n.textOrKey(i18n, "guildwar.target"));
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
         panels.register(friendPanel, friends);

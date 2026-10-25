@@ -321,3 +321,47 @@ message SpiritVeinView {
 message GetSpiritVeinStatusResponse {
   repeated SpiritVeinView veins = 1;
 }
+
+// ===== ADR-102 — Bang chiến. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_DECLARE_GUILD_WAR_COMMAND = 733). Chỉ bang chủ; tốn vàng của bang chủ.
+message DeclareGuildWarCommand {
+  string target_guild_name = 1;
+}
+
+enum DeclareGuildWarOutcome {
+  DECLARE_GUILD_WAR_OUTCOME_UNSPECIFIED = 0;
+  DECLARE_GUILD_WAR_OUTCOME_OK = 1;
+  DECLARE_GUILD_WAR_OUTCOME_NOT_IN_GUILD = 2;
+  DECLARE_GUILD_WAR_OUTCOME_NOT_LEADER = 3;
+  DECLARE_GUILD_WAR_OUTCOME_UNKNOWN_GUILD = 4;
+  DECLARE_GUILD_WAR_OUTCOME_SAME_GUILD = 5;
+  DECLARE_GUILD_WAR_OUTCOME_ALREADY_AT_WAR = 6;   // một trong hai bang đang có trận chờ/đang đánh
+  DECLARE_GUILD_WAR_OUTCOME_COOLDOWN = 7;         // cặp này vừa đánh xong chưa đủ 24 giờ
+  DECLARE_GUILD_WAR_OUTCOME_INSUFFICIENT_GOLD = 8;
+}
+
+// Response: Server -> Client (OPCODE_DECLARE_GUILD_WAR_RESPONSE = 734).
+message DeclareGuildWarResponse {
+  DeclareGuildWarOutcome outcome = 1;
+  int64 cost_gold = 2;   // giá tuyên chiến (để client hiện, server mới là nơi trừ)
+}
+
+// Request: Client -> Server (OPCODE_GET_GUILD_WAR_STATUS_REQUEST = 735).
+message GetGuildWarStatusRequest {}
+
+message GuildWarView {
+  string attacker_guild_name = 1;
+  string defender_guild_name = 2;
+  int32 attacker_kills = 3;
+  int32 defender_kills = 4;
+  bool active = 5;                  // đang trong giờ đánh
+  int64 seconds_until_change = 6;   // active: tới lúc hết giờ; không: tới lúc bắt đầu
+  bool mine = 7;                    // bang của người hỏi là một trong hai phe
+}
+
+// Response: Server -> Client (OPCODE_GET_GUILD_WAR_STATUS_RESPONSE = 736). Mọi trận chưa chốt trên server.
+message GetGuildWarStatusResponse {
+  repeated GuildWarView wars = 1;
+  int64 declare_cost_gold = 2;
+}

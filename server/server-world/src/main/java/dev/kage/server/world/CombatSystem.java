@@ -70,7 +70,7 @@ final class CombatSystem extends IteratingKSystem {
             boolean targetDied) {}
 
     private final LongFunction<KEntity> entityLookup;
-    private final BooleanSupplier pvpAllowed;
+    private final PlayerVersusPlayerRule pvpRule;
     private final RandomGenerator random;
     private final List<AttackOutcome> pendingResults = new ArrayList<>();
 
@@ -87,10 +87,15 @@ final class CombatSystem extends IteratingKSystem {
      * truyền nguồn của World (seed cố định ở test thuộc tính, xem {@link ThreadLocalRandomSource}).
      */
     CombatSystem(LongFunction<KEntity> entityLookup, BooleanSupplier pvpAllowed, RandomGenerator random) {
+        this(entityLookup, (attackerId, targetId) -> pvpAllowed.getAsBoolean(), random);
+    }
+
+    /** Như trên nhưng PvP xét theo CẶP người (ADR-102 D2) — {@link WorldFacade} dùng bản này. */
+    CombatSystem(LongFunction<KEntity> entityLookup, PlayerVersusPlayerRule pvpRule, RandomGenerator random) {
         super(Family.all(PositionComponent.class, TargetComponent.class, AttackCooldownComponent.class)
                 .get());
         this.entityLookup = entityLookup;
-        this.pvpAllowed = pvpAllowed;
+        this.pvpRule = pvpRule;
         this.random = random;
     }
 
@@ -179,11 +184,13 @@ final class CombatSystem extends IteratingKSystem {
     }
 
     /**
-     * Người chơi đánh người chơi khi World này không cho PvP (2026-09-24, tạm thời — xem
-     * {@code WorldFacade#pvpAllowed}). Quái đánh người chơi, người chơi đánh quái: không ảnh hưởng.
+     * Người chơi đánh người chơi mà luật PvP của World không cho cặp này (ADR-102 D2 — xem
+     * {@code WorldFacade#allowsPlayerVersusPlayer}). Quái đánh người chơi, người chơi đánh quái: không ảnh hưởng.
      */
     private boolean isForbiddenPlayerVersusPlayer(KEntity attacker, KEntity target) {
-        return CHARACTER_ID.has(attacker) && CHARACTER_ID.has(target) && !pvpAllowed.getAsBoolean();
+        return CHARACTER_ID.has(attacker)
+                && CHARACTER_ID.has(target)
+                && !pvpRule.allows(CHARACTER_ID.get(attacker).characterId, CHARACTER_ID.get(target).characterId);
     }
 
     private void resolveAndRecordAttack(
