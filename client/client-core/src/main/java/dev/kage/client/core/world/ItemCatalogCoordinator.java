@@ -84,6 +84,11 @@ final class ItemCatalogCoordinator implements WindowFlow {
         return catalog.byCode(itemCode);
     }
 
+    /** Mọi mẫu vật phẩm đã biết (cầu mua — ADR-116 — đặt lệnh cho món chưa có trong túi). */
+    List<ItemCatalogEntry> entries() {
+        return catalog.entries();
+    }
+
     /** Xem {@link ItemCatalog#nameKey(long)} — rỗng nghĩa là chỗ gọi PHẢI tự hiện dạng số. */
     Optional<String> nameKey(long itemTemplateId) {
         return catalog.nameKey(itemTemplateId);

@@ -97,6 +97,10 @@ sealed interface WorldCommand {
     /** Huỷ đoàn hộ tống của {@code characterId} nếu có (ADR-114). */
     record CancelEscortCommand(long characterId) implements WorldCommand {}
 
+    /** Chọn cách hồi sinh khi đang nằm chờ (ADR-117); {@code reply} chạy trên tick thread — phải trả về ngay. */
+    record ReviveCommand(long characterId, boolean inPlace, java.util.function.Consumer<ReviveOutcome> reply)
+            implements WorldCommand {}
+
     /**
      * Ngoại hình của {@code characterId} vừa đổi (đổi hệ phái — ADR-045). Command này CHỈ mang id:
      * server-world không biết "hệ phái"/"bậc trang phục" là gì và không được biết (ngoại hình sống

@@ -58,3 +58,51 @@ message ServerShuttingDownEvent {
 message ServerNoticeEvent {
   string body = 1;
 }
+
+// ADR-115 (2026-10-30) — khoá an toàn (PIN cấp 2 của TÀI KHOẢN, 4–6 chữ số). Sau khi đặt PIN, giao dịch, đặt/mua ở
+// phường thị, thư kèm đồ/linh thạch và phân giải bị chặn bằng ErrorResponse 403 `error.security_pin_required` cho tới
+// khi phiên kiểm PIN đúng một lần (mở cho tới khi ngắt kết nối). Sai 5 lần liên tiếp ⇒ khoá 30 phút.
+enum SecurityPinOutcome {
+  SECURITY_PIN_OUTCOME_UNSPECIFIED = 0;
+  SECURITY_PIN_OUTCOME_OK = 1;
+  SECURITY_PIN_OUTCOME_INVALID_FORMAT = 2;
+  SECURITY_PIN_OUTCOME_WRONG_PIN = 3;
+  SECURITY_PIN_OUTCOME_LOCKED = 4;
+  SECURITY_PIN_OUTCOME_NO_PIN = 5;
+}
+
+// Request: Client -> Server (OPCODE_GET_SECURITY_PIN_STATUS_REQUEST = 8). Cần đã đăng nhập.
+message GetSecurityPinStatusRequest {
+}
+
+// Response: Server -> Client (OPCODE_GET_SECURITY_PIN_STATUS_RESPONSE = 9).
+message GetSecurityPinStatusResponse {
+  bool has_pin = 1;
+  bool unlocked = 2;              // phiên này đã kiểm PIN đúng (hoặc chưa có PIN)
+  int64 locked_until_epoch_ms = 3; // 0 = không bị khoá
+}
+
+// Command: Client -> Server (OPCODE_SET_SECURITY_PIN_COMMAND = 10). current_pin bỏ qua khi chưa có PIN.
+message SetSecurityPinCommand {
+  string current_pin = 1;
+  string new_pin = 2;
+}
+
+// Response: Server -> Client (OPCODE_SET_SECURITY_PIN_RESPONSE = 11).
+message SetSecurityPinResponse {
+  SecurityPinOutcome outcome = 1;
+  int32 attempts_left = 2;
+  int64 locked_until_epoch_ms = 3;
+}
+
+// Command: Client -> Server (OPCODE_VERIFY_SECURITY_PIN_COMMAND = 12). Đúng ⇒ mở khoá cho tới khi ngắt kết nối.
+message VerifySecurityPinCommand {
+  string pin = 1;
+}
+
+// Response: Server -> Client (OPCODE_VERIFY_SECURITY_PIN_RESPONSE = 13).
+message VerifySecurityPinResponse {
+  SecurityPinOutcome outcome = 1;
+  int32 attempts_left = 2;
+  int64 locked_until_epoch_ms = 3;
+}

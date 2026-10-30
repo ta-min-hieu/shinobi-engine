@@ -412,6 +412,7 @@ final class MainWorldChannelRegistry {
         facade.rememberSkillCooldownsIn(skillCooldowns);
         facade.usePlayerVersusPlayerRule(registry.guildWars.roster); // ADR-102 D2 — cùng luật khu vực #1
         facade.useEscortListener(registry.escorts::onChanged); // ADR-114
+        facade.useRevivalListener(RevivalCommands.listener(registry)); // ADR-117
         return facade;
     }
 

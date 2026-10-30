@@ -61,6 +61,18 @@ final class NpcProximity {
         return false;
     }
 
+    /** ADR-118 — đứng ở world chính, cách điểm {@code (x, y)} không quá {@code radius} mét. */
+    boolean isNear(long characterId, float x, float y, float radius) {
+        return mainWorldPositionOf
+                .apply(characterId)
+                .map(p -> {
+                    float dx = p.x() - x;
+                    float dy = p.y() - y;
+                    return dx * dx + dy * dy <= radius * radius;
+                })
+                .orElse(false);
+    }
+
     private static boolean isClose(float dx, float dy) {
         return dx * dx + dy * dy <= MAX_KNOWN_DISTANCE_METERS * MAX_KNOWN_DISTANCE_METERS;
     }

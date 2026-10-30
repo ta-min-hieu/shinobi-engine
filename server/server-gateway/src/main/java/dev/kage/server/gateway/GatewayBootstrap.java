@@ -247,6 +247,7 @@ public final class GatewayBootstrap {
             positionPersister.stop();
             // Hết hạn phường thị (ADR-063 D4) + Linh Mạch (ADR-090) ghi DB + gửi thư — dừng TRƯỚC khi đóng pool.
             ctx.jobs().marketExpiry().stop();
+            ctx.jobs().expansion().stop();
             ctx.jobs().spiritVeins().stop();
             ctx.jobs().waypoints().stop();
             ctx.jobs().guildWars().stop();
@@ -277,7 +278,8 @@ public final class GatewayBootstrap {
             MarketExpiryJanitor marketExpiry,
             SpiritVeinScheduler spiritVeins,
             WaypointScheduler waypoints,
-            GuildWarScheduler guildWars) {}
+            GuildWarScheduler guildWars,
+            ExpansionJobs expansion) {}
 
     private static BackgroundJobs startBackgroundJobs(
             GatewayFacades facades, ConnectedCharacterRegistry characterRegistry, WorldGateway worldGateway) {
@@ -311,7 +313,16 @@ public final class GatewayBootstrap {
                 java.time.Clock.systemUTC());
         guildWars.start();
         characterRegistry.guildAuctions.start(); // ADR-112 — dừng ở shutdownSequence
-        return new BackgroundJobs(marketExpiry, spiritVeins, waypoints, guildWars);
+        ExpansionJobs expansion = new ExpansionJobs();
+        expansion.add(
+                ExpansionJobs.buyOrderRefunds(facades.progression().expansion().buyOrders(), mail, characterRegistry));
+        expansion.add(MerchantCommands.job(
+                facades.progression().expansion().merchant(),
+                facades.progression().adventure().waypoints(),
+                characterRegistry,
+                java.time.Clock.systemUTC()));
+        expansion.start();
+        return new BackgroundJobs(marketExpiry, spiritVeins, waypoints, guildWars, expansion);
     }
 
     /**
@@ -472,6 +483,7 @@ public final class GatewayBootstrap {
         // ADR-102 D2 — luật PvP theo cặp (bang chiến) cho world chính; khu vực mở thêm nối ở MainWorldChannelRegistry.
         firstChannelFacade.usePlayerVersusPlayerRule(characterRegistry.guildWars.roster);
         firstChannelFacade.useEscortListener(characterRegistry.escorts::onChanged); // ADR-114
+        firstChannelFacade.useRevivalListener(RevivalCommands.listener(characterRegistry)); // ADR-117
         firstChannelFacade.start();
         WorldBossScheduler worldBoss = startWorldBoss(firstChannelFacade, databaseBootstrap, characterRegistry);
         MainWorldChannelRegistry mainWorldChannels =
@@ -555,7 +567,12 @@ public final class GatewayBootstrap {
                         databaseBootstrap.wireBestiaryFacade(),
                         databaseBootstrap.wireReputationFacade(),
                         databaseBootstrap.wireRefinementFacade(),
-                        databaseBootstrap.wireGuildAuctionFacade()));
+                        databaseBootstrap.wireGuildAuctionFacade()),
+                new ExpansionFacades(
+                        databaseBootstrap.wireSecurityPinFacade(),
+                        databaseBootstrap.wireBuyOrderFacade(),
+                        databaseBootstrap.wireConsumableFacade(),
+                        databaseBootstrap.wireTravelingMerchantFacade()));
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */

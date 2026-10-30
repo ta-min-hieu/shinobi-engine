@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Timeout;
  * {@code MoveCommand} là nhân vật mang toạ độ {@code NaN} vĩnh viễn (và được lưu xuống DB lúc đăng
  * xuất). {@code Infinity} hay {@code 1e30} cũng thành {@code NaN} ({@code Inf/Inf}).
  *
- * <p><b>Người đã chết</b>: world chính hồi sinh ngay, nhưng World hầm ngục ({@code
+ * <p><b>Người đã chết</b>: world chính cho nằm chờ chọn hồi sinh (ADR-117) rồi hồi sinh, nhưng World hầm ngục ({@code
  * spawnOverworldContent = false}) để nhân vật nằm 0 máu. Cả {@code CombatSystem} lẫn
  * {@code SkillSystem} chỉ kiểm máu của MỤC TIÊU, không kiểm của người ra đòn.
  *

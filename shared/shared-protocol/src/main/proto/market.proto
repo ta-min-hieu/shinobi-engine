@@ -90,3 +90,136 @@ message ListingSoldEvent {
   int32 quantity = 3;
   int64 proceeds = 4;       // đã trừ phí
 }
+
+// ADR-116 (2026-10-30) — cầu mua. Người đặt ký quỹ quantity × unit_price linh thạch lúc đặt; người bán bán thẳng vào
+// lệnh (nhận tiền từ ký quỹ, trừ phí 5%); món vào túi người đặt. Huỷ ⇒ hoàn phần ký quỹ còn lại ngay; hết hạn 48 giờ ⇒
+// hoàn qua thư. Đặt lệnh và bán vào lệnh bị khoá an toàn chặn (ADR-115).
+enum BuyOrderOutcome {
+  BUY_ORDER_OUTCOME_UNSPECIFIED = 0;
+  BUY_ORDER_OUTCOME_OK = 1;
+  BUY_ORDER_OUTCOME_NOT_FOUND = 2;
+  BUY_ORDER_OUTCOME_UNKNOWN_ITEM = 3;
+  BUY_ORDER_OUTCOME_INVALID_QUANTITY = 4;
+  BUY_ORDER_OUTCOME_INVALID_PRICE = 5;
+  BUY_ORDER_OUTCOME_TOO_MANY_ORDERS = 6;
+  BUY_ORDER_OUTCOME_INSUFFICIENT_GOLD = 7;
+  BUY_ORDER_OUTCOME_OWN_ORDER = 8;
+  BUY_ORDER_OUTCOME_WRONG_ITEM = 9;
+  BUY_ORDER_OUTCOME_EQUIPPED = 10;
+  BUY_ORDER_OUTCOME_ENHANCED_NOT_ALLOWED = 11;
+  BUY_ORDER_OUTCOME_ITEM_IN_TRADE = 12;
+  BUY_ORDER_OUTCOME_BUYER_BAG_FULL = 13;
+}
+
+message BuyOrderView {
+  int64 order_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity_wanted = 3;
+  int32 quantity_filled = 4;
+  int64 unit_price = 5;
+  int64 expires_at_epoch_ms = 6;
+}
+
+// Request: Client -> Server (OPCODE_LIST_BUY_ORDERS_REQUEST = 1015). item_template_id = 0 ⇒ mọi loại.
+message ListBuyOrdersRequest {
+  int64 item_template_id = 1;
+}
+
+// Response: Server -> Client (OPCODE_LIST_BUY_ORDERS_RESPONSE = 1016). `orders` = tối đa 50 lệnh giá cao nhất (không gồm
+// lệnh của người hỏi); `mine` = lệnh người hỏi đang mở.
+message ListBuyOrdersResponse {
+  repeated BuyOrderView orders = 1;
+  repeated BuyOrderView mine = 2;
+}
+
+// Command: Client -> Server (OPCODE_CREATE_BUY_ORDER_COMMAND = 1017).
+message CreateBuyOrderCommand {
+  int64 item_template_id = 1;
+  int32 quantity = 2;
+  int64 unit_price = 3;
+}
+
+// Response: Server -> Client (OPCODE_CREATE_BUY_ORDER_RESPONSE = 1018).
+message CreateBuyOrderResponse {
+  BuyOrderOutcome outcome = 1;
+}
+
+// Command: Client -> Server (OPCODE_SELL_TO_BUY_ORDER_COMMAND = 1019).
+message SellToBuyOrderCommand {
+  int64 order_id = 1;
+  int64 inventory_item_id = 2;
+  int32 quantity = 3;
+}
+
+// Response: Server -> Client (OPCODE_SELL_TO_BUY_ORDER_RESPONSE = 1020).
+message SellToBuyOrderResponse {
+  BuyOrderOutcome outcome = 1;
+  int64 proceeds = 2;
+}
+
+// Command: Client -> Server (OPCODE_CANCEL_BUY_ORDER_COMMAND = 1021).
+message CancelBuyOrderCommand {
+  int64 order_id = 1;
+}
+
+// Response: Server -> Client (OPCODE_CANCEL_BUY_ORDER_RESPONSE = 1022).
+message CancelBuyOrderResponse {
+  BuyOrderOutcome outcome = 1;
+}
+
+// Event: Server -> Client (OPCODE_BUY_ORDER_FILLED_EVENT = 1023). Gửi người đặt (nếu online) mỗi lần có người bán vào.
+message BuyOrderFilledEvent {
+  int64 order_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+}
+
+// ADR-118 (2026-10-30) — thương nhân du hành. Server tự lên lịch 2–3 lần ghé mỗi ngày (giờ VN) ở các điểm truyền tống,
+// mỗi lần 30 phút, mang 3 món hiếm; số lượng mỗi món CHUNG cả server. Mua phải đứng gần trạm (≤ 8 m).
+enum MerchantBuyResult {
+  MERCHANT_BUY_RESULT_UNSPECIFIED = 0;
+  MERCHANT_BUY_RESULT_OK = 1;
+  MERCHANT_BUY_RESULT_NOT_PRESENT = 2;      // thương nhân không ở đây (chưa tới, đã đi, hoặc đứng xa trạm)
+  MERCHANT_BUY_RESULT_SOLD_OUT = 3;
+  MERCHANT_BUY_RESULT_NOT_FOUND = 4;
+  MERCHANT_BUY_RESULT_INSUFFICIENT_GOLD = 5;
+  MERCHANT_BUY_RESULT_BAG_FULL = 6;
+}
+
+message MerchantStockView {
+  int64 item_template_id = 1;
+  int64 price = 2;
+  int32 remaining = 3;
+}
+
+// Request: Client -> Server (OPCODE_GET_TRAVELING_MERCHANT_REQUEST = 1024).
+message GetTravelingMerchantRequest {
+}
+
+// Response: Server -> Client (OPCODE_GET_TRAVELING_MERCHANT_RESPONSE = 1025). present = false ⇒ các field khác rỗng.
+message GetTravelingMerchantResponse {
+  bool present = 1;
+  string waypoint_code = 2;
+  string waypoint_name_key = 3;
+  float x = 4;
+  int64 ends_at_epoch_ms = 5;
+  repeated MerchantStockView stock = 6;
+}
+
+// Command: Client -> Server (OPCODE_BUY_FROM_MERCHANT_COMMAND = 1026). Một cái mỗi lần.
+message BuyFromMerchantCommand {
+  int64 item_template_id = 1;
+}
+
+// Response: Server -> Client (OPCODE_BUY_FROM_MERCHANT_RESPONSE = 1027).
+message BuyFromMerchantResponse {
+  MerchantBuyResult result = 1;
+}
+
+// Event: Server -> Client (OPCODE_TRAVELING_MERCHANT_ARRIVED_EVENT = 1028). Gửi MỌI người online đúng một lần mỗi lần ghé.
+message TravelingMerchantArrivedEvent {
+  string waypoint_code = 1;
+  string waypoint_name_key = 2;
+  float x = 3;
+  int64 ends_at_epoch_ms = 4;
+}

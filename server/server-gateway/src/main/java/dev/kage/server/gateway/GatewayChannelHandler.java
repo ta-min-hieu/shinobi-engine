@@ -494,6 +494,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final GuildWarCommands guildWars;
     private final ServiceDeskCommands serviceDesk;
     private final CollectionCommands collections;
+    private final ExpansionCommands expansion;
+    /** ADR-115 — khoá an toàn của CHÍNH kết nối này (nạp lúc đăng nhập). */
+    private final SecurityPinGate pinGate = new SecurityPinGate();
+
     private final ItemUseCooldown itemUseCooldown = new ItemUseCooldown();
     private final Executor authExecutor;
     // Tin chat của kết nối này chạy lần lượt (dòng 71(f)) — xem SerialExecutor.
@@ -576,11 +580,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_LIST_ACHIEVEMENTS_REQUEST_VALUE, this::handleListAchievementsRequest),
             Map.entry(Opcode.OPCODE_LIST_MARKET_REQUEST_VALUE, this::handleListMarketRequest),
             Map.entry(Opcode.OPCODE_SOCKET_GEM_COMMAND_VALUE, this::handleSocketGemCommand),
-            Map.entry(Opcode.OPCODE_CREATE_LISTING_COMMAND_VALUE, this::handleCreateListingCommand),
+            Map.entry(Opcode.OPCODE_CREATE_LISTING_COMMAND_VALUE, pinGuarded(this::handleCreateListingCommand)),
             Map.entry(Opcode.OPCODE_DONATE_TO_GUILD_COMMAND_VALUE, this::handleDonateToGuildCommand),
             Map.entry(Opcode.OPCODE_LIST_SKILL_RANKS_REQUEST_VALUE, this::handleListSkillRanksRequest),
             Map.entry(Opcode.OPCODE_UPGRADE_SKILL_COMMAND_VALUE, this::handleUpgradeSkillCommand),
-            Map.entry(Opcode.OPCODE_BUY_LISTING_COMMAND_VALUE, this::handleBuyListingCommand),
+            Map.entry(Opcode.OPCODE_BUY_LISTING_COMMAND_VALUE, pinGuarded(this::handleBuyListingCommand)),
             Map.entry(Opcode.OPCODE_CANCEL_LISTING_COMMAND_VALUE, this::handleCancelListingCommand),
             Map.entry(Opcode.OPCODE_SET_ACTIVE_TITLE_COMMAND_VALUE, this::handleSetActiveTitleCommand),
             Map.entry(Opcode.OPCODE_DEPOSIT_ITEM_COMMAND_VALUE, this::handleDepositItemCommand),
@@ -841,10 +845,76 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             (h, id, c) -> h.daily.claimOnlineReward(id, c.getMilestoneMinutes()))),
             Map.entry(
                     Opcode.OPCODE_DISMANTLE_ITEM_COMMAND_VALUE,
-                    storageCommand(
+                    pinGuarded(storageCommand(
                             DismantleItemCommand.parser(),
                             Opcode.OPCODE_DISMANTLE_ITEM_RESPONSE_VALUE,
-                            (h, id, c) -> h.daily.dismantle(id, c.getItemId()))),
+                            (h, id, c) -> h.daily.dismantle(id, c.getItemId())))),
+            // Lô 23 — khoá an toàn (ADR-115). Theo TÀI KHOẢN, dùng được trước khi chọn nhân vật.
+            Map.entry(
+                    Opcode.OPCODE_GET_SECURITY_PIN_STATUS_REQUEST_VALUE,
+                    accountCommand(
+                            dev.kage.protocol.GetSecurityPinStatusRequest.parser(),
+                            Opcode.OPCODE_GET_SECURITY_PIN_STATUS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.securityPin().status(id, h.pinGate))),
+            Map.entry(
+                    Opcode.OPCODE_SET_SECURITY_PIN_COMMAND_VALUE,
+                    accountCommand(
+                            dev.kage.protocol.SetSecurityPinCommand.parser(),
+                            Opcode.OPCODE_SET_SECURITY_PIN_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.securityPin().set(id, c, h.pinGate))),
+            Map.entry(
+                    Opcode.OPCODE_VERIFY_SECURITY_PIN_COMMAND_VALUE,
+                    accountCommand(
+                            dev.kage.protocol.VerifySecurityPinCommand.parser(),
+                            Opcode.OPCODE_VERIFY_SECURITY_PIN_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.securityPin().verify(id, c.getPin(), h.pinGate))),
+            // Lô 23 — thương nhân du hành (ADR-118).
+            Map.entry(
+                    Opcode.OPCODE_GET_TRAVELING_MERCHANT_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetTravelingMerchantRequest.parser(),
+                            Opcode.OPCODE_GET_TRAVELING_MERCHANT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.merchant().status())),
+            Map.entry(
+                    Opcode.OPCODE_BUY_FROM_MERCHANT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.BuyFromMerchantCommand.parser(),
+                            Opcode.OPCODE_BUY_FROM_MERCHANT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.merchant().buy(id, c.getItemTemplateId()))),
+            // Lô 23 — hồi sinh tại chỗ (ADR-117).
+            Map.entry(
+                    Opcode.OPCODE_REVIVE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ReviveCommand.parser(),
+                            Opcode.OPCODE_REVIVE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .revival()
+                                    .revive(id, c.getInPlace(), h.currentWorldFacadeIfPresent(id)))),
+            // Lô 23 — cầu mua (ADR-116). Đặt lệnh và bán vào lệnh qua khoá an toàn như treo/mua ở phường thị.
+            Map.entry(
+                    Opcode.OPCODE_LIST_BUY_ORDERS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListBuyOrdersRequest.parser(),
+                            Opcode.OPCODE_LIST_BUY_ORDERS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.buyOrders().list(id, c.getItemTemplateId()))),
+            Map.entry(
+                    Opcode.OPCODE_CREATE_BUY_ORDER_COMMAND_VALUE,
+                    pinGuarded(storageCommand(
+                            dev.kage.protocol.CreateBuyOrderCommand.parser(),
+                            Opcode.OPCODE_CREATE_BUY_ORDER_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.buyOrders().create(id, c)))),
+            Map.entry(
+                    Opcode.OPCODE_SELL_TO_BUY_ORDER_COMMAND_VALUE,
+                    pinGuarded(storageCommand(
+                            dev.kage.protocol.SellToBuyOrderCommand.parser(),
+                            Opcode.OPCODE_SELL_TO_BUY_ORDER_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.buyOrders().sell(id, c)))),
+            Map.entry(
+                    Opcode.OPCODE_CANCEL_BUY_ORDER_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.CancelBuyOrderCommand.parser(),
+                            Opcode.OPCODE_CANCEL_BUY_ORDER_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.buyOrders().cancel(id, c.getOrderId()))),
             Map.entry(
                     Opcode.OPCODE_LIST_HERB_NODES_REQUEST_VALUE,
                     storageCommand(
@@ -861,7 +931,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(
                     Opcode.OPCODE_LIST_PENDING_FRIEND_REQUESTS_REQUEST_VALUE,
                     this::handleListPendingFriendRequestsRequest),
-            Map.entry(Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE, this::handleSendMailCommand),
+            Map.entry(
+                    Opcode.OPCODE_SEND_MAIL_COMMAND_VALUE,
+                    pinGuardedWhen(
+                            SendMailCommand.parser(),
+                            GatewayChannelHandler::carriesValue,
+                            this::handleSendMailCommand)),
             Map.entry(Opcode.OPCODE_LIST_MAIL_REQUEST_VALUE, this::handleListMailRequest),
             Map.entry(Opcode.OPCODE_CLAIM_MAIL_COMMAND_VALUE, this::handleClaimMailCommand),
             Map.entry(Opcode.OPCODE_DELETE_MAIL_COMMAND_VALUE, this::handleDeleteMailCommand),
@@ -889,11 +964,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(
                     Opcode.OPCODE_LIST_PENDING_PARTY_INVITES_REQUEST_VALUE, this::handleListPendingPartyInvitesRequest),
             Map.entry(Opcode.OPCODE_GET_MY_PARTY_REQUEST_VALUE, this::handleGetMyPartyRequest),
-            Map.entry(Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE, this::handleRequestTradeCommand),
-            Map.entry(Opcode.OPCODE_ACCEPT_TRADE_REQUEST_COMMAND_VALUE, this::handleAcceptTradeRequestCommand),
+            Map.entry(Opcode.OPCODE_REQUEST_TRADE_COMMAND_VALUE, pinGuarded(this::handleRequestTradeCommand)),
+            Map.entry(
+                    Opcode.OPCODE_ACCEPT_TRADE_REQUEST_COMMAND_VALUE,
+                    pinGuarded(this::handleAcceptTradeRequestCommand)),
             Map.entry(Opcode.OPCODE_CANCEL_TRADE_COMMAND_VALUE, this::handleCancelTradeCommand),
-            Map.entry(Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE, this::handleSetTradeOfferCommand),
-            Map.entry(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, this::handleConfirmTradeCommand),
+            Map.entry(Opcode.OPCODE_SET_TRADE_OFFER_COMMAND_VALUE, pinGuarded(this::handleSetTradeOfferCommand)),
+            Map.entry(Opcode.OPCODE_CONFIRM_TRADE_COMMAND_VALUE, pinGuarded(this::handleConfirmTradeCommand)),
             Map.entry(Opcode.OPCODE_GET_TRADE_STATUS_REQUEST_VALUE, this::handleGetTradeStatusRequest),
             Map.entry(Opcode.OPCODE_ENTER_DUNGEON_COMMAND_VALUE, this::handleEnterDungeonCommand),
             Map.entry(Opcode.OPCODE_EXIT_DUNGEON_COMMAND_VALUE, this::handleExitDungeonCommand),
@@ -939,11 +1016,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.guildWars = GuildWarCommands.of(facades, worldGateway.registry());
         this.serviceDesk = ServiceDeskCommands.of(facades, worldGateway.registry());
         this.collections = new CollectionCommands(facades.progression().collections(), inventoryFacade);
+        this.expansion = ExpansionCommands.of(facades, worldGateway, npcProximity);
         this.friendGifts = new FriendGiftCommands(
-                facades.progression().friendGifts(),
-                characterFacade,
-                facades.contentFacades().socialFacades().mailFacade(),
-                worldGateway.registry());
+                facades.progression().friendGifts(), characterFacade, mailFacade, worldGateway.registry());
         this.worldBoss = facades.progression().worldBoss();
         this.partyFinder = new PartyFinderCommands(
                 facades.contentFacades().socialFacades().partyFacade(),
@@ -1085,6 +1160,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         try {
             LoginResult result = accountFacade.login(username);
             boundAccountId = result.accountId();
+            pinGate.reset(expansion.securityPin().hasPin(result.accountId()));
             // Đăng nhập lại trên cùng kết nối (chưa vào world): phiên trước không còn ai dùng — thu hồi.
             String previousToken = sessionToken;
             sessionToken = result.sessionToken();
@@ -2276,6 +2352,61 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             C command = parser.parseFrom(payload);
             runStorage(ctx, header.sequenceId(), responseOpcode, characterId -> work.apply(this, characterId, command));
         };
+    }
+
+    /**
+     * ADR-115 — lệnh theo TÀI KHOẢN (khoá an toàn): như {@link #storageCommand} nhưng lấy {@code accountId} từ
+     * session, dùng được cả trước khi chọn nhân vật.
+     */
+    private <C> PacketHandler accountCommand(
+            com.google.protobuf.Parser<C> parser, int responseOpcode, CommandWork<C> work) {
+        return (ctx, header, payload) -> {
+            C command = parser.parseFrom(payload);
+            Long accountId = boundAccountId;
+            if (accountId == null) {
+                sendError(ctx, header.sequenceId(), 401, "error.not_authenticated");
+                return;
+            }
+            executeBlocking(
+                    ctx,
+                    header.sequenceId(),
+                    () -> send(
+                            ctx,
+                            responseOpcode,
+                            header.sequenceId(),
+                            work.apply(this, accountId, command).toByteArray()));
+        };
+    }
+
+    /**
+     * ADR-115 — chặn lệnh bằng khoá an toàn: tài khoản có PIN mà phiên chưa kiểm đúng ⇒ 403
+     * {@code error.security_pin_required}. Chỉ đọc bộ nhớ ({@link SecurityPinGate}) — an toàn trên EventLoop.
+     */
+    private PacketHandler pinGuarded(PacketHandler inner) {
+        return (ctx, header, payload) -> {
+            if (pinGate.blocks()) {
+                sendError(ctx, header.sequenceId(), 403, "error.security_pin_required");
+                return;
+            }
+            inner.handle(ctx, header, payload);
+        };
+    }
+
+    /** Như {@link #pinGuarded} nhưng chỉ chặn khi lệnh thoả {@code guarded} (vd. thư CÓ kèm đồ/linh thạch). */
+    private <C> PacketHandler pinGuardedWhen(
+            com.google.protobuf.Parser<C> parser, java.util.function.Predicate<C> guarded, PacketHandler inner) {
+        return (ctx, header, payload) -> {
+            if (pinGate.blocks() && guarded.test(parser.parseFrom(payload))) {
+                sendError(ctx, header.sequenceId(), 403, "error.security_pin_required");
+                return;
+            }
+            inner.handle(ctx, header, payload);
+        };
+    }
+
+    /** Thư mang giá trị (linh thạch hoặc vật phẩm) — thứ khoá an toàn bảo vệ; thư chữ thì không. */
+    private static boolean carriesValue(SendMailCommand command) {
+        return command.getGoldAmount() != 0 || command.getAttachmentsCount() > 0;
     }
 
     /** ADR-092 — biểu cảm: không DB, chạy thẳng trên EventLoop (chỉ xếp lệnh vào World). */

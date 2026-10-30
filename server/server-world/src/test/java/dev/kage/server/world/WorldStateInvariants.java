@@ -51,6 +51,10 @@ final class WorldStateInvariants {
     /** Một tick đuổi vượt leash (leash kiểm TRƯỚC khi bước) + sai số. */
     private static final float LEASH_SLACK = 0.25f;
 
+    /** ADR-117 — thời gian chờ hồi sinh tính bằng tick, +1 đệm. */
+    private static final int MAX_CORPSE_TICKS = Math.round(PendingRevivals.WAIT_SECONDS * 60f) + 1;
+
+    private final Map<Long, Integer> deadTicks = new HashMap<>();
     private final WorldFacade world;
     private final WorldFuzzScenario scenario;
     private final InvariantCheckingSink sink;
@@ -134,14 +138,24 @@ final class WorldStateInvariants {
         checkStep(characterId, entity, position);
     }
 
+    /** ADR-117 — world chính cho xác nằm chờ chọn cách hồi sinh, nhưng KHÔNG quá thời gian chờ (+1 tick đệm). */
+    private void checkCorpseTime(long characterId, HealthComponent health) {
+        if (!health.isDead()) {
+            deadTicks.remove(characterId);
+            return;
+        }
+        int deadFor = deadTicks.merge(characterId, 1, Integer::sum);
+        if (scenario.respawnsCharacters() && deadFor > MAX_CORPSE_TICKS) {
+            violation("nhân vật " + characterId + " nằm 0 máu ở world chính quá " + MAX_CORPSE_TICKS + " tick");
+        }
+    }
+
     private void checkHealthAndChi(long characterId, KEntity entity) {
         HealthComponent health = HEALTH.get(entity);
         if (health.max < 1 || health.current < 0 || health.current > health.max) {
             violation("nhân vật " + characterId + " máu " + health.current + "/" + health.max);
         }
-        if (scenario.respawnsCharacters() && health.isDead()) {
-            violation("nhân vật " + characterId + " nằm 0 máu ở world chính (phải hồi sinh ngay)");
-        }
+        checkCorpseTime(characterId, health);
         ChiComponent chi = CHI.get(entity);
         if (chi.current < 0 || chi.current > chi.max) {
             violation("nhân vật " + characterId + " khí " + chi.current + "/" + chi.max);

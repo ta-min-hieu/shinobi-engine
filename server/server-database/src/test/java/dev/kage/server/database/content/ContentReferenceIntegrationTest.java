@@ -116,7 +116,9 @@ class ContentReferenceIntegrationTest {
             "demon_core",
             // ADR-088 — Túi Càn Khôn lên trước art.
             "bag_expansion_pouch",
-            "teleport_talisman");
+            "teleport_talisman",
+            // ADR-117 (2026-10-30) — Hồi Hồn Đan lên trước art.
+            "revive_pill");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

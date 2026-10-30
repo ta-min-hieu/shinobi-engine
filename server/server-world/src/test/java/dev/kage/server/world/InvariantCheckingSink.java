@@ -240,8 +240,11 @@ final class InvariantCheckingSink implements WorldOutboundSink {
         recipient(respawn.characterId(), "CharacterRespawned");
         respawnedThisTick.add(respawn.characterId());
         boolean full = respawn.currentHp() == respawn.maxHp() && respawn.currentChi() == respawn.maxChi();
-        if (!full || respawn.x() != 0f || respawn.y() != 0f) {
-            violation("Hồi sinh không đầy hoặc không ở điểm hồi sinh: " + respawn);
+        boolean atSpawn = respawn.x() == 0f && respawn.y() == 0f;
+        // ADR-117 — dạng hợp lệ thứ hai: Hồi Hồn Đan, đứng dậy TẠI CHỖ với đúng 30% máu (Chi giữ nguyên).
+        boolean inPlace = respawn.currentHp() == PendingRevivals.inPlaceHp(respawn.maxHp());
+        if (!(full && atSpawn) && !inPlace) {
+            violation("Hồi sinh không đầy ở điểm hồi sinh, cũng không đúng 30% tại chỗ: " + respawn);
         }
     }
 

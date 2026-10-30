@@ -256,6 +256,8 @@ class CharacterStatusMovementTest {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(20));
         while (!sink.respawned.contains(2L) && Instant.now().isBefore(deadline)) {
             world.attack(1L);
+            // ADR-117 — gục rồi nằm chờ chọn; chọn "về điểm hồi sinh" (vô hại khi chưa gục: NOT_DEAD).
+            world.revive(2L, false, outcome -> {});
             sleepQuietly(50);
         }
         assertThat(sink.respawned).contains(2L);

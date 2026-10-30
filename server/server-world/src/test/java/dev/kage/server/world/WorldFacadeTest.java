@@ -924,7 +924,11 @@ class WorldFacadeTest {
 
         world.applyEquipmentBonus(1L, new EquipmentBonusSnapshot(1000, 0, 0, 0));
 
-        targetAndAttackUntil(world, 2L, () -> sink.characterRespawned.stream().anyMatch(r -> r.characterId() == 2L));
+        targetAndAttackUntil(world, 2L, () -> {
+            // ADR-117 — gục rồi nằm chờ chọn; chọn "về điểm hồi sinh" (vô hại khi chưa gục: NOT_DEAD).
+            world.revive(2L, false, outcome -> {});
+            return sink.characterRespawned.stream().anyMatch(r -> r.characterId() == 2L);
+        });
         CharacterRespawned respawn = sink.characterRespawned.stream()
                 .filter(r -> r.characterId() == 2L)
                 .findFirst()
@@ -1142,7 +1146,11 @@ class WorldFacadeTest {
         world.applyEquipmentBonus(2L, new EquipmentBonusSnapshot(0, 0, 0, 58));
         world.applyEquipmentBonus(1L, new EquipmentBonusSnapshot(1000, 0, 0, 0)); // đủ để hạ gục ngay
 
-        targetAndAttackUntil(world, 2L, () -> sink.characterRespawned.stream().anyMatch(r -> r.characterId() == 2L));
+        targetAndAttackUntil(world, 2L, () -> {
+            // ADR-117 — gục rồi nằm chờ chọn; chọn "về điểm hồi sinh" (vô hại khi chưa gục: NOT_DEAD).
+            world.revive(2L, false, outcome -> {});
+            return sink.characterRespawned.stream().anyMatch(r -> r.characterId() == 2L);
+        });
         CharacterRespawned respawn = sink.characterRespawned.stream()
                 .filter(r -> r.characterId() == 2L)
                 .findFirst()

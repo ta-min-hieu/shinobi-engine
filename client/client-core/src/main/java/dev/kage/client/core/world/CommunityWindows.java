@@ -27,7 +27,8 @@ record CommunityWindows(
         ReportPanel refinementPanel,
         RefinementCoordinator refinement,
         ReportPanel auctionPanel,
-        GuildAuctionCoordinator auctions) {
+        GuildAuctionCoordinator auctions,
+        ExpansionWindows expansion) {
 
     static CommunityWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         ReportPanel relationshipPanel =
@@ -58,7 +59,8 @@ record CommunityWindows(
                 refinementPanel,
                 new RefinementCoordinator(refinementPanel, sender, feeds),
                 auctionPanel,
-                new GuildAuctionCoordinator(auctionPanel, sender, feeds));
+                new GuildAuctionCoordinator(auctionPanel, sender, feeds),
+                ExpansionWindows.create(skin, sender, feeds));
     }
 
     /** Đăng ký mọi cửa sổ ở đây vào hub — tách khỏi {@code WorldScreen#registerPanels} (trần {@code MethodLength}). */
@@ -71,6 +73,7 @@ record CommunityWindows(
         panels.register(bestiaryPanel, bestiary);
         panels.register(refinementPanel, refinement);
         panels.register(auctionPanel, auctions);
+        expansion.registerInto(panels);
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */
@@ -79,5 +82,6 @@ record CommunityWindows(
         dailyPanel.setCanOpen(noneOpen);
         bestiaryPanel.setCanOpen(noneOpen);
         refinementPanel.setCanOpen(noneOpen);
+        expansion.gateKeyOpening(noneOpen);
     }
 }

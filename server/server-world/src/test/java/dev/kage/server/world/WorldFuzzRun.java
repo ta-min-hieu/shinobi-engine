@@ -64,6 +64,10 @@ final class WorldFuzzRun {
 
     /** Mỗi nhân vật trung bình một cú lên cấp mỗi ngần này tick (~2 lần mỗi 2 phút mô phỏng). */
     private static final int LEVEL_UP_ONE_IN_TICKS = 3_600;
+    /** ADR-117 — trung bình mỗi nhân vật chọn hồi sinh một lần mỗi ~5 giây mô phỏng. */
+    private static final int REVIVE_ONE_IN_TICKS = 300;
+
+    private static final long REVIVE_STREAM_SALT = 0x117_117L;
 
     private static final long LEVEL_STREAM_SALT = 0x1E7E1L;
 
@@ -75,6 +79,8 @@ final class WorldFuzzRun {
      * {@link #random} nên chuỗi lệnh gốc của mọi seed đã ghi nhận giữ nguyên.
      */
     private final SplittableRandom levelRandom;
+
+    private final SplittableRandom reviveRandom;
 
     private final InvariantCheckingSink sink = new InvariantCheckingSink();
     private final WorldFacade world;
@@ -92,6 +98,7 @@ final class WorldFuzzRun {
         this.scenario = scenario;
         this.random = new SplittableRandom(seed);
         this.levelRandom = new SplittableRandom(seed ^ LEVEL_STREAM_SALT);
+        this.reviveRandom = new SplittableRandom(seed ^ REVIVE_STREAM_SALT);
         // Nhánh random RIÊNG cho World (tách từ seed): kết quả trận đấu theo seed, nhưng không ăn
         // vào chuỗi lệnh — thêm một lần gọi random trong server không làm lệch lệnh của bộ kiểm.
         this.world = scenario.newWorld(sink, random.split());
@@ -206,6 +213,7 @@ final class WorldFuzzRun {
             return;
         }
         maybeRaiseLevel(id);
+        maybeRevive(id);
         Long focused = focus.get(id);
         if (focused != null && random.nextDouble() < FOCUS_CHANCE_PER_TICK) {
             pursue(id, focused);
@@ -214,6 +222,19 @@ final class WorldFuzzRun {
         if (random.nextDouble() < ACTION_CHANCE_PER_TICK) {
             actCommonly(id, random.nextInt(100));
         }
+    }
+
+    /**
+     * ADR-117 — thỉnh thoảng chọn cách hồi sinh (kể cả khi chưa gục: NOT_DEAD, không được ném). Luồng ngẫu nhiên RIÊNG
+     * như {@link #maybeRaiseLevel}: không xê dịch luồng chính của các seed đã chạy trước ADR-117.
+     */
+    private void maybeRevive(long id) {
+        if (reviveRandom.nextInt(REVIVE_ONE_IN_TICKS) != 0) {
+            return;
+        }
+        boolean inPlace = reviveRandom.nextBoolean();
+        log(id, "revive(" + inPlace + ")");
+        world.revive(id, inPlace, outcome -> {});
     }
 
     /** Thỉnh thoảng một cú lên cấp, kể cả số lạ (≤ 0, > 100): World chỉ được NÂNG cấp, không bao giờ ném. */

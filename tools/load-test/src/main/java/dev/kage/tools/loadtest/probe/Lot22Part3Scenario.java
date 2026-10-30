@@ -54,9 +54,11 @@ final class Lot22Part3Scenario {
     private static final float TOWER_ENTRY_X = 0f;
 
     private final GameConnection connection;
+    private final Lot23Scenario lot23;
 
     Lot22Part3Scenario(GameConnection connection) {
         this.connection = connection;
+        this.lot23 = new Lot23Scenario(connection);
     }
 
     /** Một bước; {@code "bước không hiểu"} nếu không thuộc phần này. */
@@ -255,7 +257,7 @@ final class Lot22Part3Scenario {
     private String escortFollowOrUnknown(String verb, String arg) throws IOException {
         return "escortFollow".equals(verb)
                 ? new EscortFollow(connection).run(Integer.parseInt(arg))
-                : "bước không hiểu";
+                : lot23.step(verb, arg);
     }
 
     /** Đọc khung trong {@code seconds} giây, in trạng thái đoàn cuối cùng (và dừng sớm nếu đoàn tới nơi/thất bại). */

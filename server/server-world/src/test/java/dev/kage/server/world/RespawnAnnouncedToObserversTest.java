@@ -36,6 +36,7 @@ class RespawnAnnouncedToObserversTest {
         final List<Long> spawnedTo = new CopyOnWriteArrayList<>();
         final List<Long> respawned = new CopyOnWriteArrayList<>();
         final List<HealthChanged> healthChanges = new CopyOnWriteArrayList<>();
+        final List<Long> defeated = new CopyOnWriteArrayList<>();
 
         @Override
         public void onCharacterSpawned(long targetCharacterId, long spawnedCharacterId, float x, float y) {
@@ -93,7 +94,9 @@ class RespawnAnnouncedToObserversTest {
         public void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId) {}
 
         @Override
-        public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {}
+        public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
+            defeated.add(defeatedCharacterId);
+        }
     }
 
     private final RecordingSink sink = new RecordingSink();
@@ -118,11 +121,46 @@ class RespawnAnnouncedToObserversTest {
         Instant deadline = Instant.now().plus(Duration.ofSeconds(20));
         while (!sink.respawned.contains(VICTIM) && Instant.now().isBefore(deadline)) {
             world.attack(KILLER);
+            // ADR-117 — gục rồi nằm chờ chọn; chọn "về điểm hồi sinh" (vô hại khi chưa gục: NOT_DEAD).
+            world.revive(VICTIM, false, outcome -> {});
             sleepQuietly(50);
         }
         assertThat(sink.respawned).contains(VICTIM);
 
         awaitTrue(() -> sink.healthChanges.stream().anyMatch(RespawnAnnouncedToObserversTest::tellsKillerVictimIsFull));
+    }
+
+    @Test
+    void victimShouldLieWaitingForAChoice_andPlayerKillsShouldForbidReviveInPlace() {
+        // ADR-117 — gục ở world chính thì NẰM CHỜ chọn (báo listener), không tự hồi sinh ngay; bị người chơi hạ
+        // thì không được đứng dậy tại chỗ, chọn "về điểm hồi sinh" thì được.
+        List<Boolean> awaiting = new CopyOnWriteArrayList<>();
+        List<ReviveOutcome> replies = new CopyOnWriteArrayList<>();
+        world.useRevivalListener((characterId, seconds, canReviveInPlace) -> awaiting.add(canReviveInPlace));
+        world.allowPlayerVersusPlayer();
+        world.start();
+        world.attachCharacter(KILLER, 1f, 0f, STATS);
+        world.attachCharacter(VICTIM, 0f, 0f, STATS);
+        awaitTrue(() -> sink.spawnedTo.contains(KILLER) && sink.spawnedTo.contains(VICTIM));
+        world.revive(VICTIM, false, replies::add);
+        awaitTrue(() -> replies.contains(ReviveOutcome.NOT_DEAD));
+        world.applyEquipmentBonus(KILLER, new EquipmentBonusSnapshot(1000, 0, 0, 0));
+        world.setTarget(KILLER, VICTIM);
+
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(20));
+        while (!sink.defeated.contains(VICTIM) && Instant.now().isBefore(deadline)) {
+            world.attack(KILLER);
+            sleepQuietly(50);
+        }
+        awaitTrue(() -> awaiting.contains(false));
+        sleepQuietly(300);
+        assertThat(sink.respawned).doesNotContain(VICTIM);
+
+        world.revive(VICTIM, true, replies::add);
+        awaitTrue(() -> replies.contains(ReviveOutcome.FORBIDDEN));
+        world.revive(VICTIM, false, replies::add);
+        awaitTrue(() -> sink.respawned.contains(VICTIM));
+        assertThat(replies).contains(ReviveOutcome.OK);
     }
 
     /** Gói gửi cho KILLER (người quan sát), về VICTIM, mang máu đầy. */

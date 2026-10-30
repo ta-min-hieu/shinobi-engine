@@ -146,6 +146,10 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-112](ADR-112-Guild-Auction.md) | Đấu giá bang | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
 | [ADR-113](ADR-113-Demon-Tower.md) | Trấn Yêu Tháp | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
 | [ADR-114](ADR-114-Escort-Quests.md) | Nhiệm vụ hộ tống | ✅ **Accepted** *(2026-10-25, lô 22)* | — |
+| [ADR-115](ADR-115-Security-Pin.md) | Khoá an toàn (PIN cấp 2) | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
+| [ADR-116](ADR-116-Market-Buy-Orders.md) | Cầu mua ở phường thị | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
+| [ADR-117](ADR-117-Revive-In-Place.md) | Hồi sinh tại chỗ (Hồi Hồn Đan) | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
+| [ADR-118](ADR-118-Traveling-Merchant.md) | Thương nhân du hành | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

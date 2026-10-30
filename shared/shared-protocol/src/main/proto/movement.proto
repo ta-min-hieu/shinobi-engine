@@ -276,3 +276,29 @@ enum TeleportOutcome {
 message TeleportResponse {
   TeleportOutcome outcome = 1;
 }
+
+// ADR-117 (2026-10-30) — hồi sinh tại chỗ. Event: Server -> Client (OPCODE_AWAITING_REVIVAL_EVENT = 321). CHÍNH mình
+// vừa gục ở world chính và đang nằm chờ chọn: về điểm hồi sinh, hoặc Hồi Hồn Đan đứng dậy tại chỗ với 30% máu (không
+// được nếu bị người chơi hạ). Hết `seconds` mà chưa chọn ⇒ tự về điểm hồi sinh (CharacterRespawnedEvent như cũ).
+message AwaitingRevivalEvent {
+  int32 seconds = 1;
+  bool can_revive_in_place = 2;
+}
+
+enum ReviveOutcome {
+  REVIVE_OUTCOME_UNSPECIFIED = 0;
+  REVIVE_OUTCOME_OK = 1;
+  REVIVE_OUTCOME_NOT_DEAD = 2;      // không đang nằm chờ
+  REVIVE_OUTCOME_FORBIDDEN = 3;     // bị người chơi hạ — không đứng dậy tại chỗ được
+  REVIVE_OUTCOME_NO_PILL = 4;       // không có Hồi Hồn Đan
+}
+
+// Command: Client -> Server (OPCODE_REVIVE_COMMAND = 322). in_place = dùng Hồi Hồn Đan.
+message ReviveCommand {
+  bool in_place = 1;
+}
+
+// Response: Server -> Client (OPCODE_REVIVE_RESPONSE = 323). OK thì CharacterRespawnedEvent tới kèm (vị trí + máu mới).
+message ReviveResponse {
+  ReviveOutcome outcome = 1;
+}

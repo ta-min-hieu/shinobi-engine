@@ -255,6 +255,10 @@ public final class WorldFacade {
     private final EscortCaravans escorts = new EscortCaravans();
     // volatile: nối từ luồng khởi động/mở khu vực, đọc trên tick thread.
     private volatile EscortListener escortListener = EscortListener.NONE;
+    /** ADR-117 — người đang nằm chờ chọn cách hồi sinh (chỉ world chính). */
+    private final PendingRevivals revivals = new PendingRevivals();
+
+    private volatile RevivalListener revivalListener = RevivalListener.NONE;
     // Tạo MỘT lần (tham chiếu phương thức bắt `this` cấp phát mỗi lần đánh giá — không làm thế mỗi tick).
     private final EscortCaravans.GuardLookup escortGuards = this::characterXOrNaN;
     private final EscortCaravans.ThreatLookup escortThreats = this::engagedAttackNear;
@@ -847,6 +851,19 @@ public final class WorldFacade {
         escortListener = listener;
     }
 
+    /** ADR-117 — ai nghe "vừa gục, đang chờ chọn" (chỉ world chính nối). */
+    public void useRevivalListener(RevivalListener listener) {
+        revivalListener = listener;
+    }
+
+    /**
+     * ADR-117 — chọn cách hồi sinh khi đang nằm chờ: tại chỗ ({@code inPlace}, người gọi đã tiêu Hồi Hồn Đan) hay
+     * về điểm hồi sinh. {@code reply} chạy trên tick thread với kết quả — người gọi hoàn đan nếu không phải {@code OK}.
+     */
+    public void revive(long characterId, boolean inPlace, java.util.function.Consumer<ReviveOutcome> reply) {
+        inbox.add(new WorldCommand.ReviveCommand(characterId, inPlace, reply));
+    }
+
     /** ADR-114 — huỷ đoàn của nhân vật (bỏ quest); không có đoàn thì thôi. */
     public void cancelEscort(long characterId) {
         inbox.add(new WorldCommand.CancelEscortCommand(characterId));
@@ -956,6 +973,7 @@ public final class WorldFacade {
         announceMovementModifiers(locomotionSystem.drainChanges()); // ADR-073
         tickMonsterRespawn(WorldConstants.FIXED_DT);
         escorts.tick(WorldConstants.FIXED_DT, escortGuards, escortThreats, escortListener); // ADR-114
+        revivals.tick(WorldConstants.FIXED_DT, this::respawnCharacter); // ADR-117 — hết giờ chờ ⇒ về điểm hồi sinh
         // O(n²) — chạy chậm hơn tick loop (WorldConstants.AOI_SYNC_INTERVAL_TICKS), xem
         // javadoc AreaOfInterestTracker + WorldConstants.AOI_SYNC_RATE_HZ. Combat/skill/boss
         // result ở trên KHÔNG bị ảnh hưởng — vẫn phát ngay mỗi tick qua observersOf().
@@ -1060,6 +1078,7 @@ public final class WorldFacade {
                 case WorldCommand.SpawnOnceCommand c -> spawnOnce(c);
                 case WorldCommand.StartEscortCommand c -> escorts.start(c.characterId(), c.route(), escortListener);
                 case WorldCommand.CancelEscortCommand c -> escorts.cancel(c.characterId(), escortListener);
+                case WorldCommand.ReviveCommand c -> c.reply().accept(handleRevive(c.characterId(), c.inPlace()));
                 case WorldCommand.ResetCharacterLevelCommand c -> handleResetCharacterLevel(c.characterId(), c.level());
                 case WorldCommand.ObserversCommand c -> handleObservers(c.characterId(), c.action());
                 case WorldCommand.InboxBarrierCommand c -> c.onReached().run();
@@ -1143,6 +1162,7 @@ public final class WorldFacade {
         KEntity entity = entitiesByCharacterId.remove(characterId);
         baseStatsByCharacterId.remove(characterId);
         escorts.cancel(characterId, escortListener); // ADR-114 D3 — rời World là đoàn biến mất
+        revivals.cancel(characterId); // ADR-117 — rời World giữa lúc nằm chờ
         if (entity == null) {
             return;
         }
@@ -1593,7 +1613,7 @@ public final class WorldFacade {
                 // khi hết cooldown — PHÁT HIỆN THẬT lúc thêm hồi sinh (unit test đột nhiên thấy
                 // onCharacterDefeated bắn 2 lần thay vì 1 trong lúc sleepQuietly chờ xác nhận).
                 clearAttackerTarget(outcome.attackerEntityId());
-                respawnOrHaltCorpse(outcome.targetEntityId());
+                respawnOrHaltCorpse(outcome.targetEntityId(), outcome.attackerEntityId());
             }
         }
     }
@@ -1753,7 +1773,7 @@ public final class WorldFacade {
                 // Xem giải thích đầy đủ ở handleCombatResults — cùng lý do, khác nguồn đòn (skill).
                 outboundSink.onCharacterDefeated(outcome.targetEntityId(), outcome.attackerEntityId());
                 clearAttackerTarget(outcome.attackerEntityId());
-                respawnOrHaltCorpse(outcome.targetEntityId());
+                respawnOrHaltCorpse(outcome.targetEntityId(), outcome.attackerEntityId());
             }
         }
     }
@@ -1792,17 +1812,57 @@ public final class WorldFacade {
      * chết" của {@link #handleMoveIntent}), nên một client sửa đổi chết giữa lúc đang chạy rồi KHÔNG
      * gửi lệnh nào nữa thì cái xác 0 máu cứ trôi đi mãi theo hướng cũ — server tự chạy vị trí đó.
      */
-    private void respawnOrHaltCorpse(long characterId) {
-        if (spawnOverworldContent) {
-            respawnCharacter(characterId);
-            return;
-        }
+    private void respawnOrHaltCorpse(long characterId, long killerEntityId) {
         KEntity entity = entitiesByCharacterId.get(characterId);
         if (entity != null) {
             VelocityComponent velocity = VELOCITY.get(entity);
             velocity.x = 0f;
             velocity.y = 0f;
         }
+        if (spawnOverworldContent && entity != null) {
+            // ADR-117 — nằm tại chỗ chờ chọn (Hồi Hồn Đan hay về điểm hồi sinh); hết giờ tự về như trước.
+            boolean killedByPlayer = killerEntityId > 0;
+            revivals.begin(characterId, killedByPlayer);
+            revivalListener.onAwaitingRevival(characterId, (int) PendingRevivals.WAIT_SECONDS, !killedByPlayer);
+        }
+    }
+
+    /** ADR-117 — một lựa chọn hồi sinh, trên tick thread. */
+    private ReviveOutcome handleRevive(long characterId, boolean inPlace) {
+        if (!revivals.isPending(characterId)) {
+            return ReviveOutcome.NOT_DEAD;
+        }
+        if (inPlace && !revivals.canReviveInPlace(characterId)) {
+            return ReviveOutcome.FORBIDDEN;
+        }
+        revivals.cancel(characterId);
+        if (inPlace) {
+            reviveInPlace(characterId);
+        } else {
+            respawnCharacter(characterId);
+        }
+        return ReviveOutcome.OK;
+    }
+
+    /**
+     * ADR-117 — đứng dậy tại chỗ với {@link PendingRevivals#IN_PLACE_HP_PERCENT}% máu: cùng dọn dẹp như
+     * {@link #respawnCharacter} (hiệu ứng, mục tiêu) nhưng giữ nguyên vị trí và Chi; báo qua đúng hai đường ống của hồi
+     * sinh thường (CharacterRespawnedEvent cho chính mình, HealthChangedEvent cho người đang nhìn).
+     */
+    private void reviveInPlace(long characterId) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        if (entity == null) {
+            return;
+        }
+        PositionComponent position = POSITION.get(entity);
+        HealthComponent health = HEALTH.get(entity);
+        health.current = PendingRevivals.inPlaceHp(health.max);
+        ChiComponent chi = CHI.get(entity);
+        Arrays.fill(STATUS_EFFECT.get(entity).slots, null);
+        TARGET.get(entity).targetEntityId = 0L;
+        pendingHealthChanges.add(new HealthChange(characterId, health.current, health.max));
+        outboundSink.onCharacterRespawned(new WorldOutboundSink.RespawnSnapshot(
+                characterId, position.x, position.y, health.current, health.max, chi.current, chi.max));
     }
 
     /**
@@ -1886,7 +1946,7 @@ public final class WorldFacade {
             if (outcome.targetDied() && outcome.targetEntityId() > 0) {
                 outboundSink.onCharacterDefeated(outcome.targetEntityId(), outcome.attackerEntityId());
                 clearAttackerTarget(outcome.attackerEntityId());
-                respawnOrHaltCorpse(outcome.targetEntityId());
+                respawnOrHaltCorpse(outcome.targetEntityId(), outcome.attackerEntityId());
             }
         }
     }

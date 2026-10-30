@@ -9,6 +9,7 @@ import javax.sql.DataSource;
 import redis.clients.jedis.RedisClient;
 
 import dev.kage.account.api.AccountFacade;
+import dev.kage.account.api.SecurityPinFacade;
 import dev.kage.account.application.LoginOrCreateAccountUseCase;
 import dev.kage.achievement.api.AchievementFacade;
 import dev.kage.achievement.api.BestiaryFacade;
@@ -103,7 +104,9 @@ import dev.kage.mail.application.DeleteMailUseCase;
 import dev.kage.mail.application.ListMailUseCase;
 import dev.kage.mail.application.MailPorts;
 import dev.kage.mail.application.SendMailUseCase;
+import dev.kage.market.api.BuyOrderFacade;
 import dev.kage.market.api.MarketFacade;
+import dev.kage.market.application.BuyOrderUseCase;
 import dev.kage.market.application.MarketUseCase;
 import dev.kage.monster.api.MonsterFacade;
 import dev.kage.monster.api.WorldBossFacade;
@@ -130,6 +133,7 @@ import dev.kage.quest.application.ProcessQuestEventUseCase;
 import dev.kage.quest.application.QuestRewardPorts;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
+import dev.kage.server.database.account.PostgresSecurityPinAdapter;
 import dev.kage.server.database.achievement.PostgresAchievementAdapter;
 import dev.kage.server.database.achievement.PostgresBestiaryAdapter;
 import dev.kage.server.database.achievement.PostgresReputationAdapter;
@@ -191,6 +195,7 @@ import dev.kage.server.database.mail.PostgresMailIdempotencyAdapter;
 import dev.kage.server.database.mail.PostgresMailInventoryGatewayAdapter;
 import dev.kage.server.database.mail.PostgresMailRepositoryAdapter;
 import dev.kage.server.database.market.JdbcMarketTransactionRunner;
+import dev.kage.server.database.market.PostgresBuyOrderAdapter;
 import dev.kage.server.database.market.PostgresMarketAdapter;
 import dev.kage.server.database.market.PostgresMarketGoldAdapter;
 import dev.kage.server.database.market.PostgresMarketInventoryAdapter;
@@ -214,6 +219,7 @@ import dev.kage.server.database.session.RedisClientFactory;
 import dev.kage.server.database.session.RedisConfig;
 import dev.kage.server.database.session.RedisSessionAdapter;
 import dev.kage.server.database.shop.JdbcShopTransactionRunner;
+import dev.kage.server.database.shop.PostgresMerchantAdapter;
 import dev.kage.server.database.shop.PostgresShopAuditAdapter;
 import dev.kage.server.database.shop.PostgresShopCatalogAdapter;
 import dev.kage.server.database.shop.PostgresShopGoldAdapter;
@@ -225,11 +231,13 @@ import dev.kage.server.database.trade.PostgresTradeGoldAdapter;
 import dev.kage.server.database.trade.PostgresTradeIdempotencyAdapter;
 import dev.kage.server.database.trade.PostgresTradeInventoryAdapter;
 import dev.kage.server.database.trade.PostgresTradeSessionAdapter;
+import dev.kage.server.database.world.PostgresConsumableAdapter;
 import dev.kage.server.database.world.PostgresDungeonQuotaAdapter;
 import dev.kage.server.database.world.PostgresHerbNodeAdapter;
 import dev.kage.server.database.world.PostgresSafeZoneAdapter;
 import dev.kage.server.database.world.PostgresWaypointAdapter;
 import dev.kage.shop.api.ShopFacade;
+import dev.kage.shop.api.TravelingMerchantFacade;
 import dev.kage.shop.application.BuyItemUseCase;
 import dev.kage.shop.application.ListShopItemsUseCase;
 import dev.kage.shop.application.SellItemUseCase;
@@ -244,6 +252,7 @@ import dev.kage.trade.application.SetTradeOfferUseCase;
 import dev.kage.trade.application.TradeOfferChanges;
 import dev.kage.trade.application.TradePorts;
 import dev.kage.trade.application.TradeUseCases;
+import dev.kage.world.api.ConsumableFacade;
 import dev.kage.world.api.DungeonQuotaFacade;
 import dev.kage.world.api.HerbNodeFacade;
 import dev.kage.world.api.WaypointFacade;
@@ -740,6 +749,33 @@ public final class ServerDatabaseBootstrap {
     /** Kết nghĩa huynh đệ (ADR-110). */
     public SwornFacade wireSwornFacade() {
         return new SwornFacade(new PostgresSwornAdapter(dataSource), java.time.Clock.systemUTC());
+    }
+
+    /** Cầu mua ở phường thị (ADR-116) — cùng adapter túi/vàng/audit với treo bán. */
+    public BuyOrderFacade wireBuyOrderFacade() {
+        return new BuyOrderFacade(new BuyOrderUseCase(
+                new BuyOrderUseCase.Ports(
+                        new PostgresBuyOrderAdapter(dataSource),
+                        new PostgresMarketInventoryAdapter(),
+                        new PostgresMarketGoldAdapter(),
+                        new PostgresMarketRecordAdapter()),
+                new JdbcMarketTransactionRunner(dataSource),
+                java.time.Clock.systemUTC()));
+    }
+
+    /** Tiêu / hoàn một vật phẩm theo mã (lô 23 — Hồi Hồn Đan ADR-117…). */
+    public ConsumableFacade wireConsumableFacade() {
+        return new ConsumableFacade(new PostgresConsumableAdapter(dataSource));
+    }
+
+    /** Thương nhân du hành (ADR-118). */
+    public TravelingMerchantFacade wireTravelingMerchantFacade() {
+        return new TravelingMerchantFacade(new PostgresMerchantAdapter(dataSource));
+    }
+
+    /** Khoá an toàn — PIN cấp 2 (ADR-115). */
+    public SecurityPinFacade wireSecurityPinFacade() {
+        return new SecurityPinFacade(new PostgresSecurityPinAdapter(dataSource));
     }
 
     /** Thông báo server (ADR-103) — nạp một lần, giữ trong RAM. */
