@@ -17,6 +17,7 @@ import dev.kage.protocol.AcceptQuestOutcome;
 import dev.kage.protocol.AcceptQuestResponse;
 import dev.kage.protocol.ClaimQuestRewardOutcome;
 import dev.kage.protocol.ClaimQuestRewardResponse;
+import dev.kage.protocol.EscortStateEvent;
 import dev.kage.protocol.ItemRewardView;
 import dev.kage.protocol.ListQuestsResponse;
 import dev.kage.protocol.Opcode;
@@ -161,7 +162,23 @@ final class QuestCoordinator implements WindowFlow {
             onAbandonResponse(AbandonQuestResponse.parseFrom(payload));
             return true;
         }
+        if (opcode == Opcode.OPCODE_ESCORT_STATE_EVENT_VALUE) {
+            onEscortState(EscortStateEvent.parseFrom(payload));
+            return true;
+        }
         return false;
+    }
+
+    /**
+     * ADR-114 — gói 625 cũng tới {@code DungeonCoordinator} (dải chữ của đoàn); ở đây chỉ lo phần nhiệm vụ: đoàn
+     * vỡ/bỏ ⇒ server đã bỏ quest, gỡ khỏi nhật ký rồi hỏi lại — xem {@link QuestTracker#onEscortEnded}.
+     */
+    private void onEscortState(EscortStateEvent event) {
+        if (tracker.onEscortEnded(event.getQuestCode(), event.getState())) {
+            syncHud();
+            refreshLogView();
+            sender.listQuests();
+        }
     }
 
     /**

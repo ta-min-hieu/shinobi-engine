@@ -1788,17 +1788,28 @@ class GatewayPipelineTest {
     }
 
     /**
+     * Gom mọi message ra đang chờ thành một buffer. Giữ khoá kênh để không đọc giữa chừng một frame
+     * mà luồng khác đang ghi — xem {@link SerializedOutboundWrites}.
+     */
+    private static ByteBuf drainOutbound(EmbeddedChannel channel) {
+        ByteBuf combined = Unpooled.buffer();
+        synchronized (channel) {
+            ByteBuf part;
+            while ((part = channel.readOutbound()) != null) {
+                combined.writeBytes(part);
+                part.release();
+            }
+        }
+        return combined;
+    }
+
+    /**
      * MỌI frame server đã ghi ra, không chỉ frame đầu — {@link #readOutboundFrame} cố ý bỏ phần
      * sau (đủ cho test request/response), nhưng ADR-035 cần thấy EVENT bắn KÈM sau response (VD
      * GoldChangedEvent ngay sau SelectCharacterResponse).
      */
     static List<PacketCodec.Frame> readOutboundFrames(EmbeddedChannel channel) {
-        ByteBuf combined = Unpooled.buffer();
-        ByteBuf part;
-        while ((part = channel.readOutbound()) != null) {
-            combined.writeBytes(part);
-            part.release();
-        }
+        ByteBuf combined = drainOutbound(channel);
         List<PacketCodec.Frame> frames = new ArrayList<PacketCodec.Frame>();
         while (combined.readableBytes() >= 4) {
             int length = combined.readInt();
@@ -1814,12 +1825,7 @@ class GatewayPipelineTest {
         // sinh ra HAI message riêng biệt (buffer length-prefix + buffer content gốc qua retain()),
         // không gộp thành 1 buffer. Qua socket TCP thật thì vô hình (TCP là stream, tự nối lại),
         // nhưng EmbeddedChannel.readOutbound() trả về từng message một lần gọi — phải gom đủ.
-        ByteBuf combined = Unpooled.buffer();
-        ByteBuf part;
-        while ((part = channel.readOutbound()) != null) {
-            combined.writeBytes(part);
-            part.release();
-        }
+        ByteBuf combined = drainOutbound(channel);
         assertThat(combined.readableBytes())
                 .as("server phải trả lời — không có outbound message nào")
                 .isGreaterThan(0);

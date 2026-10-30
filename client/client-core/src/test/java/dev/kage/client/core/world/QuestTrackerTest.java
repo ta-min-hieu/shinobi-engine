@@ -408,4 +408,28 @@ class QuestTrackerTest {
 
         assertThat(tracker.isTracking()).isFalse();
     }
+
+    @Test
+    @DisplayName("ADR-114: xe vỡ hoặc đoàn bị bỏ ⇒ gỡ nhiệm vụ hộ tống (server đã bỏ nó, không gửi gói bỏ nào)")
+    void failedOrAbandonedEscortRemovesTheQuest() {
+        tracker.onAccepted("daily_caravan_escort");
+
+        assertThat(tracker.onEscortEnded("daily_caravan_escort", "FAILED")).isTrue();
+        assertThat(tracker.isTracking()).isFalse();
+
+        tracker.onAccepted("daily_caravan_escort");
+        assertThat(tracker.onEscortEnded("daily_caravan_escort", "ABANDONED")).isTrue();
+        assertThat(tracker.isTracking()).isFalse();
+    }
+
+    @Test
+    @DisplayName("ADR-114: đoàn đang đi/đứng chờ/tới nơi KHÔNG gỡ nhiệm vụ (tới nơi do gói 607 COMPLETED lo)")
+    void movingWaitingOrArrivedEscortKeepsTheQuest() {
+        tracker.onAccepted("daily_caravan_escort");
+
+        assertThat(tracker.onEscortEnded("daily_caravan_escort", "MOVING")).isFalse();
+        assertThat(tracker.onEscortEnded("daily_caravan_escort", "WAITING")).isFalse();
+        assertThat(tracker.onEscortEnded("daily_caravan_escort", "ARRIVED")).isFalse();
+        assertThat(tracker.questCode()).isEqualTo("daily_caravan_escort");
+    }
 }

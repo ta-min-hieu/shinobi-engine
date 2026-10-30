@@ -179,6 +179,8 @@ public final class GameProbe {
         if (config.quest().isRequested()) {
             new QuestScenario(connection, session, observation).run(config.quest());
         }
+        // Bước cần quest vừa nhận trong CÙNG phiên (vd. đi kèm đoàn hộ tống — ngắt kết nối là đoàn vỡ).
+        new Lot21Scenario(connection, session).run(config.lot19().afterQuestSteps());
         return arena;
     }
 

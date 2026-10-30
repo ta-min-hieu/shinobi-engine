@@ -279,13 +279,15 @@ public record ProbeConfig(
      *     {@code remove}
      * @param lot20Steps bước lô 20 (xem {@link Lot20Scenario})
      * @param lot21Steps bước lô 21 (xem {@link Lot21Scenario})
+     * @param afterQuestSteps cùng bộ bước như {@code lot21Steps} nhưng chạy SAU pha quest ({@code --afterQuest})
      */
     public record Lot19Plan(
             List<String> craftRecipes,
             List<String> guildShopBuy,
             List<String> partyFinderSteps,
             List<String> lot20Steps,
-            List<String> lot21Steps) {
+            List<String> lot21Steps,
+            List<String> afterQuestSteps) {
 
         /** Danh sách bất biến — record không tự copy. */
         public Lot19Plan {
@@ -294,6 +296,7 @@ public record ProbeConfig(
             partyFinderSteps = List.copyOf(partyFinderSteps);
             lot20Steps = List.copyOf(lot20Steps);
             lot21Steps = List.copyOf(lot21Steps);
+            afterQuestSteps = List.copyOf(afterQuestSteps);
         }
 
         /** {@code true} khi có ít nhất một bước cần chạy. */
@@ -402,7 +405,8 @@ public record ProbeConfig(
                 raw.list("guildShopBuy"),
                 raw.list("partyFinder"),
                 raw.list("lot20"),
-                raw.list("lot21"));
+                raw.list("lot21"),
+                raw.list("afterQuest"));
     }
 
     private static TradePlan tradePlan(CommandLineArguments raw) {

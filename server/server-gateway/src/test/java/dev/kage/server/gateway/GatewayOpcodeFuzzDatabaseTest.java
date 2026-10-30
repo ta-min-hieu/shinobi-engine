@@ -39,9 +39,10 @@ import dev.kage.server.world.WorldFacade;
  * chối (U+0000), số tràn kiểu cột, id âm/0 tới câu SQL, lời gọi mà Port giả không cài.
  *
  * <p>Kết nối là {@link EmbeddedChannel} với executor ĐỒNG BỘ (cùng cách {@code GatewayPipelineTest}),
- * nên mỗi payload chạy xong — kể cả phần chạm DB — trước khi bộ fuzz đọc câu trả lời; không có
- * khoảng chờ hay race nào trong phép đo. World chính KHÔNG tick (thứ cần ở đây là đường lệnh, không
- * phải mô phỏng). Chạy tay nhiều vòng hơn: {@code -Dkage.fuzz.dbIterations=200}.
+ * nên mỗi payload chạy xong — kể cả phần chạm DB — trước khi bộ fuzz đọc câu trả lời. World chính
+ * KHÔNG tick, nhưng phó bản mà payload mở ra (vd. Trấn Yêu Tháp) thì CÓ — luồng tick của nó ghi vào
+ * kênh song song, nên kênh được khoá ghi bằng {@link SerializedOutboundWrites}.
+ * Chạy tay nhiều vòng hơn: {@code -Dkage.fuzz.dbIterations=200}.
  */
 @Testcontainers
 @Timeout(240)
@@ -182,11 +183,14 @@ class GatewayOpcodeFuzzDatabaseTest {
 
     private static EmbeddedChannel newConnection() {
         GatewayChannelHandler handler = new GatewayChannelHandler(facades, worldGateway, Runnable::run, observability);
-        return new EmbeddedChannel(new ChannelInitializer<Channel>() {
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInitializer<Channel>() {
             @Override
             protected void initChannel(Channel ch) {
                 GatewayServer.addProtocolHandlers(ch.pipeline(), handler);
             }
         });
+        // Phó bản (tháp, Bí Cảnh) tick THẬT và ghi vào kênh từ luồng tick — xem SerializedOutboundWrites.
+        SerializedOutboundWrites.install(channel);
+        return channel;
     }
 }

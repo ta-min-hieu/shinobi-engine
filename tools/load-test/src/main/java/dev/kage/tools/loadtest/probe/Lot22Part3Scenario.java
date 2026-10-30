@@ -39,7 +39,8 @@ import dev.kage.tools.loadtest.GameConnection;
 /**
  * Các bước lô 22 phần 3 (đi qua {@code --lot21=}): {@code refines}, {@code refine:<itemId>:<dòng giữ, -1 = không>},
  * {@code auctions}, {@code bid:<lotId>:<số tiền>}, {@code tower}, {@code enterTower}, {@code towerFight:<giây>} (đánh
- * quái tầng tới khi server báo qua tầng), {@code escortWatch:<giây>} (in trạng thái đoàn hộ tống cuối cùng thấy).
+ * quái tầng tới khi server báo qua tầng), {@code escortWatch:<giây>} (in trạng thái đoàn hộ tống cuối cùng thấy),
+ * {@code escortFollow:<giây>} (đi kèm đoàn và dọn quái — {@link EscortFollow}).
  */
 final class Lot22Part3Scenario {
 
@@ -92,7 +93,7 @@ final class Lot22Part3Scenario {
                         });
             case "towerFight" -> towerFight(Integer.parseInt(arg));
             case "escortWatch" -> escortWatch(Integer.parseInt(arg));
-            default -> "bước không hiểu";
+            default -> escortFollowOrUnknown(verb, arg);
         };
     }
 
@@ -248,6 +249,13 @@ final class Lot22Part3Scenario {
                 }
             }
         }
+    }
+
+    /** {@code escortFollow} đứng ngoài {@code switch} của {@link #step} — giữ độ phức tạp hàm đó dưới trần PMD. */
+    private String escortFollowOrUnknown(String verb, String arg) throws IOException {
+        return "escortFollow".equals(verb)
+                ? new EscortFollow(connection).run(Integer.parseInt(arg))
+                : "bước không hiểu";
     }
 
     /** Đọc khung trong {@code seconds} giây, in trạng thái đoàn cuối cùng (và dừng sớm nếu đoàn tới nơi/thất bại). */

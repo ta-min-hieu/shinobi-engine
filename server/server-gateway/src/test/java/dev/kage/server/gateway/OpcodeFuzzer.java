@@ -279,14 +279,7 @@ final class OpcodeFuzzer {
                 long caseSeed = caseSeed(opcode, stage, iteration);
                 byte[] payload = new FuzzPayloads(FuzzPayloads.random(caseSeed), memory).next(opcode);
                 sentOnChannel++;
-                String symptom;
-                try {
-                    symptom = sendAndCheck(channel, opcode, payload, memory);
-                } catch (RuntimeException e) {
-                    // Luồng khung ra hỏng (vd độ dài âm) — nói rõ CA NÀO, không chỉ stack của bộ đọc.
-                    throw new IllegalStateException(
-                            "ca fuzz hỏng: " + opcode + " @ " + stage + " vòng " + iteration + " seed=" + caseSeed, e);
-                }
+                String symptom = sendAndCheck(channel, opcode, payload, memory);
                 if (CLOSED_AT_VIOLATION_LIMIT.equals(symptom)) {
                     // Đúng thiết kế (2026-10-11): server đóng kết nối gửi quá nhiều gói vi phạm giao
                     // thức. Không phải vi phạm — mở kết nối mới rồi fuzz tiếp.

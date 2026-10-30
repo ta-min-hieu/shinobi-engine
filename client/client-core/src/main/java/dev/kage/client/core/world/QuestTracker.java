@@ -181,6 +181,22 @@ final class QuestTracker {
     }
 
     /**
+     * ADR-114 — đoàn hộ tống của {@code escortQuestCode} vừa kết thúc ở trạng thái {@code escortState} (gói 625).
+     * Vỡ ({@code FAILED}) hay bị bỏ ({@code ABANDONED}) thì server đã đưa quest về "chưa nhận" (đường ADR-054)
+     * mà KHÔNG gửi {@code AbandonQuestResponse} nào — không gỡ ở đây thì nhiệm vụ đứng mãi ở nhật ký và góc
+     * màn hình như đang làm (kiểm sống 2026-10-30). Tới nơi ({@code ARRIVED}) thì đã có gói 607 COMPLETED lo.
+     *
+     * @return {@code true} nếu đã gỡ — người gọi vẽ lại HUD/nhật ký và hỏi lại server
+     */
+    boolean onEscortEnded(String escortQuestCode, String escortState) {
+        if (!"FAILED".equals(escortState) && !"ABANDONED".equals(escortState)) {
+            return false;
+        }
+        onAbandoned(escortQuestCode);
+        return true;
+    }
+
+    /**
      * Server vừa xác nhận bỏ nhiệm vụ {@code questCode} (ADR-054) — gỡ khỏi nhật ký, và nếu HUD góc màn
      * hình đang theo dõi đúng nó thì nhận một nhiệm vụ khác lên (hoặc để trống). Không đợi lần hỏi lại
      * danh sách: {@link #onQuestsListed} chỉ đồng bộ ô đang theo dõi khi mã của nó CÒN trong nhật ký,

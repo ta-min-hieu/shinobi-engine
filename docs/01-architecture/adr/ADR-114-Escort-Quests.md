@@ -60,4 +60,16 @@ mỗi khi máu/trạng thái đổi và mỗi 1 giây khi đang đi). Client v�
    Cảnh", trống ở world chính): vị trí/đích, máu xe, đang đi/đứng chờ. Vẽ hộp cần presenter mới trong client 3D.
    ⚠️ Server khởi động lại giữa lúc hộ tống: quest ở lại IN_PROGRESS mà không có đoàn — người chơi bỏ quest (ADR-054) rồi
    nhận lại.
-2. ⏳ Kiểm sống bằng gameProbe.
+2. ✅ **Kiểm sống bằng gameProbe 2026-10-30** (DB dev V94, server thật, bước probe mới `--afterQuest=escortFollow:<giây>` —
+   đi kèm đoàn, đánh quái trong 6 m quanh xe; chạy SAU pha quest vì ngắt kết nối là đoàn vỡ):
+   - Thành công (Kagemaru Lv42): nhận qua Chu Hoành (`about_town → daily_duty → accept_quest:daily_caravan_escort`),
+     55 gói 625, hạ 5 quái dọc đường, xe tới `ARRIVED x=82/82 máu=274/300` (mất 26 ⇒ D2 chạy), 607 `COMPLETED`.
+     Lĩnh thưởng: +400 EXP (87474→87874), +80 linh thạch, `COMPLETED → CLAIMED`.
+   - Đứng xa (tanthua44, người ở x=−4): xe dừng `WAITING x=2` (đúng D1, >6 m). Ngắt kết nối ⇒ không còn hàng
+     `character_quest_progress` của quest này (về "chưa nhận", D3).
+   - Xe vỡ (tạm hạ `escort_route.max_hp` = 15 trên DB dev, đã trả lại 300): `FAILED x=17/82 máu=0/15` sau một nhát
+     `wandering_bandit`, dòng hệ thống "Hộ tống thất bại…", quest về "chưa nhận". `max_hp` đọc lúc nhận quest, không cần
+     khởi động lại server.
+   - 🐛 **Lỗi tìm ra và đã vá (client):** vỡ/bỏ đoàn thì server bỏ quest mà KHÔNG gửi gói trạng thái quest nào ⇒
+     nhật ký + góc màn hình vẫn hiện quest như đang làm tới khi relog. Vá: `QuestCoordinator` nghe 625
+     `FAILED`/`ABANDONED` ⇒ `QuestTracker.onEscortEnded` gỡ quest rồi hỏi lại danh sách (không đổi giao thức).
