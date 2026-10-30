@@ -868,6 +868,38 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.VerifySecurityPinCommand.parser(),
                             Opcode.OPCODE_VERIFY_SECURITY_PIN_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.securityPin().verify(id, c.getPin(), h.pinGate))),
+            // Lô 23 — linh điền (ADR-119).
+            Map.entry(
+                    Opcode.OPCODE_GET_SPIRIT_FIELD_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetSpiritFieldRequest.parser(),
+                            Opcode.OPCODE_GET_SPIRIT_FIELD_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.spiritField().view(id, c.getOwnerName()))),
+            Map.entry(
+                    Opcode.OPCODE_PLANT_SEED_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.PlantSeedCommand.parser(),
+                            Opcode.OPCODE_PLANT_SEED_RESPONSE_VALUE,
+                            (h, id, c) ->
+                                    h.expansion.spiritField().plant(id, c.getPlotIndex(), c.getSeedItemTemplateId()))),
+            Map.entry(
+                    Opcode.OPCODE_HARVEST_PLOT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.HarvestPlotCommand.parser(),
+                            Opcode.OPCODE_HARVEST_PLOT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.spiritField().harvest(id, c.getPlotIndex()))),
+            Map.entry(
+                    Opcode.OPCODE_WATER_PLOT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.WaterPlotCommand.parser(),
+                            Opcode.OPCODE_WATER_PLOT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.spiritField().water(id, c.getOwnerName(), c.getPlotIndex()))),
+            Map.entry(
+                    Opcode.OPCODE_UNLOCK_PLOT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.UnlockPlotCommand.parser(),
+                            Opcode.OPCODE_UNLOCK_PLOT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.spiritField().unlock(id))),
             // Lô 23 — thương nhân du hành (ADR-118).
             Map.entry(
                     Opcode.OPCODE_GET_TRAVELING_MERCHANT_REQUEST_VALUE,

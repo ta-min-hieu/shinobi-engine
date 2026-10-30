@@ -235,6 +235,7 @@ import dev.kage.server.database.world.PostgresConsumableAdapter;
 import dev.kage.server.database.world.PostgresDungeonQuotaAdapter;
 import dev.kage.server.database.world.PostgresHerbNodeAdapter;
 import dev.kage.server.database.world.PostgresSafeZoneAdapter;
+import dev.kage.server.database.world.PostgresSpiritFieldAdapter;
 import dev.kage.server.database.world.PostgresWaypointAdapter;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.shop.api.TravelingMerchantFacade;
@@ -255,6 +256,7 @@ import dev.kage.trade.application.TradeUseCases;
 import dev.kage.world.api.ConsumableFacade;
 import dev.kage.world.api.DungeonQuotaFacade;
 import dev.kage.world.api.HerbNodeFacade;
+import dev.kage.world.api.SpiritFieldFacade;
 import dev.kage.world.api.WaypointFacade;
 import dev.kage.world.api.WorldGeometryFacade;
 
@@ -771,6 +773,11 @@ public final class ServerDatabaseBootstrap {
     /** Thương nhân du hành (ADR-118). */
     public TravelingMerchantFacade wireTravelingMerchantFacade() {
         return new TravelingMerchantFacade(new PostgresMerchantAdapter(dataSource));
+    }
+
+    /** Linh điền (ADR-119). */
+    public SpiritFieldFacade wireSpiritFieldFacade() {
+        return new SpiritFieldFacade(new PostgresSpiritFieldAdapter(dataSource));
     }
 
     /** Khoá an toàn — PIN cấp 2 (ADR-115). */

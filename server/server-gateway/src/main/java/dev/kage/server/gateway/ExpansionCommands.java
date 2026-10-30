@@ -10,7 +10,8 @@ record ExpansionCommands(
         SecurityPinCommands securityPin,
         BuyOrderCommands buyOrders,
         RevivalCommands revival,
-        MerchantCommands merchant) {
+        MerchantCommands merchant,
+        SpiritFieldCommands spiritField) {
 
     static ExpansionCommands of(GatewayFacades facades, WorldGateway worldGateway, NpcProximity proximity) {
         ExpansionFacades expansion = facades.progression().expansion();
@@ -20,6 +21,11 @@ record ExpansionCommands(
                 new BuyOrderCommands(expansion.buyOrders(), worldGateway.registry()),
                 new RevivalCommands(expansion.consumables()),
                 new MerchantCommands(
-                        expansion.merchant(), facades.progression().adventure().waypoints(), proximity, clock));
+                        expansion.merchant(), facades.progression().adventure().waypoints(), proximity, clock),
+                new SpiritFieldCommands(
+                        expansion.spiritField(),
+                        facades.characterFacade(),
+                        facades.contentFacades().socialFacades().friendFacade(),
+                        clock));
     }
 }

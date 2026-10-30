@@ -118,7 +118,10 @@ class ContentReferenceIntegrationTest {
             "bag_expansion_pouch",
             "teleport_talisman",
             // ADR-117 (2026-10-30) — Hồi Hồn Đan lên trước art.
-            "revive_pill");
+            "revive_pill",
+            // ADR-119 (2026-10-30) — hai loại hạt giống linh điền lên trước art.
+            "spirit_herb_seed",
+            "fine_spirit_herb_seed");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

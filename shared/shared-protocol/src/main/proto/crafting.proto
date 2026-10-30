@@ -49,3 +49,96 @@ enum CraftItemOutcome {
 message CraftItemResponse {
   CraftItemOutcome outcome = 1;
 }
+
+// ADR-119 (2026-10-30) — linh điền. Mỗi nhân vật 4 ô (mở thêm tới 8 bằng linh thạch); gieo hạt giống từ túi, chín sau
+// thời gian THẬT, thu hoạch ra linh thảo vào túi. Bạn bè tưới một lần mỗi vụ ⇒ sản lượng kỳ vọng +10%.
+enum SpiritFieldOutcome {
+  SPIRIT_FIELD_OUTCOME_UNSPECIFIED = 0;
+  SPIRIT_FIELD_OUTCOME_OK = 1;
+  SPIRIT_FIELD_OUTCOME_INVALID_PLOT = 2;
+  SPIRIT_FIELD_OUTCOME_PLOT_OCCUPIED = 3;
+  SPIRIT_FIELD_OUTCOME_PLOT_EMPTY = 4;
+  SPIRIT_FIELD_OUTCOME_NOT_RIPE = 5;
+  SPIRIT_FIELD_OUTCOME_UNKNOWN_SEED = 6;
+  SPIRIT_FIELD_OUTCOME_NO_SEED = 7;
+  SPIRIT_FIELD_OUTCOME_ALREADY_WATERED = 8;
+  SPIRIT_FIELD_OUTCOME_MAX_PLOTS = 9;
+  SPIRIT_FIELD_OUTCOME_INSUFFICIENT_GOLD = 10;
+  SPIRIT_FIELD_OUTCOME_BAG_FULL = 11;
+  SPIRIT_FIELD_OUTCOME_NOT_FRIEND = 12;        // xem/tưới ruộng của người không phải bạn bè
+  SPIRIT_FIELD_OUTCOME_UNKNOWN_CHARACTER = 13;
+}
+
+message SpiritPlotView {
+  int32 index = 1;
+  int64 seed_item_template_id = 2;
+  int64 yield_item_template_id = 3;
+  int64 ripe_at_epoch_ms = 4;
+  bool watered = 5;
+}
+
+message FieldSeedView {
+  int64 item_template_id = 1;
+  int32 grow_minutes = 2;
+  int64 yield_item_template_id = 3;
+  int32 yield_quantity = 4;
+}
+
+// Request: Client -> Server (OPCODE_GET_SPIRIT_FIELD_REQUEST = 1804). owner_name rỗng ⇒ ruộng của mình; khác ⇒ ruộng
+// của một BẠN BÈ (để tưới).
+message GetSpiritFieldRequest {
+  string owner_name = 1;
+}
+
+// Response: Server -> Client (OPCODE_GET_SPIRIT_FIELD_RESPONSE = 1805). outcome khác OK (NOT_FRIEND, UNKNOWN_CHARACTER)
+// thì các field khác rỗng. server_time_ms để client đếm ngược mà không tin đồng hồ máy mình.
+message GetSpiritFieldResponse {
+  SpiritFieldOutcome outcome = 1;
+  string owner_name = 2;
+  int32 plots = 3;
+  repeated SpiritPlotView planted = 4;
+  repeated FieldSeedView seeds = 5;
+  int64 unlock_cost = 6;   // 0 khi đã đủ 8 ô
+  int64 server_time_ms = 7;
+}
+
+// Command: Client -> Server (OPCODE_PLANT_SEED_COMMAND = 1806).
+message PlantSeedCommand {
+  int32 plot_index = 1;
+  int64 seed_item_template_id = 2;
+}
+
+// Command: Client -> Server (OPCODE_HARVEST_PLOT_COMMAND = 1808).
+message HarvestPlotCommand {
+  int32 plot_index = 1;
+}
+
+// Command: Client -> Server (OPCODE_WATER_PLOT_COMMAND = 1810).
+message WaterPlotCommand {
+  string owner_name = 1;
+  int32 plot_index = 2;
+}
+
+// Command: Client -> Server (OPCODE_UNLOCK_PLOT_COMMAND = 1812).
+message UnlockPlotCommand {
+}
+
+// Response: Server -> Client (OPCODE_PLANT_SEED_RESPONSE = 1807).
+message PlantSeedResponse {
+  SpiritFieldOutcome outcome = 1;
+}
+
+// Response: Server -> Client (OPCODE_HARVEST_PLOT_RESPONSE = 1809).
+message HarvestPlotResponse {
+  SpiritFieldOutcome outcome = 1;
+}
+
+// Response: Server -> Client (OPCODE_WATER_PLOT_RESPONSE = 1811).
+message WaterPlotResponse {
+  SpiritFieldOutcome outcome = 1;
+}
+
+// Response: Server -> Client (OPCODE_UNLOCK_PLOT_RESPONSE = 1813).
+message UnlockPlotResponse {
+  SpiritFieldOutcome outcome = 1;
+}
