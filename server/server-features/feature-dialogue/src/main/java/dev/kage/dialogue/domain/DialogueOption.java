@@ -18,6 +18,12 @@ public record DialogueOption(String labelKey, String action) {
     /** Mở lò đan (ADR-079) — gateway gửi danh sách công thức, như {@link #ACTION_OPEN_STORAGE}. */
     public static final String ACTION_OPEN_CRAFTING = "open_crafting";
 
+    /** Mở lò luyện khí (ADR-131 — thợ rèn nhận lò của ADR-120) — gateway gửi danh sách công thức FORGE. */
+    public static final String ACTION_OPEN_FORGE = "open_forge";
+
+    /** Mở hàng của thương nhân du hành (ADR-131) — gateway gửi trạng thái + hàng của lần ghé. */
+    public static final String ACTION_OPEN_MERCHANT = "open_merchant";
+
     public static final String ACTION_END = "end";
     public static final String ACTION_ACCEPT_QUEST_PREFIX = "accept_quest:";
 

@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -16,6 +17,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 
 import dev.kage.server.world.CharacterEntry;
 import dev.kage.server.world.FinalPositionListener;
+import dev.kage.server.world.NpcCatalogSnapshot;
 import dev.kage.server.world.SkillCooldownLedger;
 import dev.kage.server.world.WorldContentCatalog;
 import dev.kage.server.world.WorldFacade;
@@ -85,6 +87,9 @@ final class MainWorldChannelRegistry {
     private final WorldContentCatalog content;
     private final SkillCooldownLedger skillCooldowns = new SkillCooldownLedger();
     private final List<Channel> channels = new ArrayList<>();
+    /** ADR-131 — NPC động đang đặt ở world chính, theo mã; đọc từ {@link NpcProximity} trên luồng khác. */
+    private final Map<String, NpcCatalogSnapshot.NpcPlacementDefinition> dynamicNpcs = new ConcurrentHashMap<>();
+
     private final Map<Long, Channel> channelByCharacterId = new HashMap<>();
 
     /**
@@ -337,6 +342,26 @@ final class MainWorldChannelRegistry {
     /** ADR-123 — làm một việc với MỌI khu vực đang chạy (ví dụ báo ngày/đêm); {@code action} phải trả về ngay. */
     synchronized void forEachChannel(Consumer<WorldFacade> action) {
         channels.forEach(channel -> action.accept(channel.facade()));
+    }
+
+    /**
+     * ADR-131 — đặt NPC ĐỘNG {@code npcCode} ở MỌI khu vực và ghi vào sổ dùng chung, để kiểm "đứng gần NPC"
+     * ({@link NpcProximity}, dựng riêng cho từng kết nối) thấy được cả NPC không nằm trong catalog tĩnh.
+     */
+    void placeDynamicNpc(String npcCode, float x, float y) {
+        dynamicNpcs.put(npcCode, new NpcCatalogSnapshot.NpcPlacementDefinition(npcCode, x, y));
+        forEachChannel(world -> world.placeNpc(npcCode, x, y));
+    }
+
+    /** ADR-131 — gỡ NPC động khỏi sổ và khỏi mọi khu vực (không có thì thôi). */
+    void removeDynamicNpc(String npcCode) {
+        dynamicNpcs.remove(npcCode);
+        forEachChannel(world -> world.removeNpc(npcCode));
+    }
+
+    /** ADR-131 — NPC động đang đứng ở world chính (bản chụp). */
+    List<NpcCatalogSnapshot.NpcPlacementDefinition> dynamicNpcs() {
+        return List.copyOf(dynamicNpcs.values());
     }
 
     /** Tổng số nhân vật đang ở MỌI khu vực map chính — mỗi nhân vật đếm đúng một lần. */

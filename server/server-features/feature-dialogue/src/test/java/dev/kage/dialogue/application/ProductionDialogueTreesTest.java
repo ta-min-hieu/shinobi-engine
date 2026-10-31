@@ -38,6 +38,8 @@ class ProductionDialogueTreesTest {
             town_elder, /scripts/dialogue/town_elder.js
             senior_sister, /scripts/dialogue/senior_sister.js
             waypost_attendant, /scripts/dialogue/waypost_attendant.js
+            sect_blacksmith, /scripts/dialogue/sect_blacksmith.js
+            traveling_merchant, /scripts/dialogue/traveling_merchant.js
             """;
 
     @ParameterizedTest(name = "[{0}] mọi action điều hướng trỏ tới một node CÓ THẬT")
@@ -129,6 +131,8 @@ class ProductionDialogueTreesTest {
                 && !DialogueOption.ACTION_OPEN_SHOP.equals(option.action())
                 && !DialogueOption.ACTION_OPEN_STORAGE.equals(option.action())
                 && !DialogueOption.ACTION_OPEN_CRAFTING.equals(option.action())
+                && !DialogueOption.ACTION_OPEN_FORGE.equals(option.action())
+                && !DialogueOption.ACTION_OPEN_MERCHANT.equals(option.action())
                 && !option.action().startsWith(DialogueOption.ACTION_ACCEPT_QUEST_PREFIX);
     }
 }

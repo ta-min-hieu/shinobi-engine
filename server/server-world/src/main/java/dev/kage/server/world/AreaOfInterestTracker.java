@@ -121,6 +121,16 @@ final class AreaOfInterestTracker {
         }
     }
 
+    /** ADR-131 — NPC động bị gỡ: báo despawn cho mọi nhân vật đang thấy nó (cùng khuôn {@link #onMonsterDetach}). */
+    void onNpcDetach(long npcId) {
+        lastSyncedPosition.remove(npcId);
+        for (Map.Entry<Long, Set<Long>> entry : visibleTo.entrySet()) {
+            if (entry.getValue().remove(npcId)) {
+                sink.onNpcDespawned(entry.getKey(), npcId);
+            }
+        }
+    }
+
     /**
      * {@code observerId} có đang thấy {@code entityId} không — rẻ hơn {@link #observersOf} khi chỉ hỏi
      * về MỘT người nhận (gửi gói riêng cho một người, vd máu của mục tiêu vừa nhắm).

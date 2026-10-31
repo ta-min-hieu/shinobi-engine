@@ -65,6 +65,23 @@ class NpcProximityTest {
         assertThat(inAnInstance.isWithinReach(CHARACTER_ID, ELDER)).isFalse();
     }
 
+    /**
+     * ADR-131 — NPC động (thương nhân du hành) không nằm trong catalog tĩnh: thiếu sổ NPC động thì luôn "quá xa"
+     * (kiểm sống 2026-10-31 bắt đúng lỗi này). Sổ đọc lại mỗi lần hỏi, nên gỡ xong là hết với tới.
+     */
+    @Test
+    void shouldReachADynamicNpcOnlyWhileItIsPlaced() {
+        java.util.concurrent.atomic.AtomicReference<List<NpcCatalogSnapshot.NpcPlacementDefinition>> placed =
+                new java.util.concurrent.atomic.AtomicReference<>(
+                        List.of(new NpcCatalogSnapshot.NpcPlacementDefinition("traveling_merchant", -3f, 0f)));
+        NpcProximity proximity =
+                new NpcProximity(NPCS, characterId -> Optional.of(new PositionSnapshot(-3f, 0f)), placed::get);
+
+        assertThat(proximity.isWithinReach(CHARACTER_ID, "traveling_merchant")).isTrue();
+        placed.set(List.of());
+        assertThat(proximity.isWithinReach(CHARACTER_ID, "traveling_merchant")).isFalse();
+    }
+
     private static NpcProximity standingAt(float x) {
         return new NpcProximity(NPCS, characterId -> Optional.of(new PositionSnapshot(x, 0f)));
     }

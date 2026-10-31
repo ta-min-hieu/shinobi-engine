@@ -1,7 +1,9 @@
 package dev.kage.server.gateway;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.function.LongFunction;
+import java.util.function.Supplier;
 
 import dev.kage.character.domain.PositionSnapshot;
 import dev.kage.server.world.NpcCatalogSnapshot;
@@ -35,6 +37,7 @@ final class NpcProximity {
 
     private final NpcCatalogSnapshot npcs;
     private final LongFunction<Optional<PositionSnapshot>> mainWorldPositionOf;
+    private final Supplier<List<NpcCatalogSnapshot.NpcPlacementDefinition>> dynamicNpcs;
 
     /**
      * @param npcs NPC được đặt trong world chính
@@ -42,8 +45,17 @@ final class NpcProximity {
      *     đứng ở world chính (đang trong hầm ngục/đấu trường) — khi đó không NPC nào ở gần
      */
     NpcProximity(NpcCatalogSnapshot npcs, LongFunction<Optional<PositionSnapshot>> mainWorldPositionOf) {
+        this(npcs, mainWorldPositionOf, List::of);
+    }
+
+    /** @param dynamicNpcs NPC ĐỘNG đang đứng ở world chính (ADR-131 — thương nhân du hành), đọc mỗi lần hỏi */
+    NpcProximity(
+            NpcCatalogSnapshot npcs,
+            LongFunction<Optional<PositionSnapshot>> mainWorldPositionOf,
+            Supplier<List<NpcCatalogSnapshot.NpcPlacementDefinition>> dynamicNpcs) {
         this.npcs = npcs;
         this.mainWorldPositionOf = mainWorldPositionOf;
+        this.dynamicNpcs = dynamicNpcs;
     }
 
     boolean isWithinReach(long characterId, String npcCode) {
@@ -53,7 +65,12 @@ final class NpcProximity {
         }
         float x = position.get().x();
         float y = position.get().y();
-        for (NpcCatalogSnapshot.NpcPlacementDefinition placement : npcs.placements()) {
+        return anyClose(npcs.placements(), npcCode, x, y) || anyClose(dynamicNpcs.get(), npcCode, x, y);
+    }
+
+    private static boolean anyClose(
+            List<NpcCatalogSnapshot.NpcPlacementDefinition> placements, String npcCode, float x, float y) {
+        for (NpcCatalogSnapshot.NpcPlacementDefinition placement : placements) {
             if (placement.npcCode().equals(npcCode) && isClose(x - placement.posX(), y - placement.posY())) {
                 return true;
             }

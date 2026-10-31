@@ -83,6 +83,30 @@ final class MerchantCommands {
                 .build();
     }
 
+    /** Mã NPC của thương nhân du hành (ADR-131) — đứng cạnh trạm đang ghé, lệch {@link #NPC_OFFSET_X} mét. */
+    static final String MERCHANT_NPC_CODE = "traveling_merchant";
+
+    /** Thương nhân đứng lệch khỏi tâm trạm để không đè NPC trạm. */
+    static final float NPC_OFFSET_X = 2f;
+
+    /**
+     * ADR-131 — mỗi phút đặt NPC thương nhân cạnh trạm của lần ghé đang diễn ra, ở MỌI kênh world chính (kênh mới mở
+     * cũng nhận ở nhịp kế), và gỡ khi không còn lần ghé nào. {@code placeNpc}/{@code removeNpc} vô hại khi gọi lặp.
+     */
+    static ExpansionJobs.Job presenceJob(
+            TravelingMerchantFacade merchant,
+            WaypointFacade waypoints,
+            MainWorldChannelRegistry channels,
+            Clock clock) {
+        return new ExpansionJobs.Job("thương nhân du hành — NPC", JOB_PERIOD_SECONDS, () -> {
+            Optional<Waypoint> station =
+                    merchant.active(clock.instant()).flatMap(visit -> waypoints.find(visit.waypointCode()));
+            station.ifPresentOrElse(
+                    at -> channels.placeDynamicNpc(MERCHANT_NPC_CODE, at.x() + NPC_OFFSET_X, 0f),
+                    () -> channels.removeDynamicNpc(MERCHANT_NPC_CODE));
+        });
+    }
+
     /** Tác vụ nền: lên lịch hôm nay nếu chưa có, báo cả server mỗi lần ghé vừa bắt đầu (đúng một lần). */
     static ExpansionJobs.Job job(
             TravelingMerchantFacade merchant,

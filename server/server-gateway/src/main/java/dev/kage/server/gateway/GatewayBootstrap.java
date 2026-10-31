@@ -340,6 +340,11 @@ public final class GatewayBootstrap {
                 facades.progression().adventure().waypoints(),
                 characterRegistry,
                 java.time.Clock.systemUTC()));
+        expansion.add(MerchantCommands.presenceJob( // ADR-131 — NPC thương nhân đứng cạnh trạm đang ghé
+                facades.progression().expansion().merchant(),
+                facades.progression().adventure().waypoints(),
+                worldGateway.mainWorldChannels(),
+                java.time.Clock.systemUTC()));
         characterRegistry.quiz.bind(new QuizHooks.Deps( // ADR-122 — hỏi đáp tông môn
                 facades.progression().expansion().quiz(), mail, characterRegistry, java.time.Clock.systemUTC()));
         expansion.add(characterRegistry.quiz.job());

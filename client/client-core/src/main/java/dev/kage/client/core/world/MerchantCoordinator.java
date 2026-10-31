@@ -87,6 +87,10 @@ final class MerchantCoordinator implements WindowFlow {
         int opcode = frame.header().opcode();
         if (opcode == Opcode.OPCODE_GET_TRAVELING_MERCHANT_RESPONSE_VALUE) {
             show(GetTravelingMerchantResponse.parseFrom(frame.payload()));
+            // ADR-131 — mở hàng qua hội thoại với NPC thương nhân: cửa sổ chưa mở thì hiện (không xin lại).
+            if (!panel.isOpen()) {
+                panel.show();
+            }
             return true;
         }
         if (opcode == Opcode.OPCODE_BUY_FROM_MERCHANT_RESPONSE_VALUE) {

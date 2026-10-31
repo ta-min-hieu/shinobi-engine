@@ -1091,8 +1091,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         this.pvpFacade = facades.contentFacades().socialFacades().pvpFacade();
         this.worldGateway = worldGateway;
         this.worldRoutes = WorldRouteLookup.of(worldGateway);
-        this.npcProximity =
-                new NpcProximity(worldGateway.mainWorldChannels().worldContent().npcs(), this::mainWorldPositionOf);
+        this.npcProximity = new NpcProximity(
+                worldGateway.mainWorldChannels().worldContent().npcs(),
+                this::mainWorldPositionOf,
+                worldGateway.mainWorldChannels()::dynamicNpcs);
         this.storage = new SectStorageCommands(inventoryFacade, npcProximity);
         this.market = new MarketCommands(facades.progression().marketFacade(), worldGateway.registry());
         this.crafting = new CraftingCommands(facades.progression().crafting(), characterFacade, npcProximity);
@@ -3409,14 +3411,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         Opcode.OPCODE_DIALOGUE_NODE_RESPONSE_VALUE,
                         sequenceId,
                         toResponse(r.node()).toByteArray());
-            case DialogueFacade.SelectOptionResult.OpenShop ignored ->
-                send(
-                        ctx,
-                        Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE,
-                        sequenceId,
-                        buildShopListingsResponse().toByteArray());
+            case DialogueFacade.SelectOptionResult.OpenShop ignored -> sendShop(ctx, sequenceId);
             case DialogueFacade.SelectOptionResult.OpenStorage ignored -> sendStorage(ctx, sequenceId, characterId);
             case DialogueFacade.SelectOptionResult.OpenCrafting ignored -> sendRecipes(ctx, sequenceId);
+            case DialogueFacade.SelectOptionResult.OpenForge ignored -> sendForge(ctx, sequenceId);
+            case DialogueFacade.SelectOptionResult.OpenMerchant ignored -> sendMerchant(ctx, sequenceId);
             case DialogueFacade.SelectOptionResult.Ended ignored ->
                 send(
                         ctx,
@@ -3448,6 +3447,33 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE,
                 sequenceId,
                 storage.list(characterId).toByteArray());
+    }
+
+    /** Lựa chọn thoại "open_shop". */
+    private void sendShop(ChannelHandlerContext ctx, int sequenceId) {
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE,
+                sequenceId,
+                buildShopListingsResponse().toByteArray());
+    }
+
+    /** Lựa chọn thoại "open_forge" (ADR-131 — thợ rèn nhận lò luyện khí). */
+    private void sendForge(ChannelHandlerContext ctx, int sequenceId) {
+        send(
+                ctx,
+                Opcode.OPCODE_LIST_FORGE_RECIPES_RESPONSE_VALUE,
+                sequenceId,
+                crafting.listForge().toByteArray());
+    }
+
+    /** Lựa chọn thoại "open_merchant" (ADR-131 — NPC thương nhân du hành). */
+    private void sendMerchant(ChannelHandlerContext ctx, int sequenceId) {
+        send(
+                ctx,
+                Opcode.OPCODE_GET_TRAVELING_MERCHANT_RESPONSE_VALUE,
+                sequenceId,
+                expansion.merchant().status().toByteArray());
     }
 
     /** Lựa chọn thoại "open_crafting" (ADR-079). */

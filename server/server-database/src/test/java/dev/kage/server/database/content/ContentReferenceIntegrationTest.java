@@ -295,6 +295,8 @@ class ContentReferenceIntegrationTest {
                 && !DialogueOption.ACTION_OPEN_SHOP.equals(option.action())
                 && !DialogueOption.ACTION_OPEN_STORAGE.equals(option.action())
                 && !DialogueOption.ACTION_OPEN_CRAFTING.equals(option.action())
+                && !DialogueOption.ACTION_OPEN_FORGE.equals(option.action())
+                && !DialogueOption.ACTION_OPEN_MERCHANT.equals(option.action())
                 && !option.action().startsWith(DialogueOption.ACTION_ACCEPT_QUEST_PREFIX);
     }
 

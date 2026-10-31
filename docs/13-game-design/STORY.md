@@ -284,6 +284,8 @@ mới = thêm dòng cùng PR (như luật GLOSSARY §4):
 | Bộ "Nội Môn" (`inner_sect_*`, 6 món, Lv37) | Y phục tông môn trao cho người qua khảo hạch nội môn — điều kiện cần của các trận sau, không bán ở Tàng Bảo Các |
 | Pháp bảo (ô ARTIFACT, ADR-127) | Pháp khí tự luyện ở Luyện Khí Đường, mang một thần thông nhỏ (khiên, hồi xuân, ngự phong) |
 | Trận pháp nhóm (ADR-128) | Đệ tử Thanh Hư học được cả 5 hệ (§4.1) nên đứng gần nhau là tự kết trận ngũ hành — càng đủ hệ càng vững |
+| Thợ rèn Luyện Khí Đường (`sect_blacksmith`, ADR-131) | Người của Luyện Khí Đường (§4.1) giữ lò rèn trong sân tông — vô danh như người trực trạm |
+| Thương nhân du hành (`traveling_merchant`, ADR-118/131) | Người của thương hội liên tông đi buôn một vòng các trạm tiếp ứng; chỉ đứng ở trạm đang ghé |
 | Động phủ (ADR-129) | Đệ tử được khai một động phủ nhỏ bên một tiểu linh mạch; linh khí tụ lại thành linh thạch theo thời gian |
 | Chết → hồi sinh tại hub | Đệ tử mang **hộ mệnh ngọc** của tông: thân tan thì hồn về núi, tông môn tái tụ thân thể (tổn thất = rơi tu vi/đồ tuỳ cơ chế) |
 | Nhiệm vụ ngày | Công việc tông môn: gánh nước, tuần sơn, hái linh thảo, trông lò luyện đan |

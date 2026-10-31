@@ -32,6 +32,9 @@ final class CraftingCommands {
     /** NPC giữ lò đan (D4). */
     static final String FURNACE_NPC_CODE = "town_elder";
 
+    /** ADR-131 — lò luyện khí (ADR-120) chuyển từ Chu Hoành sang thợ rèn tông môn; lò đan vẫn ở Chu Hoành. */
+    static final String FORGE_NPC_CODE = "sect_blacksmith";
+
     private static final Map<CraftItemUseCase.Outcome, CraftItemOutcome> OUTCOMES =
             new EnumMap<>(CraftItemUseCase.Outcome.class);
 
@@ -97,7 +100,7 @@ final class CraftingCommands {
     }
 
     ForgeItemResponse forge(long characterId, ForgeItemCommand command) {
-        if (!proximity.isWithinReach(characterId, FURNACE_NPC_CODE)) {
+        if (!proximity.isWithinReach(characterId, FORGE_NPC_CODE)) {
             return ForgeItemResponse.newBuilder()
                     .setOutcome(CraftItemOutcome.CRAFT_ITEM_OUTCOME_TOO_FAR)
                     .build();

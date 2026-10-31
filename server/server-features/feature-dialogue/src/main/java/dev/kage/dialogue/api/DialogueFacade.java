@@ -66,6 +66,12 @@ public final class DialogueFacade {
         if (DialogueOption.ACTION_OPEN_CRAFTING.equals(option.action())) {
             return new SelectOptionResult.OpenCrafting();
         }
+        if (DialogueOption.ACTION_OPEN_FORGE.equals(option.action())) {
+            return new SelectOptionResult.OpenForge();
+        }
+        if (DialogueOption.ACTION_OPEN_MERCHANT.equals(option.action())) {
+            return new SelectOptionResult.OpenMerchant();
+        }
         if (DialogueOption.ACTION_END.equals(option.action())) {
             return new SelectOptionResult.Ended();
         }
@@ -97,6 +103,12 @@ public final class DialogueFacade {
 
         /** Lựa chọn mở lò đan (ADR-079) — gateway gọi {@code CraftingFacade}, không phải feature này. */
         record OpenCrafting() implements SelectOptionResult {}
+
+        /** Lựa chọn mở lò luyện khí của thợ rèn (ADR-131) — gateway gọi {@code CraftingFacade}. */
+        record OpenForge() implements SelectOptionResult {}
+
+        /** Lựa chọn mở hàng của thương nhân du hành (ADR-131) — gateway gọi {@code TravelingMerchantFacade}. */
+        record OpenMerchant() implements SelectOptionResult {}
 
         /** Lựa chọn kết thúc hội thoại. */
         record Ended() implements SelectOptionResult {}

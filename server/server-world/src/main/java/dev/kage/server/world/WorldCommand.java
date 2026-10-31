@@ -103,6 +103,12 @@ sealed interface WorldCommand {
     record ArtifactEffectCommand(long characterId, ArtifactEffect effect, int magnitudePercent, float durationSeconds)
             implements WorldCommand {}
 
+    /** ADR-131: đặt (hoặc dời) NPC động {@code npcCode} tới (x, y) — mỗi mã một thực thể trong World. */
+    record PlaceNpcCommand(String npcCode, float x, float y) implements WorldCommand {}
+
+    /** ADR-131: gỡ NPC động {@code npcCode} (không có thì thôi). */
+    record RemoveNpcCommand(String npcCode) implements WorldCommand {}
+
     /** Thiên Kiếp (ADR-126): một đợt lôi kích trừ {@code percentOfMax}% máu tối đa của nhân vật. */
     record StrikeCharacterCommand(long characterId, int percentOfMax) implements WorldCommand {}
 

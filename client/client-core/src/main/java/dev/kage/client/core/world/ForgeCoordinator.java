@@ -85,6 +85,10 @@ final class ForgeCoordinator implements WindowFlow {
         int opcode = frame.header().opcode();
         if (opcode == Opcode.OPCODE_LIST_FORGE_RECIPES_RESPONSE_VALUE) {
             show(ListForgeRecipesResponse.parseFrom(frame.payload()));
+            // ADR-131 — thợ rèn mở lò qua hội thoại: danh sách tới mà cửa sổ chưa mở thì hiện (không xin lại).
+            if (!panel.isOpen()) {
+                panel.show();
+            }
             return true;
         }
         if (opcode == Opcode.OPCODE_FORGE_ITEM_RESPONSE_VALUE) {

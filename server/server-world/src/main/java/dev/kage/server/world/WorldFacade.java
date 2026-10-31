@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -97,6 +98,7 @@ public final class WorldFacade {
     private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
             ComponentMapper.getFor(StatusEffectComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
+    private static final ComponentMapper<NpcComponent> NPC = ComponentMapper.getFor(NpcComponent.class);
     private static final int PERCENT = 100;
     private static final ComponentMapper<CombatRecencyComponent> COMBAT_RECENCY =
             ComponentMapper.getFor(CombatRecencyComponent.class);
@@ -871,6 +873,20 @@ public final class WorldFacade {
     }
 
     /**
+     * ADR-131 — đặt NPC ĐỘNG {@code npcCode} tại (x, y): chưa có thì sinh, có rồi ở đúng chỗ thì thôi, có ở
+     * chỗ khác thì dời. Gọi lặp mỗi nhịp là an toàn (thương nhân du hành gọi mỗi phút cho mọi kênh, kể cả
+     * kênh mới mở).
+     */
+    public void placeNpc(String npcCode, float x, float y) {
+        inbox.add(new WorldCommand.PlaceNpcCommand(npcCode, x, y));
+    }
+
+    /** ADR-131 — gỡ NPC động {@code npcCode}; người đang thấy nhận despawn. Không có thì thôi. */
+    public void removeNpc(String npcCode) {
+        inbox.add(new WorldCommand.RemoveNpcCommand(npcCode));
+    }
+
+    /**
      * ADR-123 — báo world đang đêm hay ngày (gateway gửi định kỳ, chạy lại vô hại). Đêm: quái đánh đòn thường theo
      * {@code monsterDamagePercent}; điểm spawn {@code nightOnly} chỉ ra quái lúc đêm (ngày thì chờ, không hồi sinh).
      */
@@ -1122,6 +1138,8 @@ public final class WorldFacade {
                 case WorldCommand.SpawnOnceCommand c -> spawnOnce(c);
                 case WorldCommand.CaptureMonsterCommand c -> c.reply().accept(handleCapture(c));
                 case WorldCommand.StrikeCharacterCommand c -> handleStrike(c.characterId(), c.percentOfMax());
+                case WorldCommand.PlaceNpcCommand c -> handlePlaceNpc(c);
+                case WorldCommand.RemoveNpcCommand c -> handleRemoveNpc(c.npcCode());
                 case WorldCommand.ArtifactEffectCommand c -> handleArtifact(c);
                 case WorldCommand.SetNightCommand c -> {
                     night = c.night();
@@ -2410,6 +2428,37 @@ public final class WorldFacade {
             }
         }
         return false;
+    }
+
+    private void handlePlaceNpc(WorldCommand.PlaceNpcCommand command) {
+        Optional<Long> existing = npcIdOf(command.npcCode());
+        if (existing.isPresent()) {
+            PositionComponent at = POSITION.get(entitiesByNpcId.get(existing.get()));
+            if (at.x == command.x() && at.y == command.y()) {
+                return;
+            }
+            handleRemoveNpc(command.npcCode());
+        }
+        spawnNpc(new NpcCatalogSnapshot.NpcPlacementDefinition(command.npcCode(), command.x(), command.y()));
+    }
+
+    private void handleRemoveNpc(String npcCode) {
+        Optional<Long> npcId = npcIdOf(npcCode);
+        if (npcId.isEmpty()) {
+            return;
+        }
+        aoiTracker.onNpcDetach(npcId.get());
+        ecsWorld.removeEntity(entitiesByNpcId.remove(npcId.get()));
+        aoiDirty = true;
+    }
+
+    private Optional<Long> npcIdOf(String npcCode) {
+        for (Map.Entry<Long, KEntity> entry : entitiesByNpcId.entrySet()) {
+            if (npcCode.equals(NPC.get(entry.getValue()).npcCode)) {
+                return Optional.of(entry.getKey());
+            }
+        }
+        return Optional.empty();
     }
 
     /**

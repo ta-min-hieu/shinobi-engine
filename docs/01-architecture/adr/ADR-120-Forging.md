@@ -15,7 +15,7 @@
 `crafting_recipe.kind`, V100). Luyện khí đi CÙNG đường một-transaction của ADR-079 D3 (khoá túi → tiêu nguyên liệu → trừ
 linh thạch → cấp món → audit `FORGE_ITEM`), chỉ khác bước cấp. Lệnh luyện đan từ chối mã luyện khí và ngược lại.
 
-**D2 — Lò ở trưởng lão Chu Hoành** (cùng lò đan, kiểm `NpcProximity` ở server). ⚠️ **Lệch mô tả lượt hỏi**: thế giới
+**D2 — Lò ở trưởng lão Chu Hoành** *(⚠️ THAY bởi [ADR-131](ADR-131-Blacksmith-And-Merchant-NPCs.md) 2026-10-31: lò luyện khí chuyển sang thợ rèn Luyện Khí Đường; lò đan vẫn ở Chu Hoành)* (cùng lò đan, kiểm `NpcProximity` ở server). ⚠️ **Lệch mô tả lượt hỏi**: thế giới
 CHƯA có NPC thợ rèn (thêm NPC cần model + điểm đặt + thoại — việc art/nội dung). Khi có thợ rèn chỉ cần đổi mã NPC kiểm
 gần. Client mở cửa sổ bằng lệnh chat `/luyenkhi`.
 

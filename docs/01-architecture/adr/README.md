@@ -162,6 +162,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-128](ADR-128-Party-Formations.md) | Trận pháp nhóm | ✅ **Accepted** *(2026-10-31, lô 24)* | — |
 | [ADR-129](ADR-129-Cave-Dwelling.md) | Động phủ | ✅ **Accepted** *(2026-10-31, lô 24)* | — |
 | [ADR-130](ADR-130-Arc-Three-Inner-Sect.md) | Nội dung arc 3 — Nội Môn | ✅ **Accepted** *(2026-10-31, lô 24)* | — |
+| [ADR-131](ADR-131-Blacksmith-And-Merchant-NPCs.md) | NPC thợ rèn + thương nhân du hành | ✅ **Accepted** *(2026-10-31, lô 24)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)
