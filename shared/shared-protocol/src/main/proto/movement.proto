@@ -341,3 +341,10 @@ message ChooseEncounterOptionResponse {
   int32 quantity = 5;
   bool monster_spawned = 6;
 }
+
+// ADR-123 (2026-10-31) — ngày đêm. Event: Server -> Client, mọi người online (OPCODE_DAY_NIGHT_EVENT = 327), gửi lặp
+// mỗi 30 giây. Một giờ thật là một ngày; phút 40–59 của mỗi giờ là đêm (quái mạnh hơn, rơi đồ nhiều hơn).
+message DayNightEvent {
+  bool night = 1;
+  int32 seconds_until_change = 2;
+}

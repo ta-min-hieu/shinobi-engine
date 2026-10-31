@@ -296,6 +296,9 @@ public final class WorldFacade {
     private final Lock tickLock = new ReentrantLock();
     private volatile Duration stopTickWait = STOP_TICK_WAIT;
     private boolean contentSpawned;
+    /** ADR-123 — chỉ đọc/ghi trên tick thread (qua {@link WorldCommand.SetNightCommand}). */
+    private boolean night;
+
     private long fixedDtNanos;
     private final boolean spawnOverworldContent;
     /**
@@ -839,6 +842,14 @@ public final class WorldFacade {
     }
 
     /**
+     * ADR-123 — báo world đang đêm hay ngày (gateway gửi định kỳ, chạy lại vô hại). Đêm: quái đánh đòn thường theo
+     * {@code monsterDamagePercent}; điểm spawn {@code nightOnly} chỉ ra quái lúc đêm (ngày thì chờ, không hồi sinh).
+     */
+    public void setNight(boolean night, int monsterDamagePercent) {
+        inbox.add(new WorldCommand.SetNightCommand(night, monsterDamagePercent));
+    }
+
+    /**
      * ADR-114 — bắt đầu đoàn hộ tống cho nhân vật (thay đoàn cũ nếu có). Đoàn báo qua
      * {@link #useEscortListener}; người đó rời World này thì đoàn báo {@code ABANDONED} và biến mất.
      */
@@ -942,7 +953,11 @@ public final class WorldFacade {
         contentSpawned = true;
         if (spawnOverworldContent) {
             for (int i = 0; i < monsterCatalog.spawnPoints().size(); i++) {
-                spawnMonster(i);
+                if (waitsForNight(i)) {
+                    monsterRespawnCountdownSeconds[i] = 0f; // chờ tới đêm — tickMonsterRespawn giữ ở 0
+                } else {
+                    spawnMonster(i);
+                }
             }
             // NPC tĩnh, không chết/hồi sinh — spawn 1 lần duy nhất, khác quái (không có
             // spawnIndex nào phải nhớ lại, xem NpcCatalogSnapshot).
@@ -1076,6 +1091,10 @@ public final class WorldFacade {
                 case WorldCommand.SetSkillRanksCommand c -> handleSetSkillRanks(c.characterId(), c.ranks());
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c);
                 case WorldCommand.SpawnOnceCommand c -> spawnOnce(c);
+                case WorldCommand.SetNightCommand c -> {
+                    night = c.night();
+                    combatSystem.setMonsterDamagePercent(c.monsterDamagePercent());
+                }
                 case WorldCommand.StartEscortCommand c -> escorts.start(c.characterId(), c.route(), escortListener);
                 case WorldCommand.CancelEscortCommand c -> escorts.cancel(c.characterId(), escortListener);
                 case WorldCommand.ReviveCommand c -> c.reply().accept(handleRevive(c.characterId(), c.inPlace()));
@@ -1990,10 +2009,22 @@ public final class WorldFacade {
             }
             monsterRespawnCountdownSeconds[i] -= deltaTime;
             if (monsterRespawnCountdownSeconds[i] <= 0f) {
+                if (waitsForNight(i)) {
+                    monsterRespawnCountdownSeconds[i] = 0f; // ADR-123 — điểm chỉ-đêm đang ban ngày: chờ, không hồi sinh
+                    continue;
+                }
                 monsterRespawnCountdownSeconds[i] = -1f;
                 spawnMonster(i);
             }
         }
+    }
+
+    /**
+     * ADR-123 — điểm spawn chỉ ra quái ban đêm mà trời đang sáng. Quái đã ra lúc đêm KHÔNG tự biến mất khi trời sáng
+     * (ADR-123 D3) — chỉ không hồi sinh tới đêm sau.
+     */
+    private boolean waitsForNight(int spawnIndex) {
+        return !night && monsterCatalog.spawnPoints().get(spawnIndex).nightOnly();
     }
 
     /**

@@ -330,6 +330,8 @@ public final class GatewayBootstrap {
         characterRegistry.quiz.bind(new QuizHooks.Deps( // ADR-122 — hỏi đáp tông môn
                 facades.progression().expansion().quiz(), mail, characterRegistry, java.time.Clock.systemUTC()));
         expansion.add(characterRegistry.quiz.job());
+        expansion.add(DayNightJob.job( // ADR-123 — ngày đêm
+                worldGateway.mainWorldChannels(), characterRegistry, java.time.Clock.systemUTC()));
         expansion.start();
         return new BackgroundJobs(marketExpiry, spiritVeins, waypoints, guildWars, expansion);
     }

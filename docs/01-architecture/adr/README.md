@@ -154,6 +154,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-120](ADR-120-Forging.md) | Luyện khí | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 | [ADR-121](ADR-121-Chance-Encounters.md) | Kỳ ngộ | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 | [ADR-122](ADR-122-Sect-Quiz.md) | Hỏi đáp tông môn | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
+| [ADR-123](ADR-123-Day-Night.md) | Ngày đêm | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -51,7 +51,7 @@ public final class PostgresMonsterCatalogAdapter implements MonsterCatalogPort {
             """;
 
     private static final String LIST_SPAWN_POINTS = """
-            SELECT mt.code AS monster_code, ms.world_code, ms.pos_x, ms.pos_y, ms.respawn_seconds
+            SELECT mt.code AS monster_code, ms.world_code, ms.pos_x, ms.pos_y, ms.respawn_seconds, ms.night_only
               FROM monster_spawn ms
               JOIN monster_template mt ON mt.id = ms.monster_template_id
              WHERE ms.world_code = ?
@@ -142,6 +142,7 @@ public final class PostgresMonsterCatalogAdapter implements MonsterCatalogPort {
                 rs.getString("world_code"),
                 rs.getFloat("pos_x"),
                 rs.getFloat("pos_y"),
-                rs.getFloat("respawn_seconds"));
+                rs.getFloat("respawn_seconds"),
+                rs.getBoolean("night_only"));
     }
 }

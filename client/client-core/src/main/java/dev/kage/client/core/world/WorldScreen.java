@@ -954,7 +954,10 @@ public final class WorldScreen implements GameScreen {
 
     @Override
     public void render(float alpha) {
-        Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1f);
+        // ADR-123 — ngày đêm chỉ là hình: nền và lớp phủ tối dần theo gói 327 của server.
+        DayNightShade dayNight = reports.community().expansion().dayNight().shade();
+        dayNight.update(Gdx.graphics.getDeltaTime());
+        dayNight.applyClearColor();
         // Depth buffer bắt buộc từ ADR-031: nhân vật là hình học 3D thật, thiếu depth thì thứ tự vẽ
         // quyết định cái nào che cái nào — đúng thứ 2.5D phải bỏ.
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
@@ -972,6 +975,7 @@ public final class WorldScreen implements GameScreen {
             DemoPlatforms.render(shapeRenderer, camera.combined, worldChange.currentKind());
             combatFeedback.render(Gdx.graphics.getDeltaTime(), camera.combined, fallbackProjector);
         }
+        dayNight.render(shapeRenderer, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 
         syncCombatHud();
         panels.render(Gdx.graphics.getDeltaTime());

@@ -131,7 +131,7 @@ final class WorldContentLoader {
 
     private static MonsterCatalogSnapshot.MonsterSpawnDefinition toSpawnDefinition(MonsterSpawnPoint spawn) {
         return new MonsterCatalogSnapshot.MonsterSpawnDefinition(
-                spawn.monsterCode(), spawn.posX(), spawn.posY(), spawn.respawnSeconds());
+                spawn.monsterCode(), spawn.posX(), spawn.posY(), spawn.respawnSeconds(), spawn.nightOnly());
     }
 
     private static NpcCatalogSnapshot.NpcPlacementDefinition toPlacementDefinition(NpcPlacement placement) {

@@ -11,7 +11,8 @@ package dev.kage.monster.domain;
  * <p>{@code posY} luôn 0 (ADR-033 khoá di chuyển vào trục X — quái đặt lệch y là quái người chơi
  * không bao giờ chạm tới); DB có {@code CHECK} bắt buộc điều đó, đây chỉ là hàng rào thứ hai.
  */
-public record MonsterSpawnPoint(String monsterCode, String worldCode, float posX, float posY, float respawnSeconds) {
+public record MonsterSpawnPoint(
+        String monsterCode, String worldCode, float posX, float posY, float respawnSeconds, boolean nightOnly) {
 
     /** World chính — dungeon/arena chưa đọc bảng spawn ở đợt này (ADR-037 D2). */
     public static final String MAIN_WORLD_CODE = "main";

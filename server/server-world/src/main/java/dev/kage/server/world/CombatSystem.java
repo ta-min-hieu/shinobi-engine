@@ -43,6 +43,8 @@ import dev.kage.server.world.component.TargetComponent;
  */
 final class CombatSystem extends IteratingKSystem {
 
+    private static final int FULL_PERCENT = 100;
+
     private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
     private static final ComponentMapper<TargetComponent> TARGET = ComponentMapper.getFor(TargetComponent.class);
     private static final ComponentMapper<AttackCooldownComponent> COOLDOWN =
@@ -74,6 +76,9 @@ final class CombatSystem extends IteratingKSystem {
     private final RandomGenerator random;
     private final List<AttackOutcome> pendingResults = new ArrayList<>();
 
+    /** ADR-123 — phần trăm sát thương đòn thường của QUÁI (đêm 115); chỉ tick thread đọc/ghi. */
+    private int monsterDamagePercent = FULL_PERCENT;
+
     /**
      * @param entityLookup tra KEntity theo entity ID (nhân vật DƯƠNG hoặc quái ÂM — combat.proto).
      * @param pvpAllowed người chơi có được đánh người chơi khác không — xem {@code WorldFacade#pvpAllowed}.
@@ -97,6 +102,11 @@ final class CombatSystem extends IteratingKSystem {
         this.entityLookup = entityLookup;
         this.pvpRule = pvpRule;
         this.random = random;
+    }
+
+    /** ADR-123 — đặt phần trăm sát thương đòn thường của quái (gọi trên tick thread). */
+    void setMonsterDamagePercent(int percent) {
+        this.monsterDamagePercent = percent;
     }
 
     List<AttackOutcome> drainResults() {
@@ -209,6 +219,10 @@ final class CombatSystem extends IteratingKSystem {
             result = new CombatConstants.AttackResult(true, false, 0);
         }
         result = PetSkills.apply(result, COMBAT_STATS.get(attacker), COMBAT_STATS.get(target), random);
+        if (monsterDamagePercent != FULL_PERCENT && MONSTER_ID.has(attacker)) {
+            result = new CombatConstants.AttackResult(
+                    result.miss(), result.crit(), result.damage() * monsterDamagePercent / FULL_PERCENT);
+        }
         int damageAfterShield = StatusEffects.absorbWithShield(STATUS_EFFECT.get(target), result.damage());
         targetHealth.current = Math.max(0, targetHealth.current - damageAfterShield);
         // ADR-046 D2 — CẢ HAI bên vừa dính tới chiến đấu, kể cả khi đòn này hụt: đứng cạnh một con

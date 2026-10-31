@@ -22,7 +22,8 @@ record ExpansionWindows(
         ForgeCoordinator forge,
         ReportPanel encounterPanel,
         EncounterCoordinator encounter,
-        QuizCoordinator quiz) {
+        QuizCoordinator quiz,
+        DayNightCoordinator dayNight) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
@@ -53,7 +54,8 @@ record ExpansionWindows(
                 new ForgeCoordinator(forgePanel, sender, feeds),
                 encounterPanel,
                 new EncounterCoordinator(encounterPanel, sender, feeds),
-                new QuizCoordinator(feeds.chat()));
+                new QuizCoordinator(feeds.chat()),
+                new DayNightCoordinator(feeds.chat()));
     }
 
     /** Đăng ký vào hub. */
@@ -66,6 +68,7 @@ record ExpansionWindows(
         panels.register(forgePanel, forge);
         panels.register(encounterPanel, encounter);
         panels.register(quiz);
+        panels.register(dayNight);
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

@@ -61,7 +61,7 @@ class MonsterTemplateTest {
 
     @Test
     void shouldRejectNonPositiveRespawnSeconds() {
-        assertThatThrownBy(() -> new MonsterSpawnPoint("c", MonsterSpawnPoint.MAIN_WORLD_CODE, 8f, 0f, 0f))
+        assertThatThrownBy(() -> new MonsterSpawnPoint("c", MonsterSpawnPoint.MAIN_WORLD_CODE, 8f, 0f, 0f, false))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 

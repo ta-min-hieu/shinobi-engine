@@ -122,6 +122,13 @@ public record MonsterCatalogSnapshot(Map<String, MonsterSpecies> species, List<M
             int critPercent,
             String element) {}
 
-    /** Một điểm spawn: loài nào, ở đâu, hồi sinh sau bao lâu. */
-    public record MonsterSpawnDefinition(String monsterCode, float posX, float posY, float respawnSeconds) {}
+    /** Một điểm spawn: loài nào, ở đâu, hồi sinh sau bao lâu, có chỉ ra ban đêm không (ADR-123). */
+    public record MonsterSpawnDefinition(
+            String monsterCode, float posX, float posY, float respawnSeconds, boolean nightOnly) {
+
+        /** Điểm spawn ra quái cả ngày lẫn đêm. */
+        public MonsterSpawnDefinition(String monsterCode, float posX, float posY, float respawnSeconds) {
+            this(monsterCode, posX, posY, respawnSeconds, false);
+        }
+    }
 }

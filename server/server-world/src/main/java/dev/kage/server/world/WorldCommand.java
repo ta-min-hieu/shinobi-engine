@@ -91,6 +91,9 @@ sealed interface WorldCommand {
     /** Một con quái thường tại {@code (x, y)}, KHÔNG thuộc điểm spawn nào nên không hồi sinh (ADR-113). */
     record SpawnOnceCommand(String monsterCode, float x, float y) implements WorldCommand {}
 
+    /** Ngày đêm (ADR-123): đêm hay ngày + phần trăm sát thương đòn thường của quái lúc này. */
+    record SetNightCommand(boolean night, int monsterDamagePercent) implements WorldCommand {}
+
     /** Bắt đầu đoàn hộ tống cho {@code characterId} (ADR-114). */
     record StartEscortCommand(long characterId, EscortRoute route) implements WorldCommand {}
 

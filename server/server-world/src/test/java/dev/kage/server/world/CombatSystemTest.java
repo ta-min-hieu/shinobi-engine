@@ -137,6 +137,37 @@ class CombatSystemTest {
      * đánh người chơi nữa — người chơi bất tử, không phải điều chủ dự án yêu cầu.
      */
     @Test
+    void dayMonsterHitShouldDealDamage() {
+        assertThat(firstHitDamage(true, 100)).isPositive();
+    }
+
+    /** ADR-123 — đêm: đòn thường của QUÁI nhân 115%; đòn của người chơi không đổi. Cùng seed ⇒ cùng cú tung. */
+    @Test
+    void nightShouldScaleMonsterAutoAttackButNotPlayerAttacks() {
+        int day = firstHitDamage(true, 100);
+        assertThat(firstHitDamage(true, 115)).isEqualTo(day * 115 / 100);
+        int playerDay = firstHitDamage(false, 100);
+        assertThat(firstHitDamage(false, 115)).isEqualTo(playerDay);
+    }
+
+    private int firstHitDamage(boolean monster, int monsterDamagePercent) {
+        EcsWorld world = new EcsWorld();
+        KEntity attacker = monster ? buildMonsterAttacker(world) : buildAttacker(world);
+        KEntity defender = buildDefender(world, true);
+        long attackerId = monster ? MONSTER_ATTACKER_ID : ATTACKER_ID;
+        Map<Long, KEntity> byId = Map.of(attackerId, attacker, DEFENDER_ID, defender);
+        CombatSystem combatSystem =
+                new CombatSystem(byId::get, CombatSystemTest::pvpAllowed, new java.util.SplittableRandom(42));
+        combatSystem.setMonsterDamagePercent(monsterDamagePercent);
+        world.addSystem(combatSystem);
+        if (!monster) {
+            combatSystem.requestAttack(attacker);
+        }
+        world.update(0.016f);
+        return combatSystem.drainResults().getFirst().damage();
+    }
+
+    @Test
     void shouldStillAutoAttack_whenAttackerIsMonster() {
         EcsWorld world = new EcsWorld();
         KEntity attacker = buildMonsterAttacker(world);

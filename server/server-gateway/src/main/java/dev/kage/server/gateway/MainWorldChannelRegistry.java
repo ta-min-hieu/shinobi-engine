@@ -334,6 +334,11 @@ final class MainWorldChannelRegistry {
         return channel == null ? Optional.empty() : Optional.of(channel.facade());
     }
 
+    /** ADR-123 — làm một việc với MỌI khu vực đang chạy (ví dụ báo ngày/đêm); {@code action} phải trả về ngay. */
+    synchronized void forEachChannel(Consumer<WorldFacade> action) {
+        channels.forEach(channel -> action.accept(channel.facade()));
+    }
+
     /** Tổng số nhân vật đang ở MỌI khu vực map chính — mỗi nhân vật đếm đúng một lần. */
     synchronized int playerCount() {
         return totalPlayers();

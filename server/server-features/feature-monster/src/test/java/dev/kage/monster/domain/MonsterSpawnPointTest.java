@@ -19,27 +19,29 @@ class MonsterSpawnPointTest {
 
     @Test
     void shouldAcceptOrdinarySpawnPoint() {
-        MonsterSpawnPoint point = new MonsterSpawnPoint("training_dummy", "main", 8f, 0f, 5f);
+        MonsterSpawnPoint point = new MonsterSpawnPoint("training_dummy", "main", 8f, 0f, 5f, false);
 
         assertThat(point.respawnSeconds()).isEqualTo(5f);
     }
 
     @Test
     void shouldRejectNonFiniteRespawnSeconds() {
-        assertThatThrownBy(() -> new MonsterSpawnPoint("training_dummy", "main", 8f, 0f, Float.NaN))
+        assertThatThrownBy(() -> new MonsterSpawnPoint("training_dummy", "main", 8f, 0f, Float.NaN, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("respawnSeconds");
-        assertThatThrownBy(() -> new MonsterSpawnPoint("training_dummy", "main", 8f, 0f, Float.POSITIVE_INFINITY))
+        assertThatThrownBy(
+                        () -> new MonsterSpawnPoint("training_dummy", "main", 8f, 0f, Float.POSITIVE_INFINITY, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("respawnSeconds");
     }
 
     @Test
     void shouldRejectNonFinitePosition() {
-        assertThatThrownBy(() -> new MonsterSpawnPoint("training_dummy", "main", Float.NaN, 0f, 5f))
+        assertThatThrownBy(() -> new MonsterSpawnPoint("training_dummy", "main", Float.NaN, 0f, 5f, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("posX");
-        assertThatThrownBy(() -> new MonsterSpawnPoint("training_dummy", "main", 8f, Float.NEGATIVE_INFINITY, 5f))
+        assertThatThrownBy(
+                        () -> new MonsterSpawnPoint("training_dummy", "main", 8f, Float.NEGATIVE_INFINITY, 5f, false))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("posY");
     }

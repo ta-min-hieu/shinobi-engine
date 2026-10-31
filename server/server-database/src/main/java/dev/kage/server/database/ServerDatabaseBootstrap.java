@@ -273,6 +273,9 @@ import dev.kage.world.api.WorldGeometryFacade;
 public final class ServerDatabaseBootstrap {
 
     private final DataSource dataSource;
+    /** ADR-123 — lượt rơi đồ thêm ban đêm. */
+    private final java.util.SplittableRandom lootRandom = new java.util.SplittableRandom();
+
     private GameEventFacade gameEvents;
     private final RedisClient redisClient;
     private final RetentionJanitor retentionJanitor;
@@ -670,7 +673,14 @@ public final class ServerDatabaseBootstrap {
             JdbcInventoryTransactionRunner transactionRunner) {
         return new GrantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, transactionRunner)
                 .auditedBy(new PostgresAuditAdapter())
-                .withRollCount(() -> wireGameEventFacade().multiplier(GameEventKind.DROP));
+                .withRollCount(() -> wireGameEventFacade().multiplier(GameEventKind.DROP) * nightLootRolls());
+    }
+
+    /** ADR-123 — đêm có thêm một lượt tung rơi đồ với 20% (ngẫu nhiên ở server). */
+    private int nightLootRolls() {
+        synchronized (lootRandom) {
+            return dev.kage.world.domain.DayNightCycle.lootRolls(java.time.Instant.now(), lootRandom);
+        }
     }
 
     /**

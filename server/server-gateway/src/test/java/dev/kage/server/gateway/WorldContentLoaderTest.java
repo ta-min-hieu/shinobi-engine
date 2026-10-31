@@ -78,8 +78,8 @@ class WorldContentLoaderTest {
     @Test
     void shouldLoadBothCatalogs_inOneCall() {
         WorldContentCatalog content = WorldContentLoader.load(
-                monsterFacadeWith(List.of(
-                        new MonsterSpawnPoint("training_dummy", MonsterSpawnPoint.MAIN_WORLD_CODE, 8f, 0f, 10f))),
+                monsterFacadeWith(List.of(new MonsterSpawnPoint(
+                        "training_dummy", MonsterSpawnPoint.MAIN_WORLD_CODE, 8f, 0f, 10f, false))),
                 npcFacadeWith(List.of(new NpcPlacement("town_elder", NpcPlacement.MAIN_WORLD_CODE, -5f, 0f))),
                 geometryFacadeWith(List.of()),
                 MonsterSpawnPoint.MAIN_WORLD_CODE);
