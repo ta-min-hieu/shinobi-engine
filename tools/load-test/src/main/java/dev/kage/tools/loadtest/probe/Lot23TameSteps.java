@@ -31,6 +31,7 @@ final class Lot23TameSteps {
     private int maxHp;
     private int currentHp;
     private long nextAttack;
+    private int lastHit;
 
     Lot23TameSteps(GameConnection connection, Lot23Scenario.Asker asker) {
         this.connection = connection;
@@ -62,7 +63,9 @@ final class Lot23TameSteps {
     }
 
     private boolean weakEnough() {
-        return target != 0L && currentHp * PERCENT <= maxHp * TAME_HP_PERCENT;
+        // ADR-124 (2026-10-31): ≤ 20% máu HOẶC còn ít hơn một đòn của chính mình.
+        return target != 0L
+                && (currentHp * PERCENT <= maxHp * TAME_HP_PERCENT || (lastHit > 0 && currentHp <= lastHit));
     }
 
     private void attackIfDue() throws IOException {
@@ -94,6 +97,7 @@ final class Lot23TameSteps {
             AttackResultEvent hit = AttackResultEvent.parseFrom(frame.payload());
             if (hit.getTargetEntityId() == target && hit.getAttackerEntityId() > 0) {
                 currentHp = hit.getTargetCurrentHp();
+                lastHit = Math.max(lastHit, hit.getDamage());
                 return 1;
             }
         }

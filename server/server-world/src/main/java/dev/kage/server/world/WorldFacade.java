@@ -1904,7 +1904,15 @@ public final class WorldFacade {
             return new CaptureResult(CaptureResult.Outcome.TOO_FAR, code);
         }
         HealthComponent health = HEALTH.get(monster);
-        if ((long) health.current * PERCENT > (long) health.max * command.rule().maxHpPercent()) {
+        // ADR-124 (chủ dự án 2026-10-31): ≤20% máu HOẶC còn ít hơn một đòn thường của chính người dùng — sát thương gần
+        // như cố định nên ô 20% có thể bị nhảy qua hẳn (200 máu, đòn 50 ⇒ không bao giờ ≤ 40).
+        boolean lowEnough = (long) health.current * PERCENT
+                <= (long) health.max * command.rule().maxHpPercent();
+        boolean oneHitAway = health.current
+                <= CombatConstants.normalHitDamage(
+                        CombatConstants.toStats(COMBAT_STATS.get(character)),
+                        CombatConstants.toStats(COMBAT_STATS.get(monster)));
+        if (!lowEnough && !oneHitAway) {
             return new CaptureResult(CaptureResult.Outcome.HP_TOO_HIGH, code);
         }
         java.util.OptionalInt chance = command.rule().chanceOf().apply(code);

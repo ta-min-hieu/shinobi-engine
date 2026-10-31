@@ -259,14 +259,25 @@ final class CombatConstants {
         }
 
         boolean crit = random.nextFloat() < attacker.critPercent();
+        return new AttackResult(false, crit, attackDamage(attacker, defender, crit));
+    }
+
+    /**
+     * Sát thương một đòn thường TRÚNG, không bạo kích — không ngẫu nhiên. ADR-124: thu phục cho dùng phù khi quái còn
+     * ít máu hơn chừng này ("chỉ còn một đòn").
+     */
+    static int normalHitDamage(CombatStats attacker, CombatStats defender) {
+        return attackDamage(attacker, defender, false);
+    }
+
+    private static int attackDamage(CombatStats attacker, CombatStats defender, boolean crit) {
         float rawDamage = attacker.atk() * (crit ? attacker.critDamageMultiplier() : 1f);
         rawDamage *= ElementCounterTable.multiplier(attacker.element(), defender.element());
 
         float effectiveDef = Math.max(0f, defender.def());
         float mitigation = 100f / (100f + effectiveDef);
 
-        int finalDamage = Math.max(MIN_DAMAGE_FLOOR, Math.round(rawDamage * mitigation));
-        return new AttackResult(false, crit, finalDamage);
+        return Math.max(MIN_DAMAGE_FLOOR, Math.round(rawDamage * mitigation));
     }
 
     /**

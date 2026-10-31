@@ -12,7 +12,7 @@
 ## Decision
 
 **D1 — Điều kiện**: nhắm một con quái, gõ `/thuphuc`. Server kiểm: có **Phong Yêu Phù** (tiêu một lá), đứng trong **6 m**,
-quái còn **≤ 20% máu**, loài nằm trong bảng `tameable_monster` (V104 — boss không có). Tỉ lệ = tỉ lệ gốc của loài, trừ
+quái còn **≤ 20% máu hoặc ≤ một đòn thường của chính người dùng** (bổ sung 2026-10-31), loài nằm trong bảng `tameable_monster` (V104 — boss không có). Tỉ lệ = tỉ lệ gốc của loài, trừ
 **5% mỗi cấp quái hơn người**, sàn 5% (`TamingRules`). Ngẫu nhiên ở server (nguồn random gameplay của World).
 
 **D2 — Một lượt tick, không chạy đua**: gateway tiêu phù (DB) rồi gửi lệnh `CaptureMonster` vào World; trong CÙNG một lượt
@@ -58,3 +58,6 @@ hiện thành dòng hệ thống.
    bị NHẢY QUA hoàn toàn (Thạch quái 200 máu, đòn 50 ⇒ không bao giờ ≤ 40). Đề xuất: (a) nâng ngưỡng lên 30%, hoặc (b)
    cho dùng phù khi còn ≤ 20% HOẶC ≤ một đòn của chính người dùng, hoặc (c) giữ và để người chơi tự chọn vũ khí/chiêu
    yếu hơn. Chưa tự đổi — mô tả lượt hỏi ghi rõ "< 20%".
+   ✅ **Chủ dự án chọn (b) 2026-10-31 (lượt hỏi lô 24)**: ≤ 20% máu HOẶC còn ≤ sát thương một đòn thường trúng không bạo
+   kích của chính người dùng (`CombatConstants.normalHitDamage` — cùng công thức `resolveAttack`, có test). Kiểm sống:
+   Thạch quái 200 máu NGUYÊN BẢN, tanthua44 đánh 52/nhát ⇒ 200→148→96→44 (22%, trên 20% nhưng ≤ 52) ⇒ CAPTURED.
