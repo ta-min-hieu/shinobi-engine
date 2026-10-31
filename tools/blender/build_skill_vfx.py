@@ -509,6 +509,71 @@ def build_loi_thien_loi(main_hex, accent_hex):
     return {"cast": 3, "impact": 4}, 2.6, 0.2
 
 
+def _zigzag_bolt(name, x_offsets, color, top=1.15, bottom=0.0):
+    """Tia sét gãy khúc: các đoạn hộp mảnh nối đầu-đuôi qua các điểm (x, z) đều nhau theo chiều cao."""
+    count = len(x_offsets) - 1
+    step = (top - bottom) / count
+    segments = []
+    for index in range(count):
+        x0, x1 = x_offsets[index], x_offsets[index + 1]
+        z0, z1 = top - index * step, top - (index + 1) * step
+        length = math.hypot(x1 - x0, z1 - z0)
+        # Hơi dài hơn nửa đoạn để khớp nối chồng lên nhau (không hở ở góc gãy). Quay quanh Y đưa trục Z
+        # về phía +X (sinθ = x), nên đoạn đi XUỐNG-sang-phải cần θ = atan2(−dx, h) — bản đầu quên dấu
+        # trừ và các đoạn gãy ngược chiều, render ra một sợi xích rời.
+        seg = _box_obj("%s%d" % (name, index), 0.050, 0.024, length / 2.0 + 0.03,
+                       loc=((x0 + x1) / 2.0, -0.08, (z0 + z1) / 2.0))
+        seg.rotation_euler = (0.0, math.atan2(-(x1 - x0), z0 - z1), 0.0)
+        apply_toon(seg, color, shades=2)
+        segments.append(seg)
+    return segments
+
+
+def build_thien_kiep(main_hex, accent_hex):
+    """Thiên Kiếp (ADR-126) — lôi kích giáng xuống người độ kiếp, phát tại MỤC TIÊU mỗi đợt sét.
+
+    Không phải một skill của người chơi nên không đứng trong SkillRegistry; server gửi nó như một
+    SkillResultEvent mã `thien_kiep` (WorldFacade.handleStrike) để client dùng lại đúng đường phát VFX.
+    Khác `loi_thien_loi` (một cột sét tím của người chơi Lôi) ở ba chỗ đọc được ở 64px: mây kiếp ĐEN
+    TÍM rộng hơn, HAI tia gãy khúc trắng vàng chớp lệch nhịp nhau (sét trời, không phải pháp thuật một
+    người), và vòng cháy vàng dưới chân. Chớp sáng toàn màn hình để client lo (luật "hit" — không
+    render sẵn, xem loi_thien_loi).
+    """
+    # Mây kiếp: CỤM ba khối cầu đè nhau — một hộp phẳng (bản đầu) đọc ra cái bảng treo, không ra mây.
+    clouds = []
+    for index, (x, radius) in enumerate(((-0.26, 0.20), (0.0, 0.27), (0.27, 0.19))):
+        puff = _prim("ico_sphere", "KiepCloud%d" % index, radius=radius, loc=(x, -0.02, 1.24))
+        apply_toon(puff, "#2A2240", shades=2)
+        _kf(puff, 1, scale=0.25)
+        _kf(puff, 2, scale=0.75)
+        _kf(puff, 3, scale=1.0)
+        _kf(puff, 8, scale=1.05)
+        clouds.append(puff)
+
+    bolt_a = _zigzag_bolt("BoltA", [-0.10, 0.08, -0.06, 0.07, 0.0], "#FFF6C2")
+    bolt_b = _zigzag_bolt("BoltB", [0.16, 0.02, 0.14, -0.02, 0.04], accent_hex)
+    for seg in bolt_a:
+        _kf(seg, 3, scale=(1.0, 1.0, 0.0))
+        _kf(seg, 4, scale=(1.6, 1.6, 1.0))
+        _kf(seg, 5, scale=(0.8, 0.8, 1.0))
+        _kf(seg, 6, scale=(0.0, 0.0, 1.0))
+    for seg in bolt_b:
+        _kf(seg, 4, scale=(1.0, 1.0, 0.0))
+        _kf(seg, 5, scale=(1.4, 1.4, 1.0))
+        _kf(seg, 6, scale=(1.6, 1.6, 1.0))
+        _kf(seg, 7, scale=(0.0, 0.0, 1.0))
+
+    scorch = _prim("torus", "KiepScorch", major_radius=0.24, minor_radius=0.035, loc=(0.0, -0.05, 0.01))
+    scorch.rotation_euler = (math.radians(90), 0, 0)
+    apply_toon(scorch, "#FFB13D", shades=2)
+    _kf(scorch, 4, scale=(0.4, 0.4, 1.0))
+    _kf(scorch, 6, scale=(1.1, 1.1, 1.0))
+    _kf(scorch, 8, scale=(0.8, 0.8, 1.0))
+
+    _linearize(scorch, *clouds, *bolt_a, *bolt_b)
+    return {"cast": 3, "impact": 5}, 3.0, 0.15
+
+
 SKILLS = {
     "fireball": ("hoa", build_fireball),
     "thuy_song_du": ("thuy", build_thuy_song_du),
@@ -527,6 +592,8 @@ SKILLS = {
     "loi_truy_kich": ("loi", build_loi_truy_kich),
     "loi_dien_giat": ("loi", build_loi_dien_giat),
     "loi_thien_loi": ("loi", build_loi_thien_loi),
+    # ADR-126 — không phải skill người chơi; server gửi như SkillResultEvent mỗi đợt lôi kích.
+    "thien_kiep": ("loi", build_thien_kiep),
 }
 
 

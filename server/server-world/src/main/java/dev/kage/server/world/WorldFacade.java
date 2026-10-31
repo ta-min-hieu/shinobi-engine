@@ -1899,6 +1899,9 @@ public final class WorldFacade {
                 command.durationSeconds());
     }
 
+    /** Mã hiệu ứng của một đợt lôi kích Thiên Kiếp — khớp vùng atlas {@code vfx_thien_kiep_impact}. */
+    static final String TRIBULATION_STRIKE_CODE = "thien_kiep";
+
     private void handleStrike(long characterId, int percentOfMax) {
         KEntity entity = entitiesByCharacterId.get(characterId);
         if (entity == null || percentOfMax <= 0) {
@@ -1912,6 +1915,20 @@ public final class WorldFacade {
         health.current = Math.max(0, health.current - damage);
         COMBAT_RECENCY.get(entity).secondsSinceCombat = 0f;
         pendingHealthChanges.add(new HealthChange(characterId, health.current, health.max));
+        // Hiệu ứng sét (ADR-126): đi chung ống SkillResultEvent để client phát `vfx_thien_kiep_impact` tại người độ
+        // kiếp — không gói mới. Đài độ kiếp là World một người nên chỉ chính họ quan sát.
+        outboundSink.onSkillResult(
+                characterId,
+                new WorldOutboundSink.SkillOutcome(
+                        TRIBULATION_STRIKE_CODE,
+                        0L,
+                        characterId,
+                        damage,
+                        false,
+                        false,
+                        health.current,
+                        health.isDead(),
+                        SkillEffectKind.DAMAGE));
         if (health.isDead()) {
             outboundSink.onCharacterDefeated(characterId, 0L);
             respawnOrHaltCorpse(characterId, 0L);
