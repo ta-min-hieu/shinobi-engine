@@ -636,7 +636,8 @@ public final class GatewayBootstrap {
                         .wireTournamentFacade(
                                 dev.kage.pvp.domain.TournamentRules.Schedule.parse(System.getenv(TOURNAMENT_AT_ENV))),
                 databaseBootstrap.expansion().wireTribulationFacade(),
-                databaseBootstrap.expansion().wireArtifactFacade());
+                databaseBootstrap.expansion().wireArtifactFacade(),
+                databaseBootstrap.expansion().wireCaveFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */

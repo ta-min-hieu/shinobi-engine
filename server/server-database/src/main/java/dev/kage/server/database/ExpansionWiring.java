@@ -51,6 +51,11 @@ public final class ExpansionWiring {
         return new TamingFacade(new PostgresTamingAdapter(dataSource));
     }
 
+    /** Động phủ (ADR-129). */
+    public dev.kage.world.api.CaveFacade wireCaveFacade() {
+        return new dev.kage.world.api.CaveFacade(new dev.kage.server.database.world.PostgresCaveAdapter(dataSource));
+    }
+
     /** Pháp bảo (ADR-127). */
     public dev.kage.world.api.ArtifactFacade wireArtifactFacade() {
         return new dev.kage.world.api.ArtifactFacade(new PostgresArtifactAdapter(dataSource));

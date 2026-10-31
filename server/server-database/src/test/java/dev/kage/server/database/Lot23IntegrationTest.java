@@ -53,6 +53,7 @@ import dev.kage.server.database.market.PostgresMarketRecordAdapter;
 import dev.kage.server.database.pvp.PostgresTournamentAdapter;
 import dev.kage.server.database.shop.PostgresMerchantAdapter;
 import dev.kage.server.database.world.PostgresArtifactAdapter;
+import dev.kage.server.database.world.PostgresCaveAdapter;
 import dev.kage.server.database.world.PostgresEncounterAdapter;
 import dev.kage.server.database.world.PostgresSpiritFieldAdapter;
 import dev.kage.server.database.world.PostgresTamingAdapter;
@@ -61,9 +62,11 @@ import dev.kage.shop.domain.MerchantBuyOutcome;
 import dev.kage.shop.domain.MerchantStock;
 import dev.kage.shop.domain.MerchantVisit;
 import dev.kage.world.api.ArtifactFacade;
+import dev.kage.world.api.CaveFacade;
 import dev.kage.world.api.EncounterFacade;
 import dev.kage.world.api.SpiritFieldFacade;
 import dev.kage.world.api.TamingFacade;
+import dev.kage.world.domain.CavePort;
 import dev.kage.world.domain.EncounterPort;
 import dev.kage.world.domain.SpiritFieldPort;
 
@@ -503,6 +506,43 @@ class Lot23IntegrationTest {
                         bell))
                 .isEqualTo(1L);
         assertThat(artifacts.use(1L, Optional.of(bell), NOW)).isInstanceOf(ArtifactFacade.Use.Ready.class);
+    }
+
+    @Test
+    void caveVeinShouldAccrueCollectUpgradeAndTakeDecorations() {
+        long owner = character(account("caveowner"), "CaveOwner");
+        CaveFacade caves = new CaveFacade(new PostgresCaveAdapter(dataSource));
+        setGold(owner, 0L);
+
+        assertThat(caves.cave(owner, NOW).veinLevel()).isEqualTo(1);
+        assertThat(caves.collect(owner, NOW.plusSeconds(60)).outcome()).isEqualTo(CavePort.Outcome.NOTHING_TO_COLLECT);
+        Instant later = NOW.plus(Duration.ofHours(3));
+        assertThat(caves.collect(owner, later)).isEqualTo(new CavePort.Result(CavePort.Outcome.OK, 90L));
+        assertThat(scalar("SELECT gold FROM character_stat WHERE character_id = ?", owner))
+                .isEqualTo(90L);
+
+        Instant evenLater = later.plus(Duration.ofHours(1));
+        assertThat(caves.upgrade(owner, evenLater).outcome()).isEqualTo(CavePort.Outcome.INSUFFICIENT_GOLD);
+        assertThat(scalar("SELECT gold FROM character_stat WHERE character_id = ?", owner))
+                .as("từ chối ⇒ lượt thu kèm theo cũng rollback")
+                .isEqualTo(90L);
+        setGold(owner, 1_970L);
+        assertThat(caves.upgrade(owner, evenLater))
+                .as("thu 30 của giờ vừa qua rồi mới trừ 2.000")
+                .isEqualTo(new CavePort.Result(CavePort.Outcome.OK, 30L));
+        assertThat(scalar("SELECT gold FROM character_stat WHERE character_id = ?", owner))
+                .isZero();
+        assertThat(caves.cave(owner, evenLater).veinLevel()).isEqualTo(2);
+
+        setGold(owner, 1_500L);
+        assertThat(caves.decorate(owner, "spirit_pine", evenLater).outcome()).isEqualTo(CavePort.Outcome.OK);
+        assertThat(caves.decorate(owner, "spirit_pine", evenLater).outcome())
+                .isEqualTo(CavePort.Outcome.ALREADY_PLACED);
+        assertThat(caves.decorate(owner, "golden_throne", evenLater).outcome())
+                .isEqualTo(CavePort.Outcome.UNKNOWN_DECORATION);
+        CavePort.Cave cave = caves.cave(owner, evenLater);
+        assertThat(cave.decorations()).containsExactly("spirit_pine");
+        assertThat(caves.stored(cave, evenLater.plus(Duration.ofHours(1)))).isEqualTo(66L); // 60 × 110%
     }
 
     @Test

@@ -431,6 +431,71 @@ message UseArtifactResponse {
   int32 cooldown_seconds = 5;
 }
 
+// ADR-129 — động phủ.
+enum CaveAction {
+  CAVE_ACTION_UNSPECIFIED = 0;
+  CAVE_ACTION_VIEW = 1;
+  CAVE_ACTION_ENTER = 2;
+  CAVE_ACTION_COLLECT = 3;   // chỉ khi đang đứng trong động phủ của mình
+  CAVE_ACTION_UPGRADE = 4;
+  CAVE_ACTION_DECORATE = 5;  // decoration_code
+  CAVE_ACTION_INVITE = 6;    // target_name — bạn bè đang online
+  CAVE_ACTION_VISIT = 7;     // target_name — chủ động phủ đã mời mình
+}
+
+// Command: Client -> Server (OPCODE_CAVE_COMMAND = 335).
+message CaveCommand {
+  CaveAction action = 1;
+  string decoration_code = 2;
+  string target_name = 3;
+}
+
+enum CaveOutcome {
+  CAVE_OUTCOME_UNSPECIFIED = 0;
+  CAVE_OUTCOME_OK = 1;
+  CAVE_OUTCOME_NOTHING_TO_COLLECT = 2;
+  CAVE_OUTCOME_MAX_LEVEL = 3;
+  CAVE_OUTCOME_INSUFFICIENT_GOLD = 4;
+  CAVE_OUTCOME_UNKNOWN_DECORATION = 5;
+  CAVE_OUTCOME_ALREADY_PLACED = 6;
+  CAVE_OUTCOME_GOLD_CAP = 7;
+  CAVE_OUTCOME_NOT_IN_OWN_CAVE = 8;
+  CAVE_OUTCOME_UNKNOWN_CHARACTER = 9;
+  CAVE_OUTCOME_NOT_FRIEND = 10;
+  CAVE_OUTCOME_NOT_ONLINE = 11;
+  CAVE_OUTCOME_NOT_INVITED = 12;
+  CAVE_OUTCOME_BUSY = 13;            // đang ở hầm ngục/đấu trường khác
+}
+
+message CaveDecorationView {
+  string code = 1;
+  string name_key = 2;
+  int64 gold_cost = 3;
+  int32 bonus_percent = 4;
+  bool placed = 5;
+}
+
+// Response: Server -> Client (OPCODE_CAVE_RESPONSE = 336). Luôn kèm trạng thái động phủ của NGƯỜI GỬI.
+// upgrade_cost = 0 khi đã cấp tối đa; collected = linh thạch vừa vào túi ở lượt này.
+message CaveResponse {
+  CaveAction action = 1;
+  CaveOutcome outcome = 2;
+  int32 vein_level = 3;
+  int64 per_hour = 4;
+  int64 stored = 5;
+  int64 capacity = 6;
+  int64 upgrade_cost = 7;
+  repeated CaveDecorationView decorations = 8;
+  int64 collected = 9;
+  string target_name = 10;
+}
+
+// Event: Server -> Client (OPCODE_CAVE_INVITE_EVENT = 337).
+message CaveInviteEvent {
+  string owner_name = 1;
+  int32 minutes = 2;
+}
+
 // ADR-128 — bậc trận theo số linh căn khác nhau có mặt.
 enum FormationTier {
   FORMATION_TIER_UNSPECIFIED = 0;

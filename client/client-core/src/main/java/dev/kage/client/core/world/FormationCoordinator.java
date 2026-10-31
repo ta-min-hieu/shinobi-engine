@@ -65,7 +65,8 @@ final class FormationCoordinator implements WindowFlow {
         return true;
     }
 
+    /** Đuôi tên enum làm khoá i18n; giá trị lạ ({@code UNRECOGNIZED} từ server mới hơn) về {@code unspecified}. */
     private static String suffix(String name, String prefix) {
-        return name.substring(prefix.length()).toLowerCase(Locale.ROOT);
+        return name.startsWith(prefix) ? name.substring(prefix.length()).toLowerCase(Locale.ROOT) : "unspecified";
     }
 }

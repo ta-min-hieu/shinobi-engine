@@ -28,9 +28,11 @@ import dev.kage.protocol.WaterPlotResponse;
 final class Lot23FieldSteps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot24Steps lot24;
 
     Lot23FieldSteps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot24 = new Lot24Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -73,7 +75,7 @@ final class Lot23FieldSteps {
                             return r.getOutcome().name() + " " + r.getQuality().name();
                         });
             case "encounter" -> encounter(arg);
-            default -> "bước không hiểu";
+            default -> lot24.step(verb, arg);
         };
     }
 

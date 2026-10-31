@@ -126,6 +126,9 @@ enum Opcode {
   OPCODE_TRIBULATION_EVENT = 332;
   OPCODE_USE_ARTIFACT_COMMAND = 333;  // ADR-127 (2026-10-31) — pháp bảo
   OPCODE_USE_ARTIFACT_RESPONSE = 334;
+  OPCODE_CAVE_COMMAND = 335; // ADR-129 (2026-10-31) — động phủ: một lệnh, trường action
+  OPCODE_CAVE_RESPONSE = 336;
+  OPCODE_CAVE_INVITE_EVENT = 337; // bạn bè mời thăm động phủ
 
   // --- Combat / Skill (400-499) ---
   OPCODE_SET_TARGET_COMMAND = 400;

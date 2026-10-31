@@ -21,10 +21,11 @@ import dev.kage.protocol.TribulationEventKind;
 import dev.kage.protocol.TribulationOutcome;
 
 /**
- * Thiên Kiếp (ADR-126) — đưa người độ kiếp vào một World riêng không quái ({@link DungeonInstanceRegistry#enterSolo}),
- * rồi nhịp {@value #TICK_SECONDS} giây trong {@link ExpansionJobs} giáng từng đợt lôi kích. Gục (đường gục của hầm ngục
- * tự đưa về world chính) hoặc rời giữa chừng ⇒ thua: trừ EXP. Sống qua đợt cuối thêm một nhịp ⇒ thắng: ghi kiếp
- * TRƯỚC khi đưa về (lượt gắn lại world chính đọc chỉ số mới), rồi đồng bộ vạch EXP (lên cấp ngay vì EXP đã đủ).
+ * Thiên Kiếp (ADR-126) — đưa người độ kiếp vào một World riêng không quái
+ * ({@link DungeonInstanceRegistry#enterShared}, khoá {@code -characterId}), rồi nhịp {@value #TICK_SECONDS} giây
+ * trong {@link ExpansionJobs} giáng từng đợt lôi kích. Gục (đường gục của hầm ngục tự đưa về world chính) hoặc
+ * rời giữa chừng ⇒ thua: trừ EXP. Sống qua đợt cuối thêm một nhịp ⇒ thắng: ghi kiếp TRƯỚC khi đưa về (lượt gắn
+ * lại world chính đọc chỉ số mới), rồi đồng bộ vạch EXP (lên cấp ngay vì EXP đã đủ).
  * Trạng thái kiếp chỉ ở RAM: server khởi động lại giữa kiếp thì kiếp đó coi như chưa từng diễn ra, không phạt ai.
  */
 final class TribulationHooks {
@@ -76,7 +77,8 @@ final class TribulationHooks {
                 || !TribulationRules.ready(passed, character.get().exp())) {
             return response(TribulationOutcome.TRIBULATION_OUTCOME_NOT_READY, 0);
         }
-        DungeonInstanceRegistry.EnterOutcome entered = d.dungeons().enterSolo(characterId, INSTANCE_CODE);
+        DungeonInstanceRegistry.EnterOutcome entered =
+                d.dungeons().enterShared(characterId, -characterId, INSTANCE_CODE);
         if (entered != DungeonInstanceRegistry.EnterOutcome.OK || !d.dungeons().isInDungeon(characterId)) {
             return response(TribulationOutcome.TRIBULATION_OUTCOME_BUSY, 0);
         }

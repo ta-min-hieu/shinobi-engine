@@ -13,7 +13,8 @@ record ExpansionCommands(
         MerchantCommands merchant,
         SpiritFieldCommands spiritField,
         TamingCommands taming,
-        ArtifactCommands artifacts) {
+        ArtifactCommands artifacts,
+        CaveCommands cave) {
 
     static ExpansionCommands of(GatewayFacades facades, WorldGateway worldGateway, NpcProximity proximity) {
         ExpansionFacades expansion = facades.progression().expansion();
@@ -35,6 +36,13 @@ record ExpansionCommands(
                         facades.characterFacade(),
                         new PlayerNotices(
                                 facades.contentFacades().socialFacades().mailFacade(), worldGateway.registry())),
-                new ArtifactCommands(expansion.artifacts(), facades.inventoryFacade(), clock));
+                new ArtifactCommands(expansion.artifacts(), facades.inventoryFacade(), clock),
+                new CaveCommands(new CaveCommands.Deps(
+                        expansion.caves(),
+                        facades.characterFacade(),
+                        facades.contentFacades().socialFacades().friendFacade(),
+                        worldGateway.dungeonInstanceRegistry(),
+                        worldGateway.registry(),
+                        clock)));
     }
 }

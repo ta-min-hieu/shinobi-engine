@@ -28,7 +28,8 @@ record ExpansionWindows(
         TournamentCoordinator tournament,
         TribulationCoordinator tribulation,
         ArtifactCoordinator artifact,
-        FormationCoordinator formation) {
+        FormationCoordinator formation,
+        CaveCoordinator cave) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
@@ -65,7 +66,8 @@ record ExpansionWindows(
                 new TournamentCoordinator(sender, feeds.chat()),
                 new TribulationCoordinator(sender, feeds.chat()),
                 new ArtifactCoordinator(sender, feeds.chat()),
-                new FormationCoordinator(feeds.chat()));
+                new FormationCoordinator(feeds.chat()),
+                new CaveCoordinator(sender, feeds.chat()));
     }
 
     /** Đăng ký vào hub. */
@@ -84,6 +86,7 @@ record ExpansionWindows(
         panels.register(tribulation);
         panels.register(artifact);
         panels.register(formation);
+        panels.register(cave);
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

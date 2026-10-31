@@ -160,6 +160,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-126](ADR-126-Heavenly-Tribulation.md) | Thiên Kiếp | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 | [ADR-127](ADR-127-Artifacts.md) | Pháp bảo | ✅ **Accepted** *(2026-10-31, lô 24)* | — |
 | [ADR-128](ADR-128-Party-Formations.md) | Trận pháp nhóm | ✅ **Accepted** *(2026-10-31, lô 24)* | — |
+| [ADR-129](ADR-129-Cave-Dwelling.md) | Động phủ | ✅ **Accepted** *(2026-10-31, lô 24)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -295,17 +295,19 @@ final class DungeonInstanceRegistry {
     }
 
     /**
-     * ADR-126 — một World riêng cho đúng một người, KHÔNG có quái (đài Thiên Kiếp): cùng đường nhận/dời của tháp
-     * ({@code -characterId} làm khoá nhóm, nên không chung instance với ai), chết thì về world chính như mọi hầm ngục.
-     * Ai điều khiển những gì xảy ra bên trong là việc của người gọi.
+     * World KHÔNG có quái mang khoá {@code instanceKey} (dựng nếu chưa có), cùng đường nhận/dời của tháp; chết thì
+     * về world chính như mọi hầm ngục. Ai điều khiển những gì xảy ra bên trong là việc của người gọi. Mọi người vào
+     * cùng khoá thì vào CHUNG một World. Dải khoá do người gọi chọn, phải ngoài dải id nhóm (dương): đài Thiên Kiếp
+     * (ADR-126) dùng {@code -characterId} (một người, không chung với ai), động phủ (ADR-129) dùng
+     * {@code CaveCommands#caveKey}.
      */
-    EnterOutcome enterSolo(long characterId, String instanceCode) {
+    EnterOutcome enterShared(long characterId, long instanceKey, String instanceCode) {
         Optional<EnterOutcome> busy = busyElsewhere(characterId);
         if (busy.isPresent()) {
             return busy.get();
         }
         PendingEntry entry = new PendingEntry(characterId, loadoutOf(characterId), returnPositionOf(characterId));
-        Optional<AdmittedEntries> maybeAdmitted = admitBuildingWorldIfNeeded(-characterId, List.of(entry), world -> {});
+        Optional<AdmittedEntries> maybeAdmitted = admitBuildingWorldIfNeeded(instanceKey, List.of(entry), world -> {});
         if (maybeAdmitted.isEmpty()) {
             return EnterOutcome.OK;
         }
@@ -478,7 +480,13 @@ final class DungeonInstanceRegistry {
         if (isInDungeon(characterId)) {
             return Optional.of(EnterOutcome.ALREADY_IN_DUNGEON);
         }
-        return inDuel.test(characterId) ? Optional.of(EnterOutcome.IN_DUEL) : Optional.empty();
+        // filter thay cho ?: — lớp này đang sát trần độ phức tạp PMD 80 (ADR-129 thêm instanceKeyOf).
+        return Optional.of(EnterOutcome.IN_DUEL).filter(inDuelOutcome -> inDuel.test(characterId));
+    }
+
+    /** Khoá instance (id nhóm / khoá của {@link #enterShared}) mà nhân vật đang ở trong; rỗng nếu không ở hầm ngục. */
+    synchronized Optional<Long> instanceKeyOf(long characterId) {
+        return Optional.ofNullable(instanceByCharacterId.get(characterId)).map(DungeonInstance::partyId);
     }
 
     /**
