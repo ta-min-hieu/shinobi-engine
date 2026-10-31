@@ -2,10 +2,14 @@ package dev.kage.tools.loadtest.probe;
 
 import java.io.IOException;
 
+import dev.kage.protocol.ForgeItemCommand;
+import dev.kage.protocol.ForgeItemResponse;
 import dev.kage.protocol.GetSpiritFieldRequest;
 import dev.kage.protocol.GetSpiritFieldResponse;
 import dev.kage.protocol.HarvestPlotCommand;
 import dev.kage.protocol.HarvestPlotResponse;
+import dev.kage.protocol.ListForgeRecipesRequest;
+import dev.kage.protocol.ListForgeRecipesResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PlantSeedCommand;
 import dev.kage.protocol.PlantSeedResponse;
@@ -16,7 +20,8 @@ import dev.kage.protocol.WaterPlotResponse;
 
 /**
  * Bước linh điền lô 23 (ADR-119): {@code field[:<tên bạn>]}, {@code plant:<ô>:<templateId hạt>}, {@code
- * harvest:<ô>}, {@code water:<tên bạn>:<ô>}, {@code unlockPlot}. Số ô đếm từ 0 như trên dây.
+ * harvest:<ô>}, {@code water:<tên bạn>:<ô>}, {@code unlockPlot}. Số ô đếm từ 0 như trên dây. Luyện khí (ADR-120):
+ * {@code forgeList}, {@code forge:<mã công thức>}.
  */
 final class Lot23FieldSteps {
 
@@ -50,6 +55,21 @@ final class Lot23FieldSteps {
                         UnlockPlotCommand.getDefaultInstance(),
                         Opcode.OPCODE_UNLOCK_PLOT_RESPONSE_VALUE,
                         p -> UnlockPlotResponse.parseFrom(p).getOutcome().name());
+            case "forgeList" ->
+                asker.ask(
+                        Opcode.OPCODE_LIST_FORGE_RECIPES_REQUEST_VALUE,
+                        ListForgeRecipesRequest.getDefaultInstance(),
+                        Opcode.OPCODE_LIST_FORGE_RECIPES_RESPONSE_VALUE,
+                        p -> describe(ListForgeRecipesResponse.parseFrom(p)));
+            case "forge" ->
+                asker.ask(
+                        Opcode.OPCODE_FORGE_ITEM_COMMAND_VALUE,
+                        ForgeItemCommand.newBuilder().setRecipeCode(arg).build(),
+                        Opcode.OPCODE_FORGE_ITEM_RESPONSE_VALUE,
+                        p -> {
+                            ForgeItemResponse r = ForgeItemResponse.parseFrom(p);
+                            return r.getOutcome().name() + " " + r.getQuality().name();
+                        });
             default -> "bước không hiểu";
         };
     }
@@ -76,6 +96,17 @@ final class Lot23FieldSteps {
                         .build(),
                 Opcode.OPCODE_WATER_PLOT_RESPONSE_VALUE,
                 p -> WaterPlotResponse.parseFrom(p).getOutcome().name());
+    }
+
+    private static String describe(ListForgeRecipesResponse r) {
+        StringBuilder line = new StringBuilder();
+        r.getRecipesList().forEach(recipe -> line.append(' ')
+                .append(recipe.getCode())
+                .append("→tpl")
+                .append(recipe.getOutputItemTemplateId())
+                .append('@')
+                .append(recipe.getGoldCost()));
+        return line.toString().strip();
     }
 
     private static String describe(GetSpiritFieldResponse r) {

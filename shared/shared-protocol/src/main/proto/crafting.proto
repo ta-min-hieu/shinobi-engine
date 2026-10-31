@@ -142,3 +142,32 @@ message WaterPlotResponse {
 message UnlockPlotResponse {
   SpiritFieldOutcome outcome = 1;
 }
+
+// ADR-120 (2026-10-31) — luyện khí ở lò của trưởng lão (chưa có NPC thợ rèn). Công thức cùng dạng RecipeView của luyện
+// đan; mỗi lần ra đúng một món trang bị, server tung phẩm chất ⇒ số dòng tẩy luyện gieo sẵn.
+
+// Request: Client -> Server (OPCODE_LIST_FORGE_RECIPES_REQUEST = 1814).
+message ListForgeRecipesRequest {}
+
+// Response: Server -> Client (OPCODE_LIST_FORGE_RECIPES_RESPONSE = 1815).
+message ListForgeRecipesResponse {
+  repeated RecipeView recipes = 1;
+}
+
+// Command: Client -> Server (OPCODE_FORGE_ITEM_COMMAND = 1816). Server kiểm đứng gần lò, cấp, nguyên liệu, vàng, túi.
+message ForgeItemCommand {
+  string recipe_code = 1;
+}
+
+enum ForgeQuality {
+  FORGE_QUALITY_UNSPECIFIED = 0;   // lần luyện không thành
+  FORGE_QUALITY_COMMON = 1;        // 0 dòng tẩy luyện
+  FORGE_QUALITY_FINE = 2;          // 1 dòng
+  FORGE_QUALITY_RARE = 3;          // 2 dòng
+}
+
+// Response: Server -> Client (OPCODE_FORGE_ITEM_RESPONSE = 1817). Dùng lại CraftItemOutcome của luyện đan.
+message ForgeItemResponse {
+  CraftItemOutcome outcome = 1;
+  ForgeQuality quality = 2;
+}

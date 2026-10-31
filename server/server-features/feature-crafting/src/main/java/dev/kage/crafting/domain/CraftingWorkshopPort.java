@@ -23,5 +23,11 @@ public interface CraftingWorkshopPort {
     /** Cấp món luyện ra. {@code false} = túi không chứa nổi, không đổi gì. */
     boolean grantItem(Transaction tx, long characterId, long itemTemplateId, int quantity);
 
+    /**
+     * Cấp MỘT món luyện khí (ADR-120) kèm {@code refinementLines} dòng tẩy luyện gieo sẵn (luật dòng của ADR-111,
+     * ngẫu nhiên ở server). {@code false} = túi không chứa nổi, không đổi gì.
+     */
+    boolean grantForged(Transaction tx, long characterId, long itemTemplateId, int refinementLines);
+
     void audit(Transaction tx, long characterId, String action, String detailJson);
 }

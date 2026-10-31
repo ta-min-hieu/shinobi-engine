@@ -868,6 +868,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.VerifySecurityPinCommand.parser(),
                             Opcode.OPCODE_VERIFY_SECURITY_PIN_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.securityPin().verify(id, c.getPin(), h.pinGate))),
+            // Lô 23 — luyện khí (ADR-120), cùng lò với luyện đan.
+            Map.entry(
+                    Opcode.OPCODE_LIST_FORGE_RECIPES_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListForgeRecipesRequest.parser(),
+                            Opcode.OPCODE_LIST_FORGE_RECIPES_RESPONSE_VALUE,
+                            (h, id, c) -> h.crafting.listForge())),
+            Map.entry(
+                    Opcode.OPCODE_FORGE_ITEM_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ForgeItemCommand.parser(),
+                            Opcode.OPCODE_FORGE_ITEM_RESPONSE_VALUE,
+                            (h, id, c) -> h.crafting.forge(id, c))),
             // Lô 23 — linh điền (ADR-119).
             Map.entry(
                     Opcode.OPCODE_GET_SPIRIT_FIELD_REQUEST_VALUE,

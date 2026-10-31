@@ -25,6 +25,8 @@ import dev.kage.account.domain.Account;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.crafting.api.CraftingFacade;
+import dev.kage.crafting.application.CraftItemUseCase;
 import dev.kage.market.application.BuyOrderUseCase;
 import dev.kage.market.domain.BuyOrder;
 import dev.kage.market.domain.BuyOrderOutcome;
@@ -33,6 +35,9 @@ import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.account.PostgresSecurityPinAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
+import dev.kage.server.database.crafting.JdbcCraftingTransactionRunner;
+import dev.kage.server.database.crafting.PostgresCraftingWorkshopAdapter;
+import dev.kage.server.database.crafting.PostgresRecipeAdapter;
 import dev.kage.server.database.market.JdbcMarketTransactionRunner;
 import dev.kage.server.database.market.PostgresBuyOrderAdapter;
 import dev.kage.server.database.market.PostgresMarketGoldAdapter;
@@ -244,6 +249,42 @@ class Lot23IntegrationTest {
                 .isEqualTo(780L);
         assertThat(merchant.buy(other, visit.id(), pill, during)).isEqualTo(MerchantBuyOutcome.SOLD_OUT);
         assertThat(merchant.active(start.plus(Duration.ofMinutes(31)))).isEmpty();
+    }
+
+    @Test
+    void forgeShouldMakeOneItemPerRunWithQualityLinesAndStayApartFromAlchemy() {
+        long smith = character(account("forgesmith"), "ForgeSmth");
+        CraftingFacade crafting = new CraftingFacade(new CraftItemUseCase(
+                new PostgresRecipeAdapter(dataSource),
+                new PostgresCraftingWorkshopAdapter(),
+                new JdbcCraftingTransactionRunner(dataSource)));
+        String recipe = "forge_spirit_iron_sword";
+        long sword = templateOf("spirit_iron_sword");
+        int runs = 10;
+        giveItem(smith, "spirit_ore", 8 * runs, 40);
+        giveItem(smith, "demon_core", 2 * runs, 41);
+        setGold(smith, 600L * runs);
+
+        assertThat(crafting.forgeRecipes()).extracting(r -> r.code()).contains(recipe, "forge_spirit_iron_robe");
+        assertThat(crafting.recipes()).extracting(r -> r.code()).doesNotContain(recipe);
+        assertThat(crafting.craft(smith, 99, recipe)).isEqualTo(CraftItemUseCase.Outcome.UNKNOWN_RECIPE);
+        assertThat(crafting.forge(smith, 19, recipe).outcome()).isEqualTo(CraftItemUseCase.Outcome.LEVEL_TOO_LOW);
+
+        for (int i = 0; i < runs; i++) {
+            CraftItemUseCase.ForgeResult result = crafting.forge(smith, 20, recipe);
+            assertThat(result.outcome()).isEqualTo(CraftItemUseCase.Outcome.OK);
+            long newest = scalar(
+                    "SELECT MAX(id) FROM inventory_item WHERE character_id = ? AND item_template_id = ?", smith, sword);
+            assertThat(scalar("SELECT COUNT(*) FROM item_refinement WHERE inventory_item_id = ?", newest))
+                    .isEqualTo(result.quality().orElseThrow().refinementLines());
+        }
+        assertThat(countOf(smith, sword)).isEqualTo(runs);
+        assertThat(countOf(smith, templateOf("spirit_ore"))).isZero();
+        assertThat(scalar("SELECT gold FROM character_stat WHERE character_id = ?", smith))
+                .isZero();
+        assertThat(scalar("SELECT COUNT(*) FROM audit_log WHERE character_id = ? AND action = 'FORGE_ITEM'", smith))
+                .isEqualTo(runs);
+        assertThat(crafting.forge(smith, 20, recipe).outcome()).isEqualTo(CraftItemUseCase.Outcome.MISSING_MATERIALS);
     }
 
     @Test

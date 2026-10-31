@@ -8,6 +8,7 @@ import java.util.Map;
 import javax.sql.DataSource;
 
 import dev.kage.crafting.domain.Recipe;
+import dev.kage.crafting.domain.RecipeKind;
 import dev.kage.crafting.domain.RecipeMaterial;
 import dev.kage.crafting.domain.RecipePort;
 import dev.kage.server.database.JdbcOperations;
@@ -16,7 +17,7 @@ import dev.kage.server.database.JdbcOperations;
 public final class PostgresRecipeAdapter implements RecipePort {
 
     private static final String RECIPES = """
-            SELECT r.id, r.code, r.output_item_template_id, r.output_quantity, r.gold_cost, r.required_level
+            SELECT r.id, r.code, r.output_item_template_id, r.output_quantity, r.gold_cost, r.required_level, r.kind
               FROM crafting_recipe r
              ORDER BY r.sort_order, r.id
             """;
@@ -27,7 +28,8 @@ public final class PostgresRecipeAdapter implements RecipePort {
              ORDER BY recipe_id, item_template_id
             """;
 
-    private record Row(long id, String code, long output, int outputQuantity, long goldCost, int requiredLevel) {}
+    private record Row(
+            long id, String code, long output, int outputQuantity, long goldCost, int requiredLevel, RecipeKind kind) {}
 
     private final DataSource dataSource;
     private volatile List<Recipe> cached;
@@ -60,14 +62,21 @@ public final class PostgresRecipeAdapter implements RecipePort {
                 dataSource,
                 RECIPES,
                 rs -> new Row(
-                        rs.getLong(1), rs.getString(2), rs.getLong(3), rs.getInt(4), rs.getLong(5), rs.getInt(6)))) {
+                        rs.getLong(1),
+                        rs.getString(2),
+                        rs.getLong(3),
+                        rs.getInt(4),
+                        rs.getLong(5),
+                        rs.getInt(6),
+                        RecipeKind.valueOf(rs.getString(7))))) {
             recipes.add(new Recipe(
                     row.code(),
                     row.output(),
                     row.outputQuantity(),
                     row.goldCost(),
                     row.requiredLevel(),
-                    materials.getOrDefault(row.id(), List.of())));
+                    materials.getOrDefault(row.id(), List.of()),
+                    row.kind()));
         }
         return List.copyOf(recipes);
     }

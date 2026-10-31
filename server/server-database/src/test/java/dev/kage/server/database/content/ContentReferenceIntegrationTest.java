@@ -121,7 +121,10 @@ class ContentReferenceIntegrationTest {
             "revive_pill",
             // ADR-119 (2026-10-30) — hai loại hạt giống linh điền lên trước art.
             "spirit_herb_seed",
-            "fine_spirit_herb_seed");
+            "fine_spirit_herb_seed",
+            // ADR-120 (2026-10-31) — hai món luyện khí lên trước art.
+            "spirit_iron_sword",
+            "spirit_iron_robe");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

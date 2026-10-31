@@ -3,9 +3,12 @@ package dev.kage.server.database.crafting;
 import java.sql.Connection;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
+import java.util.SplittableRandom;
 
 import dev.kage.crafting.domain.CraftingWorkshopPort;
 import dev.kage.crafting.domain.Transaction;
+import dev.kage.inventory.domain.RefinementPolicy;
 import dev.kage.server.database.GoldLedger;
 import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
@@ -25,6 +28,15 @@ public final class PostgresCraftingWorkshopAdapter implements CraftingWorkshopPo
     private static final String INSERT_AUDIT_LOG = """
             INSERT INTO audit_log (character_id, action, detail_json, created_at) VALUES (?, ?, ?, ?)
             """;
+
+    // Dưới khoá túi của chính nhân vật ⇒ dòng mới nhất của mẫu này là dòng vừa chèn (identity tăng dần).
+    private static final String NEWEST_ROW =
+            "SELECT MAX(id) FROM inventory_item WHERE character_id = ? AND item_template_id = ?";
+    private static final String REQUIRED_LEVEL = "SELECT required_level FROM item_template WHERE id = ?";
+    private static final String INSERT_LINE =
+            "INSERT INTO item_refinement (inventory_item_id, line_index, stat, value) VALUES (?, ?, ?, ?)";
+
+    private final SplittableRandom random = new SplittableRandom();
 
     @Override
     public void lockInventory(Transaction tx, long characterId) {
@@ -46,6 +58,30 @@ public final class PostgresCraftingWorkshopAdapter implements CraftingWorkshopPo
         Connection connection = connection(tx);
         return InventoryStackMerge.mergeIntoExistingStack(connection, characterId, itemTemplateId, quantity)
                 || InventoryStackMerge.insertRespectingMaxStack(connection, characterId, itemTemplateId, quantity);
+    }
+
+    @Override
+    public boolean grantForged(Transaction tx, long characterId, long itemTemplateId, int refinementLines) {
+        Connection connection = connection(tx);
+        if (!InventoryStackMerge.insertRespectingMaxStack(connection, characterId, itemTemplateId, 1)) {
+            return false;
+        }
+        if (refinementLines == 0) {
+            return true;
+        }
+        long itemId = JdbcOperations.queryOne(connection, NEWEST_ROW, rs -> rs.getLong(1), characterId, itemTemplateId)
+                .orElseThrow();
+        int requiredLevel = JdbcOperations.queryOne(connection, REQUIRED_LEVEL, rs -> rs.getInt(1), itemTemplateId)
+                .orElse(1);
+        List<RefinementPolicy.Line> lines;
+        synchronized (random) {
+            lines = RefinementPolicy.seedLines(refinementLines, requiredLevel, random);
+        }
+        for (RefinementPolicy.Line line : lines) {
+            JdbcOperations.update(
+                    connection, INSERT_LINE, itemId, line.index(), line.stat().name(), line.value());
+        }
+        return true;
     }
 
     @Override

@@ -84,6 +84,18 @@ public final class RefinementPolicy {
         return List.copyOf(next);
     }
 
+    /** Gieo đúng {@code count} dòng mới (0..{@value #MAX_LINES}) — món luyện khí ra lò đã có dòng (ADR-120). */
+    public static List<Line> seedLines(int count, int requiredLevel, RandomGenerator random) {
+        if (count < 0 || count > MAX_LINES) {
+            throw new IllegalArgumentException("số dòng ngoài 0.." + MAX_LINES + ": " + count);
+        }
+        List<Line> lines = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            lines.add(rollLine(i, requiredLevel, random));
+        }
+        return List.copyOf(lines);
+    }
+
     private static Line rollLine(int index, int requiredLevel, RandomGenerator random) {
         Stat[] stats = Stat.values();
         Stat stat = stats[random.nextInt(stats.length)];
