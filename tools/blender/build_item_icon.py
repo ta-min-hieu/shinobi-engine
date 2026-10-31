@@ -1081,6 +1081,538 @@ def build_foundation_blade():
     return 1.14
 
 
+
+# --- Lô 15–23 (2026-10-31): nợ icon của các món lên trước art ----------------------------------
+#
+# Mọi món dưới đây đã có trong DB từ lô trước nhưng hiện ô TRỐNG trong túi đồ
+# (`ContentReferenceIntegrationTest.ITEMS_KNOWN_TO_LACK_AN_ICON`). Giữ đúng luật của bộ icon: khối
+# phẳng toon, viền đen, hình phải đọc được ở 64x64 — bố cục sáng-tối trước, màu sau.
+
+SPIRIT_IRON = "#4F6E7E"
+SPIRIT_IRON_LIGHT = "#B4CDD8"
+SPIRIT_IRON_CLOTH = "#3E5560"
+TALISMAN_PAPER = "#E9C46A"
+TALISMAN_INK = "#B0302E"
+TELEPORT_PAPER = "#BFD9F2"
+TELEPORT_INK = "#24508C"
+BLOOD_PAPER = "#7A1E1E"
+BLOOD_SAND = "#D39A55"
+SEAL_BLACK = "#2A2326"
+REVIVE_GOLD = "#E2B33C"
+REVIVE_SHEEN = "#FFF2C2"
+REVIVE_DARK = "#9C7420"
+CLEANSE = "#8E78C8"
+CLEANSE_SHEEN = "#E3DAF7"
+CLEANSE_DARK = "#5A4789"
+BEAST_AMBER = "#D98E2B"
+BEAST_SHEEN = "#FBDDB0"
+BEAST_DARK = "#8F5714"
+SEED_BROWN = "#8A5A2B"
+SEED_DARK = "#5B3A1A"
+SPROUT = "#7DBE4E"
+
+
+def build_spirit_iron_sword():
+    """Linh Thiết Kiếm (ADR-120) — kiếm thẳng LAM-XÁM, hộ thủ thanh NGANG thẳng có hai đầu vuông.
+
+    Phải tách khỏi ba thanh đang có ở cùng ô WEAPON bằng hình chứ không bằng màu: `foundation_blade`
+    hộ thủ lưỡi liềm chúc xuống, `outer_sect_blade` hộ thủ đĩa tròn — thanh này hộ thủ là một thanh
+    ngang thẳng dày, và lưỡi có RÃNH máu tối chạy dọc (đảo sáng-tối ngay trên lưỡi) để đọc ra "thép
+    rèn" thay vì "ngọc". Tua đỏ giữ — tín hiệu kiếm Trung Hoa (ASSET-LOG 2026-09-03).
+    """
+    blade_profile = [(-0.088, -0.200), (-0.088, 0.270), (-0.040, 0.360), (0.040, 0.360),
+                     (0.088, 0.270), (0.088, -0.200)]
+    blade = _prism_obj("Blade", blade_profile, 0.026, loc=(0.0, -0.050, 0.130))
+    apply_toon(blade, SPIRIT_IRON_LIGHT, shades=3)
+    fuller = _box_obj("Fuller", 0.020, 0.012, 0.215, loc=(0.0, -0.080, 0.115))
+    apply_toon(fuller, SPIRIT_IRON, shades=2)
+    guard = _box_obj("Guard", 0.205, 0.046, 0.040, loc=(0.0, -0.050, -0.105))
+    apply_toon(guard, SPIRIT_IRON, shades=3)
+    for side, name in ((-1, "GuardEndLeft"), (1, "GuardEndRight")):
+        end = _box_obj(name, 0.036, 0.050, 0.060, loc=(side * 0.205, -0.050, -0.105))
+        apply_toon(end, GOLD, shades=2)
+    grip = _box_obj("Grip", 0.044, 0.044, 0.130, loc=(0.0, -0.050, -0.276))
+    apply_toon(grip, SPIRIT_IRON_CLOTH, shades=3)
+    pommel = _gem_obj("Pommel", 0.060, 0.050, 0.046, loc=(0.0, -0.050, -0.430))
+    apply_toon(pommel, GOLD, shades=2)
+    knot = _box_obj("TasselKnot", 0.034, 0.036, 0.032, loc=(0.0, -0.058, -0.490))
+    apply_toon(knot, TASSEL_RED, shades=2)
+    tail = _box_obj("TasselTail", 0.030, 0.034, 0.080, loc=(-0.036, -0.060, -0.560), rot=_tilt(-18))
+    apply_toon(tail, TASSEL_RED, shades=3)
+    return 1.12
+
+
+def build_spirit_iron_robe():
+    """Linh Thiết Bào (ADR-120) — dáng áo giáp chung của ô ARMOR, vải lam-xám + tấm ngực linh thiết.
+
+    Cùng khung `_vest` như mọi áo khác (ô nào cũng giữ một dáng để người chơi nhận ra ô), khác ở
+    chất liệu: vải lam đá sẫm + giáp lam sáng, không trộn với vàng-đỏ của bộ Trúc Cơ hay ngọc xanh
+    của bộ Ngoại Môn.
+    """
+    return _vest(SPIRIT_IRON_CLOTH, SPIRIT_IRON_LIGHT, SPIRIT_IRON, SPIRIT_IRON_LIGHT, 3)
+
+
+def _paper_talisman(paper_hex, ink_hex, seal_hex, lean):
+    """Lá bùa giấy — dải giấy dọc, nét mực một sổ dọc hai gạch ngang, ấn triện vuông ở chân.
+
+    Ba lá bùa dùng chung một dáng (người chơi học một lần "dải giấy dọc = bùa dùng một lần") và tách
+    nhau bằng MÀU GIẤY — vùng chiếm nhiều điểm ảnh nhất — chứ không bằng nét mực mảnh vốn mất ở 64px.
+    Thẻ ngọc `outer_sect_talisman` là bùa hộ thân đeo được: khối dày có nút dây; lá bùa dùng một
+    lần thì mỏng, không dây, hơi nghiêng như vừa rút ra.
+    """
+    paper = _box_obj("Paper", 0.145, 0.020, 0.360, loc=(0.0, 0.0, 0.0), rot=_tilt(lean))
+    apply_toon(paper, paper_hex, shades=3)
+    stroke = _box_obj("Stroke", 0.026, 0.012, 0.250, loc=(0.0, -0.026, 0.050), rot=_tilt(lean))
+    apply_toon(stroke, ink_hex, shades=2)
+    for index, height in enumerate((0.190, 0.040)):
+        bar = _box_obj("Bar%d" % index, 0.098, 0.012, 0.024, loc=(0.0, -0.028, height), rot=_tilt(lean))
+        apply_toon(bar, ink_hex, shades=2)
+    seal = _box_obj("Seal", 0.062, 0.014, 0.062, loc=(0.0, -0.030, -0.250), rot=_tilt(lean))
+    apply_toon(seal, seal_hex, shades=2)
+    return 0.92
+
+
+def build_seal_demon_talisman():
+    """Phong Yêu Phù (ADR-124) — giấy VÀNG mực ĐỎ: lá bùa trấn yêu kinh điển."""
+    return _paper_talisman(TALISMAN_PAPER, TALISMAN_INK, SEAL_BLACK, 8)
+
+
+def build_teleport_talisman():
+    """Truyền Tống Phù (ADR-100) — giấy LAM NHẠT mực chàm: lạnh, đối lập hẳn với Phong Yêu Phù."""
+    return _paper_talisman(TELEPORT_PAPER, TELEPORT_INK, TELEPORT_INK, -8)
+
+
+def build_blood_sand_talisman():
+    """Huyết Sa Lệnh — giấy ĐỎ SẪM chữ cát: bùa của phe địch, đảo bố cục (nền tối, nét sáng)."""
+    return _paper_talisman(BLOOD_PAPER, BLOOD_SAND, BLOOD_SAND, 4)
+
+
+def _pill(main_hex, sheen_hex, dark_hex, companions):
+    """Viên đan tròn lớn + vệt sáng lệch trái + {@code companions} viên nhỏ tách rời (0..2).
+
+    Cùng khuôn `minor_healing_pill` (tròn = đan dược trong bộ icon), khác màu + số viên: Tiểu Hồi
+    Xuân Đan là ba viên đỏ, các đan quý hơn ít viên hơn — số viên cũng là thông tin.
+    """
+    main = _prism_obj("Pill", _disc(0.320), 0.140, loc=(0.000, 0.000, 0.060), rot=_tilt(-8))
+    apply_toon(main, main_hex, shades=3)
+    sheen = _prism_obj("Sheen", _disc(0.086), 0.040, loc=(-0.116, -0.160, 0.170), rot=_tilt(-8))
+    apply_toon(sheen, sheen_hex, shades=2)
+    if companions >= 1:
+        right = _prism_obj("PillRight", _disc(0.170), 0.110, loc=(0.380, 0.100, -0.300), rot=_tilt(-21))
+        apply_toon(right, dark_hex, shades=3)
+    if companions >= 2:
+        left = _prism_obj("PillLeft", _disc(0.150), 0.110, loc=(-0.380, 0.130, -0.320), rot=_tilt(16))
+        apply_toon(left, dark_hex, shades=3)
+    return 1.18
+
+
+def build_revive_pill():
+    """Hồi Hồn Đan (ADR-117) — MỘT viên vàng kim lớn + bốn đốm sáng rời quanh nó: quý, dùng khi gục.
+
+    Bản đầu bao viên bằng một vòng hào quang (torus): viền Freestyle ăn hết ống mảnh, ra một cái
+    bánh rán ĐEN quanh viên đan. Đốm sáng là bát diện nhỏ TÁCH RỜI silhouette viên chính — mỗi đốm
+    một đường viền riêng, đọc ra "lấp lánh" thay vì "khung".
+    """
+    for index, (x, z, size) in enumerate(((-0.400, 0.300, 0.070), (0.410, 0.330, 0.060),
+                                          (0.430, -0.250, 0.075), (-0.380, -0.320, 0.055))):
+        spark = _gem_obj("Spark%d" % index, size, 0.030, size * 1.5, loc=(x, -0.040, z))
+        apply_toon(spark, REVIVE_SHEEN, shades=2)
+    return _pill(REVIVE_GOLD, REVIVE_SHEEN, REVIVE_DARK, 0)
+
+
+def build_faction_change_pill():
+    """Tẩy Căn Đan (ADR-066) — viên TÍM, một viên kèm: màu duy nhất ở vùng tím trong túi đồ."""
+    return _pill(CLEANSE, CLEANSE_SHEEN, CLEANSE_DARK, 1)
+
+
+def build_spirit_beast_pill():
+    """Linh Thú Đan (ADR-078) — viên HỔ PHÁCH, hai viên kèm: ấm như đan đỏ nhưng ngả vàng nâu."""
+    return _pill(BEAST_AMBER, BEAST_SHEEN, BEAST_DARK, 2)
+
+
+def _teardrop(radius, tip, segments=14):
+    """Outline giọt nước, screen-CCW: nửa tròn dưới + đỉnh nhọn ở trên (z = tip)."""
+    points = []
+    for index in range(segments + 1):
+        angle = math.pi + math.pi * index / segments  # nửa dưới, từ trái sang phải
+        points.append((radius * math.cos(angle), radius * math.sin(angle)))
+    points.append((0.0, tip))
+    return points
+
+
+def _seeds(main_hex, dark_hex, sprout_hex, count):
+    """Cụm hạt giống hình GIỌT BẦU + mầm hai lá to trên hạt chính.
+
+    Bản đầu dùng bát diện: các mặt phẳng sắc đọc ra "tinh thể", đúng thứ mà hạt giống không được
+    giống (ngọc/khoáng đều là bát diện trong bộ icon). Giọt bầu một mesh — đáy tròn, đỉnh thuôn — và
+    mầm phải ĐỦ to để sống ở 64px, vì mầm là tín hiệu duy nhất nói "thứ này mọc được".
+    """
+    main = _prism_obj("Seed", _teardrop(0.170, 0.300), 0.090, loc=(0.0, 0.0, -0.120), rot=_tilt(-10))
+    apply_toon(main, main_hex, shades=3)
+    stem = _box_obj("Stem", 0.026, 0.026, 0.080, loc=(0.020, -0.020, 0.230), rot=_tilt(-10))
+    apply_toon(stem, sprout_hex, shades=2)
+    for side, name in ((-1, "LeafLeft"), (1, "LeafRight")):
+        leaf = _prism_obj(name, [(0.0, 0.0), (side * 0.200, 0.060), (side * 0.170, 0.150), (side * 0.040, 0.090)]
+                          if side > 0 else [(0.0, 0.0), (side * 0.040, 0.090), (side * 0.170, 0.150), (side * 0.200, 0.060)],
+                          0.024, loc=(0.030, -0.030, 0.300), rot=_tilt(-10))
+        apply_toon(leaf, sprout_hex, shades=2)
+    if count >= 2:
+        second = _prism_obj("SeedLeft", _teardrop(0.105, 0.190), 0.070, loc=(-0.330, 0.060, -0.330),
+                            rot=_tilt(30))
+        apply_toon(second, dark_hex, shades=3)
+    if count >= 3:
+        third = _prism_obj("SeedRight", _teardrop(0.095, 0.170), 0.070, loc=(0.330, 0.060, -0.350),
+                           rot=_tilt(-34))
+        apply_toon(third, dark_hex, shades=3)
+    return 1.02
+
+
+def build_spirit_herb_seed():
+    """Hạt Linh Thảo (ADR-119) — ba hạt NÂU, max_stack 99 nên cụm nhiều hạt."""
+    return _seeds(SEED_BROWN, SEED_DARK, SPROUT, 3)
+
+
+def build_fine_spirit_herb_seed():
+    """Hạt Linh Thảo Thượng Phẩm (ADR-119) — hai hạt VÀNG KIM: cùng dáng, bậc cao hơn bằng chất liệu."""
+    return _seeds(REVIVE_GOLD, REVIVE_DARK, SPROUT, 2)
+
+
+
+JADE_FIRE = ("#D9472B", "#FFB59E", "#8E2617")
+JADE_EARTH = ("#C18A2E", "#F4D58A", "#7A5414")
+JADE_WATER = ("#2F7FD6", "#A9D2FA", "#1A4C86")
+JADE_WOOD = ("#3E9E4F", "#AEE3A6", "#24622F")
+STONE = "#9FA6AE"
+STONE_DARK = "#6B7179"
+RUNE_GLOW = "#7FE6F0"
+ORE_ROCK = "#55524E"
+ORE_ROCK_DARK = "#3A3835"
+DEMON = "#3A2440"
+DEMON_GLOW = "#E0402F"
+DEMON_DARK = "#20142A"
+HERB = "#5DAA48"
+HERB_PALE = "#B8E39A"
+HERB_DARK = "#356B2A"
+FISH = "#F1EDE4"
+FISH_ORANGE = "#E07A2E"
+WOOD_TOKEN = "#9C6B3D"
+WOOD_TOKEN_DARK = "#6A4524"
+
+
+def _hexagon(radius):
+    return [(radius * math.cos(math.radians(30 + 60 * i)), radius * math.sin(math.radians(30 + 60 * i)))
+            for i in range(6)]
+
+
+def _spirit_jade(colors):
+    """Linh Ngọc (ADR-064) — viên ngọc mài LỤC GIÁC dẹt, mặt trong sáng hơn + đốm lóe.
+
+    Bốn hệ chung MỘT dáng: người chơi khảm ngọc theo hệ, nên hệ phải đọc ra ngay — ở đây màu CHÍNH
+    LÀ thông tin (bốn màu ngũ hành quen thuộc). Dáng lục giác dẹt cố ý khác bát diện của
+    `chakra_shard`/khoáng: ngọc khảm là vật đã MÀI, không phải đá thô.
+    """
+    main_hex, pale_hex, dark_hex = colors
+    rim = _prism_obj("Rim", _hexagon(0.360), 0.090, loc=(0.0, 0.000, 0.0))
+    apply_toon(rim, dark_hex, shades=3)
+    face = _prism_obj("Face", _hexagon(0.270), 0.060, loc=(0.0, -0.060, 0.0))
+    apply_toon(face, main_hex, shades=3)
+    glint = _prism_obj("Glint", [(-0.150, 0.060), (-0.060, 0.160), (-0.020, 0.120), (-0.110, 0.020)],
+                       0.020, loc=(0.0, -0.110, 0.0))
+    apply_toon(glint, pale_hex, shades=2)
+    return 0.92
+
+
+def build_spirit_jade_fire():
+    """Hoả Linh Ngọc — đỏ."""
+    return _spirit_jade(JADE_FIRE)
+
+
+def build_spirit_jade_earth():
+    """Thổ Linh Ngọc — vàng đất."""
+    return _spirit_jade(JADE_EARTH)
+
+
+def build_spirit_jade_water():
+    """Thuỷ Linh Ngọc — lam."""
+    return _spirit_jade(JADE_WATER)
+
+
+def build_spirit_jade_wood():
+    """Mộc Linh Ngọc — lục."""
+    return _spirit_jade(JADE_WOOD)
+
+
+def build_refine_stone():
+    """Tẩy Luyện Thạch (ADR-111) — khối đá xám GỒ GHỀ một mesh + đường phù văn xanh lơ phát sáng.
+
+    Đá xám trơn sẽ lẫn với `iron_scrap`; vệt phù văn sáng chạy chéo là thứ nói "đá đã được luyện",
+    và nó là mảng SÁNG trên nền đá tối-vừa — bố cục sáng-tối khác hẳn đống sắt vụn.
+    """
+    rock = _prism_obj("Rock", [(-0.300, -0.250), (0.260, -0.290), (0.340, 0.020), (0.180, 0.280),
+                               (-0.160, 0.300), (-0.340, 0.080)], 0.120)
+    apply_toon(rock, STONE, shades=3)
+    rune = _box_obj("Rune", 0.200, 0.016, 0.034, loc=(0.0, -0.130, 0.0), rot=_tilt(-28))
+    apply_toon(rune, RUNE_GLOW, shades=2)
+    for index, (x, z) in enumerate(((-0.120, 0.120), (0.130, -0.110))):
+        dot = _box_obj("RuneDot%d" % index, 0.036, 0.016, 0.036, loc=(x, -0.132, z))
+        apply_toon(dot, RUNE_GLOW, shades=2)
+    chip = _prism_obj("Chip", [(-0.080, -0.060), (0.070, -0.070), (0.050, 0.060)], 0.050,
+                      loc=(0.360, 0.040, -0.300))
+    apply_toon(chip, STONE_DARK, shades=3)
+    return 0.98
+
+
+def build_spirit_ore():
+    """Linh Khoáng Thạch (ADR-107) — tảng đá THẪM với hai tinh thể lam-ngọc mọc ra.
+
+    Nền tối + tinh thể sáng: đảo bố cục so với Tẩy Luyện Thạch (đá sáng, nét sáng mảnh), nên hai
+    món "đá" trong túi không tráo chỗ.
+    """
+    rock = _prism_obj("Rock", [(-0.360, -0.300), (0.340, -0.300), (0.300, -0.020), (0.100, 0.060),
+                               (-0.200, 0.040), (-0.360, -0.080)], 0.130, loc=(0.0, 0.040, -0.060))
+    apply_toon(rock, ORE_ROCK, shades=3)
+    big = _gem_obj("CrystalBig", 0.110, 0.070, 0.300, loc=(-0.060, -0.030, 0.150), rot=_tilt(10))
+    apply_toon(big, RUNE_GLOW, shades=3)
+    small = _gem_obj("CrystalSmall", 0.080, 0.060, 0.190, loc=(0.170, -0.040, 0.060), rot=_tilt(-24))
+    apply_toon(small, JADE_PALE, shades=3)
+    return 0.98
+
+
+def build_demon_core():
+    """Yêu Đan (ADR-079) — viên cầu TÍM THẪM với khe sáng đỏ như con ngươi thú.
+
+    Tròn như đan dược nhưng TỐI — đảo bố cục so với mọi viên đan sáng màu. Khe đỏ dọc là tín hiệu
+    "lấy từ yêu thú", không phải luyện ra.
+    """
+    orb = _prism_obj("Orb", _disc(0.340), 0.140)
+    apply_toon(orb, DEMON, shades=3)
+    slit = _prism_obj("Slit", [(0.0, -0.200), (0.060, 0.0), (0.0, 0.200), (-0.060, 0.0)], 0.030,
+                      loc=(0.0, -0.150, 0.0))
+    apply_toon(slit, DEMON_GLOW, shades=2)
+    sheen = _prism_obj("Sheen", _disc(0.060), 0.030, loc=(-0.170, -0.150, 0.180))
+    apply_toon(sheen, "#7A5A8A", shades=2)
+    return 0.92
+
+
+def build_spirit_herb():
+    """Linh Thảo (ADR-079) — bó ba lá nhọn xoè từ gốc buộc dây + ngọn sáng.
+
+    Ba lá là MỘT dáng quạt rõ ở 64px; lá giữa sáng hơn hai lá bên để không thành một khối xanh đặc.
+    """
+    for index, (angle, hexc) in enumerate(((-30, HERB_DARK), (30, HERB_DARK), (0, HERB))):
+        leaf = _prism_obj("Leaf%d" % index, [(0.0, 0.0), (0.090, 0.200), (0.0, 0.460), (-0.090, 0.200)],
+                          0.030 + 0.010 * index, loc=(0.0, -0.010 * index, -0.250), rot=_tilt(angle))
+        apply_toon(leaf, hexc, shades=3)
+    tip = _gem_obj("Tip", 0.050, 0.030, 0.070, loc=(0.0, -0.060, 0.200))
+    apply_toon(tip, HERB_PALE, shades=2)
+    tie = _box_obj("Tie", 0.070, 0.050, 0.030, loc=(0.0, -0.060, -0.220))
+    apply_toon(tie, TASSEL_RED, shades=2)
+    stem = _box_obj("Stem", 0.040, 0.040, 0.080, loc=(0.0, -0.040, -0.330))
+    apply_toon(stem, HERB_DARK, shades=2)
+    return 1.02
+
+
+def build_spirit_fish():
+    """Linh Ngư (ADR-107) — cá chép trắng đốm cam nằm ngang, đuôi xoè.
+
+    Dáng NGANG duy nhất trong túi (mọi món khác đứng dọc), đó là tín hiệu sống sót ở 64px trước cả
+    màu.
+    """
+    body = _prism_obj("Body", [(-0.300, 0.0), (-0.150, -0.140), (0.150, -0.150), (0.300, -0.040),
+                               (0.300, 0.040), (0.150, 0.150), (-0.150, 0.140)], 0.080, loc=(0.060, 0.0, 0.0))
+    apply_toon(body, FISH, shades=3)
+    tail = _prism_obj("Tail", [(0.0, 0.0), (-0.200, -0.180), (-0.160, 0.0), (-0.200, 0.180)], 0.040,
+                      loc=(-0.220, 0.020, 0.0))
+    apply_toon(tail, FISH_ORANGE, shades=3)
+    patch = _prism_obj("Patch", _disc(0.080), 0.030, loc=(0.060, -0.070, 0.050))
+    apply_toon(patch, FISH_ORANGE, shades=2)
+    eye = _box_obj("Eye", 0.026, 0.016, 0.026, loc=(0.280, -0.090, 0.030))
+    apply_toon(eye, SEAL_BLACK, shades=2)
+    return 0.96
+
+
+def build_outer_sect_tally():
+    """Ngoại Môn Lệnh Bài — thẻ GỖ đầu tròn, khung ngọc, tua đỏ ở chân.
+
+    Khác lá bùa giấy (dải mỏng, không tua) và thẻ ngọc hộ thân (ngọc xanh, nút dây trên đầu): đây là
+    lệnh bài gỗ nâu đầu vòm — dáng "bài vị" dễ nhận ra, tua treo ở DƯỚI.
+    """
+    arch = [(-0.170, -0.260), (0.170, -0.260), (0.170, 0.150)]
+    for index in range(1, 8):
+        angle = math.radians(180.0 * index / 8.0)
+        arch.append((0.170 * math.cos(angle), 0.150 + 0.170 * math.sin(angle)))
+    arch.append((-0.170, 0.150))
+    plank = _prism_obj("Plank", arch, 0.060)
+    apply_toon(plank, WOOD_TOKEN, shades=3)
+    inlay = _box_obj("Inlay", 0.090, 0.020, 0.170, loc=(0.0, -0.064, 0.020))
+    apply_toon(inlay, JADE, shades=3)
+    for index, height in enumerate((0.110, 0.020, -0.070)):
+        glyph = _box_obj("Glyph%d" % index, 0.050, 0.014, 0.014, loc=(0.0, -0.088, height))
+        apply_toon(glyph, WOOD_TOKEN_DARK, shades=2)
+    knot = _box_obj("Knot", 0.040, 0.040, 0.030, loc=(0.0, -0.010, -0.300))
+    apply_toon(knot, TASSEL_RED, shades=2)
+    fall = _box_obj("Fall", 0.030, 0.034, 0.080, loc=(0.0, -0.010, -0.400))
+    apply_toon(fall, TASSEL_RED, shades=3)
+    return 1.00
+
+
+
+POUCH = "#4B3F78"
+POUCH_DARK = "#2E2650"
+CLOUD = "#EEF3F8"
+CLOUD_SHADE = "#B9C6D4"
+FOX = "#E0802E"
+FOX_LIGHT = "#F6E7D2"
+TURTLE_SHELL = "#3F7A5E"
+TURTLE_SKIN = "#9CC48A"
+GOLEM = "#8C9097"
+GOLEM_DARK = "#5E6268"
+MOSS = "#5DAA48"
+WOLF = "#7B746C"
+WOLF_LIGHT = "#C9C2B6"
+WOLF_EYE = "#E0402F"
+
+
+def build_bag_expansion_pouch():
+    """Túi Càn Khôn (ADR-088) — túi gấm tím BẦU thắt dây vàng, miệng túi xoè.
+
+    Dáng bầu dưới + cổ thắt là hình "cái túi" phổ quát; màu tím gấm đứng riêng một vùng, không trùng
+    viên Tẩy Căn Đan (tím nhạt tròn) vì khối này tối hơn hẳn và có dây vàng cắt ngang.
+    """
+    body = [(-0.300, -0.220), (-0.150, -0.330), (0.150, -0.330), (0.300, -0.220), (0.310, 0.000),
+            (0.160, 0.130), (-0.160, 0.130), (-0.310, 0.000)]
+    sack = _prism_obj("Sack", body, 0.110, loc=(0.0, 0.0, -0.060))
+    apply_toon(sack, POUCH, shades=3)
+    neck = _frustum_obj("Neck", 0.110, 0.180, 0.080, 0.090, loc=(0.0, 0.0, 0.150))
+    apply_toon(neck, POUCH_DARK, shades=3)
+    tie = _box_obj("Tie", 0.150, 0.100, 0.030, loc=(0.0, -0.010, 0.080))
+    apply_toon(tie, GOLD, shades=2)
+    emblem = _prism_obj("Emblem", _disc(0.080), 0.030, loc=(0.0, -0.120, -0.110))
+    apply_toon(emblem, GOLD, shades=2)
+    return 0.96
+
+
+def _flying_sword(blade_hex, guard_hex):
+    """Phi kiếm (ADR-070) — kiếm NẰM CHÉO cưỡi trên ba cụm mây trắng.
+
+    Kiếm chéo + mây là hai tín hiệu tách nó khỏi kiếm ô WEAPON (đứng thẳng, không mây). Mây là
+    ba đĩa TÁCH RỜI nhau chút ít — dính lại thì Freestyle vẽ một khối lổn nhổn không ra mây.
+    """
+    # Chuôi và hộ thủ nằm TRÊN trục lưỡi đã xoay: mỗi object xoay quanh tâm riêng, nên vị trí phải
+    # tính theo trục (bản đầu đặt bằng mắt, chuôi bay lơ lửng tách khỏi lưỡi).
+    center_x, center_z, lean = 0.040, 0.080, math.radians(25.0)
+    axis_x, axis_z = math.cos(lean), math.sin(lean)
+
+    def along(offset):
+        return (center_x + axis_x * offset, -0.050, center_z + axis_z * offset)
+
+    blade = _prism_obj("Blade", [(-0.360, -0.050), (0.300, -0.050), (0.400, 0.0), (0.300, 0.050),
+                                 (-0.360, 0.050)], 0.024, loc=(center_x, -0.040, center_z), rot=_tilt(-25))
+    apply_toon(blade, blade_hex, shades=3)
+    guard = _box_obj("Guard", 0.030, 0.040, 0.110, loc=along(-0.370), rot=_tilt(-25))
+    apply_toon(guard, guard_hex, shades=2)
+    grip = _box_obj("Grip", 0.090, 0.036, 0.034, loc=along(-0.490), rot=_tilt(-25))
+    apply_toon(grip, guard_hex, shades=3)
+
+    # Mây là MỘT mesh có ba bướu (đường viền liền), đáy phẳng — ba đĩa rời đọc ra bánh xe.
+    bumps = ((-0.240, 0.120), (0.000, 0.160), (0.240, 0.115))
+    outline = []
+    steps = 24
+    for index in range(steps + 1):
+        x = -0.360 + 0.720 * index / steps
+        top = max((math.sqrt(max(0.0, r * r - (x - cx) * (x - cx))) for cx, r in bumps), default=0.0)
+        outline.append((x, max(top, 0.030)))
+    cloud = _prism_obj("Cloud", [(0.360, 0.0)] + list(reversed(outline)) + [(-0.360, 0.0)], 0.060,
+                       loc=(0.000, 0.020, -0.300))
+    apply_toon(cloud, CLOUD, shades=2)
+    shade = _box_obj("CloudShade", 0.300, 0.020, 0.022, loc=(0.0, -0.045, -0.282))
+    apply_toon(shade, CLOUD_SHADE, shades=2)
+    return 1.06
+
+
+def build_wooden_flying_sword():
+    """Mộc Phi Kiếm — lưỡi gỗ, chuôi gỗ sẫm."""
+    return _flying_sword(NOVICE_WOOD, NOVICE_TRIM)
+
+
+def build_jade_flying_sword():
+    """Ngọc Phi Kiếm — lưỡi ngọc, chuôi vàng: bậc cao hơn bằng chất liệu."""
+    return _flying_sword(JADE, GOLD)
+
+
+def _eyes(x, z, y, size, hex_color):
+    for side, name in ((-1, "EyeLeft"), (1, "EyeRight")):
+        eye = _box_obj(name, size, 0.016, size, loc=(side * x, y, z))
+        apply_toon(eye, hex_color, shades=2)
+
+
+def build_spirit_fox():
+    """Linh Hồ (ADR-072) — đầu cáo cam nhìn thẳng: mặt TAM GIÁC chĩa xuống + hai tai nhọn cao.
+
+    Bốn linh thú đều là ĐẦU nhìn thẳng (ô PET đọc ra "con vật" ngay), tách nhau bằng đường viền:
+    cáo = tam giác + tai nhọn; rùa = mai tròn; thạch linh = khối vuông; sói = mặt dài tai dựng.
+    """
+    face = _prism_obj("Face", [(-0.300, 0.150), (0.300, 0.150), (0.0, -0.300)], 0.100)
+    apply_toon(face, FOX, shades=3)
+    for side, name in ((-1, "EarLeft"), (1, "EarRight")):
+        ear = _prism_obj(name, [(side * 0.300, 0.150), (side * 0.100, 0.150), (side * 0.250, 0.420)]
+                         if side < 0 else [(side * 0.100, 0.150), (side * 0.300, 0.150), (side * 0.250, 0.420)],
+                         0.080)
+        apply_toon(ear, FOX, shades=3)
+    muzzle = _prism_obj("Muzzle", [(-0.120, -0.060), (0.120, -0.060), (0.0, -0.300)], 0.040,
+                        loc=(0.0, -0.090, 0.0))
+    apply_toon(muzzle, FOX_LIGHT, shades=2)
+    _eyes(0.120, 0.050, -0.110, 0.036, SEAL_BLACK)
+    return 0.98
+
+
+def build_spirit_turtle():
+    """Huyền Quy (ADR-072) — rùa nhìn từ trên: mai TRÒN lục giác vân + đầu và bốn chân thò ra."""
+    shell = _prism_obj("Shell", _disc(0.300), 0.100)
+    apply_toon(shell, TURTLE_SHELL, shades=3)
+    plate = _prism_obj("Plate", _hexagon(0.140), 0.030, loc=(0.0, -0.110, 0.0))
+    apply_toon(plate, JADE_PALE, shades=2)
+    head = _prism_obj("Head", _disc(0.100), 0.060, loc=(0.0, 0.050, 0.370))
+    apply_toon(head, TURTLE_SKIN, shades=3)
+    for index, (x, z) in enumerate(((-0.280, 0.200), (0.280, 0.200), (-0.280, -0.220), (0.280, -0.220))):
+        leg = _prism_obj("Leg%d" % index, _disc(0.070), 0.050, loc=(x, 0.060, z))
+        apply_toon(leg, TURTLE_SKIN, shades=3)
+    return 0.98
+
+
+def build_stone_spirit_pet():
+    """Thạch Linh (ADR-124) — đầu đá VUÔNG góc, mắt xanh lơ phát sáng, rêu trên đỉnh."""
+    head = _prism_obj("Head", [(-0.280, -0.260), (0.280, -0.260), (0.300, 0.220), (-0.300, 0.220)], 0.120)
+    apply_toon(head, GOLEM, shades=3)
+    brow = _box_obj("Brow", 0.260, 0.020, 0.040, loc=(0.0, -0.130, 0.080))
+    apply_toon(brow, GOLEM_DARK, shades=2)
+    _eyes(0.120, 0.000, -0.135, 0.050, RUNE_GLOW)
+    jaw = _box_obj("Jaw", 0.160, 0.020, 0.030, loc=(0.0, -0.132, -0.150))
+    apply_toon(jaw, GOLEM_DARK, shades=2)
+    moss = _prism_obj("Moss", [(-0.300, 0.220), (0.200, 0.220), (0.100, 0.300), (-0.220, 0.300)], 0.130)
+    apply_toon(moss, MOSS, shades=2)
+    return 0.92
+
+
+def build_wasteland_wolf_pet():
+    """Hoang Lang (ADR-124) — đầu sói xám MÕM DÀI, tai dựng, mắt đỏ: dữ hơn cáo, tối hơn cáo."""
+    face = _prism_obj("Face", [(-0.280, 0.120), (0.280, 0.120), (0.200, -0.120), (0.080, -0.330),
+                               (-0.080, -0.330), (-0.200, -0.120)], 0.100)
+    apply_toon(face, WOLF, shades=3)
+    for side, name in ((-1, "EarLeft"), (1, "EarRight")):
+        ear = _prism_obj(name, [(side * 0.280, 0.120), (side * 0.090, 0.120), (side * 0.220, 0.400)]
+                         if side < 0 else [(side * 0.090, 0.120), (side * 0.280, 0.120), (side * 0.220, 0.400)],
+                         0.080)
+        apply_toon(ear, WOLF, shades=3)
+    muzzle = _prism_obj("Muzzle", [(-0.100, -0.080), (0.100, -0.080), (0.060, -0.300), (-0.060, -0.300)],
+                        0.040, loc=(0.0, -0.090, 0.0))
+    apply_toon(muzzle, WOLF_LIGHT, shades=2)
+    _eyes(0.120, 0.020, -0.110, 0.034, WOLF_EYE)
+    nose = _box_obj("Nose", 0.040, 0.016, 0.026, loc=(0.0, -0.135, -0.270))
+    apply_toon(nose, SEAL_BLACK, shades=2)
+    return 0.98
+
+
 ITEMS = {
     "kunai": build_kunai,
     "wooden_sword": build_wooden_sword,
@@ -1121,6 +1653,33 @@ ITEMS = {
     "foundation_gloves": build_foundation_gloves,
     "foundation_boots": build_foundation_boots,
     "foundation_talisman": build_foundation_talisman,
+    "spirit_iron_sword": build_spirit_iron_sword,
+    "spirit_iron_robe": build_spirit_iron_robe,
+    "seal_demon_talisman": build_seal_demon_talisman,
+    "teleport_talisman": build_teleport_talisman,
+    "blood_sand_talisman": build_blood_sand_talisman,
+    "revive_pill": build_revive_pill,
+    "faction_change_pill": build_faction_change_pill,
+    "spirit_beast_pill": build_spirit_beast_pill,
+    "spirit_herb_seed": build_spirit_herb_seed,
+    "fine_spirit_herb_seed": build_fine_spirit_herb_seed,
+    "spirit_jade_fire": build_spirit_jade_fire,
+    "spirit_jade_earth": build_spirit_jade_earth,
+    "spirit_jade_water": build_spirit_jade_water,
+    "spirit_jade_wood": build_spirit_jade_wood,
+    "refine_stone": build_refine_stone,
+    "spirit_ore": build_spirit_ore,
+    "demon_core": build_demon_core,
+    "spirit_herb": build_spirit_herb,
+    "spirit_fish": build_spirit_fish,
+    "outer_sect_tally": build_outer_sect_tally,
+    "bag_expansion_pouch": build_bag_expansion_pouch,
+    "wooden_flying_sword": build_wooden_flying_sword,
+    "jade_flying_sword": build_jade_flying_sword,
+    "spirit_fox": build_spirit_fox,
+    "spirit_turtle": build_spirit_turtle,
+    "stone_spirit_pet": build_stone_spirit_pet,
+    "wasteland_wolf_pet": build_wasteland_wolf_pet,
 }
 
 

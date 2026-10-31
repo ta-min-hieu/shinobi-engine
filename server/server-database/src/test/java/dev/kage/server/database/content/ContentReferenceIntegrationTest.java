@@ -89,46 +89,8 @@ class ContentReferenceIntegrationTest {
      * phải lỗi dữ liệu (2026-10-03). Danh sách được GHIM hai chiều: thêm vật phẩm mới thiếu icon thì
      * đỏ, mà vẽ xong icon cho một món ở đây cũng đỏ — để danh sách không bao giờ nói dối.
      */
-    private static final Set<String> ITEMS_KNOWN_TO_LACK_AN_ICON = Set.of(
-            // ADR-111 (2026-10-25) — Tẩy Luyện Thạch lên trước art.
-            "refine_stone",
-            // ADR-107 (2026-10-25) — Linh Ngư, Linh Khoáng lên trước art.
-            "spirit_fish",
-            "spirit_ore",
-            "outer_sect_tally",
-            "blood_sand_talisman",
-            // ADR-064 (2026-10-18) — bốn Linh Ngọc lên trước art; icon dựng từ .blend là việc riêng.
-            "spirit_jade_fire",
-            "spirit_jade_earth",
-            "spirit_jade_water",
-            "spirit_jade_wood",
-            // Lô 17 (2026-10-21) — Tẩy Căn Đan (ADR-066) lên trước art.
-            "faction_change_pill",
-            // ADR-070/072 — phi kiếm + linh thú lên trước art.
-            "wooden_flying_sword",
-            "jade_flying_sword",
-            "spirit_fox",
-            "spirit_turtle",
-            // Lô 19 (2026-10-24) — Linh Thú Đan (ADR-078) lên trước art.
-            "spirit_beast_pill",
-            // ADR-079 — nguyên liệu luyện đan lên trước art.
-            "spirit_herb",
-            "demon_core",
-            // ADR-088 — Túi Càn Khôn lên trước art.
-            "bag_expansion_pouch",
-            "teleport_talisman",
-            // ADR-117 (2026-10-30) — Hồi Hồn Đan lên trước art.
-            "revive_pill",
-            // ADR-119 (2026-10-30) — hai loại hạt giống linh điền lên trước art.
-            "spirit_herb_seed",
-            "fine_spirit_herb_seed",
-            // ADR-120 (2026-10-31) — hai món luyện khí lên trước art.
-            "spirit_iron_sword",
-            "spirit_iron_robe",
-            // ADR-124 (2026-10-31) — Phong Yêu Phù + hai linh thú thu phục lên trước art.
-            "seal_demon_talisman",
-            "stone_spirit_pet",
-            "wasteland_wolf_pet");
+    // 2026-10-31 — trả hết 27 món nợ icon (lô 15–23). Món mới lên trước art thì thêm lại vào đây.
+    private static final Set<String> ITEMS_KNOWN_TO_LACK_AN_ICON = Set.of();
 
     @Container
     static final PostgreSQLContainer POSTGRES =
