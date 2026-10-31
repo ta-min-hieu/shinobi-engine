@@ -127,3 +127,21 @@ enum ReportPlayerOutcome {
 message ReportPlayerResponse {
   ReportPlayerOutcome outcome = 1;
 }
+
+// ADR-122 (2026-10-31) — hỏi đáp tông môn. Trả lời bằng chat kênh THẾ GIỚI; server chấm, người đúng đầu tiên nhận thư.
+
+// Event: Server -> Client, mọi người online (OPCODE_QUIZ_QUESTION_EVENT = 808). question_key là khoá i18n.
+message QuizQuestionEvent {
+  int32 index = 1;            // 0-based
+  int32 total = 2;
+  string question_key = 3;
+  int64 ends_at_epoch_ms = 4;
+}
+
+// Event: Server -> Client, mọi người online (OPCODE_QUIZ_REVEAL_EVENT = 809). winner_name rỗng = hết giờ không ai đúng.
+message QuizRevealEvent {
+  int32 index = 1;
+  string answer_key = 2;
+  string winner_name = 3;
+  int64 reward_gold = 4;
+}

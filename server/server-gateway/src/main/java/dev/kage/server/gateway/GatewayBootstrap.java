@@ -1,7 +1,9 @@
 package dev.kage.server.gateway;
 
 import java.time.Duration;
+import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.List;
 
 import javax.net.ssl.SSLException;
 
@@ -67,6 +69,10 @@ public final class GatewayBootstrap {
     private static final long FIRST_CLEAR_GOLD = 5_000L;
     private static final String FIRST_CLEAR_ITEM_CODE = "demon_core";
     private static final int FIRST_CLEAR_ITEM_QUANTITY = 3;
+
+    // ADR-122 — giờ phiên hỏi đáp tông môn (giờ VN), "HH:mm,HH:mm"; không đặt/hỏng ⇒ 20:00.
+    private static final String QUIZ_TIMES_ENV = "KAGE_QUIZ_TIMES";
+    private static final LocalTime DEFAULT_QUIZ_START = LocalTime.of(20, 0);
 
     private GatewayBootstrap() {}
 
@@ -321,6 +327,9 @@ public final class GatewayBootstrap {
                 facades.progression().adventure().waypoints(),
                 characterRegistry,
                 java.time.Clock.systemUTC()));
+        characterRegistry.quiz.bind(new QuizHooks.Deps( // ADR-122 — hỏi đáp tông môn
+                facades.progression().expansion().quiz(), mail, characterRegistry, java.time.Clock.systemUTC()));
+        expansion.add(characterRegistry.quiz.job());
         expansion.start();
         return new BackgroundJobs(marketExpiry, spiritVeins, waypoints, guildWars, expansion);
     }
@@ -406,7 +415,7 @@ public final class GatewayBootstrap {
                 facades.progression().guildProgression(),
                 facades.contentFacades().socialFacades().mailFacade(),
                 (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
-        bindLot21Hooks(characterRegistry, facades);
+        bindLot21Hooks(characterRegistry, facades, worldGateway, routes);
         characterRegistry.achievements.bind(
                 facades.progression().achievementFacade(),
                 (id, opcode, payload) -> characterRegistry.sendToCharacterIfOnline(id, opcode, 0, payload));
@@ -568,12 +577,20 @@ public final class GatewayBootstrap {
                         databaseBootstrap.wireReputationFacade(),
                         databaseBootstrap.wireRefinementFacade(),
                         databaseBootstrap.wireGuildAuctionFacade()),
-                new ExpansionFacades(
-                        databaseBootstrap.wireSecurityPinFacade(),
-                        databaseBootstrap.wireBuyOrderFacade(),
-                        databaseBootstrap.wireConsumableFacade(),
-                        databaseBootstrap.wireTravelingMerchantFacade(),
-                        databaseBootstrap.wireSpiritFieldFacade()));
+                expansionFacades(databaseBootstrap));
+    }
+
+    /** Facade lô 23 (ADR-115…126) — tách khỏi {@link #progressionFacades} vì trần {@code MethodLength}. */
+    private static ExpansionFacades expansionFacades(ServerDatabaseBootstrap databaseBootstrap) {
+        return new ExpansionFacades(
+                databaseBootstrap.wireSecurityPinFacade(),
+                databaseBootstrap.wireBuyOrderFacade(),
+                databaseBootstrap.wireConsumableFacade(),
+                databaseBootstrap.wireTravelingMerchantFacade(),
+                databaseBootstrap.wireSpiritFieldFacade(),
+                databaseBootstrap.wireEncounterFacade(),
+                databaseBootstrap.wireSectQuiz(dev.kage.chat.domain.QuizRules.parseStarts(
+                        System.getenv(QUIZ_TIMES_ENV), List.of(DEFAULT_QUIZ_START))));
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -641,8 +658,26 @@ public final class GatewayBootstrap {
                                 facades.contentFacades().socialFacades().mailFacade(), characterRegistry)));
     }
 
-    /** Lô 21: bụi linh thảo nạp một lần (ADR-098); bảng truy nã đi theo lượt hạ quái (ADR-101). */
-    private static void bindLot21Hooks(ConnectedCharacterRegistry characterRegistry, GatewayFacades facades) {
+    /**
+     * Lô 21: bụi linh thảo nạp một lần (ADR-098); bảng truy nã đi theo lượt hạ quái (ADR-101). Lô 23: kỳ ngộ (ADR-121)
+     * cũng đi theo lượt hạ quái, chỉ ở world chính.
+     */
+    private static void bindLot21Hooks(
+            ConnectedCharacterRegistry characterRegistry,
+            GatewayFacades facades,
+            WorldGateway worldGateway,
+            WorldRouteLookup routes) {
+        characterRegistry.encounters.bind(new EncounterHooks.Deps(
+                facades.progression().expansion().encounters(),
+                characterRegistry,
+                characterId -> worldGateway.dungeonInstanceRegistry().isInDungeon(characterId)
+                        || worldGateway.arenaInstanceRegistry().isInDuel(characterId),
+                routes::find,
+                // Vừa vào world chưa nhúc nhích thì registry chưa có vị trí — đọc chỗ đã lưu (như NpcProximity).
+                id -> java.util.Optional.ofNullable(characterRegistry.lastKnownPosition(id))
+                        .or(() ->
+                                java.util.Optional.of(facades.characterFacade().loadPosition(id))),
+                java.time.Clock.systemUTC()));
         characterRegistry.herbNodes.load(facades.progression().daily().herbs().listHerbNodes());
         characterRegistry.bounties.bind(
                 facades.progression().adventure().bounties(), facades.characterFacade(), characterRegistry);

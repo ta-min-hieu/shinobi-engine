@@ -132,6 +132,12 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-114 — đoàn hộ tống: báo client 625 + sự kiện quest tới nơi/thất bại; nối sau khi DB đã dựng. */
     final EscortHooks escorts = new EscortHooks();
 
+    /** ADR-121 — kỳ ngộ sau lượt hạ quái ở world chính + lệnh chọn; nối sau khi DB đã dựng. */
+    final EncounterHooks encounters = new EncounterHooks();
+
+    /** ADR-122 — hỏi đáp tông môn: nhịp đồng hồ + chấm chat kênh thế giới; nối sau khi DB đã dựng. */
+    final QuizHooks quiz = new QuizHooks();
+
     /** Bụi linh thảo (ADR-098) — trạng thái sẵn/hồi/đang hái, RAM, dùng chung mọi kết nối. */
     final HerbNodes herbNodes = new HerbNodes();
 
@@ -648,9 +654,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 KillRewardDispatcher.Step.BOUNTY, killerCharacterId, monsterCode, () -> {
                     bounties.onMonsterKilled(killerCharacterId, monsterCode);
                     collections.onMonsterKilled(killerCharacterId, monsterCode);
+                    encounters.onMonsterKilled(killerCharacterId); // kỳ ngộ (ADR-121)
                 });
-        // Phần của ĐỒNG ĐỘI (2026-10-11) — một việc RIÊNG, sau ba việc của người hạ: tra nhóm chạm DB,
-        // và nó hỏng thì phần của người ra đòn cuối ở trên không được suy suyển.
+        // Phần ĐỒNG ĐỘI (2026-10-11) — việc RIÊNG: tra nhóm chạm DB, hỏng thì phần người ra đòn cuối không suy suyển.
         lootExecutor.dispatch(
                 KillRewardDispatcher.Step.PARTY_SHARE,
                 killerCharacterId,

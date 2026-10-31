@@ -44,12 +44,15 @@ import dev.kage.server.database.market.PostgresMarketGoldAdapter;
 import dev.kage.server.database.market.PostgresMarketInventoryAdapter;
 import dev.kage.server.database.market.PostgresMarketRecordAdapter;
 import dev.kage.server.database.shop.PostgresMerchantAdapter;
+import dev.kage.server.database.world.PostgresEncounterAdapter;
 import dev.kage.server.database.world.PostgresSpiritFieldAdapter;
 import dev.kage.shop.api.TravelingMerchantFacade;
 import dev.kage.shop.domain.MerchantBuyOutcome;
 import dev.kage.shop.domain.MerchantStock;
 import dev.kage.shop.domain.MerchantVisit;
+import dev.kage.world.api.EncounterFacade;
 import dev.kage.world.api.SpiritFieldFacade;
+import dev.kage.world.domain.EncounterPort;
 import dev.kage.world.domain.SpiritFieldPort;
 
 /** Lô 23 (ADR-115…126) trên PostgreSQL THẬT — một container cho cả lô. */
@@ -285,6 +288,55 @@ class Lot23IntegrationTest {
         assertThat(scalar("SELECT COUNT(*) FROM audit_log WHERE character_id = ? AND action = 'FORGE_ITEM'", smith))
                 .isEqualTo(runs);
         assertThat(crafting.forge(smith, 20, recipe).outcome()).isEqualTo(CraftItemUseCase.Outcome.MISSING_MATERIALS);
+    }
+
+    @Test
+    void encounterShouldOpenOneAtATimeCapThreePerDayAndPayOutOnce() {
+        long hero = character(account("encounterhero"), "EncHero01");
+        long other = character(account("encounterother"), "EncOther1");
+        EncounterFacade encounters = new EncounterFacade(new PostgresEncounterAdapter(dataSource));
+        Instant day = Instant.parse("2026-11-20T03:00:00Z"); // 10:00 giờ VN — ngày riêng của test này
+        setGold(hero, 0L);
+
+        EncounterPort.Offer first = encounters.start(hero, day).orElseThrow();
+        assertThat(first.options()).isNotEmpty();
+        assertThat(encounters.start(hero, day.plusSeconds(5)))
+                .as("đang có một kỳ ngộ chờ")
+                .isEmpty();
+        assertThat(encounters.choose(other, first.instanceId(), 0, day).outcome())
+                .as("kỳ ngộ của người khác")
+                .isEqualTo(EncounterPort.Outcome.NOT_FOUND);
+        assertThat(encounters.choose(hero, first.instanceId(), 9, day).outcome())
+                .isEqualTo(EncounterPort.Outcome.INVALID_OPTION);
+        EncounterPort.Resolution paid = encounters.choose(hero, first.instanceId(), 0, day.plusSeconds(10));
+        assertThat(paid.outcome()).isEqualTo(EncounterPort.Outcome.OK);
+        assertThat(paid.resultKey()).startsWith("encounter.");
+        assertThat(scalar("SELECT gold FROM character_stat WHERE character_id = ?", hero))
+                .isEqualTo(paid.gold());
+        if (paid.itemTemplateId() != 0) {
+            assertThat(countOf(hero, paid.itemTemplateId())).isEqualTo(paid.quantity());
+        }
+        assertThat(encounters
+                        .choose(hero, first.instanceId(), 0, day.plusSeconds(11))
+                        .outcome())
+                .as("chọn lần hai không được thưởng lại")
+                .isEqualTo(EncounterPort.Outcome.NOT_FOUND);
+
+        EncounterPort.Offer second = encounters.start(hero, day.plusSeconds(20)).orElseThrow();
+        Instant afterExpiry = day.plusSeconds(20).plus(Duration.ofMinutes(11));
+        assertThat(encounters.choose(hero, second.instanceId(), 0, afterExpiry).outcome())
+                .as("quá 10 phút thì tan")
+                .isEqualTo(EncounterPort.Outcome.NOT_FOUND);
+        assertThat(encounters.start(hero, afterExpiry)).isPresent();
+        assertThat(encounters.start(hero, afterExpiry.plus(Duration.ofMinutes(11))))
+                .as("trần 3 lần một ngày")
+                .isEmpty();
+        assertThat(encounters.start(hero, day.plus(Duration.ofDays(1))))
+                .as("sang ngày mới")
+                .isPresent();
+        assertThat(scalar(
+                        "SELECT COUNT(*) FROM audit_log WHERE character_id = ? AND action = 'ENCOUNTER_CHOICE'", hero))
+                .isEqualTo(1L);
     }
 
     @Test

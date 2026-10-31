@@ -152,6 +152,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-118](ADR-118-Traveling-Merchant.md) | Thương nhân du hành | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 | [ADR-119](ADR-119-Spirit-Field.md) | Linh điền | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 | [ADR-120](ADR-120-Forging.md) | Luyện khí | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
+| [ADR-121](ADR-121-Chance-Encounters.md) | Kỳ ngộ | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
+| [ADR-122](ADR-122-Sect-Quiz.md) | Hỏi đáp tông môn | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

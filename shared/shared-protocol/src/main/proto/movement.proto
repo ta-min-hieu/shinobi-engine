@@ -302,3 +302,42 @@ message ReviveCommand {
 message ReviveResponse {
   ReviveOutcome outcome = 1;
 }
+
+// ADR-121 (2026-10-31) — kỳ ngộ. Hạ quái ở world chính có 2% (server tung) gặp kỳ ngộ, tối đa 3/ngày giờ VN; chữ là
+// khoá i18n. Một lựa chọn có thể thưởng linh thạch/vật phẩm và/hoặc gọi ra một con quái cạnh người chơi.
+message EncounterOptionView {
+  int32 index = 1;
+  string label_key = 2;
+}
+
+// Event: Server -> Client (OPCODE_ENCOUNTER_STARTED_EVENT = 324).
+message EncounterStartedEvent {
+  int64 instance_id = 1;
+  string prompt_key = 2;
+  repeated EncounterOptionView options = 3;
+  int64 expires_at_epoch_ms = 4;
+}
+
+// Command: Client -> Server (OPCODE_CHOOSE_ENCOUNTER_OPTION_COMMAND = 325). Server kiểm kỳ ngộ thuộc về mình, còn hạn.
+message ChooseEncounterOptionCommand {
+  int64 instance_id = 1;
+  int32 option_index = 2;
+}
+
+enum EncounterChoiceOutcome {
+  ENCOUNTER_CHOICE_OUTCOME_UNSPECIFIED = 0;
+  ENCOUNTER_CHOICE_OUTCOME_OK = 1;
+  ENCOUNTER_CHOICE_OUTCOME_NOT_FOUND = 2;       // không phải của mình, đã chọn, hoặc đã hết hạn
+  ENCOUNTER_CHOICE_OUTCOME_INVALID_OPTION = 3;
+  ENCOUNTER_CHOICE_OUTCOME_BAG_FULL = 4;        // kỳ ngộ vẫn còn chờ — dọn túi rồi chọn lại
+}
+
+// Response: Server -> Client (OPCODE_CHOOSE_ENCOUNTER_OPTION_RESPONSE = 326).
+message ChooseEncounterOptionResponse {
+  EncounterChoiceOutcome outcome = 1;
+  string result_key = 2;
+  int64 gold = 3;
+  int64 item_template_id = 4;     // 0 = không thưởng vật phẩm
+  int32 quantity = 5;
+  bool monster_spawned = 6;
+}

@@ -28,11 +28,13 @@ final class Lot23WorldSteps {
     private final GameConnection connection;
     private final Lot23Scenario.Asker asker;
     private final Lot23FieldSteps field;
+    private final Lot23QuizSteps quiz;
 
     Lot23WorldSteps(GameConnection connection, Lot23Scenario.Asker asker) {
         this.connection = connection;
         this.asker = asker;
         this.field = new Lot23FieldSteps(asker);
+        this.quiz = new Lot23QuizSteps(connection);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -45,6 +47,7 @@ final class Lot23WorldSteps {
                         GetTravelingMerchantRequest.getDefaultInstance(),
                         Opcode.OPCODE_GET_TRAVELING_MERCHANT_RESPONSE_VALUE,
                         p -> describe(GetTravelingMerchantResponse.parseFrom(p)));
+            case "quiz" -> quiz.quiz(arg);
             case "buyMerchant" ->
                 asker.ask(
                         Opcode.OPCODE_BUY_FROM_MERCHANT_COMMAND_VALUE,

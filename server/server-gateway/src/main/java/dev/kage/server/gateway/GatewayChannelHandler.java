@@ -868,6 +868,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.VerifySecurityPinCommand.parser(),
                             Opcode.OPCODE_VERIFY_SECURITY_PIN_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.securityPin().verify(id, c.getPin(), h.pinGate))),
+            // Lô 23 — kỳ ngộ (ADR-121).
+            Map.entry(
+                    Opcode.OPCODE_CHOOSE_ENCOUNTER_OPTION_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ChooseEncounterOptionCommand.parser(),
+                            Opcode.OPCODE_CHOOSE_ENCOUNTER_OPTION_RESPONSE_VALUE,
+                            (h, id, c) -> h.worldGateway.registry().encounters.choose(id, c))),
             // Lô 23 — luyện khí (ADR-120), cùng lò với luyện đan.
             Map.entry(
                     Opcode.OPCODE_LIST_FORGE_RECIPES_REQUEST_VALUE,
@@ -5384,12 +5391,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * {@code handleSendChatMessageBlocking} để giữ method đó dưới giới hạn Checkstyle MethodLength. */
     private void routeChatMessage(dev.kage.chat.domain.ChatChannel domainChannel, ChatRouteContext ctx) {
         switch (domainChannel) {
-            case WORLD ->
+            case WORLD -> {
                 worldGateway
                         .registry()
                         .broadcastToAll(
                                 Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE,
                                 chatEvent(ChatChannel.CHAT_CHANNEL_WORLD, ctx).toByteArray());
+                // ADR-122 — chấm SAU khi tin đã phát: câu trả lời đúng vẫn hiện trên kênh như mọi tin khác.
+                worldGateway.registry().quiz.onWorldChat(ctx.characterId(), ctx.senderName(), ctx.body());
+            }
             case PRIVATE ->
                 worldGateway
                         .registry()

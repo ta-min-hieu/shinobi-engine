@@ -2,6 +2,8 @@ package dev.kage.tools.loadtest.probe;
 
 import java.io.IOException;
 
+import dev.kage.protocol.ChooseEncounterOptionCommand;
+import dev.kage.protocol.ChooseEncounterOptionResponse;
 import dev.kage.protocol.ForgeItemCommand;
 import dev.kage.protocol.ForgeItemResponse;
 import dev.kage.protocol.GetSpiritFieldRequest;
@@ -21,7 +23,7 @@ import dev.kage.protocol.WaterPlotResponse;
 /**
  * Bước linh điền lô 23 (ADR-119): {@code field[:<tên bạn>]}, {@code plant:<ô>:<templateId hạt>}, {@code
  * harvest:<ô>}, {@code water:<tên bạn>:<ô>}, {@code unlockPlot}. Số ô đếm từ 0 như trên dây. Luyện khí (ADR-120):
- * {@code forgeList}, {@code forge:<mã công thức>}.
+ * {@code forgeList}, {@code forge:<mã công thức>}. Kỳ ngộ (ADR-121): {@code encounter:<instanceId>:<lựa chọn>}.
  */
 final class Lot23FieldSteps {
 
@@ -70,6 +72,7 @@ final class Lot23FieldSteps {
                             ForgeItemResponse r = ForgeItemResponse.parseFrom(p);
                             return r.getOutcome().name() + " " + r.getQuality().name();
                         });
+            case "encounter" -> encounter(arg);
             default -> "bước không hiểu";
         };
     }
@@ -84,6 +87,22 @@ final class Lot23FieldSteps {
                         .build(),
                 Opcode.OPCODE_PLANT_SEED_RESPONSE_VALUE,
                 p -> PlantSeedResponse.parseFrom(p).getOutcome().name());
+    }
+
+    private String encounter(String arg) throws IOException {
+        String[] parts = arg.split(":", 2);
+        return asker.ask(
+                Opcode.OPCODE_CHOOSE_ENCOUNTER_OPTION_COMMAND_VALUE,
+                ChooseEncounterOptionCommand.newBuilder()
+                        .setInstanceId(Long.parseLong(parts[0]))
+                        .setOptionIndex(Integer.parseInt(parts[1]))
+                        .build(),
+                Opcode.OPCODE_CHOOSE_ENCOUNTER_OPTION_RESPONSE_VALUE,
+                p -> {
+                    ChooseEncounterOptionResponse r = ChooseEncounterOptionResponse.parseFrom(p);
+                    return r.getOutcome().name() + " " + r.getResultKey() + " vàng=" + r.getGold() + " tpl"
+                            + r.getItemTemplateId() + "x" + r.getQuantity() + " quái=" + r.getMonsterSpawned();
+                });
     }
 
     private String water(String arg) throws IOException {
