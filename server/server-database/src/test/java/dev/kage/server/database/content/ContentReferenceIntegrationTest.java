@@ -124,7 +124,11 @@ class ContentReferenceIntegrationTest {
             "fine_spirit_herb_seed",
             // ADR-120 (2026-10-31) — hai món luyện khí lên trước art.
             "spirit_iron_sword",
-            "spirit_iron_robe");
+            "spirit_iron_robe",
+            // ADR-124 (2026-10-31) — Phong Yêu Phù + hai linh thú thu phục lên trước art.
+            "seal_demon_talisman",
+            "stone_spirit_pet",
+            "wasteland_wolf_pet");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

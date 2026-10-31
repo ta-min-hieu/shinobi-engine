@@ -96,6 +96,7 @@ public final class WorldFacade {
     private static final ComponentMapper<StatusEffectComponent> STATUS_EFFECT =
             ComponentMapper.getFor(StatusEffectComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
+    private static final int PERCENT = 100;
     private static final ComponentMapper<ChiComponent> CHI = ComponentMapper.getFor(ChiComponent.class);
     private static final ComponentMapper<MoveIntentComponent> MOVE_INTENT =
             ComponentMapper.getFor(MoveIntentComponent.class);
@@ -296,6 +297,8 @@ public final class WorldFacade {
     private final Lock tickLock = new ReentrantLock();
     private volatile Duration stopTickWait = STOP_TICK_WAIT;
     private boolean contentSpawned;
+    /** ADR-124 — cùng nguồn random gameplay của các system; chỉ dùng trên tick thread. */
+    private final RandomGenerator captureRandom;
     /** ADR-123 — chỉ đọc/ghi trên tick thread (qua {@link WorldCommand.SetNightCommand}). */
     private boolean night;
 
@@ -406,6 +409,7 @@ public final class WorldFacade {
             WorldContentCatalog content) {}
 
     private WorldFacade(Wiring wiring, RandomGenerator random) {
+        this.captureRandom = random;
         this.outboundSink = wiring.outboundSink();
         this.monsterCatalog = wiring.content().monsters();
         this.npcCatalog = wiring.content().npcs();
@@ -842,6 +846,15 @@ public final class WorldFacade {
     }
 
     /**
+     * ADR-124 — thử thu phục con quái {@code monsterId} cho {@code characterId}; người gọi đã tiêu Phong Yêu Phù
+     * và hoàn lại nếu kết quả không phải {@code ESCAPED}/{@code CAPTURED}.
+     */
+    public void captureMonster(
+            long characterId, long monsterId, CaptureRule rule, java.util.function.Consumer<CaptureResult> reply) {
+        inbox.add(new WorldCommand.CaptureMonsterCommand(characterId, monsterId, rule, reply));
+    }
+
+    /**
      * ADR-123 — báo world đang đêm hay ngày (gateway gửi định kỳ, chạy lại vô hại). Đêm: quái đánh đòn thường theo
      * {@code monsterDamagePercent}; điểm spawn {@code nightOnly} chỉ ra quái lúc đêm (ngày thì chờ, không hồi sinh).
      */
@@ -1091,6 +1104,7 @@ public final class WorldFacade {
                 case WorldCommand.SetSkillRanksCommand c -> handleSetSkillRanks(c.characterId(), c.ranks());
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c);
                 case WorldCommand.SpawnOnceCommand c -> spawnOnce(c);
+                case WorldCommand.CaptureMonsterCommand c -> c.reply().accept(handleCapture(c));
                 case WorldCommand.SetNightCommand c -> {
                     night = c.night();
                     combatSystem.setMonsterDamagePercent(c.monsterDamagePercent());
@@ -1847,6 +1861,33 @@ public final class WorldFacade {
     }
 
     /** ADR-117 — một lựa chọn hồi sinh, trên tick thread. */
+    private CaptureResult handleCapture(WorldCommand.CaptureMonsterCommand command) {
+        KEntity monster = entitiesByMonsterId.get(command.monsterId());
+        KEntity character = entitiesByCharacterId.get(command.characterId());
+        if (monster == null || character == null || !MONSTER.has(monster)) {
+            return new CaptureResult(CaptureResult.Outcome.NOT_FOUND, "");
+        }
+        String code = MONSTER.get(monster).monsterCode;
+        PositionComponent from = POSITION.get(character);
+        PositionComponent to = POSITION.get(monster);
+        if (Math.hypot(to.x - from.x, to.y - from.y) > command.rule().rangeMeters()) {
+            return new CaptureResult(CaptureResult.Outcome.TOO_FAR, code);
+        }
+        HealthComponent health = HEALTH.get(monster);
+        if ((long) health.current * PERCENT > (long) health.max * command.rule().maxHpPercent()) {
+            return new CaptureResult(CaptureResult.Outcome.HP_TOO_HIGH, code);
+        }
+        java.util.OptionalInt chance = command.rule().chanceOf().apply(code);
+        if (chance.isEmpty()) {
+            return new CaptureResult(CaptureResult.Outcome.NOT_TAMEABLE, code);
+        }
+        if (captureRandom.nextInt(PERCENT) >= chance.getAsInt()) {
+            return new CaptureResult(CaptureResult.Outcome.ESCAPED, code);
+        }
+        handleMonsterDeath(command.monsterId(), 0L); // killer 0 ⇒ không rơi đồ, không EXP; điểm spawn lên lịch
+        return new CaptureResult(CaptureResult.Outcome.CAPTURED, code);
+    }
+
     private ReviveOutcome handleRevive(long characterId, boolean inPlace) {
         if (!revivals.isPending(characterId)) {
             return ReviveOutcome.NOT_DEAD;

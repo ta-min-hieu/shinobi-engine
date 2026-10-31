@@ -7,6 +7,7 @@ import dev.kage.shop.api.TravelingMerchantFacade;
 import dev.kage.world.api.ConsumableFacade;
 import dev.kage.world.api.EncounterFacade;
 import dev.kage.world.api.SpiritFieldFacade;
+import dev.kage.world.api.TamingFacade;
 
 /** Lô 23 (ADR-115…126) — gom để {@link ProgressionFacades} chỉ thêm một thành phần. */
 record ExpansionFacades(
@@ -16,7 +17,8 @@ record ExpansionFacades(
         TravelingMerchantFacade merchant,
         SpiritFieldFacade spiritField,
         EncounterFacade encounters,
-        SectQuiz quiz) {
+        SectQuiz quiz,
+        TamingFacade taming) {
 
     /** Composition không có các tính năng này (test). */
     static final ExpansionFacades DISABLED = new ExpansionFacades(
@@ -26,5 +28,6 @@ record ExpansionFacades(
             TravelingMerchantFacade.DISABLED,
             SpiritFieldFacade.DISABLED,
             EncounterFacade.DISABLED,
-            SectQuiz.DISABLED);
+            SectQuiz.DISABLED,
+            TamingFacade.DISABLED);
 }

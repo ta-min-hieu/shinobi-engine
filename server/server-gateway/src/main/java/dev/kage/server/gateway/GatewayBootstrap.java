@@ -592,7 +592,8 @@ public final class GatewayBootstrap {
                 databaseBootstrap.wireSpiritFieldFacade(),
                 databaseBootstrap.wireEncounterFacade(),
                 databaseBootstrap.wireSectQuiz(dev.kage.chat.domain.QuizRules.parseStarts(
-                        System.getenv(QUIZ_TIMES_ENV), List.of(DEFAULT_QUIZ_START))));
+                        System.getenv(QUIZ_TIMES_ENV), List.of(DEFAULT_QUIZ_START))),
+                databaseBootstrap.wireTamingFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */

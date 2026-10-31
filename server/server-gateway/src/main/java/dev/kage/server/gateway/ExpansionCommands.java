@@ -11,7 +11,8 @@ record ExpansionCommands(
         BuyOrderCommands buyOrders,
         RevivalCommands revival,
         MerchantCommands merchant,
-        SpiritFieldCommands spiritField) {
+        SpiritFieldCommands spiritField,
+        TamingCommands taming) {
 
     static ExpansionCommands of(GatewayFacades facades, WorldGateway worldGateway, NpcProximity proximity) {
         ExpansionFacades expansion = facades.progression().expansion();
@@ -26,6 +27,12 @@ record ExpansionCommands(
                         expansion.spiritField(),
                         facades.characterFacade(),
                         facades.contentFacades().socialFacades().friendFacade(),
-                        clock));
+                        clock),
+                new TamingCommands(
+                        expansion.taming(),
+                        expansion.consumables(),
+                        facades.characterFacade(),
+                        new PlayerNotices(
+                                facades.contentFacades().socialFacades().mailFacade(), worldGateway.registry())));
     }
 }

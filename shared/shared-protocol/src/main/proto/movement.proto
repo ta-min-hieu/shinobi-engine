@@ -348,3 +348,27 @@ message DayNightEvent {
   bool night = 1;
   int32 seconds_until_change = 2;
 }
+
+// ADR-124 (2026-10-31) — thu phục yêu thú. Command: Client -> Server (OPCODE_TAME_MONSTER_COMMAND = 328). monster_id
+// là id ÂM của quái đang nhắm; server kiểm tầm (6 m), máu (≤ 20%), loài, tiêu một Phong Yêu Phù và tung tỉ lệ.
+message TameMonsterCommand {
+  int64 monster_id = 1;
+}
+
+enum TameOutcome {
+  TAME_OUTCOME_UNSPECIFIED = 0;
+  TAME_OUTCOME_CAPTURED = 1;
+  TAME_OUTCOME_ESCAPED = 2;        // tung trượt — mất phù, quái vẫn đó
+  TAME_OUTCOME_NO_TALISMAN = 3;
+  TAME_OUTCOME_NOT_FOUND = 4;      // các nhánh từ 4 trở đi hoàn phù
+  TAME_OUTCOME_TOO_FAR = 5;
+  TAME_OUTCOME_HP_TOO_HIGH = 6;
+  TAME_OUTCOME_NOT_TAMEABLE = 7;
+}
+
+// Response: Server -> Client (OPCODE_TAME_MONSTER_RESPONSE = 329). mailed = túi đầy nên linh thú đi qua thư.
+message TameMonsterResponse {
+  TameOutcome outcome = 1;
+  int64 pet_item_template_id = 2;
+  bool mailed = 3;
+}

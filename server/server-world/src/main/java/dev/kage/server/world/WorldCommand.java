@@ -91,6 +91,14 @@ sealed interface WorldCommand {
     /** Một con quái thường tại {@code (x, y)}, KHÔNG thuộc điểm spawn nào nên không hồi sinh (ADR-113). */
     record SpawnOnceCommand(String monsterCode, float x, float y) implements WorldCommand {}
 
+    /**
+     * Thu phục yêu thú (ADR-124): kiểm tầm/máu, hỏi {@code chanceOf} tỉ lệ của loài (rỗng = không thu phục được), tung
+     * và gỡ quái nếu trúng — tất cả trong một lượt tick. {@code reply} chạy trên tick thread, phải trả về ngay.
+     */
+    record CaptureMonsterCommand(
+            long characterId, long monsterId, CaptureRule rule, java.util.function.Consumer<CaptureResult> reply)
+            implements WorldCommand {}
+
     /** Ngày đêm (ADR-123): đêm hay ngày + phần trăm sát thương đòn thường của quái lúc này. */
     record SetNightCommand(boolean night, int monsterDamagePercent) implements WorldCommand {}
 

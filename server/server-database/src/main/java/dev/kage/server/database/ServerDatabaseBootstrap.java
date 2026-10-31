@@ -793,6 +793,12 @@ public final class ServerDatabaseBootstrap {
         return new SpiritFieldFacade(new PostgresSpiritFieldAdapter(dataSource));
     }
 
+    /** Thu phục yêu thú (ADR-124). */
+    public dev.kage.world.api.TamingFacade wireTamingFacade() {
+        return new dev.kage.world.api.TamingFacade(
+                new dev.kage.server.database.world.PostgresTamingAdapter(dataSource));
+    }
+
     /** Kỳ ngộ (ADR-121). */
     public EncounterFacade wireEncounterFacade() {
         return new EncounterFacade(new PostgresEncounterAdapter(dataSource));

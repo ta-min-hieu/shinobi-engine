@@ -46,12 +46,14 @@ import dev.kage.server.database.market.PostgresMarketRecordAdapter;
 import dev.kage.server.database.shop.PostgresMerchantAdapter;
 import dev.kage.server.database.world.PostgresEncounterAdapter;
 import dev.kage.server.database.world.PostgresSpiritFieldAdapter;
+import dev.kage.server.database.world.PostgresTamingAdapter;
 import dev.kage.shop.api.TravelingMerchantFacade;
 import dev.kage.shop.domain.MerchantBuyOutcome;
 import dev.kage.shop.domain.MerchantStock;
 import dev.kage.shop.domain.MerchantVisit;
 import dev.kage.world.api.EncounterFacade;
 import dev.kage.world.api.SpiritFieldFacade;
+import dev.kage.world.api.TamingFacade;
 import dev.kage.world.domain.EncounterPort;
 import dev.kage.world.domain.SpiritFieldPort;
 
@@ -336,6 +338,28 @@ class Lot23IntegrationTest {
                 .isPresent();
         assertThat(scalar(
                         "SELECT COUNT(*) FROM audit_log WHERE character_id = ? AND action = 'ENCOUNTER_CHOICE'", hero))
+                .isEqualTo(1L);
+    }
+
+    @Test
+    void tamingShouldListTameableSpeciesScaleChanceByLevelAndGrantPets() {
+        long tamer = character(account("tamerone"), "TamerOne1");
+        TamingFacade taming = new TamingFacade(new PostgresTamingAdapter(dataSource));
+        long stonePet = templateOf("stone_spirit_pet");
+
+        assertThat(taming.tameable("stone_ogre")).isPresent();
+        assertThat(taming.tameable("sample_boss"))
+                .as("boss không thu phục được")
+                .isEmpty();
+        assertThat(taming.chancesFor(30)).containsEntry("stone_ogre", 40).containsEntry("wasteland_beast", 30);
+        assertThat(taming.chancesFor(25).get("wasteland_beast"))
+                .as("quái Lv29 hơn 4 cấp ⇒ −20%")
+                .isEqualTo(10);
+        assertThat(TamingFacade.lookup(taming.chancesFor(1), "training_dummy")).isEmpty();
+
+        assertThat(taming.grantPet(tamer, stonePet, "stone_ogre")).isTrue();
+        assertThat(countOf(tamer, stonePet)).isEqualTo(1L);
+        assertThat(scalar("SELECT COUNT(*) FROM audit_log WHERE character_id = ? AND action = 'TAME_MONSTER'", tamer))
                 .isEqualTo(1L);
     }
 

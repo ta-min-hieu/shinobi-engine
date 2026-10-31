@@ -29,12 +29,14 @@ final class Lot23WorldSteps {
     private final Lot23Scenario.Asker asker;
     private final Lot23FieldSteps field;
     private final Lot23QuizSteps quiz;
+    private final Lot23TameSteps tameSteps;
 
     Lot23WorldSteps(GameConnection connection, Lot23Scenario.Asker asker) {
         this.connection = connection;
         this.asker = asker;
         this.field = new Lot23FieldSteps(asker);
         this.quiz = new Lot23QuizSteps(connection);
+        this.tameSteps = new Lot23TameSteps(connection, asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -48,6 +50,19 @@ final class Lot23WorldSteps {
                         Opcode.OPCODE_GET_TRAVELING_MERCHANT_RESPONSE_VALUE,
                         p -> describe(GetTravelingMerchantResponse.parseFrom(p)));
             case "quiz" -> quiz.quiz(arg);
+            case "beatTame" -> tameSteps.beatTame(arg);
+            case "tame" ->
+                asker.ask(
+                        Opcode.OPCODE_TAME_MONSTER_COMMAND_VALUE,
+                        dev.kage.protocol.TameMonsterCommand.newBuilder()
+                                .setMonsterId(Long.parseLong(arg))
+                                .build(),
+                        Opcode.OPCODE_TAME_MONSTER_RESPONSE_VALUE,
+                        p -> {
+                            dev.kage.protocol.TameMonsterResponse r =
+                                    dev.kage.protocol.TameMonsterResponse.parseFrom(p);
+                            return r.getOutcome().name() + " tpl" + r.getPetItemTemplateId() + " thư=" + r.getMailed();
+                        });
             case "buyMerchant" ->
                 asker.ask(
                         Opcode.OPCODE_BUY_FROM_MERCHANT_COMMAND_VALUE,

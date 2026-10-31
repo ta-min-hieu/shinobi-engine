@@ -487,6 +487,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(reports.guildSkillPanel(), reports.guildSkills());
         panels.register(reports.spiritVeinPanel(), reports.spiritVeins());
         reports.community().registerInto(panels);
+        reports.community().expansion().taming().useTarget(combatHudController::currentTargetId); // ADR-124
         // ADR-102 — cửa sổ bang chiến mở từ nút cửa sổ Bang; đang chiến thì click người chơi là nhắm họ.
         GuildWarCoordinator guildWars = reports.community().guildWars();
         guild.useGuildAuction(reports.community().auctions()::open);
