@@ -78,6 +78,13 @@ if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS") {
             { label_key: "dialogue.option.ask_pill_run", action: "pill_run" },
             { label_key: "dialogue.option.ask_proving", action: "proving" },
             { label_key: "dialogue.option.ask_breakthrough", action: "breakthrough" },
+            // ADR-130 (V109) — arc 3 Nội Môn, chèn SAU `breakthrough` (nối đúng nhịp đóng arc 2). `daily_duty`,
+            // `open_crafting`, `end` lùi năm chỗ — CÓ CHỦ ĐÍCH (`option_index` là VỊ TRÍ), ghim ở TownElderDialogueTreeTest.
+            { label_key: "dialogue.option.ask_inner_exam", action: "inner_exam" },
+            { label_key: "dialogue.option.ask_forbidden_archive", action: "forbidden_archive" },
+            { label_key: "dialogue.option.ask_leaked_exam", action: "leaked_exam" },
+            { label_key: "dialogue.option.ask_grand_contest", action: "grand_contest" },
+            { label_key: "dialogue.option.ask_altar_master", action: "altar_master" },
             // Nhiệm vụ ngày (ADR-055, STORY §7) — đứng CUỐI, sau mọi nhánh chính tuyến, ngay trước "bye":
             // `bye` lùi một chỗ là CÓ CHỦ ĐÍCH (option_index là VỊ TRÍ), ghim ở TownElderDialogueTreeTest.
             { label_key: "dialogue.option.ask_daily_duty", action: "daily_duty" },
@@ -329,6 +336,49 @@ if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS") {
         options: [
             { label_key: "dialogue.option.accept_quest_confront_steward",
               action: "accept_quest:confront_the_steward" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // ARC 3 — Nội Môn (STORY.md §6, ADR-130). Nhịp hé lộ (§8 quy tắc 2): ông lão chỉ được NGHI. Chữ "Thiên Môn"
+    // buột ra đúng một lần ở `forbidden_archive` rồi bị lảng; "nội gián cấp trưởng lão" là suy luận từ vật chứng
+    // (`leaked_exam`), KHÔNG kèm danh tính (arc 5). Không một chữ nào về Tô Vân Nhi ngoài lời khen ở bỉ võ.
+    inner_exam: {
+        text_key: "dialogue.town_elder.inner_exam",
+        options: [
+            { label_key: "dialogue.option.accept_quest_inner_exam", action: "accept_quest:inner_sect_examination" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    forbidden_archive: {
+        text_key: "dialogue.town_elder.forbidden_archive",
+        options: [
+            { label_key: "dialogue.option.accept_quest_forbidden_archive", action: "accept_quest:forbidden_archive_glow" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    leaked_exam: {
+        text_key: "dialogue.town_elder.leaked_exam",
+        options: [
+            { label_key: "dialogue.option.accept_quest_leaked_exam", action: "accept_quest:leaked_examination" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    grand_contest: {
+        text_key: "dialogue.town_elder.grand_contest",
+        options: [
+            { label_key: "dialogue.option.accept_quest_grand_contest", action: "accept_quest:inner_sect_grand_contest" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    altar_master: {
+        text_key: "dialogue.town_elder.altar_master",
+        options: [
+            { label_key: "dialogue.option.accept_quest_altar_master", action: "accept_quest:repel_the_altar_master" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]

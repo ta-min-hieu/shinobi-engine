@@ -94,7 +94,8 @@ final class DemoPlatforms {
      * trục chơi, atk 40, và V40 đã phải dời nó một lần rồi vì đúng chuyện đó).
      */
     // V57 (2026-10-17) nới 210 → 225: cỗ khảo hạch Trúc Cơ dời 201 → 216, biên 9m (lần thứ NĂM — xem cảnh báo trên).
-    private static final float GROUND_MAX_X = 225f;
+    // V109 (2026-10-31, ADR-130) nới 225 → 305: arc 3 đi tiếp về phía đông tới đàn chủ @296, biên 9m (lần thứ SÁU).
+    private static final float GROUND_MAX_X = 305f;
 
     private DemoPlatforms() {}
 

@@ -215,7 +215,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         List<MonsterSpawnPoint> spawns =
                 new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
 
-        assertThat(spawns).hasSize(18);
+        assertThat(spawns).hasSize(23); // V109 (arc 3) thêm 5 điểm 232/248/264/280/296
         // ADR-033 — quái lệch khỏi y=0 là quái người chơi không bao giờ chạm tới. DB có CHECK,
         // đây là hàng rào thứ hai và cũng là tài liệu sống cho ràng buộc đó.
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
@@ -293,7 +293,14 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                         // `DemoPlatforms.GROUND_MAX_X` đi 170 → 210 cùng đợt (lần thứ TƯ).
                         184f, // V57 dời 175 → 184
                         200f, // V57 dời 188 → 200
-                        216f); // V57 dời 201 → 216 — GROUND_MAX_X 210 → 225
+                        216f, // V57 dời 201 → 216 — GROUND_MAX_X 210 → 225
+                        // V109 — arc 3 Nội Môn (ADR-130): cỗ khảo hạch nội môn @232, hai tế đồ trà trộn @248/@264,
+                        // Bạch Kính Chi @280, đàn chủ Huyết Sa @296. Bước 16 như V57; GROUND_MAX_X 225 → 305.
+                        232f,
+                        248f,
+                        264f,
+                        280f,
+                        296f);
     }
 
     /**
@@ -398,7 +405,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         // CỐ Ý, xem shouldListMainWorldSpawnPointsOnThePlayLine). Con số này là một cái ĐẾM chứ
         // không phải một luật, nên mỗi đợt thêm loài CÓ aggro đều phải sửa nó — đó là chủ đích:
         // thêm một con biết tự đánh người mà không ai đọc lại luật giãn spawn thì ô này đỏ trước.
-        assertThat(aggressive).hasSize(15);
+        assertThat(aggressive).hasSize(20); // V109: cả 5 điểm arc 3 đều aggro 3 — luật giãn đã soi ở V109
         for (int i = 0; i < aggressive.size(); i++) {
             for (int j = i + 1; j < aggressive.size(); j++) {
                 MonsterSpawnPoint first = aggressive.get(i);

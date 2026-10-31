@@ -146,6 +146,22 @@ record QuestFuzzSpec(
             quest("foundation_breakthrough")
                     .killing("foundation_warden", 1, CounterKind.FLAG, "endured")
                     .reportingTo(TOWN_ELDER),
+            // ADR-130 (V109) — arc 3 Nội Môn: khoá tiến độ là chính mã quái.
+            quest("inner_sect_examination")
+                    .killing("inner_trial_construct", 1, CounterKind.COUNT_UNTIL_TARGET, "inner_trial_construct")
+                    .reportingTo(TOWN_ELDER),
+            quest("forbidden_archive_glow")
+                    .killing("archive_warden", 2, CounterKind.COUNT_UNTIL_TARGET, "archive_warden")
+                    .reportingTo(TOWN_ELDER),
+            quest("leaked_examination")
+                    .killing("blood_sand_infiltrator", 3, CounterKind.COUNT_UNTIL_TARGET, "blood_sand_infiltrator")
+                    .reportingTo(TOWN_ELDER),
+            quest("inner_sect_grand_contest")
+                    .killing("bach_kinh_chi", 1, CounterKind.COUNT_UNTIL_TARGET, "bach_kinh_chi")
+                    .reportingTo(SENIOR_SISTER),
+            quest("repel_the_altar_master")
+                    .killing("blood_sand_altar_master", 1, CounterKind.COUNT_UNTIL_TARGET, "blood_sand_altar_master")
+                    .reportingTo(TOWN_ELDER),
             // ADR-055 — nhiệm vụ ngày, không tiên quyết. Trong một lượt fuzz (vài giây) không qua 0h,
             // nên mô hình "CLAIMED là cuối" vẫn đúng.
             quest("daily_dummy_drill").killing("training_dummy", 5, CounterKind.COUNT, FELLED),

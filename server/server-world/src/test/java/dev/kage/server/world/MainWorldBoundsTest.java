@@ -57,6 +57,9 @@ class MainWorldBoundsTest {
         assertThat(MainWorldBoundsSystem.clamp(WorldConstants.MAIN_WORLD_MAX_X))
                 .isEqualTo(WorldConstants.MAIN_WORLD_MAX_X);
         assertThat(MainWorldBoundsSystem.clamp(1_000f)).isEqualTo(WorldConstants.MAIN_WORLD_MAX_X);
+        // Biên phải phủ điểm spawn xa nhất (V109: đàn chủ Huyết Sa @296) và bằng nền đất client (DemoPlatforms
+        // GROUND_MAX_X) — V57 từng nới nền mà quên biên, chặn người chơi ở 210 trước trận @216.
+        assertThat(WorldConstants.MAIN_WORLD_MAX_X).isGreaterThan(296f).isEqualTo(305f);
     }
 
     private static void runTicks(WorldFacade world, int ticks) {

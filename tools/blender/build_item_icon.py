@@ -1664,6 +1664,134 @@ def build_spring_mirror_artifact():
     return 1.05
 
 
+# --- Arc 3 (V109, ADR-130): bộ "Nội Môn" Lv37 ------------------------------------------------
+#
+# Bậc NĂM của thang trang bị. Màu là TÍM Tử Phủ (tên cảnh giới của arc 3) — không icon nào trong túi
+# đồ dùng tím đậm làm thân ngoài Tẩy Căn Đan (viên tròn, ô khác hẳn). Đảo bố cục so với bậc bốn: bộ
+# Trúc Cơ là thân SÁNG chi tiết tối, bộ này thân TỐI chi tiết BẠC sáng. Áo và hộ thủ giữ khung chung
+# `_vest`/`_wraps` của mọi bậc (đó là hình của ô, không phải của bậc); mũ, ủng, ngọc bội và kiếm có
+# HÌNH mới, vì đổi màu một hình cũ là ra món cũ đổi màu (luật ghi ở `build_foundation_cap`).
+INNER_DEEP = "#3A2E5C"
+INNER_MID = "#5A4789"
+INNER_PALE = "#C9B8E6"
+INNER_SILVER = "#D9DEE6"
+
+
+def build_inner_sect_robe():
+    # Thân tím đậm, vai + cổ bạc, yếm tím nhạt — KHÔNG vàng: `_vest` tự gắn khoá đai vàng dưới yếm.
+    return _vest(INNER_DEEP, INNER_SILVER, INNER_SILVER, INNER_PALE, cloth_shades=3)
+
+
+def build_inner_sect_gloves():
+    # Bàn tay tím đậm, dải quấn bạc, tấm khớp tím nhạt (không vàng — chốt `_wraps` là vàng).
+    return _wraps(INNER_DEEP, INNER_SILVER, INNER_PALE)
+
+
+def build_inner_sect_cap():
+    """Nội Môn Đạo Quan — vành rộng + thân + chóp HOA SEN ba cánh.
+
+    Giữ luật hình của mọi chiếc mũ trong bộ: vành là khối RỘNG NHẤT (đọc ra mũ, không ra hộp). Thứ
+    phân biệt với bậc bốn là đỉnh: bậc bốn kết thúc bằng một chóp cụt phẳng, bậc này bằng ba cánh sen
+    nhọn — viền răng cưa trên đỉnh sống sót ở 64px kể cả khi bỏ hết màu.
+    """
+    brim = _box_obj("Brim", 0.290, 0.066, 0.046, loc=(0.0, 0.0, -0.212))
+    apply_toon(brim, INNER_DEEP, shades=3)
+    crown = _frustum_obj("Crown", 0.212, 0.156, 0.070, 0.140, loc=(0.0, 0.0, -0.030))
+    apply_toon(crown, INNER_SILVER, shades=3)
+    lotus = _prism_obj("Lotus", [(-0.170, 0.000), (0.170, 0.000), (0.150, 0.150), (0.085, 0.070),
+                                 (0.000, 0.215), (-0.085, 0.070), (-0.150, 0.150)],
+                       0.050, loc=(0.0, 0.0, 0.110))
+    apply_toon(lotus, INNER_MID, shades=3)
+    stone = _gem_obj("Stone", 0.064, 0.044, 0.078, loc=(0.0, -0.090, -0.212))
+    apply_toon(stone, INNER_PALE, shades=3)
+    pin = _box_obj("Pin", 0.268, 0.022, 0.024, loc=(0.0, -0.086, 0.040), rot=_tilt(8))
+    apply_toon(pin, GOLD, shades=3)
+    return 0.92
+
+
+def build_inner_sect_boots():
+    """Nội Môn Đạo Hài — cùng tư thế nghiêng-một-khối-liền (tư thế DUY NHẤT đã chứng minh, xem
+    `build_outer_sect_boots`), ống THẤP hơn bậc bốn và mũi BẰNG không hếch: đôi hài vải của người tu
+    trong nội môn chứ không phải ủng đi đường. Đổi tỷ lệ + mũi là đổi đường viền, không chỉ đổi màu.
+    """
+    # ⚠️ VÒNG B #1 (2026-11-01): bản đầu một sắc độ + mũi là khối rời ⇒ render ra cái GHẾ chữ L.
+    # Hai sửa, cả hai đã ghi sẵn ở bậc bốn: tách ống khỏi bàn chân bằng SẮC ĐỘ (mặt ống tím nhạt), và
+    # mũi là một phần của CÙNG profile (hếch nhẹ), không phải khối dán thêm.
+    profile = [
+        (-0.160, -0.160),
+        (-0.160, 0.150),
+        (-0.146, 0.300),
+        (-0.030, 0.300),
+        (-0.016, 0.110),
+        (0.070, -0.020),
+        (0.220, -0.020),
+        (0.300, 0.040),
+        (0.330, -0.040),
+        (0.270, -0.160),
+    ]
+    body = _prism_obj("Boot", profile, 0.058, loc=(-0.030, 0.0, -0.030))
+    apply_toon(body, INNER_DEEP, shades=3)
+    shaft = _box_obj("ShaftFace", 0.050, 0.030, 0.120, loc=(-0.120, -0.062, 0.120))
+    apply_toon(shaft, INNER_PALE, shades=3)
+    cuff = _box_obj("CuffBand", 0.072, 0.066, 0.030, loc=(-0.118, -0.044, 0.266))
+    apply_toon(cuff, INNER_SILVER, shades=2)
+    sole = _box_obj("Sole", 0.230, 0.064, 0.032, loc=(0.030, 0.0, -0.206))
+    apply_toon(sole, INNER_SILVER, shades=2)
+    return 0.98
+
+
+def build_inner_sect_talisman():
+    """Nội Môn Ngọc Bội — đĩa ĐẶC tím + lõi lục giác bạc, treo dây vàng, tua đỏ.
+
+    Ô ACCESSORY_1 đã khoá ba hình: vòng kín (vòng tay), thẻ chữ nhật (bậc ba), thoi (bậc bốn). Đĩa đặc
+    không phải vòng kín — không có lỗ giữa, nên không tranh hình với vòng tay; viền TRÒN đối lại viền
+    THOI của bậc bốn phân biệt được khi bỏ hết màu.
+    """
+    cap = _box_obj("Cap", 0.058, 0.046, 0.048, loc=(0.0, 0.0, 0.348))
+    apply_toon(cap, GOLD, shades=2)
+    cord = _box_obj("Cord", 0.022, 0.030, 0.090, loc=(0.0, 0.0, 0.250))
+    apply_toon(cord, GOLD, shades=2)
+    disc = _prism_obj("Disc", _disc(0.230, segments=24), 0.050, loc=(0.0, 0.0, -0.020))
+    apply_toon(disc, INNER_MID, shades=3)
+    core = _prism_obj("Core", _hexagon(0.110), 0.030, loc=(0.0, -0.060, -0.020))
+    apply_toon(core, INNER_SILVER, shades=3)
+    fall = _box_obj("TasselFall", 0.032, 0.034, 0.082, loc=(0.0, -0.010, -0.336))
+    apply_toon(fall, TASSEL_RED, shades=3)
+    return 1.00
+
+
+def build_inner_sect_blade():
+    """Nội Môn Kiếm — lưỡi bạc MŨI NHỌN có sống tím + hộ thủ CÁNH vểnh LÊN.
+
+    Bốn thanh trước đã giữ hai trục phân biệt (đường viền, chỗ rộng nhất); bậc này đảo hộ thủ: bậc
+    bốn chúc XUỐNG (lưỡi liềm), bậc này vểnh LÊN ôm gốc lưỡi. Lưỡi vẫn SÁNG (lưỡi tối là cái ống đen
+    — `outer_sect_blade` vòng B #1); sống tím đè giữa lưỡi là chỗ đảo bố cục.
+    """
+    blade_profile = [
+        (-0.090, -0.210), (-0.086, 0.180), (-0.040, 0.330), (0.000, 0.390),
+        (0.040, 0.330), (0.086, 0.180), (0.090, -0.210),
+    ]
+    blade = _prism_obj("Blade", blade_profile, 0.026, loc=(0.0, -0.050, 0.130))
+    apply_toon(blade, INNER_SILVER, shades=3)
+    ridge = _box_obj("Ridge", 0.022, 0.030, 0.230, loc=(0.0, -0.080, 0.110))
+    apply_toon(ridge, INNER_MID, shades=2)
+    guard_profile = [
+        (-0.230, 0.090), (-0.150, -0.010), (-0.060, -0.060), (0.060, -0.060), (0.150, -0.010),
+        (0.230, 0.090), (0.190, 0.120), (0.080, 0.030), (-0.080, 0.030), (-0.190, 0.120),
+    ]
+    guard = _prism_obj("Guard", guard_profile, 0.044, loc=(0.0, -0.050, -0.110))
+    apply_toon(guard, INNER_DEEP, shades=3)
+    grip = _box_obj("Grip", 0.046, 0.044, 0.136, loc=(0.0, -0.050, -0.296))
+    apply_toon(grip, INNER_DEEP, shades=3)
+    pommel = _gem_obj("Pommel", 0.062, 0.052, 0.044, loc=(0.0, -0.050, -0.448))
+    apply_toon(pommel, GOLD, shades=2)
+    knot = _box_obj("TasselKnot", 0.034, 0.036, 0.032, loc=(0.0, -0.058, -0.506))
+    apply_toon(knot, TASSEL_RED, shades=2)
+    upper = _box_obj("TasselUpper", 0.032, 0.034, 0.076, loc=(-0.030, -0.060, -0.566), rot=_tilt(-16))
+    apply_toon(upper, TASSEL_RED, shades=3)
+    return 1.14
+
+
 ITEMS = {
     "kunai": build_kunai,
     "wooden_sword": build_wooden_sword,
@@ -1734,6 +1862,12 @@ ITEMS = {
     "golden_bell_artifact": build_golden_bell_artifact,
     "wind_fan_artifact": build_wind_fan_artifact,
     "spring_mirror_artifact": build_spring_mirror_artifact,
+    "inner_sect_blade": build_inner_sect_blade,
+    "inner_sect_robe": build_inner_sect_robe,
+    "inner_sect_cap": build_inner_sect_cap,
+    "inner_sect_gloves": build_inner_sect_gloves,
+    "inner_sect_boots": build_inner_sect_boots,
+    "inner_sect_talisman": build_inner_sect_talisman,
 }
 
 

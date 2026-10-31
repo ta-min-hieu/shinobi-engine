@@ -277,6 +277,14 @@ mới = thêm dòng cùng PR (như luật GLOSSARY §4):
 | Yêu Nhân Hoang Vực (`wasteland_beast`) | Tu sĩ bị mạch chết làm biến dị ở rìa Hoang Vực — vùng linh mạch chết ngoài vòng luật lệ. Đệ tử ngoại môn bị cắt phần tài nguyên theo thứ hạng phải tự ra đây kiếm, và đó là lý do tường thuật của quãng Lv28–36 |
 | Trắc Trúc Cơ Thạch Nhân (`foundation_warden`) | Cùng dòng máy móc Linh Triều với `trial_construct` của khảo hạch Lv10, nhưng là cỗ tông môn dựng riêng cho kỳ khảo hạch Trúc Cơ — một bậc trên, và là đối thủ của nhịp ĐÓNG arc 2 |
 | Bộ "Trúc Cơ" (`foundation_*`, 6 món, Lv30) | Đồ tông môn cấp cho đệ tử sắp vào khảo hạch Trúc Cơ. Không bán ở Tàng Bảo Các: nó là ĐIỀU KIỆN CẦN của hai nhịp cuối, bán đi là cho phép mua đường tắt qua chính chuỗi quest dựng ra nó |
+| Trắc Nội Môn Thạch Nhân (`inner_trial_construct`) | Cùng dòng máy móc Linh Triều với hai cỗ khảo hạch trước — cỗ cuối cùng tông môn sửa lại, dành riêng cho kỳ khảo hạch nội môn (mở arc 3) |
+| Tế Đồ Trà Trộn (`blood_sand_infiltrator`) | Tế đồ Huyết Sa khoác áo đệ tử lẻn vào tông; trong người mang lịch khảo hạch mà chỉ hàng trưởng lão được xem — vật chứng của nội gián (twist arc 3, danh tính giữ tới arc 5) |
+| Bạch Kính Chi (`bach_kinh_chi`) | Đối thủ ở đại bỉ võ toàn tông — trận PvE scripted, mốc "phàm nhân vượt thiên tài" (§5) |
+| Đàn Chủ Huyết Sa — Tế Đàn (`blood_sand_altar_master`) | Đàn chủ dẫn toán tập kích lễ bỉ võ, bắt hạt giống Tử Phủ làm nhiên liệu cho tế đàn (cao trào arc 3) |
+| Bộ "Nội Môn" (`inner_sect_*`, 6 món, Lv37) | Y phục tông môn trao cho người qua khảo hạch nội môn — điều kiện cần của các trận sau, không bán ở Tàng Bảo Các |
+| Pháp bảo (ô ARTIFACT, ADR-127) | Pháp khí tự luyện ở Luyện Khí Đường, mang một thần thông nhỏ (khiên, hồi xuân, ngự phong) |
+| Trận pháp nhóm (ADR-128) | Đệ tử Thanh Hư học được cả 5 hệ (§4.1) nên đứng gần nhau là tự kết trận ngũ hành — càng đủ hệ càng vững |
+| Động phủ (ADR-129) | Đệ tử được khai một động phủ nhỏ bên một tiểu linh mạch; linh khí tụ lại thành linh thạch theo thời gian |
 | Chết → hồi sinh tại hub | Đệ tử mang **hộ mệnh ngọc** của tông: thân tan thì hồn về núi, tông môn tái tụ thân thể (tổn thất = rơi tu vi/đồ tuỳ cơ chế) |
 | Nhiệm vụ ngày | Công việc tông môn: gánh nước, tuần sơn, hái linh thảo, trông lò luyện đan |
 | Nhiệm vụ bang | Nhiệm vụ Đường/bang hội giao theo tuần |

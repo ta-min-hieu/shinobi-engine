@@ -37,8 +37,8 @@ class SafeZoneIntegrationTest {
 
     private static final int POSTGRES_PORT = 5432;
 
-    /** Số vùng world chính khai sau V49: tông môn + 6 trạm tiếp ứng (ADR-050 D5). */
-    private static final int EXPECTED_ZONE_COUNT = 7;
+    /** Số vùng world chính: tông môn + 6 trạm tiếp ứng (V49, ADR-050 D5) + trạm cổng nội môn @240 (V109, ADR-130). */
+    private static final int EXPECTED_ZONE_COUNT = 8;
 
     @Container
     static final PostgreSQLContainer POSTGRES =

@@ -89,6 +89,12 @@ class TownElderDialogueTreeTest {
                         "pill_run",
                         "proving",
                         "breakthrough",
+                        // ADR-130 (V109) — arc 3, chèn SAU `breakthrough`; ba mục sau lùi năm chỗ CÓ CHỦ ĐÍCH.
+                        "inner_exam",
+                        "forbidden_archive",
+                        "leaked_exam",
+                        "grand_contest",
+                        "altar_master",
                         // ADR-055 — nhiệm vụ ngày đứng CUỐI, ngay trước `end`: `end` lùi một chỗ là CÓ
                         // CHỦ ĐÍCH (`option_index` là VỊ TRÍ), ghim lại ngay tại đây.
                         "daily_duty",
@@ -254,6 +260,26 @@ class TownElderDialogueTreeTest {
         assertThat(node("breakthrough").options())
                 .extracting(DialogueOption::action)
                 .containsExactly("accept_quest:foundation_breakthrough", "about_town", "end");
+    }
+
+    @Test
+    @DisplayName("Năm nhánh arc 3 (ADR-130) nhận đúng năm mã quest theo đúng thứ tự chuỗi")
+    void innerSectBranchesOfferTheArcThreeQuests() {
+        assertThat(node("inner_exam").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:inner_sect_examination", "about_town", "end");
+        assertThat(node("forbidden_archive").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:forbidden_archive_glow", "about_town", "end");
+        assertThat(node("leaked_exam").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:leaked_examination", "about_town", "end");
+        assertThat(node("grand_contest").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:inner_sect_grand_contest", "about_town", "end");
+        assertThat(node("altar_master").options())
+                .extracting(DialogueOption::action)
+                .containsExactly("accept_quest:repel_the_altar_master", "about_town", "end");
     }
 
     /**

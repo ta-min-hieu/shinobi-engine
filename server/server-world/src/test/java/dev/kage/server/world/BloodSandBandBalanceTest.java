@@ -206,13 +206,13 @@ class BloodSandBandBalanceTest {
 
     /** Nền đất phải phủ hết điểm xa nhất — hằng số client, spawn ở DB, nên hai thứ đi cùng lượt. */
     @Test
-    @DisplayName("Nền đất nới 210 → 225 (V57) phủ hết cỗ khảo hạch @216 và còn biên 9m")
+    @DisplayName("Nền đất nới 225 → 305 (V109) phủ hết đàn chủ Huyết Sa @296 và còn biên 9m")
     void theGroundStripShouldCoverTheFurthestSpawn() {
         // Điểm xa nhất đổi lần nữa: V48 đặt cỗ khảo hạch Trúc Cơ ở @201, vượt qua quỷ đá @161.
         // Ô này CỐ Ý soi điểm xa nhất TOÀN trục chứ không soi riêng lát cắt nào — luật "nền đất
         // phải phủ hết spawn" từng bị vi phạm trong im lặng hai lần trước khi có nó.
-        float groundMaxX = 225f;
-        float furthestSpawnX = 216f; // V57 dời 201 → 216
+        float groundMaxX = 305f; // V109 (arc 3) nới 225 → 305
+        float furthestSpawnX = 296f; // V109 — đàn chủ Huyết Sa, điểm xa nhất mới
 
         assertThat(groundMaxX).isGreaterThan(furthestSpawnX);
         assertThat(groundMaxX - furthestSpawnX).isEqualTo(9f);
