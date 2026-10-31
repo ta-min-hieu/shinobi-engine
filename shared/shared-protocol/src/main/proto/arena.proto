@@ -115,3 +115,36 @@ message GetPvpRatingResponse {
   int32 wins = 2;
   int32 losses = 3;
 }
+
+// ADR-125 (2026-10-31) — luận võ đại hội. Giải tuần (mặc định Chủ nhật 20:00 giờ VN), đăng ký trong ngày, loại trực
+// tiếp: server tự mở trận đấu trường (cùng đường thách đấu ADR-051) cho từng cặp.
+
+// Command: Client -> Server (OPCODE_REGISTER_TOURNAMENT_COMMAND = 1612).
+message RegisterTournamentCommand {}
+
+enum TournamentRegisterOutcome {
+  TOURNAMENT_REGISTER_OUTCOME_UNSPECIFIED = 0;
+  TOURNAMENT_REGISTER_OUTCOME_OK = 1;
+  TOURNAMENT_REGISTER_OUTCOME_CLOSED = 2;              // không phải giờ đăng ký
+  TOURNAMENT_REGISTER_OUTCOME_ALREADY_REGISTERED = 3;
+  TOURNAMENT_REGISTER_OUTCOME_FULL = 4;
+  TOURNAMENT_REGISTER_OUTCOME_LEVEL_TOO_LOW = 5;
+}
+
+// Response: Server -> Client (OPCODE_REGISTER_TOURNAMENT_RESPONSE = 1613).
+message RegisterTournamentResponse {
+  TournamentRegisterOutcome outcome = 1;
+}
+
+enum TournamentNoticeKind {
+  TOURNAMENT_NOTICE_KIND_UNSPECIFIED = 0;
+  TOURNAMENT_NOTICE_KIND_MATCH = 1;      // gửi riêng: vòng {round} gặp {name}; name rỗng = được đi thẳng
+  TOURNAMENT_NOTICE_KIND_CHAMPION = 2;   // gửi cả server: {name} vô địch
+}
+
+// Event: Server -> Client (OPCODE_TOURNAMENT_NOTICE_EVENT = 1614).
+message TournamentNoticeEvent {
+  TournamentNoticeKind kind = 1;
+  int32 round = 2;
+  string name = 3;
+}

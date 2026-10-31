@@ -138,6 +138,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-122 — hỏi đáp tông môn: nhịp đồng hồ + chấm chat kênh thế giới; nối sau khi DB đã dựng. */
     final QuizHooks quiz = new QuizHooks();
 
+    /** ADR-125 — luận võ đại hội: nhịp điều khiển giải + kết quả trận đấu trường; nối sau khi DB đã dựng. */
+    final TournamentHooks tournament = new TournamentHooks();
+
     /** Bụi linh thảo (ADR-098) — trạng thái sẵn/hồi/đang hái, RAM, dùng chung mọi kết nối. */
     final HerbNodes herbNodes = new HerbNodes();
 

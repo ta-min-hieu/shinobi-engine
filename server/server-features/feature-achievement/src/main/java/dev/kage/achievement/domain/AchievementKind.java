@@ -6,6 +6,8 @@ public enum AchievementKind {
     CLAIM_QUESTS,
     WIN_DUELS,
     CHECK_IN,
+    /** ADR-125 — vô địch luận võ đại hội. */
+    WIN_TOURNAMENTS,
     /** So thẳng với cấp nhân vật — không có bộ đếm. */
     REACH_LEVEL;
 

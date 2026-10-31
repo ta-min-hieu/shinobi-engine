@@ -30,6 +30,9 @@ import dev.kage.crafting.application.CraftItemUseCase;
 import dev.kage.market.application.BuyOrderUseCase;
 import dev.kage.market.domain.BuyOrder;
 import dev.kage.market.domain.BuyOrderOutcome;
+import dev.kage.pvp.application.TournamentDirector;
+import dev.kage.pvp.domain.TournamentPort;
+import dev.kage.pvp.domain.TournamentRules;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.account.PostgresSecurityPinAdapter;
@@ -43,6 +46,7 @@ import dev.kage.server.database.market.PostgresBuyOrderAdapter;
 import dev.kage.server.database.market.PostgresMarketGoldAdapter;
 import dev.kage.server.database.market.PostgresMarketInventoryAdapter;
 import dev.kage.server.database.market.PostgresMarketRecordAdapter;
+import dev.kage.server.database.pvp.PostgresTournamentAdapter;
 import dev.kage.server.database.shop.PostgresMerchantAdapter;
 import dev.kage.server.database.world.PostgresEncounterAdapter;
 import dev.kage.server.database.world.PostgresSpiritFieldAdapter;
@@ -361,6 +365,78 @@ class Lot23IntegrationTest {
         assertThat(countOf(tamer, stonePet)).isEqualTo(1L);
         assertThat(scalar("SELECT COUNT(*) FROM audit_log WHERE character_id = ? AND action = 'TAME_MONSTER'", tamer))
                 .isEqualTo(1L);
+    }
+
+    @Test
+    void tournamentShouldRunAKnockoutOnRealTablesAndCrownTheLastOneStanding() {
+        long[] ids = {
+            character(account("tourneya"), "TourneyA1"),
+            character(account("tourneyb"), "TourneyB1"),
+            character(account("tourneyc"), "TourneyC1")
+        };
+        // Chủ nhật 08/11/2026: 10:00 và 20:00 giờ VN — tuần riêng của test này.
+        Instant morning = Instant.parse("2026-11-08T03:00:00Z");
+        Instant start = Instant.parse("2026-11-08T13:00:00Z");
+        TournamentDirector director = new TournamentDirector(
+                new PostgresTournamentAdapter(dataSource), TournamentRules.DEFAULT_SCHEDULE, 11L);
+        for (long id : ids) {
+            assertThat(director.register(id, 30, morning)).isEqualTo(TournamentPort.RegisterOutcome.OK);
+        }
+        assertThat(director.register(ids[0], 30, morning)).isEqualTo(TournamentPort.RegisterOutcome.ALREADY_REGISTERED);
+        List<long[]> duels = new java.util.ArrayList<>();
+        long[] champion = new long[1];
+        TournamentDirector.Arena arena = everyoneOnline(duels);
+        TournamentDirector.Announcer announcer = championInto(champion);
+
+        director.tick(start, arena, announcer);
+        director.tick(start.plusSeconds(15), arena, announcer);
+        assertThat(duels).hasSize(1);
+        director.onDuelSettled(duels.getFirst()[0], duels.getFirst()[1]);
+        director.tick(start.plusSeconds(30), arena, announcer);
+        director.tick(start.plusSeconds(45), arena, announcer);
+        assertThat(duels).hasSize(2);
+        director.onDuelSettled(duels.getLast()[1], duels.getLast()[0]);
+        director.tick(start.plusSeconds(60), arena, announcer);
+
+        assertThat(champion[0]).isEqualTo(duels.getLast()[1]);
+        TournamentPort.Tournament done = director.current(start);
+        assertThat(done.status()).isEqualTo(TournamentPort.Status.FINISHED);
+        assertThat(done.championId()).isEqualTo(champion[0]);
+        assertThat(scalar(
+                        "SELECT COUNT(*) FROM tournament_entry WHERE tournament_id = ? AND eliminated_round IS NULL",
+                        done.id()))
+                .isEqualTo(1L);
+    }
+
+    /** Đấu trường giả: ai cũng online, mọi trận mở được — ghi lại các cặp. */
+    private static TournamentDirector.Arena everyoneOnline(List<long[]> duels) {
+        return new TournamentDirector.Arena() {
+            @Override
+            public boolean online(long characterId) {
+                return true;
+            }
+
+            @Override
+            public boolean startDuel(long aId, long bId) {
+                duels.add(new long[] {aId, bId});
+                return true;
+            }
+
+            @Override
+            public void forfeit(long characterId) {}
+        };
+    }
+
+    private static TournamentDirector.Announcer championInto(long[] champion) {
+        return new TournamentDirector.Announcer() {
+            @Override
+            public void matchAssigned(long characterId, long opponentId, int round) {}
+
+            @Override
+            public void champion(long characterId) {
+                champion[0] = characterId;
+            }
+        };
     }
 
     @Test

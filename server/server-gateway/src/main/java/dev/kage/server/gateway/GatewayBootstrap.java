@@ -74,6 +74,9 @@ public final class GatewayBootstrap {
     private static final String QUIZ_TIMES_ENV = "KAGE_QUIZ_TIMES";
     private static final LocalTime DEFAULT_QUIZ_START = LocalTime.of(20, 0);
 
+    // ADR-125 — lịch luận võ đại hội "DAY HH:mm" (giờ VN); không đặt/hỏng ⇒ "SUNDAY 20:00".
+    private static final String TOURNAMENT_AT_ENV = "KAGE_TOURNAMENT_AT";
+
     private GatewayBootstrap() {}
 
     public static void main(String[] args) throws InterruptedException, SSLException {
@@ -319,6 +322,16 @@ public final class GatewayBootstrap {
                 java.time.Clock.systemUTC());
         guildWars.start();
         characterRegistry.guildAuctions.start(); // ADR-112 — dừng ở shutdownSequence
+        ExpansionJobs expansion = expansionJobs(facades, characterRegistry, worldGateway, mail);
+        return new BackgroundJobs(marketExpiry, spiritVeins, waypoints, guildWars, expansion);
+    }
+
+    /** Tác vụ nền lô 23 (ADR-115…126) — tách khỏi {@link #startBackgroundJobs} vì trần {@code MethodLength}. */
+    private static ExpansionJobs expansionJobs(
+            GatewayFacades facades,
+            ConnectedCharacterRegistry characterRegistry,
+            WorldGateway worldGateway,
+            MailFacade mail) {
         ExpansionJobs expansion = new ExpansionJobs();
         expansion.add(
                 ExpansionJobs.buyOrderRefunds(facades.progression().expansion().buyOrders(), mail, characterRegistry));
@@ -330,10 +343,18 @@ public final class GatewayBootstrap {
         characterRegistry.quiz.bind(new QuizHooks.Deps( // ADR-122 — hỏi đáp tông môn
                 facades.progression().expansion().quiz(), mail, characterRegistry, java.time.Clock.systemUTC()));
         expansion.add(characterRegistry.quiz.job());
+        characterRegistry.tournament.bind(new TournamentHooks.Deps( // ADR-125 — luận võ đại hội
+                facades.progression().expansion().tournament(),
+                worldGateway.arenaInstanceRegistry(),
+                characterRegistry,
+                new PlayerNotices(mail, characterRegistry),
+                facades.characterFacade(),
+                java.time.Clock.systemUTC()));
+        expansion.add(characterRegistry.tournament.job());
         expansion.add(DayNightJob.job( // ADR-123 — ngày đêm
                 worldGateway.mainWorldChannels(), characterRegistry, java.time.Clock.systemUTC()));
         expansion.start();
-        return new BackgroundJobs(marketExpiry, spiritVeins, waypoints, guildWars, expansion);
+        return expansion;
     }
 
     /**
@@ -589,11 +610,17 @@ public final class GatewayBootstrap {
                 databaseBootstrap.wireBuyOrderFacade(),
                 databaseBootstrap.wireConsumableFacade(),
                 databaseBootstrap.wireTravelingMerchantFacade(),
-                databaseBootstrap.wireSpiritFieldFacade(),
-                databaseBootstrap.wireEncounterFacade(),
-                databaseBootstrap.wireSectQuiz(dev.kage.chat.domain.QuizRules.parseStarts(
-                        System.getenv(QUIZ_TIMES_ENV), List.of(DEFAULT_QUIZ_START))),
-                databaseBootstrap.wireTamingFacade());
+                databaseBootstrap.expansion().wireSpiritFieldFacade(),
+                databaseBootstrap.expansion().wireEncounterFacade(),
+                databaseBootstrap
+                        .expansion()
+                        .wireSectQuiz(dev.kage.chat.domain.QuizRules.parseStarts(
+                                System.getenv(QUIZ_TIMES_ENV), List.of(DEFAULT_QUIZ_START))),
+                databaseBootstrap.expansion().wireTamingFacade(),
+                databaseBootstrap
+                        .expansion()
+                        .wireTournamentFacade(
+                                dev.kage.pvp.domain.TournamentRules.Schedule.parse(System.getenv(TOURNAMENT_AT_ENV))));
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */

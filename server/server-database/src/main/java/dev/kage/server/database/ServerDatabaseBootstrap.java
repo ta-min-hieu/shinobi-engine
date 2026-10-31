@@ -145,7 +145,6 @@ import dev.kage.server.database.character.PostgresSeclusionAdapter;
 import dev.kage.server.database.character.PostgresSkillRankAdapter;
 import dev.kage.server.database.chat.PostgresChatAuditAdapter;
 import dev.kage.server.database.chat.PostgresChatMuteAdapter;
-import dev.kage.server.database.chat.PostgresQuizAdapter;
 import dev.kage.server.database.checkin.PostgresActivityAdapter;
 import dev.kage.server.database.checkin.PostgresCheckInAdapter;
 import dev.kage.server.database.checkin.PostgresOnlineTimeAdapter;
@@ -234,10 +233,8 @@ import dev.kage.server.database.trade.PostgresTradeInventoryAdapter;
 import dev.kage.server.database.trade.PostgresTradeSessionAdapter;
 import dev.kage.server.database.world.PostgresConsumableAdapter;
 import dev.kage.server.database.world.PostgresDungeonQuotaAdapter;
-import dev.kage.server.database.world.PostgresEncounterAdapter;
 import dev.kage.server.database.world.PostgresHerbNodeAdapter;
 import dev.kage.server.database.world.PostgresSafeZoneAdapter;
-import dev.kage.server.database.world.PostgresSpiritFieldAdapter;
 import dev.kage.server.database.world.PostgresWaypointAdapter;
 import dev.kage.shop.api.ShopFacade;
 import dev.kage.shop.api.TravelingMerchantFacade;
@@ -257,9 +254,7 @@ import dev.kage.trade.application.TradePorts;
 import dev.kage.trade.application.TradeUseCases;
 import dev.kage.world.api.ConsumableFacade;
 import dev.kage.world.api.DungeonQuotaFacade;
-import dev.kage.world.api.EncounterFacade;
 import dev.kage.world.api.HerbNodeFacade;
-import dev.kage.world.api.SpiritFieldFacade;
 import dev.kage.world.api.WaypointFacade;
 import dev.kage.world.api.WorldGeometryFacade;
 
@@ -788,25 +783,9 @@ public final class ServerDatabaseBootstrap {
         return new TravelingMerchantFacade(new PostgresMerchantAdapter(dataSource));
     }
 
-    /** Linh điền (ADR-119). */
-    public SpiritFieldFacade wireSpiritFieldFacade() {
-        return new SpiritFieldFacade(new PostgresSpiritFieldAdapter(dataSource));
-    }
-
-    /** Thu phục yêu thú (ADR-124). */
-    public dev.kage.world.api.TamingFacade wireTamingFacade() {
-        return new dev.kage.world.api.TamingFacade(
-                new dev.kage.server.database.world.PostgresTamingAdapter(dataSource));
-    }
-
-    /** Kỳ ngộ (ADR-121). */
-    public EncounterFacade wireEncounterFacade() {
-        return new EncounterFacade(new PostgresEncounterAdapter(dataSource));
-    }
-
-    /** Hỏi đáp tông môn (ADR-122) — {@code starts} là giờ bắt đầu phiên theo giờ Việt Nam. */
-    public dev.kage.chat.api.SectQuiz wireSectQuiz(List<java.time.LocalTime> starts) {
-        return new dev.kage.chat.api.SectQuiz(new PostgresQuizAdapter(dataSource), starts, System.nanoTime());
+    /** Facade lô 23 phần 2–3 (linh điền, kỳ ngộ, hỏi đáp, thu phục, luận võ) — xem {@link ExpansionWiring}. */
+    public ExpansionWiring expansion() {
+        return new ExpansionWiring(dataSource);
     }
 
     /** Khoá an toàn — PIN cấp 2 (ADR-115). */

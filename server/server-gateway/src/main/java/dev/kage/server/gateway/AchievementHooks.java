@@ -65,6 +65,10 @@ final class AchievementHooks {
         count(characterId, AchievementKind.WIN_DUELS);
     }
 
+    void onTournamentWon(long characterId) {
+        count(characterId, AchievementKind.WIN_TOURNAMENTS);
+    }
+
     void onCheckedIn(long characterId) {
         count(characterId, AchievementKind.CHECK_IN);
     }

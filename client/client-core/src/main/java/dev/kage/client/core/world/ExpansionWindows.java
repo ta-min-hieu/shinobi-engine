@@ -24,7 +24,8 @@ record ExpansionWindows(
         EncounterCoordinator encounter,
         QuizCoordinator quiz,
         DayNightCoordinator dayNight,
-        TamingCoordinator taming) {
+        TamingCoordinator taming,
+        TournamentCoordinator tournament) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
@@ -57,7 +58,8 @@ record ExpansionWindows(
                 new EncounterCoordinator(encounterPanel, sender, feeds),
                 new QuizCoordinator(feeds.chat()),
                 new DayNightCoordinator(feeds.chat()),
-                new TamingCoordinator(sender, feeds));
+                new TamingCoordinator(sender, feeds),
+                new TournamentCoordinator(sender, feeds.chat()));
     }
 
     /** Đăng ký vào hub. */
@@ -72,6 +74,7 @@ record ExpansionWindows(
         panels.register(quiz);
         panels.register(dayNight);
         panels.register(taming);
+        panels.register(tournament);
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

@@ -51,6 +51,14 @@ final class Lot23WorldSteps {
                         p -> describe(GetTravelingMerchantResponse.parseFrom(p)));
             case "quiz" -> quiz.quiz(arg);
             case "beatTame" -> tameSteps.beatTame(arg);
+            case "tournament" ->
+                asker.ask(
+                        Opcode.OPCODE_REGISTER_TOURNAMENT_COMMAND_VALUE,
+                        dev.kage.protocol.RegisterTournamentCommand.getDefaultInstance(),
+                        Opcode.OPCODE_REGISTER_TOURNAMENT_RESPONSE_VALUE,
+                        p -> dev.kage.protocol.RegisterTournamentResponse.parseFrom(p)
+                                .getOutcome()
+                                .name());
             case "tame" ->
                 asker.ask(
                         Opcode.OPCODE_TAME_MONSTER_COMMAND_VALUE,

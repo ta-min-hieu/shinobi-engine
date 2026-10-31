@@ -868,6 +868,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.VerifySecurityPinCommand.parser(),
                             Opcode.OPCODE_VERIFY_SECURITY_PIN_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.securityPin().verify(id, c.getPin(), h.pinGate))),
+            // Lô 23 — luận võ đại hội (ADR-125).
+            Map.entry(
+                    Opcode.OPCODE_REGISTER_TOURNAMENT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.RegisterTournamentCommand.parser(),
+                            Opcode.OPCODE_REGISTER_TOURNAMENT_RESPONSE_VALUE,
+                            (h, id, c) -> h.worldGateway.registry().tournament.register(id))),
             // Lô 23 — thu phục yêu thú (ADR-124).
             Map.entry(
                     Opcode.OPCODE_TAME_MONSTER_COMMAND_VALUE,
