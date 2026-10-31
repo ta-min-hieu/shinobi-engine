@@ -408,3 +408,25 @@ message TribulationEvent {
   int32 wave = 2;
   int32 waves = 3;
 }
+
+// ADR-127 (2026-10-31) — pháp bảo. Command: Client -> Server (OPCODE_USE_ARTIFACT_COMMAND = 333): dùng chiêu của món
+// đang mặc ở ô pháp bảo — server tự đọc món đang mặc, giữ hồi chiêu.
+message UseArtifactCommand {}
+
+enum ArtifactOutcome {
+  ARTIFACT_OUTCOME_UNSPECIFIED = 0;
+  ARTIFACT_OUTCOME_OK = 1;
+  ARTIFACT_OUTCOME_NO_ARTIFACT = 2;
+  ARTIFACT_OUTCOME_COOLDOWN = 3;
+  ARTIFACT_OUTCOME_NOT_IN_WORLD = 4;
+}
+
+// Response: Server -> Client (OPCODE_USE_ARTIFACT_RESPONSE = 334). effect: "SHIELD" | "HEAL" | "SPEED";
+// cooldown_seconds = hồi chiêu đầy (OK) hoặc số giây còn lại (COOLDOWN).
+message UseArtifactResponse {
+  ArtifactOutcome outcome = 1;
+  string effect = 2;
+  int32 magnitude_percent = 3;
+  int32 duration_seconds = 4;
+  int32 cooldown_seconds = 5;
+}

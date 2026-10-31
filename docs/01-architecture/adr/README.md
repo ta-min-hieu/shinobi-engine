@@ -158,6 +158,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-124](ADR-124-Monster-Taming.md) | Thu phục yêu thú | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 | [ADR-125](ADR-125-Grand-Tournament.md) | Luận võ đại hội | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 | [ADR-126](ADR-126-Heavenly-Tribulation.md) | Thiên Kiếp | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
+| [ADR-127](ADR-127-Artifacts.md) | Pháp bảo | ✅ **Accepted** *(2026-10-31, lô 24)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

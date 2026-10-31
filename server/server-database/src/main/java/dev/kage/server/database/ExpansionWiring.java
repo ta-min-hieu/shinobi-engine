@@ -11,6 +11,7 @@ import dev.kage.pvp.application.TournamentDirector;
 import dev.kage.pvp.domain.TournamentRules;
 import dev.kage.server.database.chat.PostgresQuizAdapter;
 import dev.kage.server.database.pvp.PostgresTournamentAdapter;
+import dev.kage.server.database.world.PostgresArtifactAdapter;
 import dev.kage.server.database.world.PostgresEncounterAdapter;
 import dev.kage.server.database.world.PostgresSpiritFieldAdapter;
 import dev.kage.server.database.world.PostgresTamingAdapter;
@@ -48,6 +49,11 @@ public final class ExpansionWiring {
     /** Thu phục yêu thú (ADR-124). */
     public TamingFacade wireTamingFacade() {
         return new TamingFacade(new PostgresTamingAdapter(dataSource));
+    }
+
+    /** Pháp bảo (ADR-127). */
+    public dev.kage.world.api.ArtifactFacade wireArtifactFacade() {
+        return new dev.kage.world.api.ArtifactFacade(new PostgresArtifactAdapter(dataSource));
     }
 
     /** Thiên Kiếp (ADR-126). */

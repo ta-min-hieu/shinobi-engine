@@ -52,6 +52,7 @@ import dev.kage.server.database.market.PostgresMarketInventoryAdapter;
 import dev.kage.server.database.market.PostgresMarketRecordAdapter;
 import dev.kage.server.database.pvp.PostgresTournamentAdapter;
 import dev.kage.server.database.shop.PostgresMerchantAdapter;
+import dev.kage.server.database.world.PostgresArtifactAdapter;
 import dev.kage.server.database.world.PostgresEncounterAdapter;
 import dev.kage.server.database.world.PostgresSpiritFieldAdapter;
 import dev.kage.server.database.world.PostgresTamingAdapter;
@@ -59,6 +60,7 @@ import dev.kage.shop.api.TravelingMerchantFacade;
 import dev.kage.shop.domain.MerchantBuyOutcome;
 import dev.kage.shop.domain.MerchantStock;
 import dev.kage.shop.domain.MerchantVisit;
+import dev.kage.world.api.ArtifactFacade;
 import dev.kage.world.api.EncounterFacade;
 import dev.kage.world.api.SpiritFieldFacade;
 import dev.kage.world.api.TamingFacade;
@@ -478,6 +480,29 @@ class Lot23IntegrationTest {
         assertThat(broken.progress().level()).as("qua kiếp ⇒ lên cấp ngay").isGreaterThan(18);
         assertThat(broken.leveledUp()).isTrue();
         assertThat(tribulation.levelCap(cultivator)).isEqualTo(36);
+    }
+
+    @Test
+    void artifactsShouldCarryOneSkillEachAndBeForgeable() {
+        ArtifactFacade artifacts = new ArtifactFacade(new PostgresArtifactAdapter(dataSource));
+        long bell = templateOf("golden_bell_artifact");
+
+        assertThat(artifacts.skillOf(bell)).hasValueSatisfying(skill -> {
+            assertThat(skill.effect()).isEqualTo("SHIELD");
+            assertThat(skill.cooldownSeconds()).isEqualTo(60);
+        });
+        assertThat(artifacts.skillOf(templateOf("spring_mirror_artifact")).map(s -> s.effect()))
+                .hasValue("HEAL");
+        assertThat(artifacts.skillOf(templateOf("wind_fan_artifact")).map(s -> s.effect()))
+                .hasValue("SPEED");
+        assertThat(artifacts.skillOf(templateOf("spirit_ore")))
+                .as("món thường không có chiêu")
+                .isEmpty();
+        assertThat(scalar(
+                        "SELECT COUNT(*) FROM crafting_recipe WHERE kind = 'FORGE' AND output_item_template_id = ?",
+                        bell))
+                .isEqualTo(1L);
+        assertThat(artifacts.use(1L, Optional.of(bell), NOW)).isInstanceOf(ArtifactFacade.Use.Ready.class);
     }
 
     @Test

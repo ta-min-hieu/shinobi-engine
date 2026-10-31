@@ -868,6 +868,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.VerifySecurityPinCommand.parser(),
                             Opcode.OPCODE_VERIFY_SECURITY_PIN_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.securityPin().verify(id, c.getPin(), h.pinGate))),
+            // Lô 24 — pháp bảo (ADR-127).
+            Map.entry(
+                    Opcode.OPCODE_USE_ARTIFACT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.UseArtifactCommand.parser(),
+                            Opcode.OPCODE_USE_ARTIFACT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.artifacts().use(id, h.currentWorldFacadeIfPresent(id)))),
             // Lô 23 — Thiên Kiếp (ADR-126).
             Map.entry(
                     Opcode.OPCODE_START_TRIBULATION_COMMAND_VALUE,
@@ -5541,7 +5548,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_1, EquipmentSlotType.ACCESSORY_1,
             EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_2, EquipmentSlotType.ACCESSORY_2,
             EquipmentSlot.EQUIPMENT_SLOT_MOUNT, EquipmentSlotType.MOUNT,
-            EquipmentSlot.EQUIPMENT_SLOT_PET, EquipmentSlotType.PET);
+            EquipmentSlot.EQUIPMENT_SLOT_PET, EquipmentSlotType.PET,
+            EquipmentSlot.EQUIPMENT_SLOT_ARTIFACT, EquipmentSlotType.ARTIFACT);
 
     /** {@code null} nếu client gửi giá trị enum không hợp lệ (VD {@code UNSPECIFIED}/{@code UNRECOGNIZED}). */
     private static EquipmentSlotType toDomainSlot(EquipmentSlot slot) {

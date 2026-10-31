@@ -50,6 +50,7 @@ import dev.kage.server.world.component.NpcComponent;
 import dev.kage.server.world.component.SkillCooldownComponent;
 import dev.kage.server.world.component.SkillRankComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
+import dev.kage.server.world.component.StatusEffectType;
 import dev.kage.server.world.component.TargetComponent;
 
 /**
@@ -856,6 +857,11 @@ public final class WorldFacade {
         inbox.add(new WorldCommand.CaptureMonsterCommand(characterId, monsterId, rule, reply));
     }
 
+    /** ADR-127 — chiêu chủ động pháp bảo; người gọi (gateway) đã kiểm món đang mặc và hồi chiêu. */
+    public void applyArtifact(long characterId, ArtifactEffect effect, int magnitudePercent, float durationSeconds) {
+        inbox.add(new WorldCommand.ArtifactEffectCommand(characterId, effect, magnitudePercent, durationSeconds));
+    }
+
     /**
      * ADR-126 — một đợt lôi kích Thiên Kiếp: trừ {@code percentOfMax}% máu tối đa (ít nhất 1), tính là đang chiến
      * đấu (hồi máu ngoài chiến đấu không chạy giữa hai đợt), gục thì đi đúng đường gục của mọi nguồn sát thương khác.
@@ -1116,6 +1122,7 @@ public final class WorldFacade {
                 case WorldCommand.SpawnOnceCommand c -> spawnOnce(c);
                 case WorldCommand.CaptureMonsterCommand c -> c.reply().accept(handleCapture(c));
                 case WorldCommand.StrikeCharacterCommand c -> handleStrike(c.characterId(), c.percentOfMax());
+                case WorldCommand.ArtifactEffectCommand c -> handleArtifact(c);
                 case WorldCommand.SetNightCommand c -> {
                     night = c.night();
                     combatSystem.setMonsterDamagePercent(c.monsterDamagePercent());
@@ -1872,6 +1879,26 @@ public final class WorldFacade {
     }
 
     /** ADR-117 — một lựa chọn hồi sinh, trên tick thread. */
+    private void handleArtifact(WorldCommand.ArtifactEffectCommand command) {
+        KEntity entity = entitiesByCharacterId.get(command.characterId());
+        if (entity == null || HEALTH.get(entity).isDead()) {
+            return;
+        }
+        int maxHp = HEALTH.get(entity).max;
+        if (command.effect() == ArtifactEffect.HEAL) {
+            handleHealCharacter(command.characterId(), maxHp * command.magnitudePercent() / PERCENT);
+            return;
+        }
+        boolean shield = command.effect() == ArtifactEffect.SHIELD;
+        StatusEffects.applyEffect(
+                STATUS_EFFECT.get(entity),
+                shield ? StatusEffectType.SHIELD : StatusEffectType.MOVE_SPEED_MOD,
+                shield
+                        ? (float) maxHp * command.magnitudePercent() / PERCENT
+                        : (float) command.magnitudePercent() / PERCENT,
+                command.durationSeconds());
+    }
+
     private void handleStrike(long characterId, int percentOfMax) {
         KEntity entity = entitiesByCharacterId.get(characterId);
         if (entity == null || percentOfMax <= 0) {

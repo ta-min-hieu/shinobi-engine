@@ -87,6 +87,17 @@ final class Lot23WorldSteps {
             case "quiz" -> quiz.quiz(arg);
             case "beatTame" -> tameSteps.beatTame(arg);
             case "dokiep" -> tribulation(Integer.parseInt(arg));
+            case "artifact" ->
+                asker.ask(
+                        Opcode.OPCODE_USE_ARTIFACT_COMMAND_VALUE,
+                        dev.kage.protocol.UseArtifactCommand.getDefaultInstance(),
+                        Opcode.OPCODE_USE_ARTIFACT_RESPONSE_VALUE,
+                        p -> {
+                            dev.kage.protocol.UseArtifactResponse r =
+                                    dev.kage.protocol.UseArtifactResponse.parseFrom(p);
+                            return r.getOutcome().name() + " " + r.getEffect() + " " + r.getMagnitudePercent() + "% cd="
+                                    + r.getCooldownSeconds();
+                        });
             default -> field.step(verb, arg);
         };
     }

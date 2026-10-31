@@ -12,5 +12,7 @@ public enum EquipmentSlotType {
     /** Phi kiếm — chỉ tốc độ (ADR-070). */
     MOUNT,
     /** Linh thú — chỉ số tăng theo cấp linh thú (ADR-072). */
-    PET
+    PET,
+    /** Pháp bảo — chỉ số phẳng + một chiêu chủ động (ADR-127). */
+    ARTIFACT
 }

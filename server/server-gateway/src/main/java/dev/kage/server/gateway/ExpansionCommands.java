@@ -12,7 +12,8 @@ record ExpansionCommands(
         RevivalCommands revival,
         MerchantCommands merchant,
         SpiritFieldCommands spiritField,
-        TamingCommands taming) {
+        TamingCommands taming,
+        ArtifactCommands artifacts) {
 
     static ExpansionCommands of(GatewayFacades facades, WorldGateway worldGateway, NpcProximity proximity) {
         ExpansionFacades expansion = facades.progression().expansion();
@@ -33,6 +34,7 @@ record ExpansionCommands(
                         expansion.consumables(),
                         facades.characterFacade(),
                         new PlayerNotices(
-                                facades.contentFacades().socialFacades().mailFacade(), worldGateway.registry())));
+                                facades.contentFacades().socialFacades().mailFacade(), worldGateway.registry())),
+                new ArtifactCommands(expansion.artifacts(), facades.inventoryFacade(), clock));
     }
 }

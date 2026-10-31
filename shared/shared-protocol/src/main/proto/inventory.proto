@@ -31,6 +31,7 @@ enum EquipmentSlot {
   EQUIPMENT_SLOT_ACCESSORY_2 = 7;
   EQUIPMENT_SLOT_MOUNT = 8; // ADR-070 — phi kiếm, chỉ tốc độ
   EQUIPMENT_SLOT_PET = 9;   // ADR-072 — linh thú
+  EQUIPMENT_SLOT_ARTIFACT = 10;  // ADR-127 — pháp bảo
 }
 
 // Command: Client -> Server (OPCODE_EQUIP_ITEM_COMMAND). Mặc item_id (ID thật, KHÔNG phải vị trí

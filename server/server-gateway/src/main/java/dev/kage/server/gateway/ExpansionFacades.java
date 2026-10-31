@@ -6,6 +6,7 @@ import dev.kage.chat.api.SectQuiz;
 import dev.kage.market.api.BuyOrderFacade;
 import dev.kage.pvp.api.TournamentFacade;
 import dev.kage.shop.api.TravelingMerchantFacade;
+import dev.kage.world.api.ArtifactFacade;
 import dev.kage.world.api.ConsumableFacade;
 import dev.kage.world.api.EncounterFacade;
 import dev.kage.world.api.SpiritFieldFacade;
@@ -22,7 +23,8 @@ record ExpansionFacades(
         SectQuiz quiz,
         TamingFacade taming,
         TournamentFacade tournament,
-        TribulationFacade tribulation) {
+        TribulationFacade tribulation,
+        ArtifactFacade artifacts) {
 
     /** Composition không có các tính năng này (test). */
     static final ExpansionFacades DISABLED = new ExpansionFacades(
@@ -35,5 +37,6 @@ record ExpansionFacades(
             SectQuiz.DISABLED,
             TamingFacade.DISABLED,
             TournamentFacade.DISABLED,
-            TribulationFacade.DISABLED);
+            TribulationFacade.DISABLED,
+            ArtifactFacade.DISABLED);
 }

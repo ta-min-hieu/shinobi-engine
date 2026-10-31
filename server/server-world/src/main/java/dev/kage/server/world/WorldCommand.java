@@ -99,6 +99,10 @@ sealed interface WorldCommand {
             long characterId, long monsterId, CaptureRule rule, java.util.function.Consumer<CaptureResult> reply)
             implements WorldCommand {}
 
+    /** Pháp bảo (ADR-127): chiêu chủ động của pháp bảo đang mặc — gateway đã kiểm món + hồi chiêu. */
+    record ArtifactEffectCommand(long characterId, ArtifactEffect effect, int magnitudePercent, float durationSeconds)
+            implements WorldCommand {}
+
     /** Thiên Kiếp (ADR-126): một đợt lôi kích trừ {@code percentOfMax}% máu tối đa của nhân vật. */
     record StrikeCharacterCommand(long characterId, int percentOfMax) implements WorldCommand {}
 

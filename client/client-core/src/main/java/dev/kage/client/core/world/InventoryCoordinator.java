@@ -67,7 +67,8 @@ final class InventoryCoordinator implements WindowFlow {
             EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_1,
             EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_2,
             EquipmentSlot.EQUIPMENT_SLOT_MOUNT,
-            EquipmentSlot.EQUIPMENT_SLOT_PET);
+            EquipmentSlot.EQUIPMENT_SLOT_PET,
+            EquipmentSlot.EQUIPMENT_SLOT_ARTIFACT);
 
     private final InventoryController controller = new InventoryController();
     private final InventoryPanel panel;
@@ -544,7 +545,8 @@ final class InventoryCoordinator implements WindowFlow {
             EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_1, "equipment.slot.accessory_1",
             EquipmentSlot.EQUIPMENT_SLOT_ACCESSORY_2, "equipment.slot.accessory_2",
             EquipmentSlot.EQUIPMENT_SLOT_MOUNT, "equipment.slot.mount",
-            EquipmentSlot.EQUIPMENT_SLOT_PET, "equipment.slot.pet");
+            EquipmentSlot.EQUIPMENT_SLOT_PET, "equipment.slot.pet",
+            EquipmentSlot.EQUIPMENT_SLOT_ARTIFACT, "equipment.slot.artifact");
 
     private static String slotNameKey(EquipmentSlot slot) {
         // UNSPECIFIED/UNRECOGNIZED không xuất hiện ở đây — REAL_SLOTS đã lọc trước.

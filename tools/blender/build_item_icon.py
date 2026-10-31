@@ -1613,6 +1613,57 @@ def build_wasteland_wolf_pet():
     return 0.98
 
 
+BELL_GOLD = "#D4A93A"
+BELL_DARK = "#8C6A1E"
+FAN_LEAF = "#DCEFE3"
+FAN_RIB = "#3F7A5E"
+MIRROR_BRONZE = "#A6762F"
+MIRROR_FACE = "#7FC6E8"
+MIRROR_SHEEN = "#F2FBFF"
+
+
+def build_golden_bell_artifact():
+    """Kim Chung Tráo (ADR-127, khiên) — chuông VÀNG miệng loe + đai sẫm + quả lắc: hình chuông là cả thông điệp."""
+    bell = _prism_obj("Bell", [(-0.360, -0.320), (0.360, -0.320), (0.300, -0.220), (0.270, 0.050),
+                               (0.220, 0.240), (0.110, 0.330), (-0.110, 0.330), (-0.220, 0.240),
+                               (-0.270, 0.050), (-0.300, -0.220)], 0.120)
+    apply_toon(bell, BELL_GOLD, shades=3)
+    band = _box_obj("Band", 0.292, 0.040, 0.030, loc=(0.0, -0.100, -0.140))
+    apply_toon(band, BELL_DARK, shades=2)
+    knob = _box_obj("Knob", 0.060, 0.060, 0.060, loc=(0.0, 0.0, 0.390))
+    apply_toon(knob, BELL_DARK, shades=2)
+    clapper = _prism_obj("Clapper", _disc(0.070), 0.050, loc=(0.0, -0.020, -0.390))
+    apply_toon(clapper, BELL_DARK, shades=2)
+    return 1.05
+
+
+def build_wind_fan_artifact():
+    """Thanh Phong Phiến (ADR-127, tốc độ) — quạt xếp mở 120° lá NGỌC NHẠT, nan + cán xanh sẫm."""
+    leaf = _prism_obj("Leaf", _arc_band(0.520, 0.200, 30, 150, segments=16), 0.040,
+                      loc=(0.0, 0.0, -0.260), rot=_tilt(-12))
+    apply_toon(leaf, FAN_LEAF, shades=3)
+    sticks = _prism_obj("Sticks", _arc_band(0.200, 0.040, 30, 150, segments=10), 0.050,
+                        loc=(0.0, -0.010, -0.260), rot=_tilt(-12))
+    apply_toon(sticks, FAN_RIB, shades=2)
+    handle = _box_obj("Handle", 0.040, 0.040, 0.120, loc=(0.020, 0.0, -0.360), rot=_tilt(-12))
+    apply_toon(handle, FAN_RIB, shades=2)
+    return 1.12
+
+
+def build_spring_mirror_artifact():
+    """Hồi Xuân Kính (ADR-127, hồi máu) — gương ĐỒNG tròn mặt nước lam + vệt sáng, cán ngắn."""
+    rim = _prism_obj("Rim", _disc(0.330, segments=24), 0.060, loc=(0.0, 0.0, 0.080))
+    apply_toon(rim, MIRROR_BRONZE, shades=3)
+    face = _prism_obj("Face", _disc(0.260, segments=24), 0.030, loc=(0.0, -0.050, 0.080))
+    apply_toon(face, MIRROR_FACE, shades=3)
+    sheen = _prism_obj("Sheen", [(-0.180, 0.120), (-0.100, 0.200), (0.020, 0.080), (-0.060, 0.000)],
+                       0.010, loc=(0.0, -0.085, 0.080))
+    apply_toon(sheen, MIRROR_SHEEN, shades=2)
+    handle = _box_obj("Handle", 0.055, 0.050, 0.130, loc=(0.0, 0.0, -0.360))
+    apply_toon(handle, MIRROR_BRONZE, shades=2)
+    return 1.05
+
+
 ITEMS = {
     "kunai": build_kunai,
     "wooden_sword": build_wooden_sword,
@@ -1680,6 +1731,9 @@ ITEMS = {
     "spirit_turtle": build_spirit_turtle,
     "stone_spirit_pet": build_stone_spirit_pet,
     "wasteland_wolf_pet": build_wasteland_wolf_pet,
+    "golden_bell_artifact": build_golden_bell_artifact,
+    "wind_fan_artifact": build_wind_fan_artifact,
+    "spring_mirror_artifact": build_spring_mirror_artifact,
 }
 
 
