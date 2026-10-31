@@ -159,6 +159,13 @@ final class ProbeEventLine {
             case Opcode.OPCODE_EXIT_DUNGEON_RESPONSE_VALUE ->
                 Optional.of("outcome="
                         + ExitDungeonResponse.parseFrom(payload).getOutcome().name());
+            case Opcode.OPCODE_FORMATION_CHANGED_EVENT_VALUE -> { // ADR-128
+                dev.kage.protocol.FormationChangedEvent f = dev.kage.protocol.FormationChangedEvent.parseFrom(payload);
+                yield Optional.of("members=" + f.getMembers() + " tier="
+                        + f.getTier().name() + " factions="
+                        + f.getFactionsList() + " atk/def/res/hp=+" + f.getBonusAtk() + "/+" + f.getBonusDef() + "/+"
+                        + f.getBonusRes() + "/+" + f.getBonusHp());
+            }
             default -> Optional.empty();
         };
     }

@@ -430,3 +430,23 @@ message UseArtifactResponse {
   int32 duration_seconds = 4;
   int32 cooldown_seconds = 5;
 }
+
+// ADR-128 — bậc trận theo số linh căn khác nhau có mặt.
+enum FormationTier {
+  FORMATION_TIER_UNSPECIFIED = 0;
+  FORMATION_TIER_PLAIN = 1;          // 1–2 linh căn
+  FORMATION_TIER_THREE_TALENTS = 2;  // Tam Tài Trận: 3–4 linh căn
+  FORMATION_TIER_FIVE_ELEMENTS = 3;  // Ngũ Hành Trận: đủ 5
+}
+
+// Event: Server -> Client (OPCODE_FORMATION_CHANGED_EVENT = 1327). members = 0 ⇒ trận đã tan (mọi field khác rỗng).
+// bonus_* = chỉ số phẳng đang cộng từ trận.
+message FormationChangedEvent {
+  int32 members = 1;
+  repeated Faction factions = 2;
+  FormationTier tier = 3;
+  int32 bonus_atk = 4;
+  int32 bonus_def = 5;
+  int32 bonus_res = 6;
+  int32 bonus_hp = 7;
+}

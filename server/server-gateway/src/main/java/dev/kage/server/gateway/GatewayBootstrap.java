@@ -358,6 +358,13 @@ public final class GatewayBootstrap {
                 characterRegistry,
                 java.time.Clock.systemUTC()));
         expansion.add(characterRegistry.tribulation.job());
+        characterRegistry.formation.bind(new FormationHooks.Deps( // ADR-128 — trận pháp nhóm
+                facades.contentFacades().socialFacades().partyFacade(),
+                facades.characterFacade(),
+                WorldRouteLookup.of(worldGateway),
+                worldGateway.mainWorldChannels()::worldFacadeFor,
+                characterRegistry));
+        expansion.add(characterRegistry.formation.job());
         expansion.add(DayNightJob.job( // ADR-123 — ngày đêm
                 worldGateway.mainWorldChannels(), characterRegistry, java.time.Clock.systemUTC()));
         expansion.start();
@@ -756,16 +763,21 @@ public final class GatewayBootstrap {
                         .findById(characterId)
                         .map(character -> FactionMapping.toElement(character.faction()))
                         .orElse(Element.NONE));
-        characterRegistry.skillRanks.bindGuildBonus(characterId -> TribulationEffects.plus( // ADR-126
-                RefinementEffects.plus(
-                        BestiaryEffects.plus(
-                                RebirthEffects.plus(
-                                        GuildSkillEffects.bonusOf(
-                                                facades.progression().guildSkills(), characterId),
-                                        facades.progression().rebirth().rebirthCountOf(characterId)),
-                                facades.progression().collections().bestiary().bonusOf(characterId)),
-                        facades.progression().collections().refinement().wornBonusOf(characterId)),
-                facades.progression().expansion().tribulation().passed(characterId)));
+        characterRegistry.skillRanks.bindGuildBonus(characterId -> characterRegistry.formation.plus( // ADR-128
+                TribulationEffects.plus( // ADR-126
+                        RefinementEffects.plus(
+                                BestiaryEffects.plus(
+                                        RebirthEffects.plus(
+                                                GuildSkillEffects.bonusOf(
+                                                        facades.progression().guildSkills(), characterId),
+                                                facades.progression().rebirth().rebirthCountOf(characterId)),
+                                        facades.progression()
+                                                .collections()
+                                                .bestiary()
+                                                .bonusOf(characterId)),
+                                facades.progression().collections().refinement().wornBonusOf(characterId)),
+                        facades.progression().expansion().tribulation().passed(characterId)),
+                characterId));
     }
 
     private static java.util.List<Long> partyMembers(PartyFacade partyFacade, long characterId) {
