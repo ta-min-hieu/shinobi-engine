@@ -18,7 +18,7 @@ import dev.kage.tools.loadtest.GameConnection;
 /**
  * Bước thế giới lô 23: {@code awaitRevival:<giây>} (đứng yên chờ gục — in gói 321, kèm máu lúc hồi sinh nếu server tự
  * đưa về), {@code revive:<town|pill>} (in kết quả + gói hồi sinh 305), {@code merchant}, {@code
- * buyMerchant:<templateId>}.
+ * buyMerchant:<templateId>}; linh điền ở {@link Lot23FieldSteps}.
  */
 final class Lot23WorldSteps {
 
@@ -27,10 +27,12 @@ final class Lot23WorldSteps {
 
     private final GameConnection connection;
     private final Lot23Scenario.Asker asker;
+    private final Lot23FieldSteps field;
 
     Lot23WorldSteps(GameConnection connection, Lot23Scenario.Asker asker) {
         this.connection = connection;
         this.asker = asker;
+        this.field = new Lot23FieldSteps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -51,7 +53,7 @@ final class Lot23WorldSteps {
                                 .build(),
                         Opcode.OPCODE_BUY_FROM_MERCHANT_RESPONSE_VALUE,
                         p -> BuyFromMerchantResponse.parseFrom(p).getResult().name());
-            default -> "bước không hiểu";
+            default -> field.step(verb, arg);
         };
     }
 

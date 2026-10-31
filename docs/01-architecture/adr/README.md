@@ -150,6 +150,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-116](ADR-116-Market-Buy-Orders.md) | Cầu mua ở phường thị | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 | [ADR-117](ADR-117-Revive-In-Place.md) | Hồi sinh tại chỗ (Hồi Hồn Đan) | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 | [ADR-118](ADR-118-Traveling-Merchant.md) | Thương nhân du hành | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
+| [ADR-119](ADR-119-Spirit-Field.md) | Linh điền | ✅ **Accepted** *(2026-10-30, lô 23)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -39,10 +39,13 @@ import dev.kage.server.database.market.PostgresMarketGoldAdapter;
 import dev.kage.server.database.market.PostgresMarketInventoryAdapter;
 import dev.kage.server.database.market.PostgresMarketRecordAdapter;
 import dev.kage.server.database.shop.PostgresMerchantAdapter;
+import dev.kage.server.database.world.PostgresSpiritFieldAdapter;
 import dev.kage.shop.api.TravelingMerchantFacade;
 import dev.kage.shop.domain.MerchantBuyOutcome;
 import dev.kage.shop.domain.MerchantStock;
 import dev.kage.shop.domain.MerchantVisit;
+import dev.kage.world.api.SpiritFieldFacade;
+import dev.kage.world.domain.SpiritFieldPort;
 
 /** Lô 23 (ADR-115…126) trên PostgreSQL THẬT — một container cho cả lô. */
 @Testcontainers
@@ -241,5 +244,46 @@ class Lot23IntegrationTest {
                 .isEqualTo(780L);
         assertThat(merchant.buy(other, visit.id(), pill, during)).isEqualTo(MerchantBuyOutcome.SOLD_OUT);
         assertThat(merchant.active(start.plus(Duration.ofMinutes(31)))).isEmpty();
+    }
+
+    @Test
+    void spiritFieldShouldPlantRipenWaterHarvestAndUnlock() {
+        long owner = character(account("fieldowner"), "FieldOwnr");
+        long friend = character(account("fieldfriend"), "FieldFrnd");
+        long seed = templateOf("spirit_herb_seed");
+        long herb = templateOf("spirit_herb");
+        giveItem(owner, "spirit_herb_seed", 2, 40);
+        SpiritFieldFacade field = new SpiritFieldFacade(new PostgresSpiritFieldAdapter(dataSource));
+
+        assertThat(field.field(owner).plots()).isEqualTo(4);
+        assertThat(field.plant(owner, 0, seed, NOW)).isEqualTo(SpiritFieldPort.Outcome.OK);
+        assertThat(field.plant(owner, 0, seed, NOW)).isEqualTo(SpiritFieldPort.Outcome.PLOT_OCCUPIED);
+        assertThat(field.plant(owner, 4, seed, NOW)).isEqualTo(SpiritFieldPort.Outcome.INVALID_PLOT);
+        assertThat(field.plant(owner, 1, herb, NOW)).isEqualTo(SpiritFieldPort.Outcome.UNKNOWN_SEED);
+        assertThat(field.plant(owner, 1, seed, NOW)).isEqualTo(SpiritFieldPort.Outcome.OK);
+        assertThat(field.plant(owner, 2, seed, NOW)).isEqualTo(SpiritFieldPort.Outcome.NO_SEED);
+        assertThat(countOf(owner, seed)).isZero();
+
+        Instant half = NOW.plus(Duration.ofMinutes(30));
+        assertThat(field.harvest(owner, 0, half)).isEqualTo(SpiritFieldPort.Outcome.NOT_RIPE);
+        assertThat(field.water(friend, owner, 0, half)).isEqualTo(SpiritFieldPort.Outcome.OK);
+        assertThat(field.water(friend, owner, 0, half)).isEqualTo(SpiritFieldPort.Outcome.ALREADY_WATERED);
+        assertThat(field.water(friend, owner, 3, half)).isEqualTo(SpiritFieldPort.Outcome.PLOT_EMPTY);
+
+        Instant ripe = NOW.plus(Duration.ofMinutes(61));
+        assertThat(field.harvest(owner, 1, ripe)).isEqualTo(SpiritFieldPort.Outcome.OK);
+        assertThat(countOf(owner, herb)).isEqualTo(3L); // không ai tưới ⇒ đúng sản lượng gốc
+        assertThat(field.harvest(owner, 0, ripe)).isEqualTo(SpiritFieldPort.Outcome.OK);
+        assertThat(countOf(owner, herb)).isBetween(6L, 7L); // 3 × 1,1 ⇒ 3 hoặc 4
+        assertThat(field.harvest(owner, 0, ripe)).isEqualTo(SpiritFieldPort.Outcome.PLOT_EMPTY);
+        assertThat(field.field(owner).planted()).isEmpty();
+
+        setGold(owner, 999L);
+        assertThat(field.unlockPlot(owner)).isEqualTo(SpiritFieldPort.Outcome.INSUFFICIENT_GOLD);
+        setGold(owner, 1_000L);
+        assertThat(field.unlockPlot(owner)).isEqualTo(SpiritFieldPort.Outcome.OK);
+        assertThat(field.field(owner).plots()).isEqualTo(5);
+        assertThat(scalar("SELECT gold FROM character_stat WHERE character_id = ?", owner))
+                .isZero();
     }
 }

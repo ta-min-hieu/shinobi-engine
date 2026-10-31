@@ -15,7 +15,9 @@ record ExpansionWindows(
         ReportPanel revivalPanel,
         RevivalCoordinator revival,
         ReportPanel merchantPanel,
-        MerchantCoordinator merchant) {
+        MerchantCoordinator merchant,
+        ReportPanel fieldPanel,
+        SpiritFieldCoordinator field) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
@@ -25,6 +27,9 @@ record ExpansionWindows(
         ReportPanel revivalPanel = new ReportPanel(skin, "revive.title", Input.Keys.UNKNOWN, List.of());
         // Thương nhân du hành (ADR-118) — không phím, mở bằng lệnh chat /thuongnhan.
         ReportPanel merchantPanel = new ReportPanel(skin, "merchant.title", Input.Keys.UNKNOWN, List.of());
+        // Linh điền (ADR-119) — không phím, mở bằng lệnh chat /linhdien.
+        ReportPanel fieldPanel =
+                new ReportPanel(skin, "field.title", Input.Keys.UNKNOWN, SpiritFieldCoordinator.TAB_KEYS);
         return new ExpansionWindows(
                 new SecurityPinCoordinator(sender, feeds.chat()),
                 buyOrderPanel,
@@ -32,7 +37,9 @@ record ExpansionWindows(
                 revivalPanel,
                 new RevivalCoordinator(revivalPanel, sender),
                 merchantPanel,
-                new MerchantCoordinator(merchantPanel, sender, feeds));
+                new MerchantCoordinator(merchantPanel, sender, feeds),
+                fieldPanel,
+                new SpiritFieldCoordinator(fieldPanel, sender, feeds));
     }
 
     /** Đăng ký vào hub. */
@@ -41,6 +48,7 @@ record ExpansionWindows(
         panels.register(buyOrderPanel, buyOrders);
         panels.register(revivalPanel, revival);
         panels.register(merchantPanel, merchant);
+        panels.register(fieldPanel, field);
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */
