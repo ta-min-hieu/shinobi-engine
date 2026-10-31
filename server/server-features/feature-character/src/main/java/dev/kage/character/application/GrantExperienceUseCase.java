@@ -1,5 +1,7 @@
 package dev.kage.character.application;
 
+import java.util.function.LongToIntFunction;
+
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.CharacterPort;
 import dev.kage.character.domain.ExperienceCurve;
@@ -17,9 +19,17 @@ import dev.kage.character.domain.ExperienceProgress;
 public final class GrantExperienceUseCase {
 
     private final CharacterPort characterPort;
+    private final LongToIntFunction levelCapOf;
 
+    /** Không trần cảnh giới — mọi nhân vật lên tới {@link ExperienceCurve#MAX_LEVEL} (test, composition cũ). */
     public GrantExperienceUseCase(CharacterPort characterPort) {
+        this(characterPort, characterId -> ExperienceCurve.MAX_LEVEL);
+    }
+
+    /** ADR-126 — {@code levelCapOf} trả trần cấp theo số kiếp đã qua của nhân vật (chạm DB: Virtual Thread). */
+    public GrantExperienceUseCase(CharacterPort characterPort, LongToIntFunction levelCapOf) {
         this.characterPort = characterPort;
+        this.levelCapOf = levelCapOf;
     }
 
     /**
@@ -35,14 +45,15 @@ public final class GrantExperienceUseCase {
     public Result execute(long characterId, long amount) {
         Character character =
                 characterPort.findById(characterId).orElseThrow(() -> new CharacterNotFoundException(characterId));
-        ExperienceProgress before = ExperienceCurve.progressOf(character.exp());
+        int cap = levelCapOf.applyAsInt(characterId);
+        ExperienceProgress before = ExperienceCurve.progressOf(character.exp(), cap);
         if (amount <= 0L) {
             reconcileStoredLevel(characterId, character.level(), before.level(), character.exp());
             return new Result(before, false);
         }
 
         long expAfter = characterPort.addExperience(characterId, amount);
-        ExperienceProgress after = ExperienceCurve.progressOf(expAfter);
+        ExperienceProgress after = ExperienceCurve.progressOf(expAfter, cap);
         return new Result(after, raiseStoredLevel(characterId, character.level(), after.level(), expAfter));
     }
 
@@ -59,7 +70,7 @@ public final class GrantExperienceUseCase {
     public Result syncAfterExternalGrant(long characterId) {
         Character character =
                 characterPort.findById(characterId).orElseThrow(() -> new CharacterNotFoundException(characterId));
-        ExperienceProgress now = ExperienceCurve.progressOf(character.exp());
+        ExperienceProgress now = ExperienceCurve.progressOf(character.exp(), levelCapOf.applyAsInt(characterId));
         return new Result(now, raiseStoredLevel(characterId, character.level(), now.level(), character.exp()));
     }
 

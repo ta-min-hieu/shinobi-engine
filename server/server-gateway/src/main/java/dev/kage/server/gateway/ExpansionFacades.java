@@ -1,6 +1,7 @@
 package dev.kage.server.gateway;
 
 import dev.kage.account.api.SecurityPinFacade;
+import dev.kage.character.api.TribulationFacade;
 import dev.kage.chat.api.SectQuiz;
 import dev.kage.market.api.BuyOrderFacade;
 import dev.kage.pvp.api.TournamentFacade;
@@ -20,7 +21,8 @@ record ExpansionFacades(
         EncounterFacade encounters,
         SectQuiz quiz,
         TamingFacade taming,
-        TournamentFacade tournament) {
+        TournamentFacade tournament,
+        TribulationFacade tribulation) {
 
     /** Composition không có các tính năng này (test). */
     static final ExpansionFacades DISABLED = new ExpansionFacades(
@@ -32,5 +34,6 @@ record ExpansionFacades(
             EncounterFacade.DISABLED,
             SectQuiz.DISABLED,
             TamingFacade.DISABLED,
-            TournamentFacade.DISABLED);
+            TournamentFacade.DISABLED,
+            TribulationFacade.DISABLED);
 }

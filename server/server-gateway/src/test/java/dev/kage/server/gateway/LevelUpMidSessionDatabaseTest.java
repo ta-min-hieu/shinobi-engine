@@ -218,14 +218,18 @@ class LevelUpMidSessionDatabaseTest {
 
     // ---------------------------------------------------------------------------------------------
 
-    /** Lv49, thiếu đúng 1 EXP để lên Lv50, hệ Hỏa (chủ của {@link #ULTIMATE}), đứng tại {@code x}. */
+    /**
+     * Lv49, thiếu đúng 1 EXP để lên Lv50, hệ Hỏa (chủ của {@link #ULTIMATE}), đứng tại {@code x}. Đã qua 2 Thiên Kiếp
+     * (ADR-126 — trần 54) như mọi nhân vật thật ở cấp này, không thì trần cảnh giới giữ họ ở 18.
+     */
     private static void placeOneExpBelowGate(long characterId, float x) {
         long expAtGate = 0L;
         for (int level = 1; level < GATE_LEVEL; level++) {
             expAtGate += ExperienceCurve.expForNextLevel(level);
         }
         update(
-                "UPDATE character SET faction = 'HOA', level = ?, exp = ?, pos_x = ? WHERE id = ?",
+                "UPDATE character SET faction = 'HOA', tribulations_passed = 2, level = ?, exp = ?, pos_x = ?"
+                        + " WHERE id = ?",
                 GATE_LEVEL - 1,
                 expAtGate - 1L,
                 x,

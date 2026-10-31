@@ -50,6 +50,12 @@ public final class ExpansionWiring {
         return new TamingFacade(new PostgresTamingAdapter(dataSource));
     }
 
+    /** Thiên Kiếp (ADR-126). */
+    public dev.kage.character.api.TribulationFacade wireTribulationFacade() {
+        return new dev.kage.character.api.TribulationFacade(
+                new dev.kage.server.database.character.PostgresTribulationAdapter(dataSource));
+    }
+
     /** Luận võ đại hội (ADR-125) — {@code schedule} là ngày + giờ giải theo giờ Việt Nam. */
     public TournamentFacade wireTournamentFacade(TournamentRules.Schedule schedule) {
         return new TournamentFacade(

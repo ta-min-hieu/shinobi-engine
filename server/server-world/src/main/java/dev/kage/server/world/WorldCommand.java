@@ -99,6 +99,9 @@ sealed interface WorldCommand {
             long characterId, long monsterId, CaptureRule rule, java.util.function.Consumer<CaptureResult> reply)
             implements WorldCommand {}
 
+    /** Thiên Kiếp (ADR-126): một đợt lôi kích trừ {@code percentOfMax}% máu tối đa của nhân vật. */
+    record StrikeCharacterCommand(long characterId, int percentOfMax) implements WorldCommand {}
+
     /** Ngày đêm (ADR-123): đêm hay ngày + phần trăm sát thương đòn thường của quái lúc này. */
     record SetNightCommand(boolean night, int monsterDamagePercent) implements WorldCommand {}
 

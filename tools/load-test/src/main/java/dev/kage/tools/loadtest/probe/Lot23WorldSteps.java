@@ -49,8 +49,6 @@ final class Lot23WorldSteps {
                         GetTravelingMerchantRequest.getDefaultInstance(),
                         Opcode.OPCODE_GET_TRAVELING_MERCHANT_RESPONSE_VALUE,
                         p -> describe(GetTravelingMerchantResponse.parseFrom(p)));
-            case "quiz" -> quiz.quiz(arg);
-            case "beatTame" -> tameSteps.beatTame(arg);
             case "tournament" ->
                 asker.ask(
                         Opcode.OPCODE_REGISTER_TOURNAMENT_COMMAND_VALUE,
@@ -79,8 +77,68 @@ final class Lot23WorldSteps {
                                 .build(),
                         Opcode.OPCODE_BUY_FROM_MERCHANT_RESPONSE_VALUE,
                         p -> BuyFromMerchantResponse.parseFrom(p).getResult().name());
+            default -> lateSteps(verb, arg);
+        };
+    }
+
+    /** Bước lô 23 phần 2–3 — switch riêng để {@link #step} ở dưới trần độ phức tạp PMD. */
+    private String lateSteps(String verb, String arg) throws IOException {
+        return switch (verb) {
+            case "quiz" -> quiz.quiz(arg);
+            case "beatTame" -> tameSteps.beatTame(arg);
+            case "dokiep" -> tribulation(Integer.parseInt(arg));
             default -> field.step(verb, arg);
         };
+    }
+
+    /** ADR-126 — gửi /dokiep rồi in kết quả + mọi gói 332 trong {@code seconds} giây. */
+    private String tribulation(int seconds) throws IOException {
+        String outcome = asker.ask(
+                Opcode.OPCODE_START_TRIBULATION_COMMAND_VALUE,
+                dev.kage.protocol.StartTribulationCommand.getDefaultInstance(),
+                Opcode.OPCODE_START_TRIBULATION_RESPONSE_VALUE,
+                p -> {
+                    dev.kage.protocol.StartTribulationResponse r =
+                            dev.kage.protocol.StartTribulationResponse.parseFrom(p);
+                    return r.getOutcome().name() + " đợt=" + r.getWaves();
+                });
+        StringBuilder seen = new StringBuilder(outcome);
+        long deadline = System.currentTimeMillis() + seconds * MILLIS_PER_SECOND;
+        while (System.currentTimeMillis() < deadline) {
+            PacketCodec.Frame frame;
+            try {
+                frame = connection.readFrame();
+            } catch (SocketTimeoutException quiet) {
+                continue;
+            }
+            int opcode = frame.header().opcode();
+            if (opcode == Opcode.OPCODE_TRIBULATION_EVENT_VALUE) {
+                dev.kage.protocol.TribulationEvent e = dev.kage.protocol.TribulationEvent.parseFrom(frame.payload());
+                seen.append(" [")
+                        .append(e.getKind().name().replace("TRIBULATION_EVENT_KIND_", ""))
+                        .append(' ')
+                        .append(e.getWave())
+                        .append('/')
+                        .append(e.getWaves())
+                        .append(']');
+            } else if (opcode == Opcode.OPCODE_HEALTH_CHANGED_EVENT_VALUE) {
+                dev.kage.protocol.HealthChangedEvent h =
+                        dev.kage.protocol.HealthChangedEvent.parseFrom(frame.payload());
+                seen.append(" máu=").append(h.getCurrentHp()).append('/').append(h.getMaxHp());
+            } else if (opcode == Opcode.OPCODE_WORLD_CHANGED_EVENT_VALUE) {
+                seen.append(" [308 ")
+                        .append(dev.kage.protocol.WorldChangedEvent.parseFrom(frame.payload())
+                                .getWorldKind()
+                                .name())
+                        .append(']');
+            } else if (opcode == Opcode.OPCODE_EXPERIENCE_CHANGED_EVENT_VALUE) {
+                seen.append(" [EXP cấp=")
+                        .append(dev.kage.protocol.ExperienceChangedEvent.parseFrom(frame.payload())
+                                .getLevel())
+                        .append(']');
+            }
+        }
+        return seen.toString();
     }
 
     private String awaitRevival(int seconds) throws IOException {

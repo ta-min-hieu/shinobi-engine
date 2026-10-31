@@ -17,7 +17,8 @@ public final class PostgresRebirthAdapter implements RebirthPort {
     private static final String LOCK = "SELECT level, rebirth_count FROM character WHERE id = ? FOR UPDATE";
 
     private static final String REBIRTH =
-            "UPDATE character SET level = 1, exp = 0, rebirth_count = rebirth_count + 1 WHERE id = ?";
+            "UPDATE character SET level = 1, exp = 0, tribulations_passed = 0, rebirth_count = rebirth_count + 1"
+                    + " WHERE id = ?"; // ADR-126: chuyển thế là tu lại từ đầu, kể cả các kiếp
 
     private static final String COUNT = "SELECT rebirth_count FROM character WHERE id = ?";
 

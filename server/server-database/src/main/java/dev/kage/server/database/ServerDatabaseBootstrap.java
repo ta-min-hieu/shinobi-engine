@@ -328,7 +328,7 @@ public final class ServerDatabaseBootstrap {
                 listUseCase,
                 selectUseCase,
                 selectFactionUseCase,
-                new GrantExperienceUseCase(characterPort));
+                new GrantExperienceUseCase(characterPort, expansion().wireTribulationFacade()::levelCap)); // ADR-126
         return new CharacterFacade(useCases, characterPort);
     }
 

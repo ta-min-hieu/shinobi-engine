@@ -351,6 +351,13 @@ public final class GatewayBootstrap {
                 facades.characterFacade(),
                 java.time.Clock.systemUTC()));
         expansion.add(characterRegistry.tournament.job());
+        characterRegistry.tribulation.bind(new TribulationHooks.Deps( // ADR-126 — Thiên Kiếp
+                facades.progression().expansion().tribulation(),
+                facades.characterFacade(),
+                worldGateway.dungeonInstanceRegistry(),
+                characterRegistry,
+                java.time.Clock.systemUTC()));
+        expansion.add(characterRegistry.tribulation.job());
         expansion.add(DayNightJob.job( // ADR-123 — ngày đêm
                 worldGateway.mainWorldChannels(), characterRegistry, java.time.Clock.systemUTC()));
         expansion.start();
@@ -620,7 +627,8 @@ public final class GatewayBootstrap {
                 databaseBootstrap
                         .expansion()
                         .wireTournamentFacade(
-                                dev.kage.pvp.domain.TournamentRules.Schedule.parse(System.getenv(TOURNAMENT_AT_ENV))));
+                                dev.kage.pvp.domain.TournamentRules.Schedule.parse(System.getenv(TOURNAMENT_AT_ENV))),
+                databaseBootstrap.expansion().wireTribulationFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -747,13 +755,16 @@ public final class GatewayBootstrap {
                         .findById(characterId)
                         .map(character -> FactionMapping.toElement(character.faction()))
                         .orElse(Element.NONE));
-        characterRegistry.skillRanks.bindGuildBonus(characterId -> RefinementEffects.plus(
-                BestiaryEffects.plus(
-                        RebirthEffects.plus(
-                                GuildSkillEffects.bonusOf(facades.progression().guildSkills(), characterId),
-                                facades.progression().rebirth().rebirthCountOf(characterId)),
-                        facades.progression().collections().bestiary().bonusOf(characterId)),
-                facades.progression().collections().refinement().wornBonusOf(characterId)));
+        characterRegistry.skillRanks.bindGuildBonus(characterId -> TribulationEffects.plus( // ADR-126
+                RefinementEffects.plus(
+                        BestiaryEffects.plus(
+                                RebirthEffects.plus(
+                                        GuildSkillEffects.bonusOf(
+                                                facades.progression().guildSkills(), characterId),
+                                        facades.progression().rebirth().rebirthCountOf(characterId)),
+                                facades.progression().collections().bestiary().bonusOf(characterId)),
+                        facades.progression().collections().refinement().wornBonusOf(characterId)),
+                facades.progression().expansion().tribulation().passed(characterId)));
     }
 
     private static java.util.List<Long> partyMembers(PartyFacade partyFacade, long characterId) {

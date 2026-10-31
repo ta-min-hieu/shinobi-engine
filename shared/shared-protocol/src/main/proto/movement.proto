@@ -372,3 +372,39 @@ message TameMonsterResponse {
   int64 pet_item_template_id = 2;
   bool mailed = 3;
 }
+
+// ADR-126 (2026-10-31) — Thiên Kiếp. Tầng 9 của 5 cảnh giới đầu (cấp 18/36/54/72/90) là trần: muốn lên cảnh giới mới
+// phải độ kiếp trong một World riêng — sống qua mọi đợt lôi kích. Thua mất 10% EXP cấp kế; thắng lên cấp + chỉ số vĩnh viễn.
+
+// Command: Client -> Server (OPCODE_START_TRIBULATION_COMMAND = 330).
+message StartTribulationCommand {}
+
+enum TribulationOutcome {
+  TRIBULATION_OUTCOME_UNSPECIFIED = 0;
+  TRIBULATION_OUTCOME_OK = 1;
+  TRIBULATION_OUTCOME_NOT_READY = 2;        // chưa đứng ở trần hoặc EXP chưa đủ cho cấp kế
+  TRIBULATION_OUTCOME_ALREADY_IN_TRIAL = 3;
+  TRIBULATION_OUTCOME_BUSY = 4;             // đang ở hầm ngục/đấu trường
+}
+
+// Response: Server -> Client (OPCODE_START_TRIBULATION_RESPONSE = 331).
+message StartTribulationResponse {
+  TribulationOutcome outcome = 1;
+  int32 waves = 2;
+  int32 strike_percent = 3;
+  int32 interval_seconds = 4;
+}
+
+enum TribulationEventKind {
+  TRIBULATION_EVENT_KIND_UNSPECIFIED = 0;
+  TRIBULATION_EVENT_KIND_STRIKE = 1;
+  TRIBULATION_EVENT_KIND_PASSED = 2;
+  TRIBULATION_EVENT_KIND_FAILED = 3;
+}
+
+// Event: Server -> Client (OPCODE_TRIBULATION_EVENT = 332).
+message TribulationEvent {
+  TribulationEventKind kind = 1;
+  int32 wave = 2;
+  int32 waves = 3;
+}

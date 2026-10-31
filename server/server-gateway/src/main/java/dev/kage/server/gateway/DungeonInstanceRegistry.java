@@ -294,6 +294,29 @@ final class DungeonInstanceRegistry {
         return EnterOutcome.OK;
     }
 
+    /**
+     * ADR-126 — một World riêng cho đúng một người, KHÔNG có quái (đài Thiên Kiếp): cùng đường nhận/dời của tháp
+     * ({@code -characterId} làm khoá nhóm, nên không chung instance với ai), chết thì về world chính như mọi hầm ngục.
+     * Ai điều khiển những gì xảy ra bên trong là việc của người gọi.
+     */
+    EnterOutcome enterSolo(long characterId, String instanceCode) {
+        Optional<EnterOutcome> busy = busyElsewhere(characterId);
+        if (busy.isPresent()) {
+            return busy.get();
+        }
+        PendingEntry entry = new PendingEntry(characterId, loadoutOf(characterId), returnPositionOf(characterId));
+        Optional<AdmittedEntries> maybeAdmitted = admitBuildingWorldIfNeeded(-characterId, List.of(entry), world -> {});
+        if (maybeAdmitted.isEmpty()) {
+            return EnterOutcome.OK;
+        }
+        AdmittedEntries admitted = maybeAdmitted.get();
+        awaitOldWorldSilent(
+                CompletableFuture.allOf(admitted.mainWorldDrained().toArray(CompletableFuture[]::new)), characterId);
+        finishEnter(admitted, instanceCode, characterId);
+        resyncLevels(admitted);
+        return EnterOutcome.OK;
+    }
+
     /** Tầng tháp cần dựng: số tầng + loài + số con (đọc DB ngoài khoá, ở gateway). */
     record TowerFloorPlan(int floor, String monsterCode, int monsterCount) {}
 

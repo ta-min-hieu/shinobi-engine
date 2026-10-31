@@ -22,9 +22,12 @@ import org.testcontainers.utility.DockerImageName;
 
 import dev.kage.account.api.SecurityPinFacade;
 import dev.kage.account.domain.Account;
+import dev.kage.character.api.TribulationFacade;
+import dev.kage.character.application.GrantExperienceUseCase;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.Faction;
 import dev.kage.character.domain.NewCharacter;
+import dev.kage.character.domain.TribulationRules;
 import dev.kage.crafting.api.CraftingFacade;
 import dev.kage.crafting.application.CraftItemUseCase;
 import dev.kage.market.application.BuyOrderUseCase;
@@ -38,6 +41,7 @@ import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.account.PostgresSecurityPinAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
+import dev.kage.server.database.character.PostgresTribulationAdapter;
 import dev.kage.server.database.crafting.JdbcCraftingTransactionRunner;
 import dev.kage.server.database.crafting.PostgresCraftingWorkshopAdapter;
 import dev.kage.server.database.crafting.PostgresRecipeAdapter;
@@ -437,6 +441,43 @@ class Lot23IntegrationTest {
                 champion[0] = characterId;
             }
         };
+    }
+
+    @Test
+    void tribulationShouldCapTheLevelUntilPassedAndPenalizeWithoutDroppingBelowTheCap() {
+        long cultivator = character(account("tribulationone"), "TribuOne1");
+        TribulationFacade tribulation = new TribulationFacade(new PostgresTribulationAdapter(dataSource));
+        GrantExperienceUseCase experience =
+                new GrantExperienceUseCase(new PostgresCharacterAdapter(dataSource), tribulation::levelCap);
+        long beyondCap = TribulationRules.expToReach(20);
+
+        GrantExperienceUseCase.Result capped = experience.execute(cultivator, beyondCap);
+        assertThat(capped.progress().level()).as("chưa độ kiếp ⇒ đứng ở tầng 9").isEqualTo(18);
+        assertThat(capped.progress().totalExp()).isEqualTo(beyondCap);
+        assertThat(TribulationRules.ready(tribulation.passed(cultivator), beyondCap))
+                .isTrue();
+
+        tribulation.penalize(cultivator, 18);
+        assertThat(scalar("SELECT exp FROM character WHERE id = ?", cultivator))
+                .isEqualTo(beyondCap - TribulationRules.failPenalty(18));
+        tribulation.penalize(cultivator, 18);
+        tribulation.penalize(cultivator, 18);
+        tribulation.penalize(cultivator, 18);
+        tribulation.penalize(cultivator, 18);
+        tribulation.penalize(cultivator, 18);
+        assertThat(scalar("SELECT exp FROM character WHERE id = ?", cultivator))
+                .as("không tụt xuống dưới đầu cấp 18")
+                .isGreaterThanOrEqualTo(TribulationRules.expToReach(18));
+
+        experience.execute(cultivator, beyondCap);
+        assertThat(tribulation.advance(cultivator, 0)).isTrue();
+        assertThat(tribulation.advance(cultivator, 0))
+                .as("compare-and-set: lượt thứ hai trượt")
+                .isFalse();
+        GrantExperienceUseCase.Result broken = experience.syncAfterExternalGrant(cultivator);
+        assertThat(broken.progress().level()).as("qua kiếp ⇒ lên cấp ngay").isGreaterThan(18);
+        assertThat(broken.leveledUp()).isTrue();
+        assertThat(tribulation.levelCap(cultivator)).isEqualTo(36);
     }
 
     @Test

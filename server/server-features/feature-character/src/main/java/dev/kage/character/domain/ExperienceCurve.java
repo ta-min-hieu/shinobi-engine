@@ -48,9 +48,18 @@ public final class ExperienceCurve {
      * động đúng, kể cả EXP đã tích trước khi có hệ thống lên cấp này.
      */
     public static ExperienceProgress progressOf(long totalExp) {
+        return progressOf(totalExp, MAX_LEVEL);
+    }
+
+    /**
+     * Như {@link #progressOf(long)} nhưng không lên quá {@code levelCap} (ADR-126 — chưa độ kiếp thì đứng ở tầng 9):
+     * EXP vẫn giữ nguyên trong {@code totalExp}, phần dư dồn hết vào {@code expIntoLevel}.
+     */
+    public static ExperienceProgress progressOf(long totalExp, int levelCap) {
+        int cap = Math.min(MAX_LEVEL, Math.max(1, levelCap));
         long remaining = Math.max(0L, totalExp);
         int level = 1;
-        while (level < MAX_LEVEL && remaining >= expForNextLevel(level)) {
+        while (level < cap && remaining >= expForNextLevel(level)) {
             remaining -= expForNextLevel(level);
             level++;
         }

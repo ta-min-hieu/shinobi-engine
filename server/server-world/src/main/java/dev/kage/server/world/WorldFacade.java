@@ -97,6 +97,8 @@ public final class WorldFacade {
             ComponentMapper.getFor(StatusEffectComponent.class);
     private static final ComponentMapper<HealthComponent> HEALTH = ComponentMapper.getFor(HealthComponent.class);
     private static final int PERCENT = 100;
+    private static final ComponentMapper<CombatRecencyComponent> COMBAT_RECENCY =
+            ComponentMapper.getFor(CombatRecencyComponent.class);
     private static final ComponentMapper<ChiComponent> CHI = ComponentMapper.getFor(ChiComponent.class);
     private static final ComponentMapper<MoveIntentComponent> MOVE_INTENT =
             ComponentMapper.getFor(MoveIntentComponent.class);
@@ -855,6 +857,14 @@ public final class WorldFacade {
     }
 
     /**
+     * ADR-126 — một đợt lôi kích Thiên Kiếp: trừ {@code percentOfMax}% máu tối đa (ít nhất 1), tính là đang chiến
+     * đấu (hồi máu ngoài chiến đấu không chạy giữa hai đợt), gục thì đi đúng đường gục của mọi nguồn sát thương khác.
+     */
+    public void strikeCharacter(long characterId, int percentOfMax) {
+        inbox.add(new WorldCommand.StrikeCharacterCommand(characterId, percentOfMax));
+    }
+
+    /**
      * ADR-123 — báo world đang đêm hay ngày (gateway gửi định kỳ, chạy lại vô hại). Đêm: quái đánh đòn thường theo
      * {@code monsterDamagePercent}; điểm spawn {@code nightOnly} chỉ ra quái lúc đêm (ngày thì chờ, không hồi sinh).
      */
@@ -1105,6 +1115,7 @@ public final class WorldFacade {
                 case WorldCommand.SpawnBossCommand c -> spawnBossEntity(c);
                 case WorldCommand.SpawnOnceCommand c -> spawnOnce(c);
                 case WorldCommand.CaptureMonsterCommand c -> c.reply().accept(handleCapture(c));
+                case WorldCommand.StrikeCharacterCommand c -> handleStrike(c.characterId(), c.percentOfMax());
                 case WorldCommand.SetNightCommand c -> {
                     night = c.night();
                     combatSystem.setMonsterDamagePercent(c.monsterDamagePercent());
@@ -1861,6 +1872,25 @@ public final class WorldFacade {
     }
 
     /** ADR-117 — một lựa chọn hồi sinh, trên tick thread. */
+    private void handleStrike(long characterId, int percentOfMax) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        if (entity == null || percentOfMax <= 0) {
+            return;
+        }
+        HealthComponent health = HEALTH.get(entity);
+        if (health.isDead()) {
+            return;
+        }
+        int damage = (int) Math.max(1L, (long) health.max * percentOfMax / PERCENT);
+        health.current = Math.max(0, health.current - damage);
+        COMBAT_RECENCY.get(entity).secondsSinceCombat = 0f;
+        pendingHealthChanges.add(new HealthChange(characterId, health.current, health.max));
+        if (health.isDead()) {
+            outboundSink.onCharacterDefeated(characterId, 0L);
+            respawnOrHaltCorpse(characterId, 0L);
+        }
+    }
+
     private CaptureResult handleCapture(WorldCommand.CaptureMonsterCommand command) {
         KEntity monster = entitiesByMonsterId.get(command.monsterId());
         KEntity character = entitiesByCharacterId.get(command.characterId());
