@@ -55,6 +55,7 @@ NOT_IN_WORLD kèm hiệu ứng, độ lớn, thời lượng, hồi chiêu). `pr
    `artifact`, ba icon (`tools/blender/build_item_icon.py`).
 2. ✅ **Kiểm sống bằng gameProbe 2026-10-31** (DB dev lên V107; món cấp qua SQL thẳng vào ô ARTIFACT): Kagemaru mặc Kim
    Chung Tráo, `/phapbao` hai lần ⇒ `OK SHIELD 25% cd=60` rồi `COOLDOWN cd=59`. Benkei mặc Hồi Xuân Kính, vào Thiên Kiếp,
-   chịu đợt sét 1 (164 → 132) rồi `/phapbao` ⇒ `OK HEAL 30% cd=90` và gói 408 báo 164/164 ngay. Chưa kiểm sống khiên
-   hấp thụ đòn thật và tốc chạy của quạt (cùng đường `StatusEffect` mà skill đang dùng).
+   chịu đợt sét 1 (164 → 132) rồi `/phapbao` ⇒ `OK HEAL 30% cd=90` và gói 408 báo 164/164 ngay. **Bổ sung 2026-11-01**: Thanh Phong Phiến đo sống — đi 30 m không kích ~5,08 giây, kích `/phapbao` rồi đi ~3,62
+   giây (tỉ lệ 1,40 = +40%). Khiên hấp thụ đòn thật vẫn CHƯA quan sát được: probe kích trước khi đi bộ, khiên 10 giây hết
+   trước đòn quái đầu tiên — đường khiên dùng chung `StatusEffect` SHIELD của chiêu khiên đá (đã có test).
 3. ⚠️ Chủ dự án xem: toàn bộ con số ở D2 do AI chọn; chưa có nút chiêu pháp bảo trên HUD (mới có lệnh chat).

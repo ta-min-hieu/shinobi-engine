@@ -53,6 +53,6 @@ hội thoại mới. Schema: chỉ thêm dòng (V110).
    (kiểm đứng gần có hiệu lực). Thương nhân được job đặt @-3 (= trạm -5 + 2) sau nhịp đầu ⇒ nói chuyện ⇒ "xem hàng" ⇒
    1025. **Lỗi thật lộ ra khi kiểm**: `NpcProximity` chỉ biết NPC tĩnh, nên NPC động luôn "quá xa". Vá: sổ NPC động
    dùng chung ở `MainWorldChannelRegistry` (`placeDynamicNpc`/`removeDynamicNpc`/`dynamicNpcs`), `NpcProximity`
-   đọc cả sổ đó (test `shouldReachADynamicNpcOnlyWhileItIsPlaced`). Gỡ NPC khi hết lần ghé phủ bằng `DynamicNpcTest`,
-   chưa kiểm sống.
+   đọc cả sổ đó (test `shouldReachADynamicNpcOnlyWhileItIsPlaced`). Gỡ NPC khi hết lần ghé: **kiểm sống 2026-11-01** — lượt ghé còn 80 giây, người đứng cạnh trạm thấy thương nhân hiện
+   (giây 20, nhịp job) rồi `NPC_DESPAWNED` ở giây 80, đúng lúc hết lượt.
 3. ⚠️ Chủ dự án xem: vị trí @-11, lệch +2 m cạnh trạm; hai model chưa qua `runWorldPreview`.

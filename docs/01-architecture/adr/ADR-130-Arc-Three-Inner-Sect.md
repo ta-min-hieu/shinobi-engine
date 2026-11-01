@@ -65,7 +65,9 @@ Bộ Nội Môn: công 70 · thủ 60 · kháng 48 · máu 150 (6 món), không 
    trong 5 nhát, mất 87/479 máu ⇒ báo Chu Hoành ⇒ lĩnh: +9.000 EXP (Cấp 42 → 44) + đủ 6 món bộ Nội Môn ⇒ quest 22 mở và
    nhận được. **Lỗi thật lộ ra khi kiểm**: `WorldConstants.MAIN_WORLD_MAX_X` vẫn là 210 từ dòng 67(c) trong khi V57
    nới nền client lên 225 và dời cỗ khảo hạch Trúc Cơ sang @216 — người chơi bị chặn cách trận đóng arc 2 sáu mét. Đã
-   nới biên server lên 305 (= nền đất mới), ghim ở `MainWorldBoundsTest`. Quest 22–25 chưa đi hết bằng probe (cùng
-   khuôn kill→báo NPC, đã phủ bằng `QuestStateMachinePropertyIntegrationTest`).
+   nới biên server lên 305 (= nền đất mới), ghim ở `MainWorldBoundsTest`. **Bổ sung 2026-11-01 — đi TRỌN quest 22–25 bằng probe** (Kagemaru mặc bộ Nội Môn): 2 thạch vệ → lĩnh → nhận 23;
+   3 tế đồ trà trộn (mỗi con 35 sát thương/nhát lên người chơi) → lĩnh → nhận 24; Bạch Kính Chi 450 máu hạ trong 6 nhát,
+   mất 7 × 39 = 273 máu → báo sư tỷ → lĩnh → nhận 25; đàn chủ 480 máu hạ, còn 316 máu → lĩnh. Kết thúc ở **đúng Cấp 54**
+   (trần Thiên Kiếp kế tiếp) — chuỗi arc 3 đưa người chơi tới đúng mốc độ kiếp.
 3. ⚠️ Chủ dự án xem: toàn bộ con số + lời thoại do AI soạn; 4 model quái là bản đầu chưa qua `runWorldPreview`; EXP
    5 quest (58.000) không nhắm "lĩnh xong đứng đúng Cấp 54" như arc 2 — trần Thiên Kiếp ở 54 đã giữ cấp.
