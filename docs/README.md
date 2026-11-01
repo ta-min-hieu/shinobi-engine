@@ -2,7 +2,7 @@
 
 MMORPG **tu tiên** side-view 2.5D ([ADR-038](01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md), 2026-09-01 — trước đó là bối cảnh ninja, cơ chế không đổi) bằng **Java 25 + libGDX + HyperLap2D** (client) và **Netty + PostgreSQL + Redis** (server). Kiến trúc Hybrid: Clean/Hexagonal cho nghiệp vụ, ECS + Data-Oriented cho gameplay realtime, Event-Driven giữa các hệ thống.
 
-> **Trạng thái hiện tại (2026-09-03)**: **Phase 0–9 đã đạt Exit Criteria**, dự án đang ở **Phase 10 — Release** (checklist thật ở [ROADMAP.md](11-process/ROADMAP.md)). Bộ docs này vẫn là nguồn thiết kế gốc ([Điều 35](00-governance/KAGE-CONSTITUTION.md)) — code phải khớp docs, lệch thì báo cáo mâu thuẫn (§14 [/CLAUDE.md](../CLAUDE.md)), không tự chọn bên nào.
+> **Trạng thái hiện tại (2026-11-01)**: **Phase 0–9 đã đạt Exit Criteria**, dự án đang ở **Phase 10 — Release** (checklist thật ở [ROADMAP.md](11-process/ROADMAP.md)); từ 2026-10-10 nội dung đi theo **lô tính năng** chủ dự án chọn (lô 9–26, ADR-052…142, migration tới V115 — mục lục ở ROADMAP mục 81, bảng thật ở [adr/README.md](01-architecture/adr/README.md)). Bộ docs này vẫn là nguồn thiết kế gốc ([Điều 35](00-governance/KAGE-CONSTITUTION.md)) — code phải khớp docs, lệch thì báo cáo mâu thuẫn (§14 [/CLAUDE.md](../CLAUDE.md)), không tự chọn bên nào.
 >
 > *(Ghi chú lịch sử — **Cập nhật 2026-07-22**: Phase 0–4 đã code xong, đạt Exit Criteria — foundation, engine core, network, character/map/movement, combat/skill/monster (kể cả script sandbox GraalJS thật, [ADR-016](01-architecture/adr/ADR-016-Scripting-Engine.md)). Lúc đó đang ở Phase 5 — Inventory · Equipment · Shop.)*
 

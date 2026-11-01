@@ -3282,3 +3282,11 @@ Sáu ADR mới so với lần đếm trước (2026-08-07):
       tới nơi **150** máu, đàn chủ tới nơi **147**, cả hai biên **+2**. Phần hành quân của lát này sau
       đó được ADR-050 viết lại, và đã chạy lại trọn trong ô "Arc 2 khép ở Lv36" (Exit Criteria v1).
 
+81. **CÁC LÔ TÍNH NĂNG 9–26 (2026-10-10 → 2026-11-01) — mục lục, KHÔNG nhật ký chi tiết** (rà tài liệu mục lô 26:
+    nhật ký này dừng ở mục 80 suốt sáu tuần trong khi dự án đi thêm 18 lô). Từ 2026-10-10 dự án chạy theo LÔ: chủ dự
+    án chọn một bộ mục qua MỘT lượt hỏi, mỗi tính năng một ADR "Accepted (chủ dự án chọn …)", `check` toàn repo xanh,
+    kiểm sống bằng `gameProbe`, rồi push lên master. Chi tiết từng lô sống ở **ADR tương ứng** (mục "Kiểm chứng") và
+    bảng [adr/README.md](../01-architecture/adr/README.md) — không chép lại ở đây. Mốc nội dung lớn: arc 3 Nội Môn
+    (lô 24, ADR-130), arc 4 Hạ Sơn / Kim Đan Lv55–72 (lô 25, ADR-139, trục chính dài tới x=417), PvP Hoang Vực + sát
+    khí (ADR-137/142). Migration mới nhất: **V115**. Exit Criteria hình thức của Phase 10 vẫn CHƯA có (mục 22) — các lô
+    là nội dung, không phải bước Beta→RC→Production.
