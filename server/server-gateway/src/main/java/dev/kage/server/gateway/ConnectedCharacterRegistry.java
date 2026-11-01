@@ -124,6 +124,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-102 — ảnh chụp ai đang chiến với ai (luật PvP của world chính) + đếm lần hạ; nối sau khi DB đã dựng. */
     final GuildWarHooks guildWars = new GuildWarHooks();
 
+    /** ADR-142 — sát khí: cộng điểm khi hạ người trong dải PvP, Ma Đầu rơi vàng; nối sau khi DB đã dựng. */
+    final KillingIntentHooks killingIntent = new KillingIntentHooks();
+
     /** ADR-112 — mở lô đấu giá khi boss Bí Cảnh chết + nhịp chốt/gửi thư; nối sau khi DB đã dựng. */
     final GuildAuctionHooks guildAuctions = new GuildAuctionHooks();
 
@@ -392,6 +395,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setFaction(appearance.faction())
                 .setCostumeTier(appearance.costumeTier())
                 .setLevel(appearance.level())
+                .setOutlaw(killingIntent.isOutlaw(spawnedCharacterId)) // ADR-142
                 .build();
         send(ctx, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE, 0, event.toByteArray());
     }
@@ -600,6 +604,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setFaction(appearance.faction())
                 .setCostumeTier(appearance.costumeTier())
                 .setLevel(appearance.level())
+                .setOutlaw(killingIntent.isOutlaw(changedCharacterId))
                 .build();
         send(ctx, Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE, 0, event.toByteArray());
     }
@@ -614,6 +619,11 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     public void onCharacterDefeated(long defeatedCharacterId, long killerEntityId) {
         // Hồi sinh: WorldFacade tự gọi onCharacterRespawned, xem javadoc phía trên. Ở đây chỉ đếm bang chiến (ADR-102).
         guildWars.onCharacterDefeated(defeatedCharacterId, killerEntityId);
+        killingIntent.onCharacterDefeated(
+                defeatedCharacterId,
+                killerEntityId,
+                Optional.ofNullable(lastKnownPosition.get(defeatedCharacterId)),
+                guildWars.roster); // ADR-142
     }
 
     @Override

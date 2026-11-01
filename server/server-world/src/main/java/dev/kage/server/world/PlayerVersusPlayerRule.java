@@ -15,4 +15,12 @@ public interface PlayerVersusPlayerRule {
 
     /** {@code attackerCharacterId} được đánh/dùng chiêu ENEMY lên {@code targetCharacterId}. */
     boolean allows(long attackerCharacterId, long targetCharacterId);
+
+    /**
+     * ADR-142 — {@code targetCharacterId} là Ma Đầu (sát khí cao): trong dải PvP tự do, trạm an toàn KHÔNG che họ nữa
+     * (lính trạm không cho ma đầu nương náu). Mặc định không ai.
+     */
+    default boolean isHunted(long targetCharacterId) {
+        return false;
+    }
 }

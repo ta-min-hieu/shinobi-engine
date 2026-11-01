@@ -261,6 +261,7 @@ public final class GatewayBootstrap {
             ctx.jobs().waypoints().stop();
             ctx.jobs().guildWars().stop();
             ctx.characterRegistry().guildWars.stop();
+            ctx.characterRegistry().killingIntent.stop();
             ctx.characterRegistry().activity.stop();
             ctx.characterRegistry().collections.stop();
             ctx.characterRegistry().guildAuctions.stop();
@@ -370,10 +371,27 @@ public final class GatewayBootstrap {
                 worldGateway.mainWorldChannels()::worldFacadeFor,
                 characterRegistry));
         expansion.add(characterRegistry.formation.job());
+        expansion.add(bindKillingIntent(facades, characterRegistry, worldGateway)); // ADR-142 — sát khí
         expansion.add(DayNightJob.job( // ADR-123 — ngày đêm
                 worldGateway.mainWorldChannels(), characterRegistry, java.time.Clock.systemUTC()));
         expansion.start();
         return expansion;
+    }
+
+    /** ADR-142 — nối sát khí (dải PvP của world chính đọc một lần) và trả nhịp làm mới ảnh chụp Ma Đầu. */
+    private static ExpansionJobs.Job bindKillingIntent(
+            GatewayFacades facades, ConnectedCharacterRegistry characterRegistry, WorldGateway worldGateway) {
+        characterRegistry.killingIntent.bind(new KillingIntentHooks.Deps(
+                facades.progression().expansion().killingIntent(),
+                facades.characterFacade(),
+                facades.progression()
+                        .adventure()
+                        .geometry()
+                        .listPvpZones(dev.kage.world.domain.SafeZone.MAIN_WORLD_CODE),
+                characterRegistry,
+                WorldRouteLookup.of(worldGateway),
+                java.time.Clock.systemUTC()));
+        return characterRegistry.killingIntent.job();
     }
 
     /**
@@ -532,7 +550,8 @@ public final class GatewayBootstrap {
         WorldFacade firstChannelFacade = new WorldFacade(
                 characterRegistry, true, new MicrometerTickMetricsPort(meterRegistry, WORLD_TAG_MAIN), worldContent);
         // ADR-102 D2 — luật PvP theo cặp (bang chiến) cho world chính; khu vực mở thêm nối ở MainWorldChannelRegistry.
-        firstChannelFacade.usePlayerVersusPlayerRule(characterRegistry.guildWars.roster);
+        firstChannelFacade.usePlayerVersusPlayerRule(
+                characterRegistry.killingIntent.ruleWith(characterRegistry.guildWars.roster)); // + ADR-142
         firstChannelFacade.useEscortListener(characterRegistry.escorts::onChanged); // ADR-114
         firstChannelFacade.useRevivalListener(RevivalCommands.listener(characterRegistry)); // ADR-117
         firstChannelFacade.start();
@@ -643,7 +662,8 @@ public final class GatewayBootstrap {
                                 dev.kage.pvp.domain.TournamentRules.Schedule.parse(System.getenv(TOURNAMENT_AT_ENV))),
                 databaseBootstrap.expansion().wireTribulationFacade(),
                 databaseBootstrap.expansion().wireArtifactFacade(),
-                databaseBootstrap.expansion().wireCaveFacade());
+                databaseBootstrap.expansion().wireCaveFacade(),
+                databaseBootstrap.expansion().wireKillingIntentFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */

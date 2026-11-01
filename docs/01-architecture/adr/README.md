@@ -173,6 +173,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-139](ADR-139-Arc-Four-Descend-The-Mountain.md) | Nội dung arc 4 — Hạ Sơn (Kim Đan, Lv55–72) | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
 | [ADR-140](ADR-140-Overhead-Realm-Title.md) | Danh hiệu cảnh giới trên đầu | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
 | [ADR-141](ADR-141-Zone-Map-HUD-And-Wasteland-Waypoints.md) | Biển vùng PvP trên HUD (338/339, click nhắm trong dải) + 3 trạm truyền tống 240/304/368 (V114) | ✅ **Accepted** *(2026-11-01, lô 26)* | — |
+| [ADR-142](ADR-142-Killing-Intent-And-Outlaws.md) | Sát khí + Ma Đầu: trạm giữa dải PvP không che, cấm truyền tống, chết rơi 10% vàng (V115, cờ `outlaw` 303/307) | ✅ **Accepted** *(2026-11-01, lô 26)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

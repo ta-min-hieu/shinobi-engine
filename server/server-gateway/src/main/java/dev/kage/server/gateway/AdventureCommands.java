@@ -40,7 +40,8 @@ final class AdventureCommands {
             CharacterFacade characters,
             InventoryFacade inventory,
             MainWorldRelocation relocation,
-            LongPredicate outsideMainWorld) {}
+            LongPredicate outsideMainWorld,
+            LongPredicate outlaw) {}
 
     private final Deps deps;
 
@@ -56,7 +57,8 @@ final class AdventureCommands {
                 new MainWorldRelocation(
                         worldGateway.mainWorldChannels(), worldGateway.registry(), facades.characterFacade()),
                 id -> worldGateway.dungeonInstanceRegistry().isInDungeon(id)
-                        || worldGateway.arenaInstanceRegistry().isInDuel(id)));
+                        || worldGateway.arenaInstanceRegistry().isInDuel(id),
+                worldGateway.registry().killingIntent::isOutlaw)); // ADR-142 — Ma Đầu không được truyền tống
     }
 
     ListWaypointsResponse waypoints(long characterId) {
@@ -99,6 +101,8 @@ final class AdventureCommands {
             outcome = TeleportOutcome.TELEPORT_OUTCOME_NOT_UNLOCKED;
         } else if (deps.outsideMainWorld().test(characterId)) {
             outcome = TeleportOutcome.TELEPORT_OUTCOME_NOT_IN_MAIN_WORLD;
+        } else if (deps.outlaw().test(characterId)) {
+            outcome = TeleportOutcome.TELEPORT_OUTCOME_OUTLAW;
         } else if (!waypoints.consumeTalisman(characterId)) {
             outcome = TeleportOutcome.TELEPORT_OUTCOME_NO_TALISMAN;
         } else {

@@ -154,6 +154,62 @@ class PlayerVersusPlayerRuleTest {
         assertThat(hitsBy(ATTACKER)).isEmpty();
     }
 
+    /** ADR-142 — Ma Đầu đứng trong trạm an toàn GIỮA dải PvP: trạm không che họ, đòn vẫn ra. */
+    @Test
+    void shouldLetAnyoneStrikeAHuntedOutlaw_insideASafePostWithinThePvpRange() {
+        startOutlawPostWorld(true);
+
+        world.setTarget(ATTACKER, VICTIM);
+        world.attack(ATTACKER);
+
+        awaitTrue(() -> !hitsBy(ATTACKER).isEmpty());
+    }
+
+    /** ADR-142 — cùng chỗ đó, người thường (không bị truy) vẫn được trạm che. */
+    @Test
+    void shouldStillShelterAnOrdinaryPlayer_insideASafePostWithinThePvpRange() {
+        startOutlawPostWorld(false);
+
+        world.setTarget(ATTACKER, VICTIM);
+        world.attack(ATTACKER);
+        sleepQuietly(SETTLE_MILLIS);
+
+        assertThat(hitsBy(ATTACKER)).isEmpty();
+    }
+
+    /** Dải PvP [20, 46] với trạm an toàn [30, 36] ở giữa; hai người đứng trong trạm. */
+    private void startOutlawPostWorld(boolean victimHunted) {
+        WorldContentCatalog content = new WorldContentCatalog(
+                MonsterCatalogSnapshot.EMPTY,
+                NpcCatalogSnapshot.EMPTY,
+                new SafeZoneCatalogSnapshot(
+                        List.of(new SafeZoneCatalogSnapshot.SafeZoneDefinition(
+                                TestWorldContents.TEST_ZONE_CODE,
+                                WILD_MIN_X + 10f,
+                                -10f,
+                                WILD_MIN_X + 16f,
+                                10f,
+                                false)),
+                        List.of(new SafeZoneCatalogSnapshot.OpenPvpRange(
+                                "wasteland_deep", WILD_MIN_X, WILD_MIN_X + 26f))));
+        world = new WorldFacade(sink, false, TickMetricsPort.NO_OP, content);
+        world.usePlayerVersusPlayerRule(new PlayerVersusPlayerRule() {
+            @Override
+            public boolean allows(long attacker, long target) {
+                return false;
+            }
+
+            @Override
+            public boolean isHunted(long target) {
+                return victimHunted && target == VICTIM;
+            }
+        });
+        world.start();
+        world.attachCharacter(ATTACKER, WILD_MIN_X + 13f, 0f, FIRE);
+        world.attachCharacter(VICTIM, WILD_MIN_X + 13.5f, 0f, FIRE);
+        sleepQuietly(100);
+    }
+
     private void startWastelandWorld(float attackerX, float victimX) {
         WorldContentCatalog content = new WorldContentCatalog(
                 MonsterCatalogSnapshot.EMPTY,

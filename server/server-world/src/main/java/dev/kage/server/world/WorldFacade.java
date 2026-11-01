@@ -670,9 +670,10 @@ public final class WorldFacade {
         }
         // ADR-137 — dải PvP tự do (Hoang Vực): cả hai cùng đứng trong dải là đủ, không cần bang chiến.
         boolean open = inOpenPvpRange(attackerId) && inOpenPvpRange(targetId);
+        // ADR-142 — Ma Đầu bị truy trong dải PvP kể cả khi hai bên đứng trong trạm an toàn giữa dải.
+        boolean hunted = open && guildWarRule.isHunted(targetId);
         return (open || guildWarRule.allows(attackerId, targetId))
-                && outsideSafeZones(attackerId)
-                && outsideSafeZones(targetId);
+                && (hunted || (outsideSafeZones(attackerId) && outsideSafeZones(targetId)));
     }
 
     /** ADR-137 — nhân vật đang đứng trong một dải PvP tự do của World này (mảng nạp một lần, không cấp phát). */

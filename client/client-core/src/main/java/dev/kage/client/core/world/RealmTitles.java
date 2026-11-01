@@ -40,6 +40,12 @@ final class RealmTitles implements Disposable {
 
     private static final Color SHADOW = new Color(0f, 0f, 0f, 0.8f);
 
+    /** ADR-142 — nhãn Ma Đầu: đỏ son, một dòng phía trên danh hiệu. */
+    private static final Color OUTLAW = Color.valueOf("FF5A4AFF");
+
+    /** Khoảng cách dòng Ma Đầu phía trên danh hiệu, theo pixel màn hình. */
+    private static final float OUTLAW_LINE_OFFSET_PX = 16f;
+
     private final BitmapFont font;
     private final I18NBundle i18n = KageI18n.load();
     private final SpriteBatch batch = new SpriteBatch();
@@ -67,18 +73,30 @@ final class RealmTitles implements Disposable {
 
     /** Một danh hiệu tại chân nhân vật ({@code x}, {@code y}); cấp ≤ 0 (chưa biết) thì bỏ qua. */
     void draw(float x, float y, int level) {
+        draw(x, y, level, false);
+    }
+
+    /** Như {@link #draw(float, float, int)}, thêm dòng "Ma Đầu" đỏ phía trên nếu {@code outlaw} (ADR-142). */
+    void draw(float x, float y, int level, boolean outlaw) {
         if (level <= 0) {
             return;
         }
-        String title = i18n.get(CultivationRealm.of(level).nameKey());
         scratch.set(x, y, HEAD_HEIGHT_UNITS);
         projector.project(scratch);
-        layout.setText(font, title);
+        line(i18n.get(CultivationRealm.of(level).nameKey()), scratch.y, TITLE);
+        if (outlaw) {
+            line(i18n.get("realm.outlaw"), scratch.y + OUTLAW_LINE_OFFSET_PX, OUTLAW);
+        }
+    }
+
+    /** Một dòng chữ có bóng, căn giữa quanh {@code scratch.x}. */
+    private void line(String text, float baselineY, Color color) {
+        layout.setText(font, text);
         float left = scratch.x - (layout.width / 2f);
         font.setColor(SHADOW);
-        font.draw(batch, title, left + SHADOW_OFFSET_PX, scratch.y - SHADOW_OFFSET_PX);
-        font.setColor(TITLE);
-        font.draw(batch, title, left, scratch.y);
+        font.draw(batch, text, left + SHADOW_OFFSET_PX, baselineY - SHADOW_OFFSET_PX);
+        font.setColor(color);
+        font.draw(batch, text, left, baselineY);
     }
 
     void end() {

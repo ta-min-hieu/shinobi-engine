@@ -79,6 +79,8 @@ message CharacterSpawnedEvent {
   CostumeTier costume_tier = 5;
   // ADR-140 — cấp của nhân vật (client hiện tên CẢNH GIỚI trên đầu). 0 = chưa biết (đã ngắt kết nối).
   int32 level = 6;
+  // ADR-142 — Ma Đầu (sát khí cao): client vẽ nhãn đỏ trên đầu để người khác biết mà truy.
+  bool outlaw = 7;
 }
 
 // Event: Server -> Client (OPCODE_CHARACTER_DESPAWNED_EVENT). Nhân vật khác VỪA rời AoI (ngắt
@@ -114,6 +116,8 @@ message CharacterAppearanceChangedEvent {
   CostumeTier costume_tier = 3;
   // ADR-140 — cấp mới; server phát gói này cả khi chỉ CẢNH GIỚI đổi (danh hiệu trên đầu), không riêng bậc trang phục.
   int32 level = 4;
+  // ADR-142 — server phát gói này cả khi chỉ trạng thái Ma Đầu đổi.
+  bool outlaw = 5;
 }
 
 // ADR-051 — loại World mà người chơi vừa được đưa vào.
@@ -274,6 +278,7 @@ enum TeleportOutcome {
   TELEPORT_OUTCOME_NOT_UNLOCKED = 3;
   TELEPORT_OUTCOME_NO_TALISMAN = 4;
   TELEPORT_OUTCOME_NOT_IN_MAIN_WORLD = 5;
+  TELEPORT_OUTCOME_OUTLAW = 6;  // ADR-142 — Ma Đầu không được dùng trạm truyền tống
 }
 
 // Response: Server -> Client (OPCODE_TELEPORT_RESPONSE = 320). OK ⇒ WorldChangedEvent (lý do TELEPORT) đã/đang tới.

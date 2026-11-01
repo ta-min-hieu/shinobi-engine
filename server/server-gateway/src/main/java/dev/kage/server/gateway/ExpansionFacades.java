@@ -10,10 +10,11 @@ import dev.kage.world.api.ArtifactFacade;
 import dev.kage.world.api.CaveFacade;
 import dev.kage.world.api.ConsumableFacade;
 import dev.kage.world.api.EncounterFacade;
+import dev.kage.world.api.KillingIntentFacade;
 import dev.kage.world.api.SpiritFieldFacade;
 import dev.kage.world.api.TamingFacade;
 
-/** Lô 23 (ADR-115…126) — gom để {@link ProgressionFacades} chỉ thêm một thành phần. */
+/** Lô 23 (ADR-115…126) + sát khí (ADR-142) — gom để {@link ProgressionFacades} chỉ thêm một thành phần. */
 record ExpansionFacades(
         SecurityPinFacade securityPin,
         BuyOrderFacade buyOrders,
@@ -26,7 +27,8 @@ record ExpansionFacades(
         TournamentFacade tournament,
         TribulationFacade tribulation,
         ArtifactFacade artifacts,
-        CaveFacade caves) {
+        CaveFacade caves,
+        KillingIntentFacade killingIntent) {
 
     /** Composition không có các tính năng này (test). */
     static final ExpansionFacades DISABLED = new ExpansionFacades(
@@ -41,5 +43,6 @@ record ExpansionFacades(
             TournamentFacade.DISABLED,
             TribulationFacade.DISABLED,
             ArtifactFacade.DISABLED,
-            CaveFacade.DISABLED);
+            CaveFacade.DISABLED,
+            KillingIntentFacade.DISABLED);
 }

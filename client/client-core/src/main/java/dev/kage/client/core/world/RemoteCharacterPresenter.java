@@ -47,6 +47,9 @@ final class RemoteCharacterPresenter {
     /** ADR-140 — cấp từng người đang thấy (danh hiệu cảnh giới trên đầu); cùng tập khoá với {@link #entities}. */
     private final LongMap<Integer> levels = new LongMap<>();
 
+    /** ADR-142 — ai đang là Ma Đầu (cờ {@code outlaw} của gói 303/307); chỉ chứa người đang là. */
+    private final LongMap<Boolean> outlaws = new LongMap<>();
+
     private final long localCharacterId;
 
     /**
@@ -77,6 +80,7 @@ final class RemoteCharacterPresenter {
         pickables.put(event.getCharacterId(), new CharacterPoint(entity));
         models.addCharacter(event.getCharacterId(), CharacterModelKey.of(event.getFaction(), event.getCostumeTier()));
         levels.put(event.getCharacterId(), event.getLevel());
+        markOutlaw(event.getCharacterId(), event.getOutlaw());
     }
 
     /**
@@ -96,6 +100,7 @@ final class RemoteCharacterPresenter {
         models.replaceCharacterModel(
                 event.getCharacterId(), CharacterModelKey.of(event.getFaction(), event.getCostumeTier()));
         levels.put(event.getCharacterId(), event.getLevel());
+        markOutlaw(event.getCharacterId(), event.getOutlaw());
     }
 
     void onMoved(CharacterMovedEvent event) {
@@ -138,6 +143,7 @@ final class RemoteCharacterPresenter {
         models.remove(event.getCharacterId());
         motionTracker.remove(event.getCharacterId());
         levels.remove(event.getCharacterId());
+        outlaws.remove(event.getCharacterId());
     }
 
     /**
@@ -155,6 +161,7 @@ final class RemoteCharacterPresenter {
         }
         entities.clear();
         levels.clear();
+        outlaws.clear();
         // Cùng tập với entities — bỏ sót ở đây thì người chơi của World CŨ vẫn click trúng được
         // (entity đã gỡ khỏi EcsWorld nhưng Ashley giữ nguyên PositionComponent của nó), và cú click
         // vào chỗ họ từng đứng chọn họ làm đối thủ thách đấu dù họ không còn ở đây.
@@ -165,7 +172,15 @@ final class RemoteCharacterPresenter {
     void drawRealmTitles(RealmTitles titles) {
         for (LongMap.Entry<KEntity> entry : entities.entries()) {
             PositionComponent position = POSITION.get(entry.value);
-            titles.draw(position.x, position.y, levels.get(entry.key, 0));
+            titles.draw(position.x, position.y, levels.get(entry.key, 0), outlaws.containsKey(entry.key));
+        }
+    }
+
+    private void markOutlaw(long characterId, boolean outlaw) {
+        if (outlaw) {
+            outlaws.put(characterId, Boolean.TRUE);
+        } else {
+            outlaws.remove(characterId);
         }
     }
 
