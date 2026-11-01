@@ -45,6 +45,11 @@ final class CaveCommands {
         this.deps = deps;
     }
 
+    /** ADR-134 — cấp linh mạch của mọi động phủ (Bia Anh Danh). Chạm DB — gọi trên Virtual Thread. */
+    java.util.Map<Long, Integer> veinLevels() {
+        return deps.caves().veinLevels();
+    }
+
     static long caveKey(long ownerId) {
         return CAVE_KEY_BASE - ownerId;
     }

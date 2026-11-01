@@ -165,6 +165,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-131](ADR-131-Blacksmith-And-Merchant-NPCs.md) | NPC thợ rèn + thương nhân du hành | ✅ **Accepted** *(2026-10-31, lô 24)* | — |
 | [ADR-132](ADR-132-Costume-Tier-By-Realm.md) | Bậc trang phục theo cảnh giới | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
 | [ADR-133](ADR-133-Artifact-Hud-Button.md) | Nút pháp bảo trên HUD | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
+| [ADR-134](ADR-134-Cave-And-Tribulation-Leaderboards.md) | Bảng xếp hạng Động phủ + Thiên Kiếp | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

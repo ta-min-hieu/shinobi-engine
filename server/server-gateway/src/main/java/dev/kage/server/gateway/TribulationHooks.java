@@ -56,6 +56,11 @@ final class TribulationHooks {
         this.deps = Optional.of(realDeps);
     }
 
+    /** ADR-134 — số kiếp đã qua của mọi nhân vật (Bia Anh Danh); chưa nối DB thì rỗng. Chạm DB. */
+    Map<Long, Integer> passedByCharacter() {
+        return deps.map(d -> d.facade().passedByCharacter()).orElse(Map.of());
+    }
+
     /** Nhịp giáng lôi cho {@link ExpansionJobs}. */
     ExpansionJobs.Job job() {
         return new ExpansionJobs.Job("thiên kiếp", TICK_SECONDS, () -> deps.ifPresent(this::tick));

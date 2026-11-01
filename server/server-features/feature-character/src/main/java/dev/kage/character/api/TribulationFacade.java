@@ -36,6 +36,11 @@ public final class TribulationFacade {
         return port.passed(characterId);
     }
 
+    /** ADR-134 — số kiếp đã qua của mọi nhân vật có ít nhất một kiếp (bảng xếp hạng Thiên Kiếp). */
+    public java.util.Map<Long, Integer> passedByCharacter() {
+        return port.passedByCharacter();
+    }
+
     /** Trần cấp hiện tại của nhân vật. */
     public int levelCap(long characterId) {
         return TribulationRules.levelCap(port.passed(characterId));

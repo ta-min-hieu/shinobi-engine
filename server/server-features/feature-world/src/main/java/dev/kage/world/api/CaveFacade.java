@@ -85,6 +85,11 @@ public final class CaveFacade {
         return CaveRules.accrued(cave.veinLevel(), bonusPercentOf(cave), cave.lastCollectedAt(), now);
     }
 
+    /** ADR-134 — cấp linh mạch của mọi động phủ đã dựng (bảng xếp hạng Động phủ). */
+    public Map<Long, Integer> veinLevels() {
+        return port.veinLevels();
+    }
+
     /** Thu linh thạch. */
     public CavePort.Result collect(long characterId, Instant now) {
         return port.collect(characterId, now);

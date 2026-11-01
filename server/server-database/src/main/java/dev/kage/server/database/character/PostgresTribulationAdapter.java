@@ -12,6 +12,8 @@ import dev.kage.server.database.JdbcOperations;
 public final class PostgresTribulationAdapter implements TribulationPort {
 
     private static final String PASSED = "SELECT tribulations_passed FROM character WHERE id = ?";
+    private static final String ALL_PASSED =
+            "SELECT id, tribulations_passed FROM character WHERE tribulations_passed > 0";
     private static final String ADVANCE = """
             UPDATE character SET tribulations_passed = tribulations_passed + 1
              WHERE id = ? AND tribulations_passed = ? AND tribulations_passed < 5
@@ -40,6 +42,14 @@ public final class PostgresTribulationAdapter implements TribulationPort {
             audit(characterId, "TRIBULATION_PASSED", "{\"passed\":" + (expectedPassed + 1) + "}");
         }
         return advanced;
+    }
+
+    @Override
+    public java.util.Map<Long, Integer> passedByCharacter() {
+        return JdbcOperations.query(dataSource, ALL_PASSED, rs -> java.util.Map.entry(rs.getLong(1), rs.getInt(2)))
+                .stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        java.util.Map.Entry::getKey, java.util.Map.Entry::getValue));
     }
 
     @Override

@@ -51,7 +51,11 @@ final class LeaderboardCache {
         /** ADR-068 — bang hội theo kinh nghiệm bang; mỗi THÀNH VIÊN tra được hạng bang mình. */
         GUILD,
         /** ADR-081 — tổng sát thương lên boss thế giới. */
-        BOSS_DAMAGE
+        BOSS_DAMAGE,
+        /** ADR-134 — cấp linh mạch động phủ. */
+        CAVE,
+        /** ADR-134 — số kiếp Thiên Kiếp đã qua. */
+        TRIBULATION
     }
 
     /** Một dòng đã xếp hạng. {@code rank} bắt đầu từ 1. */
@@ -65,6 +69,8 @@ final class LeaderboardCache {
     private final ToLongFunction<Character> combatPowerOf;
     private final Supplier<List<GuildRank>> guildRanks;
     private final Supplier<List<WorldBossPort.DamageRank>> bossDamage;
+    private final Supplier<Map<Long, Integer>> caveLevels;
+    private final Supplier<Map<Long, Integer>> tribulations;
     private final Clock clock;
     private final Map<Kind, Board> boards = new EnumMap<>(Kind.class);
     private final Map<Kind, Object> locks = new EnumMap<>(Kind.class);
@@ -75,7 +81,9 @@ final class LeaderboardCache {
             PvpFacade pvpFacade,
             ToLongFunction<Character> combatPowerOf,
             Supplier<List<GuildRank>> guildRanks,
-            Supplier<List<WorldBossPort.DamageRank>> bossDamage) {}
+            Supplier<List<WorldBossPort.DamageRank>> bossDamage,
+            Supplier<Map<Long, Integer>> caveLevels,
+            Supplier<Map<Long, Integer>> tribulations) {}
 
     LeaderboardCache(Sources sources, Clock clock) {
         this.characterFacade = sources.characterFacade();
@@ -83,6 +91,8 @@ final class LeaderboardCache {
         this.combatPowerOf = sources.combatPowerOf();
         this.guildRanks = sources.guildRanks();
         this.bossDamage = sources.bossDamage();
+        this.caveLevels = sources.caveLevels();
+        this.tribulations = sources.tribulations();
         this.clock = clock;
         for (Kind kind : Kind.values()) {
             locks.put(kind, new Object());
@@ -112,14 +122,7 @@ final class LeaderboardCache {
 
     private Board compute(Kind kind, Instant now) {
         List<Character> characters = characterFacade.listAllByRealm();
-        List<Row> rows =
-                switch (kind) {
-                    case REALM -> rank(characters, Character::exp);
-                    case COMBAT_POWER -> rankByCombatPower(characters);
-                    case ARENA -> rankByRating(characters);
-                    case GUILD -> List.of();
-                    case BOSS_DAMAGE -> rankByBossDamage(characters);
-                };
+        List<Row> rows = rowsFor(kind, characters);
         Map<Long, Row> byId = new HashMap<>();
         for (Row row : rows) {
             byId.put(row.characterId(), row);
@@ -128,6 +131,18 @@ final class LeaderboardCache {
             rows = rankGuilds(characters, byId);
         }
         return new Board(List.copyOf(rows), Collections.unmodifiableMap(byId), now);
+    }
+
+    private List<Row> rowsFor(Kind kind, List<Character> characters) {
+        return switch (kind) {
+            case REALM -> rank(characters, Character::exp);
+            case COMBAT_POWER -> rankByCombatPower(characters);
+            case ARENA -> rankByRating(characters);
+            case GUILD -> List.of();
+            case BOSS_DAMAGE -> rankByBossDamage(characters);
+            case CAVE -> rankByScore(characters, caveLevels.get());
+            case TRIBULATION -> rankByScore(characters, tribulations.get());
+        };
     }
 
     /** {@code characters} đã theo đúng thứ tự (cấp, EXP, id) của SQL — chỉ đánh số. */
@@ -174,6 +189,25 @@ final class LeaderboardCache {
             for (long member : guild.memberIds()) {
                 byId.put(member, row);
             }
+        }
+        return rows;
+    }
+
+    /**
+     * ADR-134 — xếp theo điểm giảm dần, chỉ người CÓ điểm; hoà điểm thì giữ thứ tự cảnh giới của {@code ordered}
+     * (cấp, EXP, id — đúng thứ tự SQL), nên sắp xếp phải ổn định.
+     */
+    private static List<Row> rankByScore(List<Character> ordered, Map<Long, Integer> scores) {
+        List<Character> scored = new ArrayList<>();
+        for (Character c : ordered) {
+            if (scores.containsKey(c.id())) {
+                scored.add(c);
+            }
+        }
+        scored.sort(Comparator.comparingInt((Character c) -> scores.get(c.id())).reversed());
+        List<Row> rows = new ArrayList<>(scored.size());
+        for (Character c : scored) {
+            rows.add(new Row(rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), scores.get(c.id())));
         }
         return rows;
     }

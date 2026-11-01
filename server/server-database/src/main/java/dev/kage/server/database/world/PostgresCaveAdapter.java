@@ -31,6 +31,8 @@ public final class PostgresCaveAdapter implements CavePort {
 
     private static final String CAVE = "SELECT vein_level, last_collected_at FROM cave_dwelling WHERE character_id = ?";
 
+    private static final String ALL_VEINS = "SELECT character_id, vein_level FROM cave_dwelling";
+
     private static final String CAVE_FOR_UPDATE = CAVE + " FOR UPDATE";
 
     private static final String DECORATIONS = """
@@ -74,6 +76,14 @@ public final class PostgresCaveAdapter implements CavePort {
                 dataSource,
                 CATALOG,
                 rs -> new Decoration(rs.getString(1), rs.getString(2), rs.getLong(3), rs.getInt(4)));
+    }
+
+    @Override
+    public java.util.Map<Long, Integer> veinLevels() {
+        return JdbcOperations.query(dataSource, ALL_VEINS, rs -> java.util.Map.entry(rs.getLong(1), rs.getInt(2)))
+                .stream()
+                .collect(java.util.stream.Collectors.toUnmodifiableMap(
+                        java.util.Map.Entry::getKey, java.util.Map.Entry::getValue));
     }
 
     @Override

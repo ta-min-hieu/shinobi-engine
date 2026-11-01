@@ -533,6 +533,7 @@ class Lot23IntegrationTest {
         assertThat(scalar("SELECT gold FROM character_stat WHERE character_id = ?", owner))
                 .isZero();
         assertThat(caves.cave(owner, evenLater).veinLevel()).isEqualTo(2);
+        assertThat(caves.veinLevels()).as("ADR-134 — Bia Anh Danh động phủ").containsEntry(owner, 2);
 
         setGold(owner, 1_500L);
         assertThat(caves.decorate(owner, "spirit_pine", evenLater).outcome()).isEqualTo(CavePort.Outcome.OK);

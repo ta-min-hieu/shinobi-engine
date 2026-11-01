@@ -53,4 +53,9 @@ public interface CavePort {
 
     /** Thu kho rồi mua + bày món {@code code}. */
     Result decorate(long characterId, String code, Instant now);
+
+    /** ADR-134 — cấp linh mạch của mọi động phủ đã dựng (Bia Anh Danh). */
+    default java.util.Map<Long, Integer> veinLevels() {
+        return java.util.Map.of();
+    }
 }

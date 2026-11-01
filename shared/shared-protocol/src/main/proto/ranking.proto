@@ -19,6 +19,8 @@ enum LeaderboardKind {
   // chủ, faction để trống; own_rank = hạng bang của người hỏi.
   LEADERBOARD_KIND_GUILD = 4;
   LEADERBOARD_KIND_BOSS_DAMAGE = 5; // ADR-081 — tổng sát thương lên boss thế giới; chỉ người đã từng gây sát thương
+  LEADERBOARD_KIND_CAVE = 6;        // ADR-134 — cấp linh mạch động phủ; chỉ người đã dựng động phủ
+  LEADERBOARD_KIND_TRIBULATION = 7; // ADR-134 — số kiếp Thiên Kiếp đã qua; chỉ người đã qua ít nhất một kiếp
 }
 
 // Command: Client -> Server (OPCODE_GET_LEADERBOARD_REQUEST = 1202).

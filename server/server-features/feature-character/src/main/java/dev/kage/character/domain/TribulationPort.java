@@ -11,4 +11,9 @@ public interface TribulationPort {
 
     /** Trừ {@code amount} EXP nhưng không xuống dưới {@code floorExp}. */
     void penalize(long characterId, long amount, long floorExp);
+
+    /** ADR-134 — số kiếp đã qua của mọi nhân vật đã qua ít nhất một kiếp (Bia Anh Danh). */
+    default java.util.Map<Long, Integer> passedByCharacter() {
+        return java.util.Map.of();
+    }
 }

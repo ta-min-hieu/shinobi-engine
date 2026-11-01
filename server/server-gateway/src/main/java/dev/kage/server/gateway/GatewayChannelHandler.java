@@ -2994,6 +2994,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return WorldFacade.statSheet(loadout.baseStats(), loadout.equipmentBonus());
     }
 
+    /** Nguồn dữ liệu của mọi bảng xếp hạng — dựng ở lượt hỏi đầu, sau đó {@code shared} trả bản cũ. */
+    private LeaderboardCache.Sources leaderboardSources() {
+        return new LeaderboardCache.Sources(
+                characterFacade,
+                pvpFacade,
+                character -> statSheetOf(character.id()).combatPower(),
+                guildProgression::rankGuilds,
+                () -> worldBoss.topDamage(LeaderboardCache.TOP_SIZE),
+                expansion.cave()::veinLevels, // ADR-134
+                worldGateway.registry().tribulation::passedByCharacter);
+    }
+
+    private static LeaderboardCache.Kind toCacheKind(LeaderboardKind kind) {
+        return switch (kind) {
+            case LEADERBOARD_KIND_ARENA -> LeaderboardCache.Kind.ARENA;
+            case LEADERBOARD_KIND_COMBAT_POWER -> LeaderboardCache.Kind.COMBAT_POWER;
+            case LEADERBOARD_KIND_GUILD -> LeaderboardCache.Kind.GUILD;
+            case LEADERBOARD_KIND_BOSS_DAMAGE -> LeaderboardCache.Kind.BOSS_DAMAGE;
+            case LEADERBOARD_KIND_CAVE -> LeaderboardCache.Kind.CAVE;
+            case LEADERBOARD_KIND_TRIBULATION -> LeaderboardCache.Kind.TRIBULATION;
+            // UNSPECIFIED/lạ (client mới hơn server) ⇒ bảng cảnh giới, không lỗi.
+            default -> LeaderboardCache.Kind.REALM;
+        };
+    }
+
     /** ADR-057 — Bia Anh Danh: bảng dùng chung cả server, cache 60 s ({@link LeaderboardCache}). */
     private void handleGetLeaderboardRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
@@ -3004,23 +3029,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendError(ctx, sequenceId, 401, "error.not_authenticated");
             return;
         }
-        LeaderboardCache.Kind kind =
-                switch (request.getKind()) {
-                    case LEADERBOARD_KIND_ARENA -> LeaderboardCache.Kind.ARENA;
-                    case LEADERBOARD_KIND_COMBAT_POWER -> LeaderboardCache.Kind.COMBAT_POWER;
-                    case LEADERBOARD_KIND_GUILD -> LeaderboardCache.Kind.GUILD;
-                    case LEADERBOARD_KIND_BOSS_DAMAGE -> LeaderboardCache.Kind.BOSS_DAMAGE;
-                    // UNSPECIFIED/lạ (client mới hơn server) ⇒ bảng cảnh giới, không lỗi.
-                    default -> LeaderboardCache.Kind.REALM;
-                };
+        LeaderboardCache.Kind kind = toCacheKind(request.getKind());
         executeBlocking(ctx, sequenceId, () -> {
-            LeaderboardCache cache = LeaderboardCache.shared(new LeaderboardCache.Sources(
-                    characterFacade,
-                    pvpFacade,
-                    character -> statSheetOf(character.id()).combatPower(),
-                    guildProgression::rankGuilds,
-                    () -> worldBoss.topDamage(LeaderboardCache.TOP_SIZE)));
-            LeaderboardCache.Board board = cache.board(kind);
+            LeaderboardCache.Board board =
+                    LeaderboardCache.shared(leaderboardSources()).board(kind);
             GetLeaderboardResponse.Builder response = GetLeaderboardResponse.newBuilder()
                     .setKind(toProtoLeaderboardKind(kind))
                     .setComputedAtEpochMs(board.computedAt().toEpochMilli());
@@ -3054,6 +3066,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case COMBAT_POWER -> LeaderboardKind.LEADERBOARD_KIND_COMBAT_POWER;
             case GUILD -> LeaderboardKind.LEADERBOARD_KIND_GUILD;
             case BOSS_DAMAGE -> LeaderboardKind.LEADERBOARD_KIND_BOSS_DAMAGE;
+            case CAVE -> LeaderboardKind.LEADERBOARD_KIND_CAVE;
+            case TRIBULATION -> LeaderboardKind.LEADERBOARD_KIND_TRIBULATION;
         };
     }
 
