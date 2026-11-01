@@ -77,5 +77,11 @@ cuộn, ngọc bội bán nguyệt, kiếm hộ thủ đĩa tròn).
    `INVENTORY_FULL` (túi dev 34/34 — server chặn đúng, đã dọn 6 món sang kho) ⇒ lĩnh: +18.000 EXP (Cấp 56 → 59) + đủ 6
    món Kim Đan ⇒ mặc cả bộ, nhận quest 27 ⇒ quật mạch đồ @328 (540 máu) hạ trong 6 nhát, mất ~250/613 máu. Dải PvP
    `wasteland_deep`: hai người @384/@385 ⇒ 2 đòn; cùng đứng trong trạm @368 ⇒ 0 đòn.
+   **Trọn arc 2026-11-01 (lô 26, kiểm sống nợ)**: quest 27 thợ đào thứ hai ⇒ báo ⇒ +20.000; quest 28 Hộ Thú @360 hạ trong
+   6 nhát, nhận 6 đòn × 38 (còn 396/629) ⇒ +22.000; quest 29 hai Cuồng Mạch Thú @376 (mỗi trận nhận 7–8 đòn, còn
+   467/639) ⇒ +24.000; quest 30 Cổ Thạch Khổng Lồ @408 hạ trong 6 nhát, nhận 6 đòn × 41 ⇒ +30.000. ⚠️ Không phải phép đo
+   biên: Kagemaru vào arc ở Cấp 60 (dư từ các lượt thử trước) và tới trận cuối đã Cấp 72 — trận ở cấp thiết kế vẫn chỉ có
+   trên giấy (`GoldenCoreBalanceTest`). Một lượt chết do bẫy công cụ "mục tiêu chốt một lần" (probe chốt Hộ Thú ngoài tầm
+   lúc Cuồng Mạch Thú chưa hồi sinh), không phải do cân bằng.
 3. ⚠️ Chủ dự án xem: toàn bộ con số + lời thoại do AI soạn; NPC đồng minh (Bạch Kính Chi, yêu tộc) mới chỉ có trong lời
    thoại — muốn họ hiện hình/đánh cùng cần cơ chế mới.
