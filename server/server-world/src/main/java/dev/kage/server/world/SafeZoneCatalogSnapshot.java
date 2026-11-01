@@ -13,14 +13,23 @@ import java.util.List;
  *
  * @param zones vùng theo THỨ TỰ; hai vùng chồng nhau là hợp lệ (mỗi vùng vào/ra độc lập)
  */
-public record SafeZoneCatalogSnapshot(List<SafeZoneDefinition> zones) {
+public record SafeZoneCatalogSnapshot(List<SafeZoneDefinition> zones, List<OpenPvpRange> pvpRanges) {
 
     /** Không có vùng an toàn nào — dungeon/arena, và mọi test không quan tâm tới vùng an toàn. */
-    public static final SafeZoneCatalogSnapshot EMPTY = new SafeZoneCatalogSnapshot(List.of());
+    public static final SafeZoneCatalogSnapshot EMPTY = new SafeZoneCatalogSnapshot(List.of(), List.of());
 
     public SafeZoneCatalogSnapshot {
         zones = List.copyOf(zones);
+        pvpRanges = List.copyOf(pvpRanges);
     }
+
+    /** Chỉ vùng an toàn, không dải PvP nào — hình dạng cũ (trước ADR-137). */
+    public SafeZoneCatalogSnapshot(List<SafeZoneDefinition> zones) {
+        this(zones, List.of());
+    }
+
+    /** ADR-137 — một dải PvP tự do trên trục X (bảng {@code pvp_zone}). */
+    public record OpenPvpRange(String code, float minX, float maxX) {}
 
     public boolean isEmpty() {
         return zones.isEmpty();

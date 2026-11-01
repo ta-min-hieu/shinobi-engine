@@ -34,4 +34,9 @@ public final class WorldGeometryFacade {
     public List<SafeZone> listSafeZones(String worldCode) {
         return safeZonePort.listSafeZones(worldCode);
     }
+
+    /** ADR-137 — dải PvP tự do của {@code worldCode}; rỗng nếu world đó không có (mặc định của mọi world). */
+    public List<dev.kage.world.domain.PvpZone> listPvpZones(String worldCode) {
+        return safeZonePort.listPvpZones(worldCode);
+    }
 }

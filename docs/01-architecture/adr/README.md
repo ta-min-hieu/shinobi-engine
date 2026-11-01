@@ -168,6 +168,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-134](ADR-134-Cave-And-Tribulation-Leaderboards.md) | Bảng xếp hạng Động phủ + Thiên Kiếp | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
 | [ADR-135](ADR-135-Inner-Sect-Daily-Quests.md) | Nhiệm vụ ngày nội môn | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
 | [ADR-136](ADR-136-Realm-Breakthrough-Ceremony.md) | Nghi lễ đột phá cảnh giới | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
+| [ADR-137](ADR-137-Wasteland-Pvp-Zone.md) | Vùng PvP Hoang Vực | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

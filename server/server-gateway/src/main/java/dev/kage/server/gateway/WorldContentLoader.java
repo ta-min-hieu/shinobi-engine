@@ -56,9 +56,13 @@ final class WorldContentLoader {
     }
 
     private static SafeZoneCatalogSnapshot loadSafeZones(WorldGeometryFacade geometryFacade, String worldCode) {
-        return new SafeZoneCatalogSnapshot(geometryFacade.listSafeZones(worldCode).stream()
-                .map(WorldContentLoader::toSafeZoneDefinition)
-                .toList());
+        return new SafeZoneCatalogSnapshot(
+                geometryFacade.listSafeZones(worldCode).stream()
+                        .map(WorldContentLoader::toSafeZoneDefinition)
+                        .toList(),
+                geometryFacade.listPvpZones(worldCode).stream() // ADR-137
+                        .map(zone -> new SafeZoneCatalogSnapshot.OpenPvpRange(zone.code(), zone.minX(), zone.maxX()))
+                        .toList());
     }
 
     private static SafeZoneCatalogSnapshot.SafeZoneDefinition toSafeZoneDefinition(SafeZone zone) {

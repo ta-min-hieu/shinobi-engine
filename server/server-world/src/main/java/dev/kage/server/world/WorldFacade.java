@@ -211,6 +211,9 @@ public final class WorldFacade {
     // ADR-102 — ai đang chiến với ai (ảnh chụp RAM do gateway dựng lại); world chính nối qua usePlayerVersusPlayerRule.
     private volatile PlayerVersusPlayerRule guildWarRule = PlayerVersusPlayerRule.NOBODY;
 
+    /** ADR-137 — dải PvP tự do, cặp [minX, maxX] liền nhau; nạp một lần từ catalog lúc dựng World. */
+    private final float[] openPvpRanges;
+
     /**
      * Sổ hồi chiêu sống lâu hơn thực thể (README dòng 37iii) — mặc định là sổ không nhớ gì, xem
      * {@link #rememberSkillCooldownsIn}. {@code volatile}: cùng lý do {@link #pvpAllowed}.
@@ -419,6 +422,7 @@ public final class WorldFacade {
         this.monsterCatalog = wiring.content().monsters();
         this.npcCatalog = wiring.content().npcs();
         this.healingZoneCodes = healingZoneCodesOf(wiring.content().safeZones());
+        this.openPvpRanges = openPvpRangesOf(wiring.content().safeZones());
         this.monsterRespawnCountdownSeconds =
                 newAliveCountdowns(monsterCatalog.spawnPoints().size());
         this.spawnOverworldContent = wiring.spawnOverworldContent();
@@ -664,7 +668,26 @@ public final class WorldFacade {
         if (pvpAllowed) {
             return true;
         }
-        return guildWarRule.allows(attackerId, targetId) && outsideSafeZones(attackerId) && outsideSafeZones(targetId);
+        // ADR-137 — dải PvP tự do (Hoang Vực): cả hai cùng đứng trong dải là đủ, không cần bang chiến.
+        boolean open = inOpenPvpRange(attackerId) && inOpenPvpRange(targetId);
+        return (open || guildWarRule.allows(attackerId, targetId))
+                && outsideSafeZones(attackerId)
+                && outsideSafeZones(targetId);
+    }
+
+    /** ADR-137 — nhân vật đang đứng trong một dải PvP tự do của World này (mảng nạp một lần, không cấp phát). */
+    private boolean inOpenPvpRange(long characterId) {
+        KEntity entity = entitiesByCharacterId.get(characterId);
+        if (entity == null) {
+            return false;
+        }
+        float x = POSITION.get(entity).x;
+        for (int i = 0; i < openPvpRanges.length; i += 2) {
+            if (x >= openPvpRanges[i] && x <= openPvpRanges[i + 1]) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean outsideSafeZones(long characterId) {
@@ -1717,6 +1740,15 @@ public final class WorldFacade {
      * <p>Vòng lặp thường thay vì stream: chạy đúng MỘT lần lúc dựng world, nên không có gì để tối ưu,
      * mà đọc ra thì thẳng hơn.
      */
+    private static float[] openPvpRangesOf(SafeZoneCatalogSnapshot safeZones) {
+        float[] ranges = new float[safeZones.pvpRanges().size() * 2];
+        for (int i = 0; i < safeZones.pvpRanges().size(); i++) {
+            ranges[i * 2] = safeZones.pvpRanges().get(i).minX();
+            ranges[i * 2 + 1] = safeZones.pvpRanges().get(i).maxX();
+        }
+        return ranges;
+    }
+
     private static Set<String> healingZoneCodesOf(SafeZoneCatalogSnapshot safeZones) {
         List<String> codes = new ArrayList<String>();
         for (SafeZoneCatalogSnapshot.SafeZoneDefinition zone : safeZones.zones()) {

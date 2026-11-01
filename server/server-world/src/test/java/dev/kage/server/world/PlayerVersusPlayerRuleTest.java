@@ -29,6 +29,10 @@ class PlayerVersusPlayerRuleTest {
     private static final long SETTLE_MILLIS = 600L;
     private static final float WAR_X = 12f;
     private static final float SAFE_X = 3f;
+    /** ADR-137 — dải PvP thử: [20, 46]. */
+    private static final float WILD_MIN_X = 20f;
+
+    private static final float WILD_X = 30f;
 
     private record Hit(long attacker, long target, String skillCode) {}
 
@@ -125,6 +129,44 @@ class PlayerVersusPlayerRuleTest {
         sleepQuietly(SETTLE_MILLIS);
 
         assertThat(hitsBy(ATTACKER)).isEmpty();
+    }
+
+    /** ADR-137 — hai người cùng đứng trong dải PvP Hoang Vực: đánh nhau được dù KHÔNG có bang chiến. */
+    @Test
+    void shouldLetAnyoneFight_insideTheWastelandPvpRange() {
+        startWastelandWorld(WILD_X, WILD_X + 0.5f);
+
+        world.setTarget(ATTACKER, VICTIM);
+        world.attack(ATTACKER);
+
+        awaitTrue(() -> !hitsBy(ATTACKER).isEmpty());
+    }
+
+    /** ADR-137 — nạn nhân đứng NGOÀI dải (người đánh ở trong): không đòn nào ra. */
+    @Test
+    void shouldNotLetAnyoneFight_whenTheTargetStandsOutsideThePvpRange() {
+        startWastelandWorld(WILD_MIN_X + 0.3f, WILD_MIN_X - 0.3f);
+
+        world.setTarget(ATTACKER, VICTIM);
+        world.attack(ATTACKER);
+        sleepQuietly(SETTLE_MILLIS);
+
+        assertThat(hitsBy(ATTACKER)).isEmpty();
+    }
+
+    private void startWastelandWorld(float attackerX, float victimX) {
+        WorldContentCatalog content = new WorldContentCatalog(
+                MonsterCatalogSnapshot.EMPTY,
+                NpcCatalogSnapshot.EMPTY,
+                new SafeZoneCatalogSnapshot(
+                        List.of(),
+                        List.of(new SafeZoneCatalogSnapshot.OpenPvpRange(
+                                "wasteland_rim", WILD_MIN_X, WILD_MIN_X + 26f))));
+        world = new WorldFacade(sink, false, TickMetricsPort.NO_OP, content);
+        world.start();
+        world.attachCharacter(ATTACKER, attackerX, 0f, FIRE);
+        world.attachCharacter(VICTIM, victimX, 0f, FIRE);
+        sleepQuietly(100);
     }
 
     /** Luật chỉ cho cặp (ATTACKER → VICTIM); vùng an toàn phủ [0, 7]. */
