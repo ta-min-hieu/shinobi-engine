@@ -100,6 +100,7 @@ huyền thiết · **Tử Phủ tím** (`#3A2E5C` → `#C9B8E6`, lô 24) · Kim 
 | 2 | 15 | Ngoại Môn (`outer_sect_*`) | thân ngọc trung tính, chi tiết sáng | |
 | 3 | 30 | Trúc Cơ (`foundation_*`) | thân trắng ngà, chi tiết huyền thiết | |
 | 4 | 37 | Nội Môn (`inner_sect_*`) | thân tím Tử Phủ, chi tiết bạc | arc 3, lô 24 |
+| 5 | 55 | Kim Đan (`golden_core_*`) | thân vàng kim, chi tiết huyền thiết | arc 4, lô 25 |
 
 Hai luật leo bậc, cả hai đã chứng minh bằng render (ghi ở `build_item_icon.py`):
 
@@ -179,7 +180,7 @@ Mô tả VFX từng skill (giữ từ bản cũ — mã skill và cơ chế khô
 
 ### 2.8 Môi trường
 
-Dải nền đất một trục X (world chính −61 → 305, khớp `MAIN_WORLD_MAX_X` server — hai nơi phải nới CÙNG lúc). Từ tây
+Dải nền đất một trục X (world chính −61 → 417, khớp `MAIN_WORLD_MAX_X` server — hai nơi phải nới CÙNG lúc). Từ tây
 sang đông: sân khảo hạch + Tàng Thư Đường cũ · **sân tông Thanh Hư** (vùng an toàn, Chu Hoành, sư tỷ, thợ rèn) · linh
 mạch sơ cấp · vùng mạch chết Huyết Sa · rìa Hoang Vực · sân khảo hạch Trúc Cơ · **cổng nội môn** + sân bỉ võ (arc 3).
 Bảy trạm tiếp ứng (trận pháp nhỏ) rải dọc trục.

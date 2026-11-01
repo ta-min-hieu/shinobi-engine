@@ -287,6 +287,12 @@ mới = thêm dòng cùng PR (như luật GLOSSARY §4):
 | Thợ rèn Luyện Khí Đường (`sect_blacksmith`, ADR-131) | Người của Luyện Khí Đường (§4.1) giữ lò rèn trong sân tông — vô danh như người trực trạm |
 | Thương nhân du hành (`traveling_merchant`, ADR-118/131) | Người của thương hội liên tông đi buôn một vòng các trạm tiếp ứng; chỉ đứng ở trạm đang ghé |
 | Động phủ (ADR-129) | Đệ tử được khai một động phủ nhỏ bên một tiểu linh mạch; linh khí tụ lại thành linh thạch theo thời gian |
+| Tà Tu Hoang Vực (`wasteland_marauder`) | Tu sĩ không tông không phái chặn cửa ngõ Hoang Vực sâu — trận mở arc 4, nơi không có luật |
+| Quật Mạch Đồ Huyết Sa (`blood_sand_digger`) | Đồ chúng Huyết Sa đào bới quanh linh mạch đã chết, không lấy linh thạch mà "tìm thứ gì đó" (arc 4 chỉ được nói tới đây — §8 quy tắc 2) |
+| Cai Ngục Huyết Sa (`blood_sand_beast_warden`) | Kẻ giam yêu tộc khai trí làm chó dò mạch — twist arc 4: yêu tộc cũng là nạn nhân Đại Kiếp (§4.4) |
+| Cuồng Mạch Yêu Thú (`frenzied_vein_beast`) | Yêu tộc hoá cuồng vì mạch chết lan tới đất của chúng — "yêu thú" với người, "anh em đã mất" với đồng loại |
+| Cổ Thạch Quái Hộ Mạch (`ancient_stone_colossus`) | Máy hộ mạch Linh Triều (dòng `stone_ogre` nâng cấp) Huyết Sa đánh thức dưới mạch chết — cao trào arc 4, người chơi + Bạch Kính Chi + yêu tộc liên thủ |
+| Bộ "Kim Đan" (`golden_core_*`, 6 món, Lv55) | Y phục tông môn trao cho đệ tử Kim Đan khi xuống núi lịch luyện — điều kiện cần của các trận sau, không bán ở Tàng Bảo Các |
 | Chết → hồi sinh tại hub | Đệ tử mang **hộ mệnh ngọc** của tông: thân tan thì hồn về núi, tông môn tái tụ thân thể (tổn thất = rơi tu vi/đồ tuỳ cơ chế) |
 | Nhiệm vụ ngày | Công việc tông môn: gánh nước, tuần sơn, hái linh thảo, trông lò luyện đan |
 | Nhiệm vụ bang | Nhiệm vụ Đường/bang hội giao theo tuần |

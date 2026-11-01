@@ -65,25 +65,18 @@ class TownElderDialogueTreeTest {
                         "night_watch",
                         "old_archive",
                         "awakening_trial",
-                        // V45 — quãng Lv10-18 của arc 1, chèn TRƯỚC `outer_sect` vì arc 1 phải đọc
-                        // xong rồi mới tới nhịp bàn giao sang arc 2. Ba lựa chọn sau đó lùi ba chỗ;
-                        // `option_index` là VỊ TRÍ nên đây là thay đổi CÓ CHỦ ĐÍCH, và ô test này
-                        // chính là chỗ ghim nó lại.
+                        // V45 — Lv10-18 arc 1, TRƯỚC `outer_sect`; `option_index` là VỊ TRÍ nên lùi chỗ là CÓ CHỦ ĐÍCH.
                         "spirit_vein",
                         "first_manual",
                         "raider_band",
                         "outer_sect",
                         "missing_disciple",
                         "confront_steward",
-                        // V47 — quãng Lv22–27 của arc 2, chèn SAU `confront_steward` vì cả ba nối
-                        // tiếp đúng cái kết dang dở của nó. Chỉ `end` lùi ba chỗ; `option_index` là
-                        // VỊ TRÍ nên đây là thay đổi CÓ CHỦ ĐÍCH, ghim lại ngay tại đây.
+                        // V47 — Lv22–27 arc 2, SAU `confront_steward` (nối tiếp cái kết dang dở của nó).
                         "dead_vein",
                         "blood_sand_trail",
                         "scatter_band",
-                        // V48 — quãng Lv28–36, chèn SAU `scatter_band` vì đây là đoạn khép arc 2 ở
-                        // Trúc Cơ tầng 9. Chỉ `end` lùi năm chỗ; `option_index` là VỊ TRÍ nên đây là
-                        // thay đổi CÓ CHỦ ĐÍCH, ghim lại ngay tại đây.
+                        // V48 — Lv28–36, SAU `scatter_band` — đoạn khép arc 2 ở Trúc Cơ tầng 9.
                         "wasteland_edge",
                         "rank_board",
                         "pill_run",
@@ -95,6 +88,12 @@ class TownElderDialogueTreeTest {
                         "leaked_exam",
                         "grand_contest",
                         "altar_master",
+                        // ADR-139 (V113) — arc 4, chèn SAU `altar_master`; ba mục sau lùi thêm năm chỗ CÓ CHỦ ĐÍCH.
+                        "descend",
+                        "trace_blood_sand",
+                        "awakened_beast",
+                        "frenzied_kin",
+                        "colossus",
                         // ADR-055 — nhiệm vụ ngày đứng CUỐI, ngay trước `end`: `end` lùi một chỗ là CÓ
                         // CHỦ ĐÍCH (`option_index` là VỊ TRÍ), ghim lại ngay tại đây.
                         "daily_duty",
@@ -280,6 +279,23 @@ class TownElderDialogueTreeTest {
         assertThat(node("altar_master").options())
                 .extracting(DialogueOption::action)
                 .containsExactly("accept_quest:repel_the_altar_master", "about_town", "end");
+    }
+
+    @Test
+    @DisplayName("Năm nhánh arc 4 (ADR-139) nhận đúng năm mã quest theo đúng thứ tự chuỗi")
+    void descendTheMountainBranchesOfferTheArcFourQuests() {
+        String[][] branches = {
+            {"descend", "descend_the_mountain"},
+            {"trace_blood_sand", "trace_the_blood_sand"},
+            {"awakened_beast", "free_the_awakened_beast"},
+            {"frenzied_kin", "quiet_the_frenzied_kin"},
+            {"colossus", "fell_the_ancient_colossus"},
+        };
+        for (String[] branch : branches) {
+            assertThat(node(branch[0]).options())
+                    .extracting(DialogueOption::action)
+                    .containsExactly("accept_quest:" + branch[1], "about_town", "end");
+        }
     }
 
     /**

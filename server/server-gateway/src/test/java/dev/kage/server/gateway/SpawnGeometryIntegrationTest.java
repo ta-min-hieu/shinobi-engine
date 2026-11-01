@@ -74,7 +74,7 @@ class SpawnGeometryIntegrationTest {
      */
     private static final float GROUND_MIN_X = -61f; // V57 nới -55 → -61
 
-    private static final float GROUND_MAX_X = 305f; // V57 nới 210 → 225; V109 (arc 3) nới 225 → 305
+    private static final float GROUND_MAX_X = 417f; // V57 210 → 225; V109 (arc 3) → 305; V113 (arc 4) → 417
 
     @Container
     static final PostgreSQLContainer POSTGRES =

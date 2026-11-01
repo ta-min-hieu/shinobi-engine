@@ -30,8 +30,9 @@ final class WorldConstants {
      * Xem {@link #MAIN_WORLD_MIN_X}. ⚠️ 2026-10-31 (ADR-130): đứng ở 210 từ dòng 67(c) trong khi V57 đã nới nền client
      * lên 225 và dời cỗ khảo hạch Trúc Cơ sang @216 — người chơi bị chặn ở 210, cách trận đóng arc 2 sáu mét. Kiểm
      * sống arc 3 mới lộ ra. Nay 305 = {@code DemoPlatforms.GROUND_MAX_X}, ghim ở {@code MainWorldBoundsTest}.
+     * V113 (2026-11-01, ADR-139): arc 4 đi tiếp về đông tới cổ thạch quái @408 ⇒ 417, CÙNG lượt với nền đất client.
      */
-    static final float MAIN_WORLD_MAX_X = 305f;
+    static final float MAIN_WORLD_MAX_X = 417f;
 
     /** Bán kính Area of Interest — chốt 2026-10-23 (SERVER.md §6, Technical Decision #10). */
     static final float AOI_RADIUS_METERS = 15f;

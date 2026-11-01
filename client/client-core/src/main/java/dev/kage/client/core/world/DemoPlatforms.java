@@ -95,7 +95,8 @@ final class DemoPlatforms {
      */
     // V57 (2026-10-17) nới 210 → 225: cỗ khảo hạch Trúc Cơ dời 201 → 216, biên 9m (lần thứ NĂM — xem cảnh báo trên).
     // V109 (2026-10-31, ADR-130) nới 225 → 305: arc 3 đi tiếp về phía đông tới đàn chủ @296, biên 9m (lần thứ SÁU).
-    private static final float GROUND_MAX_X = 305f;
+    // V113 (2026-11-01, ADR-139) nới 305 → 417: arc 4 Hoang Vực sâu tới cổ thạch quái @408, biên 9m (lần thứ BẢY).
+    private static final float GROUND_MAX_X = 417f;
 
     private DemoPlatforms() {}
 

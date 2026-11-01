@@ -1792,6 +1792,128 @@ def build_inner_sect_blade():
     return 1.14
 
 
+# --- Arc 4 (V113, ADR-139): bộ "Kim Đan" Lv55 -------------------------------------------------
+#
+# Bậc SÁU. Màu là VÀNG KIM của Kim Đan (tên cảnh giới arc 4) — khác vàng ngà của bậc bốn ở chỗ đậm và
+# ấm hẳn. Đảo bố cục so với bậc năm: bộ Nội Môn thân TỐI chi tiết bạc, bộ này thân SÁNG (vàng kim) chi
+# tiết TỐI huyền thiết. Áo và hộ thủ giữ khung chung `_vest`/`_wraps`; mũ, ủng, ngọc bội và kiếm có HÌNH
+# mới (luật ở `build_foundation_cap`): mũ chóp NGỌC CHÂU tròn (bậc năm là sen răng cưa), hài mũi CUỘN
+# MÂY hếch cao, ngọc bội BÁN NGUYỆT (ô ACCESSORY_1 đã có vòng kín, thẻ, thoi, đĩa đặc), kiếm hộ thủ ĐĨA
+# TRÒN với lưỡi hình LÁ (rộng nhất ở hai phần ba).
+GOLDEN_BODY = "#E2B847"
+GOLDEN_PALE = "#F6E6B0"
+GOLDEN_IRON = "#2B2F3A"
+GOLDEN_MID = "#9C7A2A"
+
+
+def build_golden_core_robe():
+    # Thân vàng kim, vai + cổ huyền thiết, yếm vàng nhạt.
+    return _vest(GOLDEN_BODY, GOLDEN_IRON, GOLDEN_IRON, GOLDEN_PALE, cloth_shades=3)
+
+
+def build_golden_core_gloves():
+    # Bàn tay vàng kim, dải quấn huyền thiết, tấm khớp vàng nhạt.
+    return _wraps(GOLDEN_BODY, GOLDEN_IRON, GOLDEN_PALE)
+
+
+def build_golden_core_cap():
+    """Kim Đan Đạo Quan — vành rộng + thân + chóp NGỌC CHÂU tròn trên cuống.
+
+    Vành vẫn là khối RỘNG NHẤT (đọc ra mũ). Đỉnh đổi hình: bậc bốn chóp cụt, bậc năm sen răng cưa, bậc
+    này một viên châu TRÒN — viền cong trên đỉnh, đối lập răng cưa khi bỏ hết màu.
+    """
+    brim = _box_obj("Brim", 0.290, 0.066, 0.046, loc=(0.0, 0.0, -0.212))
+    apply_toon(brim, GOLDEN_IRON, shades=3)
+    crown = _frustum_obj("Crown", 0.212, 0.156, 0.070, 0.140, loc=(0.0, 0.0, -0.030))
+    apply_toon(crown, GOLDEN_BODY, shades=3)
+    stalk = _box_obj("Stalk", 0.030, 0.030, 0.050, loc=(0.0, 0.0, 0.150))
+    apply_toon(stalk, GOLDEN_IRON, shades=2)
+    pearl = _prism_obj("Pearl", _disc(0.105, segments=20), 0.060, loc=(0.0, 0.0, 0.290))
+    apply_toon(pearl, GOLDEN_PALE, shades=3)
+    stone = _gem_obj("Stone", 0.064, 0.044, 0.078, loc=(0.0, -0.090, -0.212))
+    apply_toon(stone, GOLDEN_BODY, shades=3)
+    return 0.92
+
+
+def build_golden_core_boots():
+    """Kim Đan Đạo Hài — cùng tư thế nghiêng-một-khối-liền, ống CAO và mũi CUỘN MÂY hếch hẳn lên.
+
+    Bậc năm mũi bằng ống thấp; bậc này mũi cuộn lên cao gần nửa ống — đổi đường viền, không chỉ đổi
+    màu. Mặt ống sắc độ khác (vàng nhạt) để tách ống khỏi bàn chân (bài học vòng B bậc năm).
+    """
+    profile = [
+        (-0.160, -0.160),
+        (-0.160, 0.170),
+        (-0.146, 0.320),
+        (-0.030, 0.320),
+        (-0.016, 0.110),
+        (0.090, -0.010),
+        (0.220, -0.010),
+        (0.300, 0.080),
+        (0.290, 0.170),
+        (0.350, 0.120),
+        (0.350, 0.000),
+        (0.270, -0.160),
+    ]
+    body = _prism_obj("Boot", profile, 0.058, loc=(-0.030, 0.0, -0.030))
+    apply_toon(body, GOLDEN_BODY, shades=3)
+    shaft = _box_obj("ShaftFace", 0.050, 0.030, 0.130, loc=(-0.120, -0.062, 0.130))
+    apply_toon(shaft, GOLDEN_PALE, shades=3)
+    cuff = _box_obj("CuffBand", 0.072, 0.066, 0.030, loc=(-0.118, -0.044, 0.286))
+    apply_toon(cuff, GOLDEN_IRON, shades=2)
+    sole = _box_obj("Sole", 0.230, 0.064, 0.032, loc=(0.030, 0.0, -0.206))
+    apply_toon(sole, GOLDEN_IRON, shades=2)
+    return 0.98
+
+
+def build_golden_core_talisman():
+    """Kim Đan Ngọc Bội — ngọc BÁN NGUYỆT vàng kim úp xuống, viền trong huyền thiết, treo dây vàng, tua đỏ.
+
+    Ô ACCESSORY_1 đã khoá bốn hình: vòng kín, thẻ chữ nhật, thoi, đĩa đặc. Bán nguyệt (cung + dây cung
+    thẳng phía trên) là hình thứ năm: cạnh THẲNG nằm ngang đọc khác hẳn mọi hình tròn/thoi kể cả khi bỏ màu.
+    """
+    cap = _box_obj("Cap", 0.058, 0.046, 0.048, loc=(0.0, 0.0, 0.348))
+    apply_toon(cap, GOLD, shades=2)
+    cord = _box_obj("Cord", 0.022, 0.030, 0.090, loc=(0.0, 0.0, 0.250))
+    apply_toon(cord, GOLD, shades=2)
+    half_moon = [(0.270 * math.cos(math.radians(180 + 10 * i)), 0.270 * math.sin(math.radians(180 + 10 * i))) for i in range(19)]
+    moon = _prism_obj("Moon", half_moon, 0.050, loc=(0.0, 0.0, 0.140))
+    apply_toon(moon, GOLDEN_BODY, shades=3)
+    inner = _prism_obj("Inner", _arc_band(0.150, 0.090, 180, 360, segments=14), 0.030,
+                       loc=(0.0, -0.050, 0.140))
+    apply_toon(inner, GOLDEN_IRON, shades=2)
+    fall = _box_obj("TasselFall", 0.032, 0.034, 0.082, loc=(0.0, -0.010, -0.230))
+    apply_toon(fall, TASSEL_RED, shades=3)
+    return 1.00
+
+
+def build_golden_core_blade():
+    """Kim Đan Kiếm — lưỡi hình LÁ vàng nhạt sống huyền thiết + hộ thủ ĐĨA TRÒN.
+
+    Hai bậc trước đảo hộ thủ (chúc xuống, vểnh lên); bậc này đổi hẳn hình hộ thủ thành đĩa tròn, và
+    lưỡi rộng nhất ở hai phần ba thay vì thẳng đều — viền lá đọc ra ở 64px. Lưỡi vẫn SÁNG.
+    """
+    blade_profile = [
+        (-0.070, -0.200), (-0.100, 0.120), (-0.080, 0.290), (0.000, 0.410),
+        (0.080, 0.290), (0.100, 0.120), (0.070, -0.200),
+    ]
+    blade = _prism_obj("Blade", blade_profile, 0.026, loc=(0.0, -0.050, 0.130))
+    apply_toon(blade, GOLDEN_PALE, shades=3)
+    ridge = _box_obj("Ridge", 0.022, 0.030, 0.230, loc=(0.0, -0.080, 0.110))
+    apply_toon(ridge, GOLDEN_IRON, shades=2)
+    guard = _prism_obj("Guard", _disc(0.150, segments=20), 0.044, loc=(0.0, -0.050, -0.110))
+    apply_toon(guard, GOLDEN_BODY, shades=3)
+    grip = _box_obj("Grip", 0.046, 0.044, 0.136, loc=(0.0, -0.050, -0.296))
+    apply_toon(grip, GOLDEN_IRON, shades=3)
+    pommel = _gem_obj("Pommel", 0.062, 0.052, 0.044, loc=(0.0, -0.050, -0.448))
+    apply_toon(pommel, GOLDEN_BODY, shades=2)
+    knot = _box_obj("TasselKnot", 0.034, 0.036, 0.032, loc=(0.0, -0.058, -0.506))
+    apply_toon(knot, TASSEL_RED, shades=2)
+    upper = _box_obj("TasselUpper", 0.032, 0.034, 0.076, loc=(-0.030, -0.060, -0.566), rot=_tilt(-16))
+    apply_toon(upper, TASSEL_RED, shades=3)
+    return 1.14
+
+
 ITEMS = {
     "kunai": build_kunai,
     "wooden_sword": build_wooden_sword,
@@ -1868,6 +1990,12 @@ ITEMS = {
     "inner_sect_gloves": build_inner_sect_gloves,
     "inner_sect_boots": build_inner_sect_boots,
     "inner_sect_talisman": build_inner_sect_talisman,
+    "golden_core_blade": build_golden_core_blade,
+    "golden_core_robe": build_golden_core_robe,
+    "golden_core_cap": build_golden_core_cap,
+    "golden_core_gloves": build_golden_core_gloves,
+    "golden_core_boots": build_golden_core_boots,
+    "golden_core_talisman": build_golden_core_talisman,
 }
 
 

@@ -300,6 +300,19 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     };
 
     private static final float CAVE_X = 120f;
+
+    /** Phần bảy (lô 25, arc 4) — năm quái Hoang Vực sâu cạnh ĐỐI CHỨNG đàn chủ Huyết Sa (bậc cuối arc 3, đã duyệt). */
+    private static final String[] ARC_FOUR_STRIP = {
+        "blood_sand_altar_master",
+        "wasteland_marauder",
+        "blood_sand_digger",
+        "blood_sand_beast_warden",
+        "frenzied_vein_beast",
+        "ancient_stone_colossus",
+    };
+
+    private static final float ARC_FOUR_X = 180f;
+    private static final long ARC_FOUR_FIRST_ID = -980L;
     private static final long CAVE_FIRST_ID = -950L;
 
     /** Tâm camera của dải đang chiếu (dải Q7 hay dải lô 24). */
@@ -535,9 +548,18 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
             case 162 -> capture("7-lo24-sau-model-moi");
             case 164 -> showingBackdrop = true;
             case 168 -> capture("8-hau-canh-parallax");
+            default -> lot25Script();
+        }
+    }
+
+    /** Phần sáu + bảy (lô 25) — tách khỏi {@link #lot24Script()} vì trần {@code CyclomaticComplexity} của PMD. */
+    private void lot25Script() {
+        switch (frame) {
             case 170 -> startCaveStrip();
             case 176 -> capture("9-bay-tri-dong-phu");
-            case 180 -> Gdx.app.exit();
+            case 180 -> startArcFourStrip();
+            case 192 -> capture("10-arc4-quai-hoang-vuc");
+            case 196 -> Gdx.app.exit();
             default -> {
                 /* các khung còn lại chỉ để animation chạy tiếp */
             }
@@ -560,6 +582,14 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         }
         stripCenterX = LOT24_X;
         LOG.info("dải lô 24 dựng ở x={}", LOT24_X);
+    }
+
+    private void startArcFourStrip() {
+        float left = ARC_FOUR_X - LOT24_STEP * (ARC_FOUR_STRIP.length - 1) / 2f;
+        for (int index = 0; index < ARC_FOUR_STRIP.length; index++) {
+            putMonster(ARC_FOUR_FIRST_ID - index, ARC_FOUR_STRIP[index], left + LOT24_STEP * index);
+        }
+        stripCenterX = ARC_FOUR_X;
     }
 
     private void startCaveStrip() {

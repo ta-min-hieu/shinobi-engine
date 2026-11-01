@@ -36,6 +36,9 @@ import dev.kage.server.database.inventory.PostgresDropTableAdapter;
 @Testcontainers
 class PostgresMonsterCatalogAdapterIntegrationTest {
 
+    /** Điểm xa nhất của arc 3 (đàn chủ Huyết Sa, V109) — mốc chia hai ô ghim toạ độ spawn. */
+    private static final float ARC_THREE_LAST_X = 296f;
+
     private static final int POSTGRES_PORT = 5432;
 
     /**
@@ -215,7 +218,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         List<MonsterSpawnPoint> spawns =
                 new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
 
-        assertThat(spawns).hasSize(23); // V109 (arc 3) thêm 5 điểm 232/248/264/280/296
+        assertThat(spawns).hasSize(30); // V109 (arc 3) thêm 5 điểm 232…296; V113 (arc 4) thêm 7 điểm 312…408
         // ADR-033 — quái lệch khỏi y=0 là quái người chơi không bao giờ chạm tới. DB có CHECK,
         // đây là hàng rào thứ hai và cũng là tài liệu sống cho ràng buộc đó.
         assertThat(spawns).allSatisfy(spawn -> assertThat(spawn.posY()).isZero());
@@ -264,6 +267,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
 
         // KHÔNG khớp theo thứ tự: adapter trả về theo id (thứ tự chèn của các migration), không theo trục x.
         assertThat(spawns)
+                .filteredOn(spawn -> spawn.posX() <= ARC_THREE_LAST_X)
                 .extracting(MonsterSpawnPoint::posX)
                 .containsExactlyInAnyOrder(
                         -52f, // V56/V57 dời -47 → -52 (vế tuần tra, dòng 64(b))
@@ -301,6 +305,22 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
                         264f,
                         280f,
                         296f);
+    }
+
+    /**
+     * V113 — arc 4 Hạ Sơn (ADR-139), Hoang Vực sâu phía đông cổng nội môn: tà tu @312, hai quật mạch đồ @328/@344, cai
+     * ngục @360, hai cuồng mạch yêu thú @376/@392, cổ thạch quái @408. Bước 16; GROUND_MAX_X 305 → 417. Tách khỏi
+     * {@link #shouldPlaceMainWorldSpawnsAtTheirDocumentedX} vì trần {@code MethodLength} của Checkstyle.
+     */
+    @Test
+    void shouldPlaceArcFourSpawnsInTheDeepWasteland() {
+        List<MonsterSpawnPoint> spawns =
+                new PostgresMonsterCatalogAdapter(dataSource).listSpawnPoints(MonsterSpawnPoint.MAIN_WORLD_CODE);
+
+        assertThat(spawns)
+                .filteredOn(spawn -> spawn.posX() > ARC_THREE_LAST_X)
+                .extracting(MonsterSpawnPoint::posX)
+                .containsExactlyInAnyOrder(312f, 328f, 344f, 360f, 376f, 392f, 408f);
     }
 
     /**
@@ -405,7 +425,7 @@ class PostgresMonsterCatalogAdapterIntegrationTest {
         // CỐ Ý, xem shouldListMainWorldSpawnPointsOnThePlayLine). Con số này là một cái ĐẾM chứ
         // không phải một luật, nên mỗi đợt thêm loài CÓ aggro đều phải sửa nó — đó là chủ đích:
         // thêm một con biết tự đánh người mà không ai đọc lại luật giãn spawn thì ô này đỏ trước.
-        assertThat(aggressive).hasSize(20); // V109: cả 5 điểm arc 3 đều aggro 3 — luật giãn đã soi ở V109
+        assertThat(aggressive).hasSize(27); // V109: 5 điểm arc 3; V113: 7 điểm arc 4 — đều aggro 3, luật giãn đã soi
         for (int i = 0; i < aggressive.size(); i++) {
             for (int j = i + 1; j < aggressive.size(); j++) {
                 MonsterSpawnPoint first = aggressive.get(i);

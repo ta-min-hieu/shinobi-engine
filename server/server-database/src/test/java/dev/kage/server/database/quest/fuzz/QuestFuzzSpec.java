@@ -162,6 +162,22 @@ record QuestFuzzSpec(
             quest("repel_the_altar_master")
                     .killing("blood_sand_altar_master", 1, CounterKind.COUNT_UNTIL_TARGET, "blood_sand_altar_master")
                     .reportingTo(TOWN_ELDER),
+            // ADR-139 (V113) — arc 4 Hạ Sơn: khoá tiến độ là chính mã quái, báo Chu Hoành.
+            quest("descend_the_mountain")
+                    .killing("wasteland_marauder", 1, CounterKind.COUNT_UNTIL_TARGET, "wasteland_marauder")
+                    .reportingTo(TOWN_ELDER),
+            quest("trace_the_blood_sand")
+                    .killing("blood_sand_digger", 2, CounterKind.COUNT_UNTIL_TARGET, "blood_sand_digger")
+                    .reportingTo(TOWN_ELDER),
+            quest("free_the_awakened_beast")
+                    .killing("blood_sand_beast_warden", 1, CounterKind.COUNT_UNTIL_TARGET, "blood_sand_beast_warden")
+                    .reportingTo(TOWN_ELDER),
+            quest("quiet_the_frenzied_kin")
+                    .killing("frenzied_vein_beast", 2, CounterKind.COUNT_UNTIL_TARGET, "frenzied_vein_beast")
+                    .reportingTo(TOWN_ELDER),
+            quest("fell_the_ancient_colossus")
+                    .killing("ancient_stone_colossus", 1, CounterKind.COUNT_UNTIL_TARGET, "ancient_stone_colossus")
+                    .reportingTo(TOWN_ELDER),
             // ADR-055 — nhiệm vụ ngày, không tiên quyết. Trong một lượt fuzz (vài giây) không qua 0h,
             // nên mô hình "CLAIMED là cuối" vẫn đúng.
             quest("daily_dummy_drill").killing("training_dummy", 5, CounterKind.COUNT, FELLED),

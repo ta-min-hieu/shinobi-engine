@@ -85,6 +85,13 @@ if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS") {
             { label_key: "dialogue.option.ask_leaked_exam", action: "leaked_exam" },
             { label_key: "dialogue.option.ask_grand_contest", action: "grand_contest" },
             { label_key: "dialogue.option.ask_altar_master", action: "altar_master" },
+            // ADR-139 (V113) — arc 4 Hạ Sơn, chèn SAU `altar_master` (nối đúng nhịp đóng arc 3). `daily_duty`,
+            // `open_crafting`, `end` lùi thêm năm chỗ — CÓ CHỦ ĐÍCH, ghim ở TownElderDialogueTreeTest.
+            { label_key: "dialogue.option.ask_descend", action: "descend" },
+            { label_key: "dialogue.option.ask_trace_blood_sand", action: "trace_blood_sand" },
+            { label_key: "dialogue.option.ask_awakened_beast", action: "awakened_beast" },
+            { label_key: "dialogue.option.ask_frenzied_kin", action: "frenzied_kin" },
+            { label_key: "dialogue.option.ask_colossus", action: "colossus" },
             // Nhiệm vụ ngày (ADR-055, STORY §7) — đứng CUỐI, sau mọi nhánh chính tuyến, ngay trước "bye":
             // `bye` lùi một chỗ là CÓ CHỦ ĐÍCH (option_index là VỊ TRÍ), ghim ở TownElderDialogueTreeTest.
             { label_key: "dialogue.option.ask_daily_duty", action: "daily_duty" },
@@ -379,6 +386,48 @@ if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS") {
         text_key: "dialogue.town_elder.altar_master",
         options: [
             { label_key: "dialogue.option.accept_quest_altar_master", action: "accept_quest:repel_the_altar_master" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    // ARC 4 — Hạ Sơn (ADR-139, STORY §6). Nhịp hé lộ (§8 quy tắc 2): được nói yêu tộc là nạn nhân Đại Kiếp, Huyết Sa
+    // đào linh mạch chết "tìm thứ gì đó" — KHÔNG nói vết nứt/Thiên Môn sâu hơn arc 3, KHÔNG danh tính nội gián.
+    descend: {
+        text_key: "dialogue.town_elder.descend",
+        options: [
+            { label_key: "dialogue.option.accept_quest_descend", action: "accept_quest:descend_the_mountain" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    trace_blood_sand: {
+        text_key: "dialogue.town_elder.trace_blood_sand",
+        options: [
+            { label_key: "dialogue.option.accept_quest_trace_blood_sand", action: "accept_quest:trace_the_blood_sand" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    awakened_beast: {
+        text_key: "dialogue.town_elder.awakened_beast",
+        options: [
+            { label_key: "dialogue.option.accept_quest_awakened_beast", action: "accept_quest:free_the_awakened_beast" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    frenzied_kin: {
+        text_key: "dialogue.town_elder.frenzied_kin",
+        options: [
+            { label_key: "dialogue.option.accept_quest_frenzied_kin", action: "accept_quest:quiet_the_frenzied_kin" },
+            { label_key: "dialogue.option.back", action: "about_town" },
+            { label_key: "dialogue.option.bye", action: "end" }
+        ]
+    },
+    colossus: {
+        text_key: "dialogue.town_elder.colossus",
+        options: [
+            { label_key: "dialogue.option.accept_quest_colossus", action: "accept_quest:fell_the_ancient_colossus" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]
