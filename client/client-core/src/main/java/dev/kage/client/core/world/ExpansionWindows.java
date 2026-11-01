@@ -36,7 +36,8 @@ record ExpansionWindows(
         CaveCoordinator cave,
         ZoneMapCoordinator zoneMap,
         ReportPanel displaySettingsPanel,
-        DisplaySettingsCoordinator displaySettings) {
+        DisplaySettingsCoordinator displaySettings,
+        WeatherCoordinator weather) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
@@ -85,7 +86,8 @@ record ExpansionWindows(
                 new DisplaySettingsCoordinator(
                         displaySettingsPanel,
                         DisplaySettings.load(new GdxPreferencesDisplaySettingsStore()),
-                        feeds.chat()));
+                        feeds.chat()),
+                new WeatherCoordinator()); // ADR-144
     }
 
     /** Đăng ký vào hub. */
@@ -107,6 +109,20 @@ record ExpansionWindows(
         panels.register(cave);
         panels.register(zoneMap);
         panels.register(displaySettingsPanel, displaySettings);
+        panels.register(weather);
+    }
+
+    /**
+     * Nối lớp hiển thị của lô 26: biển vùng PvP lên HUD (ADR-141), công tắc cài đặt vào từng lớp vẽ (ADR-143) và lớp
+     * thời tiết (ADR-144).
+     */
+    void wireDisplay(
+            dev.kage.client.core.ui.hud.CombatHud hud,
+            RealmTitles titles,
+            CombatFeedbackPresenter feedback,
+            HorizonBackdrop backdrop) {
+        zoneMap.useBanner(hud::setZoneBanner);
+        displaySettings.applyTo(titles, feedback, backdrop, weather.overlay());
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

@@ -20,4 +20,9 @@ public interface SafeZonePort {
     default List<PvpZone> listPvpZones(String worldCode) {
         return List.of();
     }
+
+    /** ADR-144 — vùng thời tiết của một world (bảng {@code weather_region}, V116); mặc định rỗng. */
+    default List<WeatherRegion> listWeatherRegions(String worldCode) {
+        return List.of();
+    }
 }

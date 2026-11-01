@@ -498,11 +498,10 @@ public final class WorldScreen implements GameScreen {
         GuildWarCoordinator guildWars = reports.community().guildWars();
         guild.useGuildAuction(reports.community().auctions()::open);
         guild.useGuildWar(guildWars::open);
-        ZoneMapCoordinator zoneMap = reports.community().expansion().zoneMap(); // ADR-141 — biển + click nhắm
-        zoneMap.useBanner(combatHud::setZoneBanner);
-        reports.community().expansion().displaySettings().applyTo(realmTitles, combatFeedback, backdrop); // ADR-143
+        ExpansionWindows expansion = reports.community().expansion(); // ADR-141 biển PvP, 143 cài đặt, 144 thời tiết
+        expansion.wireDisplay(combatHud, realmTitles, combatFeedback, backdrop);
         duelTargeting.useGuildWar(
-                zoneMap.orInPvpZone(guildWars::isMyWarActive),
+                expansion.zoneMap().orInPvpZone(guildWars::isMyWarActive),
                 dev.kage.client.core.ui.theme.KageI18n.textOrKey(i18n, "guildwar.target"));
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
@@ -997,6 +996,8 @@ public final class WorldScreen implements GameScreen {
             DemoPlatforms.render(shapeRenderer, camera.combined, worldChange.currentKind());
             combatFeedback.render(Gdx.graphics.getDeltaTime(), camera.combined, fallbackProjector);
         }
+        WeatherCoordinator weather = reports.community().expansion().weather(); // ADR-144 — trước lớp phủ đêm
+        weather.render(shapeRenderer, POSITION.get(localPlayer).x, Gdx.graphics.getDeltaTime());
         dayNight.render(shapeRenderer, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 
         syncCombatHud();

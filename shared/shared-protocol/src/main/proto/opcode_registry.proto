@@ -131,6 +131,7 @@ enum Opcode {
   OPCODE_CAVE_INVITE_EVENT = 337; // bạn bè mời thăm động phủ
   OPCODE_LIST_ZONE_MAP_REQUEST = 338; // ADR-141 (2026-11-01) — bản đồ vùng PvP/an toàn cho HUD
   OPCODE_LIST_ZONE_MAP_RESPONSE = 339;
+  OPCODE_WEATHER_EVENT = 340; // ADR-144 (2026-11-01) — thời tiết theo vùng (chỉ hiển thị)
 
   // --- Combat / Skill (400-499) ---
   OPCODE_SET_TARGET_COMMAND = 400;

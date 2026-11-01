@@ -19,7 +19,9 @@ public final class DisplaySettings {
         /** Số damage / né / chí mạng bay lên. */
         DAMAGE_NUMBERS("display.damage_numbers"),
         /** Núi xa/gần và mây trôi của hậu cảnh (ART-PIPELINE §2.8) — tắt còn trời và biển mây phẳng. */
-        PARALLAX("display.parallax");
+        PARALLAX("display.parallax"),
+        /** Mưa linh khí / bão cát theo vùng (ADR-144). */
+        WEATHER("display.weather");
 
         private final String key;
 

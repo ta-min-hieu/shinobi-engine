@@ -39,4 +39,9 @@ public final class WorldGeometryFacade {
     public List<dev.kage.world.domain.PvpZone> listPvpZones(String worldCode) {
         return safeZonePort.listPvpZones(worldCode);
     }
+
+    /** ADR-144 — vùng thời tiết của {@code worldCode} (chỉ hiển thị); rỗng nếu world đó không có. */
+    public List<dev.kage.world.domain.WeatherRegion> listWeatherRegions(String worldCode) {
+        return safeZonePort.listWeatherRegions(worldCode);
+    }
 }

@@ -157,6 +157,22 @@ class SafeZoneIntegrationTest {
         }
     }
 
+    /** ADR-144 (V116) — hai vùng thời tiết đọc đủ cột, bão cát trùng dải PvP Hoang Vực sâu. */
+    @Test
+    void shouldSeedTheTwoWeatherRegions() {
+        List<dev.kage.world.domain.WeatherRegion> regions =
+                new PostgresSafeZoneAdapter(dataSource).listWeatherRegions(SafeZone.MAIN_WORLD_CODE);
+
+        assertThat(regions)
+                .extracting(dev.kage.world.domain.WeatherRegion::code)
+                .containsExactly("sect_spirit_rain", "wasteland_sandstorm");
+        dev.kage.world.domain.WeatherRegion storm = regions.get(1);
+        assertThat(storm.kind()).isEqualTo("SANDSTORM");
+        assertThat(storm.minX()).isEqualTo(307f);
+        assertThat(storm.maxX()).isEqualTo(417f);
+        assertThat(storm.periodMinutes()).isEqualTo(45);
+    }
+
     private static SafeZone zoneByCode(List<SafeZone> zones, String code) {
         return zones.stream()
                 .filter(zone -> zone.code().equals(code))

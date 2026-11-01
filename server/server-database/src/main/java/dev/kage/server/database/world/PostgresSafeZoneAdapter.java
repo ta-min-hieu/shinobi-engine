@@ -42,6 +42,25 @@ public final class PostgresSafeZoneAdapter implements SafeZonePort {
     }
 
     @Override
+    public List<dev.kage.world.domain.WeatherRegion> listWeatherRegions(String worldCode) {
+        return JdbcOperations.query(
+                dataSource,
+                """
+                SELECT code, min_x, max_x, kind, period_minutes, active_minutes, offset_minutes
+                  FROM weather_region WHERE world_code = ? ORDER BY min_x
+                """,
+                rs -> new dev.kage.world.domain.WeatherRegion(
+                        rs.getString(1),
+                        rs.getFloat(2),
+                        rs.getFloat(3),
+                        rs.getString(4),
+                        rs.getInt(5),
+                        rs.getInt(6),
+                        rs.getInt(7)),
+                worldCode);
+    }
+
+    @Override
     public List<SafeZone> listSafeZones(String worldCode) {
         return JdbcOperations.query(dataSource, LIST_SAFE_ZONES, PostgresSafeZoneAdapter::mapSafeZone, worldCode);
     }

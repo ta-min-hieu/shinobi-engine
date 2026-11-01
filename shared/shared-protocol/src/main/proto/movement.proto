@@ -544,3 +544,24 @@ message ListZoneMapResponse {
   repeated ZoneRange pvp_ranges = 1;
   repeated ZoneRange safe_ranges = 2;
 }
+
+// ADR-144 (2026-11-01) — loại thời tiết (chỉ hiển thị, không đổi gameplay).
+enum WeatherKind {
+  WEATHER_KIND_UNSPECIFIED = 0;
+  WEATHER_KIND_SPIRIT_RAIN = 1;  // mưa linh khí — tông môn
+  WEATHER_KIND_SANDSTORM = 2;    // bão cát đỏ — Hoang Vực sâu
+}
+
+// Một vùng đang có thời tiết trên trục X của world chính (biên gồm cả hai đầu).
+message WeatherZone {
+  string code = 1;
+  float min_x = 2;
+  float max_x = 3;
+  WeatherKind kind = 4;
+}
+
+// Event: Server -> Client, mọi người online (OPCODE_WEATHER_EVENT = 340), gửi lặp mỗi 30 giây cùng nhịp ngày đêm.
+// zones = các vùng ĐANG có thời tiết (rỗng = trời quang mọi nơi). Client tự so vị trí của mình để vẽ.
+message WeatherEvent {
+  repeated WeatherZone zones = 1;
+}

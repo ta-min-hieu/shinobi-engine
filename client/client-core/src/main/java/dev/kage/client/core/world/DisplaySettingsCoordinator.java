@@ -37,10 +37,12 @@ final class DisplaySettingsCoordinator implements WindowFlow {
     }
 
     /** Nối công tắc vào từng lớp vẽ — mỗi lớp tự hỏi công tắc của mình mỗi khung. */
-    void applyTo(RealmTitles titles, CombatFeedbackPresenter feedback, HorizonBackdrop backdrop) {
+    void applyTo(
+            RealmTitles titles, CombatFeedbackPresenter feedback, HorizonBackdrop backdrop, WeatherOverlay weather) {
         titles.useSwitch(settings.switchFor(DisplaySettings.Option.REALM_TITLES));
         feedback.useSwitch(settings.switchFor(DisplaySettings.Option.DAMAGE_NUMBERS));
         backdrop.useSwitch(settings.switchFor(DisplaySettings.Option.PARALLAX));
+        weather.useSwitch(settings.switchFor(DisplaySettings.Option.WEATHER));
     }
 
     private boolean onSlash(String line) {
