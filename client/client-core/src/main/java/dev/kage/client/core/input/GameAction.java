@@ -21,6 +21,8 @@ public enum GameAction {
      * trên màn hình, không phải ý định nhị phân bấm/không bấm.
      */
     USE_SKILL,
+    /** ADR-133 (lô 25) — kích chiêu pháp bảo đang mặc ở ô ARTIFACT. */
+    USE_ARTIFACT,
 
     /**
      * Đánh thường một đòn lên mục tiêu đang chọn (chủ dự án yêu cầu 2026-08-09: "tôi phải bấm đánh

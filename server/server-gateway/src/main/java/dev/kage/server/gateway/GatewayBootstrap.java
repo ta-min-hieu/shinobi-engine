@@ -441,7 +441,7 @@ public final class GatewayBootstrap {
         // tiên mọi bảng định tuyến World cùng tồn tại.
         // ADR-093 — thưởng sư đồ đi theo mỗi cú lên cấp.
         characterRegistry.syncLevelUpsThrough(
-                CharacterLevelSync.of(worldGateway, mentorshipCommands(facades, characterRegistry)::onLevelReached));
+                CharacterLevelSync.of(worldGateway, levelListener(facades, characterRegistry, worldGateway)));
         // Cùng lý do: "đồng đội cùng World" chỉ tra được khi mọi bảng định tuyến đã có.
         characterRegistry.shareKillRewardsThrough(
                 KillRewardSharing.of(facades.contentFacades().socialFacades().partyFacade(), worldGateway));
@@ -757,6 +757,18 @@ public final class GatewayBootstrap {
                                     FIRST_CLEAR_GOLD,
                                     items));
                 });
+    }
+
+    /** Lên cấp: sư đồ (ADR-091) rồi bậc trang phục theo cảnh giới (ADR-132). */
+    private static CharacterLevelSync.LevelListener levelListener(
+            GatewayFacades facades, ConnectedCharacterRegistry characterRegistry, WorldGateway worldGateway) {
+        CharacterLevelSync.LevelListener mentorship = mentorshipCommands(facades, characterRegistry)::onLevelReached;
+        CharacterLevelSync.LevelListener costume = CostumeTierHooks.listener(
+                facades.characterFacade(), characterRegistry, WorldRouteLookup.of(worldGateway));
+        return (characterId, level) -> {
+            mentorship.onLevelReached(characterId, level);
+            costume.onLevelReached(characterId, level);
+        };
     }
 
     /** Bậc chiêu + tâm pháp (ADR-071/077) — tâm pháp cần linh căn hiện tại đọc từ DB. */

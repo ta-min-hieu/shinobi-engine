@@ -23,6 +23,8 @@ final class DesktopInputMapper implements InputMapper {
                 Gdx.input.isKeyPressed(Keys.W) || Gdx.input.isKeyPressed(Keys.UP) || Gdx.input.isKeyPressed(Keys.SPACE);
             // Enter (cả phím chính lẫn Enter bàn phím số) — đúng phím chủ dự án yêu cầu 2026-08-09.
             case USE_SKILL -> Gdx.input.isKeyPressed(Keys.ENTER) || Gdx.input.isKeyPressed(Keys.NUMPAD_ENTER);
+            // ADR-133 — pháp bảo: phím 1 (hàng số và bàn phím số), phím chữ đã chia hết cho các cửa sổ.
+            case USE_ARTIFACT -> Gdx.input.isKeyPressed(Keys.NUM_1) || Gdx.input.isKeyPressed(Keys.NUMPAD_1);
             // Đánh thường: Z (ngón trái vẫn ở A/D được) hoặc Ctrl. KHÔNG dùng Space — đã là nhảy.
             case ATTACK ->
                 Gdx.input.isKeyPressed(Keys.Z)

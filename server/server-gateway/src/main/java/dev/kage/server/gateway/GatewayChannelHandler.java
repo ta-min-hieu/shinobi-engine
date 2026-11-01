@@ -1607,7 +1607,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // Đăng ký connection NÀY để world outbound (spawn/move/despawn — SERVER.md §6) tìm
             // đúng channel; attachCharacter chỉ enqueue, entity ECS thật tạo ở tick kế tiếp. Hai bước
             // trong một khoá — lượt kéo vào hầm ngục/đấu trường không chen được vào giữa (dòng 73(f)).
-            CharacterAppearance appearance = CharacterAppearance.of(toProtoFaction(character.faction()));
+            CharacterAppearance appearance =
+                    CharacterAppearance.of(toProtoFaction(character.faction()), character.level());
             worldGateway
                     .mainWorldChannels()
                     .registerAndAttach(
@@ -1818,7 +1819,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // Ngoại hình cache ở registry được ghi MỘT LẦN lúc vào world — không cập nhật ở đây thì
             // mọi CharacterSpawnedEvent phát về sau vẫn mang hệ phái CŨ, xem
             // ConnectedCharacterRegistry#updateAppearance.
-            worldGateway.registry().updateAppearance(characterId, CharacterAppearance.of(request.getFaction()));
+            CharacterAppearance changed = CharacterAppearance.of(request.getFaction(), levelOf(characterId));
+            worldGateway.registry().updateAppearance(characterId, changed);
             // ADR-045 — người ĐANG nhìn thấy nhân vật này (và chính họ) mới biết model đã đổi. Phải
             // đi qua hàng đợi world vì AoI chỉ đọc được trên tick thread. Chưa vào World nào thì
             // không có ai đang nhìn — bỏ qua, lần vào world sau CharacterSpawnedEvent đã mang hệ
@@ -2367,7 +2369,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 currentWorldFacadeIfPresent(characterId).ifPresent(world -> world.resetCharacterLevel(characterId, 1));
                 characterFacade.findById(characterId).ifPresent(character -> worldGateway
                         .registry()
-                        .register(characterId, ctx, CharacterAppearance.of(toProtoFaction(character.faction()))));
+                        .register(
+                                characterId,
+                                ctx,
+                                CharacterAppearance.of(toProtoFaction(character.faction()), character.level())));
                 applyEquipmentBonusAndComputeMaxHp(characterId);
                 send(
                         ctx,
@@ -5628,14 +5633,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .build();
     }
 
+    /** Cấp hiện tại trong DB (ADR-132 — bậc trang phục theo cảnh giới); không tìm thấy thì Cấp 1. */
+    private int levelOf(long characterId) {
+        return characterFacade
+                .findById(characterId)
+                .map(dev.kage.character.domain.Character::level)
+                .orElse(1);
+    }
+
     private static Faction toProtoFaction(dev.kage.character.domain.Faction faction) {
-        return switch (faction) {
-            case HOA -> Faction.FACTION_HOA;
-            case THUY -> Faction.FACTION_THUY;
-            case PHONG -> Faction.FACTION_PHONG;
-            case LOI -> Faction.FACTION_LOI;
-            case THO -> Faction.FACTION_THO;
-        };
+        return FactionMapping.toProto(faction);
     }
 
     private static dev.kage.character.domain.Faction toDomainFaction(Faction faction) {

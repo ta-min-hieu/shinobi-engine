@@ -139,6 +139,16 @@ public final class CombatHud implements HudWindow {
         actions.setOnSkillClicked(callback);
     }
 
+    /** ADR-133 — nút pháp bảo. */
+    public void setOnArtifactClicked(Runnable callback) {
+        actions.setOnArtifactClicked(callback);
+    }
+
+    /** ADR-133 — giây hồi chiêu pháp bảo còn lại (0 = sẵn sàng). */
+    public void setArtifactCooldown(float remainingSeconds) {
+        actions.setArtifactCooldown(remainingSeconds);
+    }
+
     /** Nút Đánh (đánh thường) — luôn bấm được, server tự bỏ qua nếu chưa hết cooldown/ngoài tầm. */
     public void setOnAttackClicked(Runnable callback) {
         actions.setOnAttackClicked(callback);

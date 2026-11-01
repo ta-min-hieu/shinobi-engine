@@ -23,4 +23,15 @@ final class FactionMapping {
             case THO -> Element.THO;
         };
     }
+
+    /** {@code feature-character.Faction} → enum giao thức (ngoại hình gửi qua dây). */
+    static dev.kage.protocol.Faction toProto(Faction faction) {
+        return switch (faction) {
+            case HOA -> dev.kage.protocol.Faction.FACTION_HOA;
+            case THUY -> dev.kage.protocol.Faction.FACTION_THUY;
+            case PHONG -> dev.kage.protocol.Faction.FACTION_PHONG;
+            case LOI -> dev.kage.protocol.Faction.FACTION_LOI;
+            case THO -> dev.kage.protocol.Faction.FACTION_THO;
+        };
+    }
 }

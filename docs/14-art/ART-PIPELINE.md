@@ -114,11 +114,12 @@ KHÔNG sinh lại được, chỉ sửa: `retrofit_weapon.py`, `strip_headband.p
 
 | Bậc | Tên hiển thị (mới) | Ý nghĩa | Trạng thái code |
 |---|---|---|---|
-| B1 | **Đệ tử Ngoại Môn** | áo vải, ít phụ kiện | đang dùng — server luôn gửi B1 (`CharacterAppearance.DEFAULT_COSTUME_TIER`) |
-| B2 | **Đệ tử Nội Môn** | thêm giáp mảnh + khăn/đai màu hệ | có model, **chưa có luật lên bậc** |
-| B3 | **Chân Truyền** | thêm MỘT chi tiết chuyển động (vòng nguyên tố, tàn lửa) | có model, **chưa có luật lên bậc** |
+| B1 | **Đệ tử Luyện Khí** | áo vải, ít phụ kiện | Cấp 1–18 |
+| B2 | **Đệ tử Trúc Cơ** | thêm giáp mảnh + khăn/đai màu hệ | từ Cấp 19 |
+| B3 | **Đệ tử Tử Phủ** | thêm MỘT chi tiết chuyển động (vòng nguyên tố, tàn lửa) | từ Cấp 37 |
 
-Thay tên cũ Học Viên / Nhẫn Giả / Thượng Nhẫn. Luật chọn bậc theo cảnh giới là việc gameplay — cần quyết riêng.
+Thay tên cũ Học Viên / Nhẫn Giả / Thượng Nhẫn. Bậc theo cảnh giới, đổi ngay trong phiên khi vượt mốc —
+[ADR-132](../01-architecture/adr/ADR-132-Costume-Tier-By-Realm.md) (`CharacterAppearance.tierFor`).
 
 **Vũ khí theo hệ** (kit `kage_mesh_kit`, gắn vào xương — đổi được không phải dựng lại thân): Hoả **trường kiếm** (lô 24
 thay kunai) · Lôi trường kiếm · Phong song đao · Thổ chuỳ · Thuỷ hồ lô. **Không kunai, không băng trán** trên nhân vật.

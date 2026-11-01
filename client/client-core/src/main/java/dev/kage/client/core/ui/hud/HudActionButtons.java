@@ -31,6 +31,13 @@ final class HudActionButtons {
     private final TextButton attackButton;
     private final CooldownText cooldownText = new CooldownText();
 
+    /** ADR-133 — nút pháp bảo, bên TRÁI nút chiêu, cùng cỡ: dùng ít hơn đánh thường, ngang hàng chiêu. */
+    private final TextButton artifactButton;
+
+    private final CooldownText artifactCooldownText = new CooldownText();
+    private Runnable onArtifactClicked;
+    private String shownArtifactText;
+
     private Runnable onSkillClicked;
     private Runnable onAttackClicked;
     private String shownSkillText;
@@ -39,6 +46,7 @@ final class HudActionButtons {
         this.i18n = i18n;
         this.skillButton = new TextButton("", skin.roundButtonStyle);
         this.attackButton = new TextButton("", skin.roundButtonStyle);
+        this.artifactButton = new TextButton("", skin.roundButtonStyle);
         this.skillNameLabel = new Label("", skin.statLabelStyle);
     }
 
@@ -59,12 +67,24 @@ final class HudActionButtons {
                 }
             }
         });
+        artifactButton.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                if (onArtifactClicked != null) {
+                    onArtifactClicked.run();
+                }
+            }
+        });
         skillNameLabel.setAlignment(Align.center);
 
         // Mỗi nút một CỘT riêng (biển tên + nút), canh đáy: hai nút khác cỡ nằm chung một lưới 2 hàng sẽ
         // kéo hàng biển tên giãn theo nút cao nhất, để lại khoảng trống lơ lửng giữa tên và nút — thấy
         // thật trên ảnh chụp preview 2026-08-09.
         Table cluster = new Table();
+        Label artifactName = new Label(i18n.get("hud.action.artifact"), skin.statLabelStyle);
+        cluster.add(buttonColumn(HudLayout.namePlate(skin, artifactName), artifactButton, SKILL_BUTTON_SIZE))
+                .bottom()
+                .padRight(10f);
         cluster.add(buttonColumn(HudLayout.namePlate(skin, skillNameLabel), skillButton, SKILL_BUTTON_SIZE))
                 .bottom()
                 .padRight(10f);
@@ -87,6 +107,21 @@ final class HudActionButtons {
 
     void setOnAttackClicked(Runnable callback) {
         this.onAttackClicked = callback;
+    }
+
+    void setOnArtifactClicked(Runnable callback) {
+        this.onArtifactClicked = callback;
+    }
+
+    /** ADR-133 — đếm ngược hồi chiêu pháp bảo trong nút (rỗng khi sẵn sàng); chỉ setText khi đổi (UI.md §9). */
+    void setArtifactCooldown(float remainingSeconds) {
+        String text = artifactCooldownText.textFor(remainingSeconds);
+        if (text.equals(shownArtifactText)) {
+            return;
+        }
+        shownArtifactText = text;
+        artifactButton.setText(text);
+        artifactButton.setDisabled(remainingSeconds > 0f);
     }
 
     /** Xem {@link CombatHud#setSkillState}. */

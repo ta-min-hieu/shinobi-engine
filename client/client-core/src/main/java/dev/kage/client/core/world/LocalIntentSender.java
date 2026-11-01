@@ -58,6 +58,11 @@ final class LocalIntentSender {
      */
     private final KeyPressEdge skillKey = new KeyPressEdge();
 
+    /** ADR-133 — mép nhấn phím pháp bảo; hành động do {@link #setOnArtifact} nối (ArtifactCoordinator). */
+    private final KeyPressEdge artifactKey = new KeyPressEdge();
+
+    private Runnable onArtifact = () -> {};
+
     LocalIntentSender(LocalIntentContext context) {
         this.context = context;
         this.attackInput = new AttackInputController(context.localCharacterId());
@@ -110,6 +115,26 @@ final class LocalIntentSender {
         updateJump(fixedDeltaTime);
         updateAttack(fixedDeltaTime);
         updateSkill();
+        updateArtifact();
+    }
+
+    /**
+     * ADR-133 — nối hành động phím pháp bảo (một lần, lúc dựng màn hình).
+     *
+     * @return chính {@code action}, để nút HUD nối cùng hành động trong một dòng ({@code WorldScreen} ở trần PMD)
+     */
+    Runnable setOnArtifact(Runnable action) {
+        this.onArtifact = action;
+        return action;
+    }
+
+    private void updateArtifact() {
+        boolean freshPress = artifactKey.update(
+                context.inputMapper().isPressed(GameAction.USE_ARTIFACT),
+                context.keyboardFree().getAsBoolean());
+        if (freshPress && !context.dialogueOpen().getAsBoolean()) {
+            onArtifact.run();
+        }
     }
 
     /**

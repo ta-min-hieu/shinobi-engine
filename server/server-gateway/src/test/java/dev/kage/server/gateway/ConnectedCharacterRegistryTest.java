@@ -384,9 +384,11 @@ class ConnectedCharacterRegistryTest {
         registry.register(1L, observer.pipeline().firstContext());
         EmbeddedChannel changed = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(
-                2L, changed.pipeline().firstContext(), CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_HOA));
+                2L,
+                changed.pipeline().firstContext(),
+                CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_HOA, 1));
 
-        registry.updateAppearance(2L, CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_THUY));
+        registry.updateAppearance(2L, CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_THUY, 1));
         registry.onCharacterSpawned(1L, 2L, 3f, 4f);
 
         PacketCodec.Frame frame = awaitOutboundFrame(observer, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE);
@@ -410,7 +412,7 @@ class ConnectedCharacterRegistryTest {
         EmbeddedChannel observer = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(1L, observer.pipeline().firstContext());
 
-        registry.updateAppearance(2L, CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_THUY));
+        registry.updateAppearance(2L, CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_THUY, 1));
         registry.onCharacterSpawned(1L, 2L, 3f, 4f);
 
         PacketCodec.Frame frame = awaitOutboundFrame(observer, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE);
@@ -431,9 +433,11 @@ class ConnectedCharacterRegistryTest {
         registry.register(1L, observer.pipeline().firstContext());
         EmbeddedChannel changed = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
         registry.register(
-                2L, changed.pipeline().firstContext(), CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_HOA));
+                2L,
+                changed.pipeline().firstContext(),
+                CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_HOA, 1));
 
-        registry.updateAppearance(2L, CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_THUY));
+        registry.updateAppearance(2L, CharacterAppearance.of(dev.kage.protocol.Faction.FACTION_THUY, 1));
         registry.onCharacterAppearanceChanged(1L, 2L);
 
         PacketCodec.Frame frame = awaitOutboundFrame(observer, Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE);

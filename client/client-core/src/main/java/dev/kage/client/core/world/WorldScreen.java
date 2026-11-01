@@ -488,6 +488,9 @@ public final class WorldScreen implements GameScreen {
         panels.register(reports.spiritVeinPanel(), reports.spiritVeins());
         reports.community().registerInto(panels);
         reports.community().expansion().taming().useTarget(combatHudController::currentTargetId); // ADR-124
+        // ADR-133 — nút pháp bảo trên HUD và phím 1 cùng gọi ArtifactCoordinator.use.
+        combatHud.setOnArtifactClicked(
+                intents.setOnArtifact(reports.community().expansion().artifact()::use));
         // ADR-102 — cửa sổ bang chiến mở từ nút cửa sổ Bang; đang chiến thì click người chơi là nhắm họ.
         GuildWarCoordinator guildWars = reports.community().guildWars();
         guild.useGuildAuction(reports.community().auctions()::open);
@@ -1000,6 +1003,7 @@ public final class WorldScreen implements GameScreen {
         TargetHudSync.sync(combatHudController, combatHud);
         combatHud.setSkillState(combatHudController.skillNameKey(), combatHudController.skillCooldownRemaining());
         combatHud.setSkillReady(combatHudController.canUseSkill());
+        combatHud.setArtifactCooldown(reports.community().expansion().artifact().cooldownRemainingSeconds());
     }
 
     /** Nhánh 3D (ADR-031) — model glTF qua camera orthographic khoá góc. */

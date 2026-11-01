@@ -14,17 +14,25 @@ import dev.kage.protocol.Faction;
 record CharacterAppearance(Faction faction, CostumeTier costumeTier) {
 
     /**
-     * Bậc trang phục mặc định. ⚠️ HIỆN LÀ HẰNG SỐ: art đã có đủ B1/B2/B3 cho cả 5 hệ
-     * ([ART-PIPELINE §4.2](docs/14-art/ART-PIPELINE.md)) nhưng gameplay CHƯA có khái niệm "bậc
-     * trang bị" nào để suy ra — bảng {@code equipment} không có cột bậc, và ánh xạ trang bị → bậc
-     * là quyết định thiết kế game, không phải thứ tầng gateway được tự đặt ra. Khi khái niệm đó tồn
-     * tại, đổi đúng ở đây là đủ; protocol đã sẵn field.
+     * ADR-132 (lô 25, chủ dự án chọn) — bậc trang phục theo CẢNH GIỚI, không theo trang bị: B2 từ Trúc Cơ (Cấp 19,
+     * arc 2 Ngoại Môn), B3 từ Tử Phủ (Cấp 37, arc 3 Nội Môn). Trước đó là hằng số B1 dù art đã đủ cả ba bậc.
      */
-    private static final CostumeTier DEFAULT_COSTUME_TIER = CostumeTier.COSTUME_TIER_B1;
+    static final int SECOND_TIER_LEVEL = 19;
 
-    /** Ngoại hình suy từ hệ phái thật của nhân vật (cột {@code character.faction}, migration V2). */
-    static CharacterAppearance of(Faction faction) {
-        return new CharacterAppearance(faction, DEFAULT_COSTUME_TIER);
+    /** Xem {@link #SECOND_TIER_LEVEL}. */
+    static final int THIRD_TIER_LEVEL = 37;
+
+    /** Bậc trang phục của một cấp. */
+    static CostumeTier tierFor(int level) {
+        if (level >= THIRD_TIER_LEVEL) {
+            return CostumeTier.COSTUME_TIER_B3;
+        }
+        return level >= SECOND_TIER_LEVEL ? CostumeTier.COSTUME_TIER_B2 : CostumeTier.COSTUME_TIER_B1;
+    }
+
+    /** Ngoại hình suy từ hệ phái thật (cột {@code character.faction}) và cấp hiện tại của nhân vật. */
+    static CharacterAppearance of(Faction faction, int level) {
+        return new CharacterAppearance(faction, tierFor(level));
     }
 
     /**

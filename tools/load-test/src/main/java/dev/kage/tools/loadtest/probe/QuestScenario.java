@@ -50,6 +50,12 @@ final class QuestScenario {
             Opcode.OPCODE_ACCEPT_QUEST_RESPONSE_VALUE,
             // action="open_shop" tái dùng thẳng gói cửa hàng, không có response riêng (dialogue.proto).
             Opcode.OPCODE_LIST_SHOP_ITEMS_RESPONSE_VALUE,
+            // Lô 25 — các action mở cửa sổ khác cũng trả thẳng gói của cửa sổ đó (không có node kế): thiếu chúng thì
+            // probe treo chờ node tới hết thời gian (2026-10-31, open_forge/open_merchant).
+            Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE, // open_storage (ADR-061)
+            Opcode.OPCODE_LIST_RECIPES_RESPONSE_VALUE, // open_crafting (ADR-079)
+            Opcode.OPCODE_LIST_FORGE_RECIPES_RESPONSE_VALUE, // open_forge (ADR-131)
+            Opcode.OPCODE_GET_TRAVELING_MERCHANT_RESPONSE_VALUE, // open_merchant (ADR-131)
             Opcode.OPCODE_ERROR_VALUE);
 
     /** Ảnh chụp trạng thái nhân vật ở MỘT thời điểm — hai cái tạo thành một phép đo. */

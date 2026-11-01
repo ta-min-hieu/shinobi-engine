@@ -2,6 +2,7 @@ package dev.kage.server.gateway;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 import io.netty.channel.ChannelHandlerContext;
@@ -195,8 +196,14 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      * <p>Bỏ qua nếu nhân vật không còn kết nối: không có gì để giữ, và lần đăng nhập sau
      * {@link #register} tự đọc lại hệ phái thật từ DB.
      */
-    void updateAppearance(long characterId, CharacterAppearance appearance) {
-        appearanceByCharacterId.computeIfPresent(characterId, (id, previous) -> appearance);
+    Optional<CharacterAppearance> updateAppearance(long characterId, CharacterAppearance appearance) {
+        // ADR-132 — trả ngoại hình CŨ để người gọi biết bậc trang phục có đổi không (chỉ khi đổi mới phát 307).
+        CharacterAppearance[] previous = new CharacterAppearance[1];
+        appearanceByCharacterId.computeIfPresent(characterId, (id, old) -> {
+            previous[0] = old;
+            return appearance;
+        });
+        return Optional.ofNullable(previous[0]);
     }
 
     void unregister(long characterId) {
