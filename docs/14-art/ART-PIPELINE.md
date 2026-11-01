@@ -48,133 +48,161 @@ Từ [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md), pip
 
 ---
 
-## 2. Art Direction
+## 2. Art Direction — Tu Tiên
+
+> **Viết lại 2026-11-01** (lô 24, mục lục chủ dự án duyệt) thay bản Art Direction bối cảnh ninja. Bối cảnh đổi theo
+> [ADR-038](../01-architecture/adr/ADR-038-Theme-Pivot-Tu-Tien.md) (tường thuật + tên hiển thị, KHÔNG đổi cơ chế);
+> lore là [STORY.md](../13-game-design/STORY.md) (§4 thế lực, §7 ánh xạ lore ↔ hệ thống). §3–§8 (pipeline kỹ thuật)
+> không đổi. Luật đo cụ thể (outline, ngân sách tam giác) vẫn là [ART-QUALITY-STANDARD](ART-QUALITY-STANDARD.md).
 
 ### 2.1 Trụ cột phong cách
 
-| Trụ cột | Chuẩn | Nguồn tham chiếu |
+| Trụ cột | Chuẩn |
+|---|---|
+| Tỷ lệ | **Chibi 2–2,5 đầu GIỮ NGUYÊN** — đầu to, chi ngắn. Đổi bối cảnh không đổi tỷ lệ (rig 11 xương + 7 action dùng chung mọi nhân vật/quái người). |
+| Đường nét | Outline đen; kỹ thuật + số đo ở ART-QUALITY-STANDARD §4 mục 3 (nguồn duy nhất). |
+| Màu | Cel 2–3 nấc, màu phẳng. Bão hoà vừa — tu tiên trọng **ngọc, lụa, đồng cổ, mực tàu**; chỉ VFX và màu phe (đỏ Huyết Sa) được rực. |
+| Đọc được | Silhouette nhận ra ở 64px; **bố cục sáng-tối thắng màu** (asset cùng dòng phải ĐẢO bố cục, không chỉ đổi hue). |
+| Bối cảnh | Tông môn trên núi (Thanh Hư), linh mạch ngũ hành, rìa Hoang Vực mạch chết, di tích Linh Triều. KHÔNG làng ninja, KHÔNG học viện. |
+| VFX | Kịch tính, tương phản mạnh với nền; boss/bí cảnh tông tối hơn thế giới thường. |
+
+**Quy tắc vàng** (giữ): asset mới phải hoà vào asset đã duyệt trong `assets/raw/ASSET-LOG.md` — lệch thì sửa asset mới.
+
+### 2.2 Bảng màu
+
+**5 linh căn** — GIỮ hex cũ (khớp GDD §4, VFX skill và UI đánh dấu hệ đang dùng):
+
+| Linh căn | Chính | Phụ |
 |---|---|---|
-| Tỷ lệ nhân vật | Chibi 2–2.5 đầu, đầu to, chi ngắn | Ninja School Online |
-| Đường nét | Outline đen. **Không phải một kỹ thuật, cũng không phải một con số**: mesh thủ tục dùng Freestyle, mesh Text→3D dùng inverted hull — kỹ thuật + số đo ở [ART-QUALITY-STANDARD §4](ART-QUALITY-STANDARD.md) mục 3 (nguồn duy nhất) | Ninja School Online |
-| Màu | Cel 2–3 nấc (base + shadow + highlight), màu phẳng, bão hòa cao | Anime nói chung |
-| Readability | Silhouette phải nhận ra được ở 64px (Low tier); mọi asset duyệt ở cả @0.5x | Nguyên tắc mobile |
-| VFX skill | Kịch tính, aura/trail đậm, tương phản mạnh với nền; boss & bí cảnh tông tối hơn thế giới thường | The Eminence in Shadow |
-| Bối cảnh | Làng ninja Á Đông, học viện, rừng tre, đền — parallax nhiều lớp | Ninja School + Naruto |
+| Hoả | `#E8552D` | `#FFB13D` |
+| Thuỷ | `#2D7FE8` | `#7FD4FF` |
+| Phong | `#3DBF7A` | `#CFF5E0` |
+| Lôi | `#8C4DE8` | `#FFE84D` |
+| Thổ | `#A6763D` | `#E0C089` |
 
-**Quy tắc vàng**: mọi asset phải hòa vào cùng một thế giới. Trước khi làm asset mới, so với asset đã duyệt trong `assets/raw/ASSET-LOG.md` (§7) — lệch phong cách thì sửa asset mới, không sửa asset cũ.
+**Màu phe — luật CỨNG trên trục chơi** (đã trả giá bằng render thật, ghi ở các builder `tools/blender/build_monster_*`):
 
-### 2.2 Palette theo 5 hệ phái
+| Màu | Nghĩa | Không được dùng cho |
+|---|---|---|
+| Đỏ máu (`#6E201B`, `#B33B3B`) | **Huyết Sa** — mọi vệt đỏ trên quái/NPC nghĩa là phe này | quái/NPC của tông, máy Linh Triều |
+| Amber mắt (`#E8A33C`) | dòng **máy Linh Triều** (thạch vệ, cỗ khảo hạch, quỷ đá) | sinh vật sống |
+| Ngọc + vàng (`#5FA986`, `#C9A227`) | **nghi lễ tông môn** (đồ tông cấp, cỗ khảo hạch tông dựng) | Huyết Sa |
+| Xám đá + rêu | máy Linh Triều phế/nhặt về sửa | — |
 
-Khớp [GDD §4](../13-game-design/GAME-DESIGN-DOCUMENT.md) (Hỏa/Thủy/Phong/Lôi/Thổ). Dùng cho trang phục đặc trưng hệ, VFX skill, UI đánh dấu hệ.
+**Màu cảnh giới** (dùng cho đồ/quái gắn một cảnh giới, và VFX đột phá): Luyện Khí nâu vải thô · Trúc Cơ trắng ngà +
+huyền thiết · **Tử Phủ tím** (`#3A2E5C` → `#C9B8E6`, lô 24) · Kim Đan / Nguyên Anh / Hoá Thần — chốt khi làm arc 4–6.
 
-| Hệ | Chính | Phụ | VFX ghi chú |
+### 2.3 Thang trang bị
+
+| Bậc | Cấp | Bộ | Bảng màu | Ghi chú |
+|---|---|---|---|---|
+| 1 | 1 | Tạp Dịch (`novice_*`) | vải thô nâu | mã code còn tên cũ (ADR-038 cấm đổi mã) |
+| 2 | 15 | Ngoại Môn (`outer_sect_*`) | thân ngọc trung tính, chi tiết sáng | |
+| 3 | 30 | Trúc Cơ (`foundation_*`) | thân trắng ngà, chi tiết huyền thiết | |
+| 4 | 37 | Nội Môn (`inner_sect_*`) | thân tím Tử Phủ, chi tiết bạc | arc 3, lô 24 |
+
+Hai luật leo bậc, cả hai đã chứng minh bằng render (ghi ở `build_item_icon.py`):
+
+1. **Đảo bố cục sáng-tối mỗi bậc** — bậc trước thân sáng chi tiết tối thì bậc sau thân tối chi tiết sáng.
+2. **Ô có hình riêng phải đổi HÌNH, không chỉ màu** — mũ, ủng, ngọc bội, kiếm: đổi màu một hình cũ là ra món cũ đổi màu.
+   Áo (`_vest`) và hộ thủ (`_wraps`) giữ khung chung mọi bậc — đó là hình của Ô, không phải của bậc.
+
+### 2.4 Nhân vật người chơi — 5 linh căn × 3 bậc trang phục
+
+Model: 15 nhân vật Text→3D (`char_<hệ>-b1|b2|b3`), `.blend` nguồn là master (khoá Rodin hết quỹ từ 2026-09-03 ⇒ thân
+KHÔNG sinh lại được, chỉ sửa: `retrofit_weapon.py`, `strip_headband.py`, `recolor_head_band.py`).
+
+| Bậc | Tên hiển thị (mới) | Ý nghĩa | Trạng thái code |
 |---|---|---|---|
-| Hỏa | `#E8552D` | `#FFB13D` | Lửa dạng lưỡi liềm, ember bay lên, ánh cam ở rìa |
-| Thủy | `#2D7FE8` | `#7FD4FF` | Sóng/giọt, ripple tròn, trong mờ nhẹ |
-| Phong | `#3DBF7A` | `#CFF5E0` | Vệt gió xoáy, lá cuốn, trail dài theo hướng di chuyển |
-| Lôi | `#8C4DE8` | `#FFE84D` | Tia zigzag sắc, flash 1–2 frame, afterimage |
-| Thổ | `#A6763D` | `#E0C089` | Khối đá vỡ, bụi thấp sát đất, rung nặng |
+| B1 | **Đệ tử Ngoại Môn** | áo vải, ít phụ kiện | đang dùng — server luôn gửi B1 (`CharacterAppearance.DEFAULT_COSTUME_TIER`) |
+| B2 | **Đệ tử Nội Môn** | thêm giáp mảnh + khăn/đai màu hệ | có model, **chưa có luật lên bậc** |
+| B3 | **Chân Truyền** | thêm MỘT chi tiết chuyển động (vòng nguyên tố, tàn lửa) | có model, **chưa có luật lên bậc** |
 
-### 2.3 Style sheet 5 hệ phái
+Thay tên cũ Học Viên / Nhẫn Giả / Thượng Nhẫn. Luật chọn bậc theo cảnh giới là việc gameplay — cần quyết riêng.
 
-**Skill code trong bảng dưới là code thật** trong `server/server-world/src/main/java/dev/kage/server/world/SkillRegistry.java` (riêng `fireball` khai báo ở `SkillConstants.java` cùng package — skill chạy qua script engine từ Phase 4) — không phải tên đặt cho vui. Quy tắc đặt tên VFX: **`vfx_<skill_code>`** (ví dụ `vfx_loi_thien_loi`), nên asset map 1-1 với skill, không cần bảng tra riêng.
+**Vũ khí theo hệ** (kit `kage_mesh_kit`, gắn vào xương — đổi được không phải dựng lại thân): Hoả **trường kiếm** (lô 24
+thay kunai) · Lôi trường kiếm · Phong song đao · Thổ chuỳ · Thuỷ hồ lô. **Không kunai, không băng trán** trên nhân vật.
+(Icon `icon_kunai` "Phi Đao" GIỮ — ART-AUDIT-TU-TIEN đã duyệt nó đọc đúng phi đao.)
 
-3 bậc trang bị dùng chung tên gọi: **B1 Học Viên** → **B2 Nhẫn Giả** → **B3 Thượng Nhẫn**. Quy tắc leo bậc chung cho mọi hệ: B1 vải thô/ít phụ kiện, B2 thêm giáp mảnh + khăn/đai màu hệ, B3 thêm 1 chi tiết *chuyển động* (đuôi khăn dài, vòng nguyên tố bay quanh) — đây là thứ khiến người chơi nhìn phát biết "đồ xịn" ngay cả ở @0.5x.
+### 2.5 Quái và NPC theo dòng dõi
 
----
+| Dòng | Đặc trưng hình | Ví dụ |
+|---|---|---|
+| Máy Linh Triều | thân đá/đồng, **`stone_visor` + khe amber** thay mặt, `cap: False`, `face_style: none` | thạch vệ, cỗ khảo hạch (3 bậc), quỷ đá, thủ lĩnh bí cảnh |
+| Huyết Sa | người, áo tối + **đỏ máu**, đàn chủ có `embers` | thám tử, tế đồ, chấp sự, đàn chủ, tế đồ trà trộn |
+| Tán tu | người, áo bụi đường, không màu phe | tán tu cường đạo, đoạt mạch, đầu lĩnh |
+| Yêu tộc / biến dị | thân thú hoặc người méo, rêu/xanh bệnh | yêu nhân Hoang Vực, linh thú, Yêu Vương |
+| Đệ tử / người của tông | áo màu tông, KHÔNG đỏ | Chu Hoành, Tô Vân Nhi, trực trạm, thợ rèn, Bạch Kính Chi |
 
-#### 🔥 Hỏa — *sát thương liên tục, bùng nổ*
+**Luật cấm đã trả giá:** KHÔNG `cloak` trên nhân vật người chơi nhìn thẳng (ăn mất mặt ba lần — dưới camera chúc
+xuống, khối tối dựng ở tầm đầu khép lên đầu) · NPC kit có ngân sách **4 phụ kiện** (LOW tier ~4.98k/5k tam giác) · vũ
+khí `long_blade` gắn sau lưng là vô hình (đã sửa ở kit; kiểm lại khi thêm hình vũ khí mới).
 
-- **Trang phục** — B1: áo khoác ngắn nâu đất, băng tay đỏ. B2: giáp vai trái đơn, khăn quàng `#E8552D` dài ngang hông. B3: áo choàng cụt tay rìa cháy sém, khăn dài phất, 3 đốm lửa `#FFB13D` lơ lửng sau lưng.
-- **Vũ khí**: kunai lưỡi rộng ám khói + cuộn giấy phù chú đeo hông.
+### 2.6 Icon vật phẩm (64px)
+
+- Khối phẳng toon, viền đen, đọc ở 64x64 — **bố cục sáng-tối trước, màu sau**; duyệt bằng tờ ghép 128/64px.
+- Mỗi ô một HÌNH đã chiếm, không món mới nào được tranh: vòng kín = vòng tay · chữ U = dây chuyền · thẻ chữ nhật =
+  bùa Ngoại Môn · thoi = bùa Trúc Cơ · đĩa đặc = ngọc bội Nội Môn · viên tròn = đan dược · bát diện/lục giác = khoáng/
+  Linh Ngọc · giấy bùa kem ấn đỏ = Hộ Linh Phù.
+- Mảnh nhỏ rời KHÔNG hoà vào khối nó định bám (Freestyle vẽ viền từng object) — hình không phải hộp thì dựng MỘT mesh.
+- Món mới lên trước art phải vào `ContentReferenceIntegrationTest.ITEMS_KNOWN_TO_LACK_AN_ICON` (ghim hai chiều).
+
+### 2.7 VFX
+
+Quy ước tên `vfx_<skill_code>`, client phát vùng `vfx_<code>_impact` tại mục tiêu (`SkillVfxRenderer`). Ngoài skill
+người chơi, **VFX hệ thống** đi chung ống `SkillResultEvent` với mã riêng: `thien_kiep` (lôi kích Thiên Kiếp, lô 24).
+Ứng viên kế: đột phá cảnh giới, khai mở Thần Thông. Chớp sáng toàn màn hình, rung camera, tàn lửa bay là việc runtime,
+KHÔNG render sẵn.
+
+Mô tả VFX từng skill (giữ từ bản cũ — mã skill và cơ chế không đổi khi đổi bối cảnh):
+
+**🔥 Hỏa — *sát thương liên tục, bùng nổ***
 - **Skill thường `fireball`** — cast: lùi nửa bước, tay kết ấn, quầng cam nhỏ ở lòng bàn tay (2 frame). Bay: cầu lửa lưỡi liềm kéo đuôi ember. Impact: nở hoa lửa 3 frame + tàn lửa bay **lên** (particle runtime, không render sẵn).
 - **Ultimate**: *chưa có trong `SkillRegistry`* — Hỏa mới chỉ có `fireball` (MVP đi 1 hệ trước, [GDD](../13-game-design/GAME-DESIGN-DOCUMENT.md)). Khi thêm ult mới làm VFX, **đừng làm trước**.
-- **Prompt 3D** (khung chung ở cuối §2.3): `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, sleeveless burnt-edge coat, long scarf, arm wraps, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
 
-#### 💧 Thủy — *khống chế, hồi phục*
-
-- **Trang phục** — B1: áo ngắn xanh nhạt, quần lửng, chân trần quấn băng. B2: giáp ngực mỏng `#2D7FE8`, tay áo rộng buông. B3: áo choàng nước rìa gợn sóng, vòng nước `#7FD4FF` xoay chậm quanh cổ tay.
-- **Vũ khí**: bình hồ lô đeo lưng + dải lụa nước (không phải kiếm — Thủy là hệ hỗ trợ).
+**💧 Thủy — *khống chế, hồi phục***
 - **Skill thường `thuy_hoi_phuc`** (mục tiêu ALLY) — cast: chắp tay, cúi nhẹ. Impact: **cột nước dịu dâng từ chân lên** đồng đội, kèm vòng ripple ở mặt đất, tông `#7FD4FF` trong mờ. Tránh dùng màu xanh lá — dễ nhầm hệ Phong.
 - **Ultimate `thuy_thuy_trieu`** (ENEMY) — cast dài 4 frame: nước dâng quanh chân người thi triển. Impact: **sóng lớn quét ngang màn hình** từ trái sang phải, đối thủ trong sóng bị đẩy lùi; kết bằng màn nước rơi + ripple đọng 2 frame.
-- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, flowing wide-sleeve robe, waist sash, dark knee-length trousers, cloth wraps on feet, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology`
 
-#### 🌪 Phong — *tốc độ, bạo kích*
-
-- **Trang phục** — B1: áo bó sát xanh lục nhạt, ống tay ngắn. B2: áo gile `#3DBF7A` + đai lưng dài bay ngược chiều chạy. B3: khăn choàng mỏng `#CFF5E0` xẻ tà, 2 dải lụa bay tự do — bậc này phải thấy "gió" ngay cả khi đứng yên.
-- **Vũ khí**: song đao ngắn cong (đánh nhanh 2 tay).
+**🌪 Phong — *tốc độ, bạo kích***
 - **Skill thường `phong_gia_toc`** (buff SELF) — cast: dậm chân, luồng gió xoáy `#3DBF7A` bốc từ chân lên. Trong lúc buff: **afterimage mờ** phía sau khi di chuyển (làm bằng code — vẽ lại sprite cũ với alpha giảm, **không** render frame riêng, tiết kiệm cả atlas lẫn công).
 - **Ultimate `phong_loc_xoay`** (ENEMY) — cast: xoay người 1 vòng. Impact: **cột lốc xoáy** dựng tại vị trí mục tiêu, lá cuốn theo xoắn ốc, kéo đối thủ vào giữa; tan dần từ dưới lên.
-- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, tight sleeveless top, long flowing sash, dynamic light armor, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology` — song đao gắn rời bằng `attach_weapon(kind='twin_blades')`
 
-#### ⚡ Lôi — *đơn mục tiêu, xuyên giáp*
-
-- **Trang phục** — B1: áo tối màu, băng đô vàng `#FFE84D`. B2: giáp vai đôi `#8C4DE8` góc cạnh, găng tay dài. B3: áo choàng tím sẫm rìa răng cưa, **tia điện nhỏ chạy dọc viền giáp** (2 frame lặp).
-- **Vũ khí**: trường đao thẳng lưỡi mảnh (hệ xuyên giáp — hình dáng phải "sắc", không tù).
+**⚡ Lôi — *đơn mục tiêu, xuyên giáp***
 - **Skill thường `loi_tia_set`** (ENEMY) — cast: chỉ tay, tụ sáng ở đầu ngón (1 frame). Impact: **tia zigzag `#FFE84D` đánh thẳng xuống mục tiêu**, kèm **flash trắng toàn màn 1 frame** rồi tắt hẳn — độ giật là bản sắc hệ Lôi, không kéo dài.
 - **Ultimate `loi_thien_loi`** (ENEMY) — cast: giơ tay lên trời, mây tối tụ trên đầu 3 frame (báo hiệu để đối thủ né — luật thiết kế PvP: ult phải đọc được). Impact: **cột sét khổng lồ giáng thẳng**, chớp 2 lần, để lại vệt cháy tím `#8C4DE8` mờ dần trên đất.
-- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, dark hooded jacket, angular shoulder armor, headband, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology` — trường đao gắn rời bằng `attach_weapon(kind='long_blade')`
 
-#### ⛰ Thổ — *phòng thủ, khiên*
-
-- **Trang phục** — B1: áo thô nâu `#A6763D`, giáp da vai. B2: giáp ngực dày, tấm che đùi, khăn đầu be `#E0C089`. B3: giáp đá khối, **mảnh đá nhỏ lơ lửng quanh vai** — hệ Thổ phải trông **nặng nhất**: bóng đổ dày hơn, chân bám đất rộng hơn.
-- **Vũ khí**: chuỳ đá lớn hoặc găng chiến (không dùng vũ khí mảnh).
+**⛰ Thổ — *phòng thủ, khiên***
 - **Skill thường `tho_khien_da`** (buff SELF) — cast: dậm chân mạnh, **3 phiến đá trồi lên từ mặt đất** dựng thành khiên trước mặt; giữ nguyên trong suốt thời gian buff, nứt dần theo lượng damage đã chặn (2 mức nứt là đủ).
 - **Ultimate `tho_dia_chan`** (ENEMY) — cast: nhảy lên rồi giáng cả người xuống. Impact: **vết nứt lan trên mặt đất** theo chiều ngang + bụi thấp sát đất + **rung camera** (camera shake là hiệu ứng code, thuộc tier Medium/High §5, tier Low tắt).
-- **Prompt 3D**: `chibi ninja warrior character, 2.5 heads tall, big head, short limbs, heavy stone plate armor, bulky shoulders, thick leather chest guard, dark knee-length trousers, clearly visible anime face: large glossy black eyes with white highlights, thin sharp eyebrows, small smiling mouth, spiky black hair, toon style, flat colors, T-pose, low poly, clean topology` — chuỳ đá gắn rời bằng `attach_weapon(kind='stone_mace')`
 
----
+### 2.8 Môi trường
 
-**Khung chung của 5 prompt trên** — đổi phần trang phục/vũ khí, giữ nguyên phần còn lại:
+Dải nền đất một trục X (world chính −61 → 305, khớp `MAIN_WORLD_MAX_X` server — hai nơi phải nới CÙNG lúc). Từ tây
+sang đông: sân khảo hạch + Tàng Thư Đường cũ · **sân tông Thanh Hư** (vùng an toàn, Chu Hoành, sư tỷ, thợ rèn) · linh
+mạch sơ cấp · vùng mạch chết Huyết Sa · rìa Hoang Vực · sân khảo hạch Trúc Cơ · **cổng nội môn** + sân bỉ võ (arc 3).
+Bảy trạm tiếp ứng (trận pháp nhỏ) rải dọc trục. Parallax/hậu cảnh chưa dựng — khi dựng: núi mây, bậc đá, đình đài,
+không mái ngói làng.
 
-```
-chibi ninja warrior character, 2.5 heads tall, big head, short limbs,
-<trang phục + vũ khí theo bậc>,
-dark knee-length trousers,
-clearly visible anime face: large glossy black eyes with white highlights,
-thin sharp eyebrows, small smiling mouth, spiky black hair,
-toon style, flat colors, T-pose, low poly, clean topology
-```
+### 2.9 Di sản ninja còn sót
 
-⚠️ **Vũ khí KHÔNG bao giờ nằm trong prompt.** Ranh giới: *thứ biến dạng theo cơ thể thì nướng vào mesh,
-thứ cầm cứng hoặc thay được thì gắn lên xương.*
+| Mục | Trạng thái |
+|---|---|
+| Băng trán + kunai `char_hoa-b1` | ✅ dọn 2026-10-31 (lô 24) |
+| Băng trán 14 nhân vật khác | ✅ không có (ART-AUDIT-TU-TIEN §4.10) |
+| Mã code `novice_*`, `genin_*`, `icon_genin_headband`… | GIỮ — ADR-038 cấm đổi mã; chỉ tên hiển thị đã đổi |
+| `icon_kunai` | GIỮ — đọc đúng "Phi Đao" |
+| Tên bậc trang phục Học Viên/Nhẫn Giả/Thượng Nhẫn | ✅ thay ở §2.4 (chưa có chuỗi hiển thị nào dùng) |
+| Tham chiếu "Ninja School Online" ở §2.1 cũ | ✅ bỏ |
 
-| | Vào prompt Rodin | Gắn rời |
-|---|---|---|
-| Trang phục (áo, khăn, giáp, băng tay) — định nghĩa bậc B1/B2/B3 | ✅ | |
-| Vũ khí (`kunai` `gourd` `twin_blades` `long_blade` `stone_mace`) | | ✅ `attach_weapon()` |
+### 2.10 Quy trình duyệt
 
-Bốn lý do, không phải sở thích:
-
-1. **Vũ khí nướng vào mesh sẽ bị biến dạng.** Mesh sinh ra là *một khối hàn liền* rồi mới gán trọng số
-   theo khoảng cách tới xương (`weight_by_proximity`). Lưỡi đao vươn ra khỏi bàn tay sẽ bị chia trọng số
-   cho nhiều xương và **uốn dẻo như cao su** mỗi lần gập khuỷu. Trang phục thì ngược lại — nó *phải*
-   biến dạng theo thân, nên nướng vào là đúng.
-2. **Chi phí sửa lệch nhau hàng chục lần.** Vũ khí gắn rời: Q7 FAIL là **vòng B miễn phí**
-   ([ART-QUALITY-STANDARD §7.2](ART-QUALITY-STANDARD.md)). Vũ khí trong mesh: Q7 FAIL là **vòng A tốn
-   credit Rodin**, và sinh lại thì mất luôn cơ thể đang đạt.
-3. **Trùng khớp với [ADR-031](../01-architecture/adr/ADR-031-25D-Realtime-3D-Rendering.md)** ("trang bị
-   nhìn thấy được là gắn mesh vào xương, không nhân tổ hợp sheet") và §3.1. Trang bị là **chỉ số thay
-   đổi được** trong `item_template`; nướng vũ khí vào thân là khoá cứng người chơi vào một vũ khí.
-4. **Bản pilot đã duyệt vốn làm đúng cách này** — kunai của Hỏa nằm trong file dưới dạng 3 object rời
-   (`hoa_KunaiBlade` · `hoa_KunaiGrip` · `hoa_KunaiRing`), không phải một phần của `Hoa_D`. Prompt Hỏa
-   và Thủy vốn đã không có vũ khí; ba prompt còn lại là chỗ lệch chuẩn, nay đã sửa.
-
-Cả 5 kiểu vũ khí **đã có sẵn** trong `kage_mesh_kit.build_weapon()` — không có khoảng trống nào phải lấp.
-
-> Vì sao **trang phục** vẫn nướng vào mesh dù cũng là "trang bị": `item_template` hiện **không có cột hình
-> ảnh nào** (ADR-031 Context) nên chưa có gì để thay lúc chạy, và trang phục là thứ tạo ra 3 vùng màu của
-> Q4/Q5. Điều kiện đảo lại quyết định này: ngày `item_template` có cột hình ảnh thật.
-
-Ba mệnh đề **không được bỏ**, mỗi cái mua bằng một lần hỏng thật ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước B):
-
-- **Cả cụm mô tả khuôn mặt** — thiếu là ra nhân vật đầu trọc không mặt.
-- **`warrior character` + `dark knee-length trousers`** thay cho `boy` + chân trần — tổ hợp cũ bị Rodin chặn `IMAGE_CONTENT_VIOLATION`.
-- **KHÔNG có `side profile facing right`** — vô nghĩa với mesh 3D và làm mesh **dẹt theo chiều sâu**. (Cụm này là di sản thời pre-render sprite; ADR-031 bỏ hẳn khái niệm "hướng nướng vào tài sản".)
-
-⚠️ **Prompt chỉ ra base mesh thô.** Model Rodin trả về luôn kiểu bán-tả-thực → bắt buộc chuẩn hoá + toon hoá lại bằng `kage_text3d_kit` (`normalise` → `clean` → `toon_textured`) trước khi nghiệm thu ([BLENDER-SESSION-GUIDE §1.5](BLENDER-SESSION-GUIDE.md) bước C). Đừng render thẳng.
-
----
+1. Dựng headless bằng script trong `tools/blender/` (không làm tay trong MCP cho asset ship).
+2. **Đối chứng RENDER, không chấm theo trí nhớ**: model ⇒ `:client:client-core:runWorldPreview` (camera client thật),
+   cắt + phóng to cạnh một asset đã duyệt cùng dòng; icon ⇒ tờ ghép 128/64px.
+3. Checklist: silhouette đọc ở 64px · bố cục sáng-tối khác asset cùng dòng · đúng màu phe (§2.2) · không mảnh rời ·
+   mặt không bị che · LOW tier không vượt ngân sách (§4.4).
+4. Ghi ASSET-LOG một dòng mỗi asset (nguồn `.blend`, ngày, vòng B đã sửa gì).
 
 ## 3. Kiến trúc pipeline
 
