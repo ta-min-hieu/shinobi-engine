@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.character.domain.TribulationRules;
 import dev.kage.checkin.api.ActivityFacade;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.protocol.DungeonEnteredEvent;
@@ -663,13 +664,19 @@ final class DungeonInstanceRegistry {
             });
             return;
         }
+        if (TribulationRules.isHeartDemon(monsterCode)) {
+            // ADR-146 — tâm ma trong đài Thiên Kiếp: lôi kiếp tiếp tục.
+            defeatExecutor.execute(() -> registry.tribulation.onHeartDemonSlain(killerCharacterId));
+            return;
+        }
         if (!DUNGEON_BOSS_CODE.equals(monsterCode)) {
             return;
         }
         List<Long> members;
         synchronized (this) {
-            DungeonInstance instance = instanceByCharacterId.get(killerCharacterId);
-            members = instance == null ? List.of(killerCharacterId) : List.copyOf(instance.characterIds());
+            members = Optional.ofNullable(instanceByCharacterId.get(killerCharacterId))
+                    .<List<Long>>map(instance -> List.copyOf(instance.characterIds()))
+                    .orElse(List.of(killerCharacterId));
         }
         defeatExecutor.execute(() -> rewards.onBossKilled(killerCharacterId, members, DUNGEON_CODE));
     }

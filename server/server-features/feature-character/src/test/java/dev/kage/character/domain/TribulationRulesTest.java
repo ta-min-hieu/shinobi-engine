@@ -22,6 +22,18 @@ class TribulationRulesTest {
     }
 
     @Test
+    void heartDemonShouldAppearFromTheSecondTribulationOn() {
+        assertThat(TribulationRules.hasHeartDemon(0)).isFalse();
+        assertThat(TribulationRules.hasHeartDemon(1)).isTrue();
+        assertThat(TribulationRules.hasHeartDemon(4)).isTrue();
+        assertThat(TribulationRules.hasHeartDemon(5)).isFalse();
+        assertThat(TribulationRules.heartDemonCode(3)).isEqualTo("heart_demon_3");
+        assertThat(TribulationRules.isHeartDemon("heart_demon_4")).isTrue();
+        assertThat(TribulationRules.isHeartDemon("demon_king")).isFalse();
+        assertThat(TribulationRules.HEART_DEMON_AFTER_WAVE).isLessThan(TribulationRules.waves(1));
+    }
+
+    @Test
     void readyOnlyWhenTheExpAlreadyPassesTheCap() {
         long atCap = TribulationRules.expToReach(18);
         long enoughForNext = TribulationRules.expToReach(19);

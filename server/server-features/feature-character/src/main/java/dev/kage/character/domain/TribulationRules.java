@@ -28,9 +28,33 @@ public final class TribulationRules {
     public static final int BONUS_RES = 3;
     public static final int BONUS_HP = 30;
 
+    /** ADR-146 — tâm ma hiện ngay sau đợt lôi kích thứ này, từ kiếp thứ hai trở đi. */
+    public static final int HEART_DEMON_AFTER_WAVE = 2;
+
+    /** ADR-146 — lôi kiếp ngừng chờ tối đa chừng này giây; tâm ma còn sống thì thua kiếp. */
+    public static final int HEART_DEMON_SECONDS = 60;
+
+    /** ADR-146 — tiền tố mã quái tâm ma; bậc = số kiếp đã qua (V118: {@code heart_demon_1..4}). */
+    public static final String HEART_DEMON_CODE_PREFIX = "heart_demon_";
+
     private static final int PERCENT = 100;
 
     private TribulationRules() {}
+
+    /** Kiếp kế tiếp (đã qua {@code passed} kiếp) có tâm ma không — kiếp đầu (Luyện Khí → Trúc Cơ) thì không. */
+    public static boolean hasHeartDemon(int passed) {
+        return passed >= 1 && passed < TRIBULATIONS;
+    }
+
+    /** Mã quái tâm ma của kiếp kế tiếp; chỉ có nghĩa khi {@link #hasHeartDemon}. */
+    public static String heartDemonCode(int passed) {
+        return HEART_DEMON_CODE_PREFIX + passed;
+    }
+
+    /** {@code monsterCode} có phải một con tâm ma không. */
+    public static boolean isHeartDemon(String monsterCode) {
+        return monsterCode.startsWith(HEART_DEMON_CODE_PREFIX);
+    }
 
     /** Trần cấp khi đã qua {@code passed} kiếp. */
     public static int levelCap(int passed) {

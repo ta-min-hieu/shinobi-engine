@@ -409,6 +409,8 @@ enum TribulationEventKind {
   TRIBULATION_EVENT_KIND_STRIKE = 1;
   TRIBULATION_EVENT_KIND_PASSED = 2;
   TRIBULATION_EVENT_KIND_FAILED = 3;
+  TRIBULATION_EVENT_KIND_HEART_DEMON_APPEARED = 4; // ADR-146 — lôi kiếp ngừng, hạ tâm ma trong seconds_left giây
+  TRIBULATION_EVENT_KIND_HEART_DEMON_SLAIN = 5;    // ADR-146 — lôi kiếp tiếp tục
 }
 
 // Event: Server -> Client (OPCODE_TRIBULATION_EVENT = 332).
@@ -416,6 +418,7 @@ message TribulationEvent {
   TribulationEventKind kind = 1;
   int32 wave = 2;
   int32 waves = 3;
+  int32 seconds_left = 4; // ADR-146 — chỉ có nghĩa với HEART_DEMON_APPEARED
 }
 
 // ADR-127 (2026-10-31) — pháp bảo. Command: Client -> Server (OPCODE_USE_ARTIFACT_COMMAND = 333): dùng chiêu của món

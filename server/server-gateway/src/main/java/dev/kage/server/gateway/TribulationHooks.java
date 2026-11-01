@@ -27,6 +27,10 @@ import dev.kage.protocol.TribulationOutcome;
  * rời giữa chừng ⇒ thua: trừ EXP. Sống qua đợt cuối thêm một nhịp ⇒ thắng: ghi kiếp TRƯỚC khi đưa về (lượt gắn
  * lại world chính đọc chỉ số mới), rồi đồng bộ vạch EXP (lên cấp ngay vì EXP đã đủ).
  * Trạng thái kiếp chỉ ở RAM: server khởi động lại giữa kiếp thì kiếp đó coi như chưa từng diễn ra, không phạt ai.
+ *
+ * <p>ADR-146 — từ kiếp thứ hai, ngay sau đợt {@value TribulationRules#HEART_DEMON_AFTER_WAVE}, tâm ma hiện cạnh người
+ * độ kiếp; lôi kiếp ngừng tới khi hạ được nó ({@link #onHeartDemonSlain}), quá
+ * {@value TribulationRules#HEART_DEMON_SECONDS} giây thì thua kiếp.
  */
 final class TribulationHooks {
 
@@ -35,6 +39,16 @@ final class TribulationHooks {
     private static final long TICK_SECONDS = 1L;
     private static final Duration FIRST_STRIKE_DELAY = Duration.ofSeconds(5);
     private static final Duration STRIKE_INTERVAL = Duration.ofSeconds(TribulationRules.STRIKE_INTERVAL_SECONDS);
+    private static final Duration HEART_DEMON_LIMIT = Duration.ofSeconds(TribulationRules.HEART_DEMON_SECONDS);
+    /**
+     * Tâm ma hiện cạnh điểm vào đài (người độ kiếp vào ở gốc toạ độ, như mọi hầm ngục). KHÔNG lấy
+     * {@code lastKnownPosition} của registry: đó là vị trí theo nhịp của WORLD CHÍNH — kiểm sống 2026-11-01 một nhân
+     * vật đứng x=165 ở world chính làm tâm ma sinh ở x=167 trong đài, ngoài tầm nhìn. V118 cho nó săn khắp đài
+     * (aggro 40 m) nên người chơi đã đi lệch khỏi điểm vào vẫn bị tìm tới.
+     */
+    private static final float HEART_DEMON_X = 2f;
+
+    private static final float HEART_DEMON_Y = 0f;
 
     /** Thứ việc này cần. */
     record Deps(
@@ -44,8 +58,15 @@ final class TribulationHooks {
             ConnectedCharacterRegistry registry,
             Clock clock) {}
 
-    /** Một kiếp đang diễn ra. */
-    private record Trial(int passed, int cap, int waves, int struck, Instant nextStrikeAt) {}
+    /**
+     * Một kiếp đang diễn ra. Khi {@code demonAlive}, {@code nextStrikeAt} là hạn chót hạ tâm ma (ADR-146).
+     */
+    private record Trial(int passed, int cap, int waves, int struck, Instant nextStrikeAt, boolean demonAlive) {
+
+        Trial next(int wave, Instant at, boolean demon) {
+            return new Trial(passed, cap, waves, wave, at, demon);
+        }
+    }
 
     private final Map<Long, Trial> trials = new ConcurrentHashMap<>();
     // volatile, không final: registry dựng TRƯỚC DB — bind() sau.
@@ -95,7 +116,8 @@ final class TribulationHooks {
                         TribulationRules.levelCap(passed),
                         waves,
                         0,
-                        d.clock().instant().plus(FIRST_STRIKE_DELAY)));
+                        d.clock().instant().plus(FIRST_STRIKE_DELAY),
+                        false));
         return response(TribulationOutcome.TRIBULATION_OUTCOME_OK, waves);
     }
 
@@ -117,6 +139,12 @@ final class TribulationHooks {
             fail(d, characterId, trial);
             return;
         }
+        if (trial.demonAlive()) {
+            if (!now.isBefore(trial.nextStrikeAt())) {
+                fail(d, characterId, trial);
+            }
+            return;
+        }
         if (now.isBefore(trial.nextStrikeAt())) {
             return;
         }
@@ -128,8 +156,51 @@ final class TribulationHooks {
         d.dungeons()
                 .worldFacadeFor(characterId)
                 .ifPresent(world -> world.strikeCharacter(characterId, TribulationRules.STRIKE_PERCENT));
-        trials.put(characterId, new Trial(trial.passed(), trial.cap(), trial.waves(), wave, now.plus(STRIKE_INTERVAL)));
+        boolean demon = wave == TribulationRules.HEART_DEMON_AFTER_WAVE
+                && wave < trial.waves()
+                && TribulationRules.hasHeartDemon(trial.passed());
+        trials.put(characterId, trial.next(wave, now.plus(demon ? HEART_DEMON_LIMIT : STRIKE_INTERVAL), demon));
         notify(d, characterId, event(TribulationEventKind.TRIBULATION_EVENT_KIND_STRIKE, wave, trial.waves()));
+        if (demon) {
+            summonHeartDemon(d, characterId, trial.passed());
+            notify(
+                    d,
+                    characterId,
+                    event(TribulationEventKind.TRIBULATION_EVENT_KIND_HEART_DEMON_APPEARED, wave, trial.waves())
+                            .toBuilder()
+                            .setSecondsLeft(TribulationRules.HEART_DEMON_SECONDS)
+                            .build());
+        }
+    }
+
+    private static void summonHeartDemon(Deps d, long characterId, int passed) {
+        d.dungeons()
+                .worldFacadeFor(characterId)
+                .ifPresent(world ->
+                        world.spawnMonsterOnce(TribulationRules.heartDemonCode(passed), HEART_DEMON_X, HEART_DEMON_Y));
+    }
+
+    /**
+     * ADR-146 — {@code killerCharacterId} vừa hạ một con tâm ma (gọi ngoài tick thread, từ đường quái chết của
+     * {@link DungeonInstanceRegistry}): lôi kiếp tiếp tục sau một nhịp. Không đang chờ tâm ma thì bỏ qua.
+     */
+    void onHeartDemonSlain(long killerCharacterId) {
+        Optional<Deps> current = deps;
+        Trial before = trials.get(killerCharacterId);
+        if (current.isEmpty() || before == null || !before.demonAlive()) {
+            return;
+        }
+        Deps d = current.get();
+        Trial resumed = before.next(before.struck(), d.clock().instant().plus(STRIKE_INTERVAL), false);
+        if (trials.replace(killerCharacterId, before, resumed)) {
+            notify(
+                    d,
+                    killerCharacterId,
+                    event(
+                            TribulationEventKind.TRIBULATION_EVENT_KIND_HEART_DEMON_SLAIN,
+                            before.struck(),
+                            before.waves()));
+        }
     }
 
     private void fail(Deps d, long characterId, Trial trial) {

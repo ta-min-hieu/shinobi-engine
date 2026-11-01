@@ -177,6 +177,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-143](ADR-143-Display-Settings.md) | Cài đặt hiển thị `/caidat`: ẩn danh hiệu, chữ damage, hậu cảnh parallax (thuần client) | ✅ **Accepted** *(2026-11-01, lô 26)* | — |
 | [ADR-144](ADR-144-Regional-Weather.md) | Thời tiết theo vùng (chỉ hiển thị): mưa linh khí tông môn, bão cát Hoang Vực sâu (V116, opcode 340) | ✅ **Accepted** *(2026-11-01, lô 26)* | — |
 | [ADR-145](ADR-145-Colossus-Ground-Slam.md) | Cổ Thạch Khổng Lồ thành boss: dậm đất 4 m có báo trước 1,5 giây (V117, opcode 413, hành động script `ground_slam`) | ✅ **Accepted** *(2026-11-01, lô 26)* | — |
+| [ADR-146](ADR-146-Heart-Demon.md) | Tâm ma khi độ kiếp: từ kiếp thứ hai, sau đợt sét thứ hai, tâm ma hiện — lôi kiếp ngừng, hạ trong 60 giây hoặc thua (V118, 2 loại sự kiện 332 + `seconds_left`) | ✅ **Accepted** *(2026-11-01, lô 26)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

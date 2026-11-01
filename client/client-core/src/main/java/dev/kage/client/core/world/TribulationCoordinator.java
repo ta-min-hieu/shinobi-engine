@@ -67,8 +67,8 @@ final class TribulationCoordinator implements WindowFlow {
                     .name()
                     .substring("TRIBULATION_EVENT_KIND_".length())
                     .toLowerCase(Locale.ROOT);
-            chat.showSystemNotice(
-                    KageI18n.formatOrKey(i18n, "tribulation.event." + suffix, event.getWave(), event.getWaves()));
+            chat.showSystemNotice(KageI18n.formatOrKey(
+                    i18n, "tribulation.event." + suffix, event.getWave(), event.getWaves(), event.getSecondsLeft()));
             return true;
         }
         return false;
