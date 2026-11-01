@@ -1013,6 +1013,11 @@ public final class WorldScreen implements GameScreen {
         monsterPresenter.render(
                 shapeRenderer, projection, combatHudController.monsters(), combatHudController.currentTargetId());
         npcPresenter.render(shapeRenderer, projection);
+        reports.community()
+                .expansion()
+                .telegraphs()
+                .render( // ADR-145 — vòng báo trước dậm đất
+                        shapeRenderer, projection, Gdx.graphics.getDeltaTime());
     }
 
     private void syncCombatHud() {

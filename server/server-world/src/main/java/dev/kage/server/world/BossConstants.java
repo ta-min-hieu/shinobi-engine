@@ -20,6 +20,15 @@ final class BossConstants {
     static final long SCRIPT_MAX_STATEMENTS = 10_000L;
 
     /**
+     * ADR-145 — dậm đất: boss gồng (tự choáng, không đánh thường) chừng này giây rồi nổ — đủ để người chơi thấy vòng đỏ
+     * và bước ra. Đề xuất cân bằng.
+     */
+    static final float SLAM_TELEGRAPH_SECONDS = 1.5f;
+
+    /** ADR-145 — bán kính dậm đất quanh chỗ boss đứng lúc bắt đầu gồng. Đề xuất cân bằng. */
+    static final float SLAM_RADIUS_METERS = 4f;
+
+    /**
      * Boss nhớ "người khác vừa đánh mình" trong bao lâu (README dòng 37i, xem {@link BossRetargeting}).
      * 10 giây: dài hơn mọi hồi chiêu đang có (dài nhất 8 giây) nên một người đang đánh đều tay không
      * bao giờ rơi khỏi trí nhớ, mà người đã bỏ đi thì không kéo boss theo mãi. Con số do người triển

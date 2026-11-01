@@ -187,3 +187,14 @@ message UpgradeSkillResponse {
   UpgradeSkillOutcome outcome = 1;
   ListSkillRanksResponse sheet = 2;
 }
+
+// ADR-145 (2026-11-01) — Event: Server -> Client (OPCODE_BOSS_TELEGRAPH_EVENT = 413), cho người đang thấy boss.
+// Boss bắt đầu gồng một đòn diện rộng: vòng bán kính radius quanh (x, y), nổ sau seconds giây. Ai còn đứng trong vòng
+// lúc nổ thì ăn đòn (SkillResultEvent skill_code "ground_slam"); bước ra kịp là thoát. Chỉ để hiển thị — server quyết.
+message BossTelegraphEvent {
+  int64 monster_id = 1;
+  float x = 2;
+  float y = 3;
+  float radius = 4;
+  float seconds = 5;
+}

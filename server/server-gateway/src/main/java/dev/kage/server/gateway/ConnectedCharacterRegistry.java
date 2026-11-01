@@ -512,6 +512,23 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         send(ctx, Opcode.OPCODE_ATTACK_RESULT_EVENT_VALUE, 0, event.toByteArray());
     }
 
+    /** ADR-145 — vòng báo trước dậm đất của boss, cho một người đang thấy boss. */
+    @Override
+    public void onBossTelegraph(long observerCharacterId, WorldOutboundSink.BossTelegraphSnapshot telegraph) {
+        sendToCharacterIfOnline(
+                observerCharacterId,
+                Opcode.OPCODE_BOSS_TELEGRAPH_EVENT_VALUE,
+                0,
+                dev.kage.protocol.BossTelegraphEvent.newBuilder()
+                        .setMonsterId(telegraph.monsterId())
+                        .setX(telegraph.x())
+                        .setY(telegraph.y())
+                        .setRadius(telegraph.radius())
+                        .setSeconds(telegraph.seconds())
+                        .build()
+                        .toByteArray());
+    }
+
     @Override
     public void onSkillResult(long targetCharacterId, WorldOutboundSink.SkillOutcome outcome) {
         ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
@@ -594,9 +611,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      */
     @Override
     public void onCharacterAppearanceChanged(long targetCharacterId, long changedCharacterId) {
-        ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         CharacterAppearance appearance = appearanceByCharacterId.get(changedCharacterId);
-        if (ctx == null || appearance == null) {
+        if (appearance == null) {
             return;
         }
         CharacterAppearanceChangedEvent event = CharacterAppearanceChangedEvent.newBuilder()
@@ -606,7 +622,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setLevel(appearance.level())
                 .setOutlaw(killingIntent.isOutlaw(changedCharacterId))
                 .build();
-        send(ctx, Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE, 0, event.toByteArray());
+        sendToCharacterIfOnline(
+                targetCharacterId, Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE, 0, event.toByteArray());
     }
 
     /**

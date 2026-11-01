@@ -273,6 +273,11 @@ final class ProbeEventLine {
             case Opcode.OPCODE_GOLD_CHANGED_EVENT_VALUE -> Optional.of(gold(GoldChangedEvent.parseFrom(payload)));
             case Opcode.OPCODE_ITEM_GRANTED_EVENT_VALUE -> Optional.of(item(ItemGrantedEvent.parseFrom(payload)));
             case Opcode.OPCODE_ERROR_VALUE -> Optional.of(error(ErrorResponse.parseFrom(payload)));
+            case Opcode.OPCODE_BOSS_TELEGRAPH_EVENT_VALUE -> { // ADR-145
+                dev.kage.protocol.BossTelegraphEvent t = dev.kage.protocol.BossTelegraphEvent.parseFrom(payload);
+                yield Optional.of("monsterId=" + t.getMonsterId() + " x=" + t.getX() + " radius=" + t.getRadius()
+                        + " seconds=" + t.getSeconds());
+            }
             case Opcode.OPCODE_WEATHER_EVENT_VALUE -> // ADR-144
                 Optional.of("zones="
                         + dev.kage.protocol.WeatherEvent.parseFrom(payload).getZonesList().stream()

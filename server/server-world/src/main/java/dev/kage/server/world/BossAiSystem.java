@@ -5,10 +5,12 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongFunction;
+import java.util.function.Supplier;
 import java.util.random.RandomGenerator;
 
 import org.slf4j.Logger;
@@ -24,11 +26,13 @@ import dev.kage.engine.scripting.ScriptSandbox;
 import dev.kage.server.world.component.AiState;
 import dev.kage.server.world.component.AiStateComponent;
 import dev.kage.server.world.component.BossAiComponent;
+import dev.kage.server.world.component.CharacterIdComponent;
 import dev.kage.server.world.component.CombatRecencyComponent;
 import dev.kage.server.world.component.CombatStatsComponent;
 import dev.kage.server.world.component.HealthComponent;
 import dev.kage.server.world.component.MonsterIdComponent;
 import dev.kage.server.world.component.StatusEffectComponent;
+import dev.kage.server.world.component.StatusEffectType;
 import dev.kage.server.world.component.TargetComponent;
 
 /**
@@ -76,7 +80,14 @@ final class BossAiSystem extends IteratingKSystem {
             int targetCurrentHp,
             boolean targetDied) {}
 
+    /** ADR-145 — một lần dậm đất vừa bắt đầu gồng: client vẽ vòng đỏ {@code radius} quanh ({@code x}, {@code y}). */
+    record BossTelegraph(long monsterId, float x, float y, float radius, float seconds) {}
+
     private record ScriptDecision(String action, double rawDamage) {}
+
+    private static final ComponentMapper<PositionComponent> POSITION = ComponentMapper.getFor(PositionComponent.class);
+    private static final ComponentMapper<CharacterIdComponent> CHARACTER_ID =
+            ComponentMapper.getFor(CharacterIdComponent.class);
 
     private final LongFunction<KEntity> entityLookup;
     private final ScriptSandbox scriptSandbox = new ScriptSandbox(BossConstants.SCRIPT_MAX_STATEMENTS);
@@ -95,16 +106,24 @@ final class BossAiSystem extends IteratingKSystem {
 
     private final List<BossActionOutcome> pendingResults = new ArrayList<>();
 
+    private final List<BossTelegraph> pendingTelegraphs = new ArrayList<>();
+
+    /** ADR-145 — mọi nhân vật trong World (dậm đất đánh ai đứng trong vòng, không riêng mục tiêu). */
+    private final Supplier<? extends Collection<KEntity>> characters;
+
     /** @param entityLookup tra KEntity theo entity ID (nhân vật DƯƠNG hoặc quái ÂM — combat.proto). */
     BossAiSystem(LongFunction<KEntity> entityLookup) {
-        this(entityLookup, ThreadLocalRandomSource.INSTANCE);
+        this(entityLookup, ThreadLocalRandomSource.INSTANCE, List::of);
     }
 
     /**
      * Như constructor 1 tham số nhưng nguồn random trúng/né/bạo kích của chiêu boss do caller cấp —
      * {@link WorldFacade} truyền nguồn của World (xem {@link ThreadLocalRandomSource}).
      */
-    BossAiSystem(LongFunction<KEntity> entityLookup, RandomGenerator random) {
+    BossAiSystem(
+            LongFunction<KEntity> entityLookup,
+            RandomGenerator random,
+            Supplier<? extends Collection<KEntity>> characters) {
         super(Family.all(
                         BossAiComponent.class,
                         AiStateComponent.class,
@@ -115,10 +134,21 @@ final class BossAiSystem extends IteratingKSystem {
                 .get());
         this.entityLookup = entityLookup;
         this.random = random;
+        this.characters = characters;
         // ⚠️ KHÔNG còn validate script ở đây, và đó là hệ quả có ý thức của ADR-048: lúc dựng system
         // chưa biết boss nào sẽ spawn nên chưa có ref nào để nạp. Fail fast chuyển sang
         // `ScriptValidator` lúc khởi động server — cùng chỗ đã duyệt script quest và hội thoại
         // (SCRIPTING.md §8).
+    }
+
+    /** ADR-145 — các lần bắt đầu gồng dậm đất trong tick này. */
+    List<BossTelegraph> drainTelegraphs() {
+        if (pendingTelegraphs.isEmpty()) {
+            return List.of();
+        }
+        List<BossTelegraph> telegraphs = List.copyOf(pendingTelegraphs);
+        pendingTelegraphs.clear();
+        return telegraphs;
     }
 
     List<BossActionOutcome> drainResults() {
@@ -133,8 +163,11 @@ final class BossAiSystem extends IteratingKSystem {
     @Override
     protected void processEntity(KEntity entity, float deltaTime) {
         BossAiComponent bossAi = BOSS_AI.get(entity);
-        if (bossAi.heavyStrikeCooldownSeconds > 0f) {
-            bossAi.heavyStrikeCooldownSeconds -= deltaTime;
+        bossAi.heavyStrikeCooldownSeconds = Math.max(0f, bossAi.heavyStrikeCooldownSeconds - deltaTime);
+        if (bossAi.slamSecondsLeft > 0f) {
+            // ADR-145 — đang gồng: chạy TRƯỚC kiểm choáng (chính boss tự choáng trong lúc gồng).
+            tickSlam(entity, bossAi, deltaTime);
+            return;
         }
         if (bossAi.decisionCooldownSeconds > 0f) {
             bossAi.decisionCooldownSeconds -= deltaTime;
@@ -174,6 +207,10 @@ final class BossAiSystem extends IteratingKSystem {
             return; // đánh thường vẫn chạy độc lập qua CombatSystem — không làm gì thêm ở đây.
         }
         BossAiComponent bossAi = BOSS_AI.get(entity);
+        if ("ground_slam".equals(decision.action())) {
+            startSlam(entity, bossAi, decision.rawDamage());
+            return;
+        }
         if ("enrage".equals(decision.action())) {
             bossAi.enraged = true;
         } else if (!"heavy_strike".equals(decision.action())) {
@@ -187,6 +224,15 @@ final class BossAiSystem extends IteratingKSystem {
         CombatConstants.CombatStats defenderStats = withModifiers(targetEntity);
         CombatConstants.AttackResult result =
                 CombatConstants.resolveSkillAttack(attackerStats, defenderStats, decision.rawDamage(), random);
+        hit(entity, targetEntity, new Struck(targetEntityId, decision.action()), result);
+    }
+
+    /** Ai bị đánh và bằng chiêu gì — gói để {@link #hit} không vượt 4 tham số. */
+    private record Struck(long targetEntityId, String actionCode) {}
+
+    /** Trừ một đòn chiêu đã giải (sau khiên) vào {@code targetEntity} và ghi kết quả để phát AoI. */
+    private void hit(KEntity entity, KEntity targetEntity, Struck struck, CombatConstants.AttackResult result) {
+        long targetEntityId = struck.targetEntityId();
         int damage = STATUS_EFFECT.has(targetEntity)
                 ? StatusEffects.absorbWithShield(STATUS_EFFECT.get(targetEntity), result.damage())
                 : result.damage();
@@ -199,7 +245,7 @@ final class BossAiSystem extends IteratingKSystem {
         }
 
         pendingResults.add(new BossActionOutcome(
-                decision.action(),
+                struck.actionCode(),
                 MONSTER_ID.get(entity).monsterId,
                 targetEntityId,
                 damage, // damage THẬT trừ vào máu (sau khiên) — cùng quy ước với AttackOutcome.
@@ -207,6 +253,50 @@ final class BossAiSystem extends IteratingKSystem {
                 result.miss(),
                 targetHealth.current,
                 targetHealth.isDead()));
+    }
+
+    /**
+     * ADR-145 — bắt đầu gồng dậm đất: chốt tâm + sát thương, boss TỰ CHOÁNG suốt lúc gồng (không đánh thường, không
+     * đi — dùng đúng đường choáng có sẵn của {@code AiSystem}/{@code CombatSystem}), phát vòng báo trước.
+     */
+    private void startSlam(KEntity entity, BossAiComponent bossAi, double rawDamage) {
+        PositionComponent position = POSITION.get(entity);
+        bossAi.heavyStrikeCooldownSeconds = bossAi.skillCooldownSeconds;
+        bossAi.slamSecondsLeft = BossConstants.SLAM_TELEGRAPH_SECONDS;
+        bossAi.slamX = position.x;
+        bossAi.slamY = position.y;
+        bossAi.slamRawDamage = rawDamage;
+        if (STATUS_EFFECT.has(entity)) {
+            StatusEffects.applyEffect(
+                    STATUS_EFFECT.get(entity), StatusEffectType.STUN, 0f, BossConstants.SLAM_TELEGRAPH_SECONDS);
+        }
+        pendingTelegraphs.add(new BossTelegraph(
+                MONSTER_ID.get(entity).monsterId,
+                position.x,
+                position.y,
+                BossConstants.SLAM_RADIUS_METERS,
+                BossConstants.SLAM_TELEGRAPH_SECONDS));
+    }
+
+    /** ADR-145 — đếm ngược gồng; hết giờ thì nổ vào mọi nhân vật còn sống đứng trong vòng (né ra kịp là thoát). */
+    private void tickSlam(KEntity entity, BossAiComponent bossAi, float deltaTime) {
+        bossAi.slamSecondsLeft -= deltaTime;
+        if (bossAi.slamSecondsLeft > 0f || HEALTH.get(entity).isDead()) {
+            return;
+        }
+        bossAi.slamSecondsLeft = 0f;
+        float radiusSquared = BossConstants.SLAM_RADIUS_METERS * BossConstants.SLAM_RADIUS_METERS;
+        CombatConstants.CombatStats attackerStats = withModifiers(entity);
+        for (KEntity character : characters.get()) {
+            PositionComponent at = POSITION.get(character);
+            float dx = at.x - bossAi.slamX;
+            float dy = at.y - bossAi.slamY;
+            if (!HEALTH.get(character).isDead() && dx * dx + dy * dy <= radiusSquared) {
+                CombatConstants.AttackResult result = CombatConstants.resolveSkillAttack(
+                        attackerStats, withModifiers(character), bossAi.slamRawDamage, random);
+                hit(entity, character, new Struck(CHARACTER_ID.get(character).characterId, "ground_slam"), result);
+            }
+        }
     }
 
     /**

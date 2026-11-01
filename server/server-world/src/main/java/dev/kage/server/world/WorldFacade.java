@@ -433,7 +433,7 @@ public final class WorldFacade {
         this.healthRegenSystem = new HealthRegenSystem(this::isPvpAllowed);
         this.aiSystem = new AiSystem(entitiesByCharacterId::values, this::lookupEntity, random);
         this.skillSystem = new SkillSystem(this::lookupEntity, this::allowsPlayerVersusPlayer, random);
-        this.bossAiSystem = new BossAiSystem(this::lookupEntity, random);
+        this.bossAiSystem = new BossAiSystem(this::lookupEntity, random, entitiesByCharacterId::values);
         // Thứ tự ĐÚNG ECS.md §6 (InputCommandSystem -> AISystem -> MovementSystem -> ... ->
         // CombatSystem): AI set vận tốc/mục tiêu trước, Movement tích luỹ vị trí, Combat mới xét
         // tầm đánh — đổi thứ tự = đổi behavior (engine/CLAUDE.md). SkillSystem/BossAiSystem chỉ
@@ -1050,6 +1050,7 @@ public final class WorldFacade {
         tickMetricsPort.recordEntityCount(ecsWorld.entityCount());
         handleCombatResults(combatSystem.drainResults());
         handleSkillResults(skillSystem.drainResults());
+        handleBossTelegraphs(bossAiSystem.drainTelegraphs()); // ADR-145 — TRƯỚC kết quả để vòng hiện trước đòn
         handleBossResults(bossAiSystem.drainResults());
         handleHealthChanges(healthRegenSystem.drainResults()); // ADR-046 D2
         handleHealthChanges(aiSystem.drainHealthChanges()); // ADR-046 D4
@@ -2103,6 +2104,17 @@ public final class WorldFacade {
 
         outboundSink.onCharacterRespawned(new WorldOutboundSink.RespawnSnapshot(
                 characterId, position.x, position.y, health.current, health.max, chi.current, chi.max));
+    }
+
+    /** ADR-145 — vòng báo trước dậm đất cho mọi người đang thấy boss. */
+    private void handleBossTelegraphs(List<BossAiSystem.BossTelegraph> telegraphs) {
+        for (BossAiSystem.BossTelegraph telegraph : telegraphs) {
+            WorldOutboundSink.BossTelegraphSnapshot snapshot = new WorldOutboundSink.BossTelegraphSnapshot(
+                    telegraph.monsterId(), telegraph.x(), telegraph.y(), telegraph.radius(), telegraph.seconds());
+            for (long observerId : aoiTracker.observersOf(telegraph.monsterId())) {
+                outboundSink.onBossTelegraph(observerId, snapshot);
+            }
+        }
     }
 
     /**

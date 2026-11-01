@@ -37,7 +37,8 @@ record ExpansionWindows(
         ZoneMapCoordinator zoneMap,
         ReportPanel displaySettingsPanel,
         DisplaySettingsCoordinator displaySettings,
-        WeatherCoordinator weather) {
+        WeatherCoordinator weather,
+        BossTelegraphPresenter telegraphs) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
@@ -78,16 +79,22 @@ record ExpansionWindows(
                 new ArtifactCoordinator(sender, feeds.chat()),
                 new FormationCoordinator(feeds.chat()),
                 new CaveCoordinator(sender, feeds.chat()),
-                new ZoneMapCoordinator( // ADR-141
-                        () -> sender.sendReadRequest(
-                                Opcode.OPCODE_LIST_ZONE_MAP_REQUEST_VALUE, ListZoneMapRequest.getDefaultInstance()),
-                        feeds.chat()::showSystemNotice),
+                zoneMap(sender, feeds), // ADR-141
                 displaySettingsPanel,
                 new DisplaySettingsCoordinator(
                         displaySettingsPanel,
                         DisplaySettings.load(new GdxPreferencesDisplaySettingsStore()),
                         feeds.chat()),
-                new WeatherCoordinator()); // ADR-144
+                new WeatherCoordinator(), // ADR-144
+                new BossTelegraphPresenter()); // ADR-145
+    }
+
+    /** ADR-141 — biển vùng PvP: hỏi bản đồ vùng qua {@code sender}, báo vào/ra qua kênh hệ thống. */
+    private static ZoneMapCoordinator zoneMap(WorldCommandSender sender, ReportWindows.Feeds feeds) {
+        return new ZoneMapCoordinator(
+                () -> sender.sendReadRequest(
+                        Opcode.OPCODE_LIST_ZONE_MAP_REQUEST_VALUE, ListZoneMapRequest.getDefaultInstance()),
+                feeds.chat()::showSystemNotice);
     }
 
     /** Đăng ký vào hub. */
@@ -110,6 +117,7 @@ record ExpansionWindows(
         panels.register(zoneMap);
         panels.register(displaySettingsPanel, displaySettings);
         panels.register(weather);
+        panels.register(telegraphs);
     }
 
     /**

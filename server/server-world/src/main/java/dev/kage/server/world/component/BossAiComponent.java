@@ -32,4 +32,14 @@ public final class BossAiComponent implements Component {
     public float decisionCooldownSeconds;
     public float heavyStrikeCooldownSeconds;
     public boolean enraged;
+
+    /**
+     * ADR-145 — dậm đất đang gồng: còn bao nhiêu giây tới lúc nổ (0 = không gồng). Tâm và sát thương thô chốt lúc bắt
+     * đầu gồng — boss tự choáng trong lúc gồng nên không đi đâu.
+     */
+    public float slamSecondsLeft;
+
+    public float slamX;
+    public float slamY;
+    public double slamRawDamage;
 }

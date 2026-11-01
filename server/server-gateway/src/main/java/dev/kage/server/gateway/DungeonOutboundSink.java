@@ -107,6 +107,11 @@ final class DungeonOutboundSink implements WorldOutboundSink {
     }
 
     @Override
+    public void onBossTelegraph(long observerCharacterId, WorldOutboundSink.BossTelegraphSnapshot telegraph) {
+        registry.onBossTelegraph(observerCharacterId, telegraph); // ADR-145 — boss Bí Cảnh dùng cùng đường
+    }
+
+    @Override
     public void onAreaChatMessage(long targetCharacterId, long senderCharacterId, String senderName, String body) {
         registry.onAreaChatMessage(targetCharacterId, senderCharacterId, senderName, body);
     }

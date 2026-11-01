@@ -121,6 +121,15 @@ public interface WorldOutboundSink {
     default void onCharacterPositionSampled(long characterId, float x, float y) {}
 
     /**
+     * ADR-145 — boss {@code monsterId} bắt đầu gồng dậm đất: {@code observerCharacterId} đang thấy nó nên vẽ vòng báo
+     * trước bán kính {@code radius} quanh ({@code x}, {@code y}) trong {@code seconds} giây. Mặc định không làm gì.
+     */
+    default void onBossTelegraph(long observerCharacterId, BossTelegraphSnapshot telegraph) {}
+
+    /** ADR-145 — dữ liệu một vòng báo trước dậm đất. */
+    record BossTelegraphSnapshot(long monsterId, float x, float y, float radius, float seconds) {}
+
+    /**
      * ADR-073 — hệ số tốc độ do hiệu ứng trạng thái ({@code statusSpeedMultiplier}, không gồm phi kiếm) hoặc trạng
      * thái "không đi được" (choáng/gục) của CHÍNH {@code characterId} vừa đổi. Chỉ gửi cho người đó. Mặc định bỏ qua
      * (sink của test); sink thật của gateway PHẢI ghi đè.
