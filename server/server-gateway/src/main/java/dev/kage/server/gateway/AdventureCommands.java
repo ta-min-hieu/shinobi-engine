@@ -14,14 +14,19 @@ import dev.kage.protocol.AcceptBountyResponse;
 import dev.kage.protocol.BountyView;
 import dev.kage.protocol.GetBountyBoardResponse;
 import dev.kage.protocol.ListWaypointsResponse;
+import dev.kage.protocol.ListZoneMapResponse;
 import dev.kage.protocol.TeleportOutcome;
 import dev.kage.protocol.TeleportResponse;
 import dev.kage.protocol.WaypointView;
 import dev.kage.protocol.WorldChangeReason;
+import dev.kage.protocol.ZoneRange;
 import dev.kage.quest.api.BountyFacade;
 import dev.kage.quest.domain.BountyBoard;
 import dev.kage.quest.domain.BountyTemplate;
 import dev.kage.world.api.WaypointFacade;
+import dev.kage.world.api.WorldGeometryFacade;
+import dev.kage.world.domain.PvpZone;
+import dev.kage.world.domain.SafeZone;
 import dev.kage.world.domain.Waypoint;
 
 /**
@@ -65,6 +70,23 @@ final class AdventureCommands {
                     .setOpen(waypoints.isOpen(characterId, waypoint)));
         }
         return response.setTalismans(talismansOf(characterId)).build();
+    }
+
+    /** ADR-141 — dải PvP và dải an toàn của world chính cho HUD (hiển thị thuần; luật đòn đánh vẫn ở ADR-137). */
+    ListZoneMapResponse zoneMap() {
+        WorldGeometryFacade geometry = deps.adventure().geometry();
+        ListZoneMapResponse.Builder response = ListZoneMapResponse.newBuilder();
+        for (PvpZone zone : geometry.listPvpZones(SafeZone.MAIN_WORLD_CODE)) {
+            response.addPvpRanges(range(zone.code(), zone.minX(), zone.maxX()));
+        }
+        for (SafeZone zone : geometry.listSafeZones(SafeZone.MAIN_WORLD_CODE)) {
+            response.addSafeRanges(range(zone.code(), zone.minX(), zone.maxX()));
+        }
+        return response.build();
+    }
+
+    private static ZoneRange range(String code, float minX, float maxX) {
+        return ZoneRange.newBuilder().setCode(code).setMinX(minX).setMaxX(maxX).build();
     }
 
     TeleportResponse teleport(long characterId, String waypointCode) {

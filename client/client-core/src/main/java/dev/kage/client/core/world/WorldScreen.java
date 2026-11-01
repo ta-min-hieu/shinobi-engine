@@ -498,8 +498,12 @@ public final class WorldScreen implements GameScreen {
         GuildWarCoordinator guildWars = reports.community().guildWars();
         guild.useGuildAuction(reports.community().auctions()::open);
         guild.useGuildWar(guildWars::open);
+        // ADR-141 — trong dải PvP Hoang Vực click người chơi cũng là nhắm họ (server vẫn phán quyết đòn).
+        ZoneMapCoordinator zoneMap = reports.community().expansion().zoneMap();
+        zoneMap.useBanner(combatHud::setZoneBanner);
         duelTargeting.useGuildWar(
-                guildWars::isMyWarActive, dev.kage.client.core.ui.theme.KageI18n.textOrKey(i18n, "guildwar.target"));
+                zoneMap.orInPvpZone(guildWars::isMyWarActive),
+                dev.kage.client.core.ui.theme.KageI18n.textOrKey(i18n, "guildwar.target"));
         panels.register(dialoguePanel, dialogue);
         panels.register(partyPanel, party);
         panels.register(friendPanel, friends);
@@ -658,6 +662,7 @@ public final class WorldScreen implements GameScreen {
         // sàng, còn show() là thời điểm màn hình thật sự bắt đầu sống.
         itemCatalog.request();
         quests.requestLog();
+        reports.community().expansion().zoneMap().request(); // ADR-141
     }
 
     @Override
@@ -1017,6 +1022,7 @@ public final class WorldScreen implements GameScreen {
         combatHud.setSkillState(combatHudController.skillNameKey(), combatHudController.skillCooldownRemaining());
         combatHud.setSkillReady(combatHudController.canUseSkill());
         combatHud.setArtifactCooldown(reports.community().expansion().artifact().cooldownRemainingSeconds());
+        reports.community().expansion().zoneMap().update(POSITION.get(localPlayer).x); // ADR-141
     }
 
     /** Nhánh 3D (ADR-031) — model glTF qua camera orthographic khoá góc. */

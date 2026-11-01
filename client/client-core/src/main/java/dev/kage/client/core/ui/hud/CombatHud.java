@@ -1,5 +1,6 @@
 package dev.kage.client.core.ui.hud;
 
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.scenes.scene2d.Stage;
@@ -283,6 +284,17 @@ public final class CombatHud implements HudWindow {
      */
     public void setDungeonBanner(String banner, String exitHint) {
         banners.setDungeonBanner(banner, exitHint);
+    }
+
+    /**
+     * Biển vùng (ADR-141) — "Vùng PvP" khi đứng trong dải PvP tự do, rỗng để giấu. Thường trực như dải hầm ngục: bước
+     * vào dải là bị người khác đánh được, một dòng chat thoáng qua là không đủ.
+     *
+     * @param text chuỗi ĐÃ dịch, hoặc rỗng
+     * @param color màu chữ — KHÔNG phải thông tin duy nhất (chữ đã nói đủ, UI.md)
+     */
+    public void setZoneBanner(String text, Color color) {
+        banners.setZoneBanner(text, color);
     }
 
     public void setOnClaimQuestClicked(Runnable listener) {

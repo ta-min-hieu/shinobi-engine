@@ -519,3 +519,23 @@ message FormationChangedEvent {
   int32 bonus_res = 6;
   int32 bonus_hp = 7;
 }
+
+// ADR-141 (2026-11-01) — bản đồ vùng của world chính cho HUD. Request: Client -> Server
+// (OPCODE_LIST_ZONE_MAP_REQUEST = 338), gửi một lần khi vào world. Chỉ để HIỂN THỊ (biển "Vùng PvP", cho phép click
+// nhắm người) — server vẫn phán quyết mọi đòn bằng luật ADR-137.
+message ListZoneMapRequest {
+}
+
+// Một dải trên trục X (biên gồm cả hai đầu).
+message ZoneRange {
+  string code = 1;
+  float min_x = 2;
+  float max_x = 3;
+}
+
+// Response: Server -> Client (OPCODE_LIST_ZONE_MAP_RESPONSE = 339). pvp_ranges = bảng pvp_zone; safe_ranges = bảng
+// safe_zone (an toàn thắng PvP khi chồng nhau). Chỉ world chính — dungeon/arena không có dải nào.
+message ListZoneMapResponse {
+  repeated ZoneRange pvp_ranges = 1;
+  repeated ZoneRange safe_ranges = 2;
+}

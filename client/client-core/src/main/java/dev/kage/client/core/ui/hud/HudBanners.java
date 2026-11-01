@@ -1,5 +1,6 @@
 package dev.kage.client.core.ui.hud;
 
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.scenes.scene2d.ui.Cell;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -8,8 +9,8 @@ import com.badlogic.gdx.utils.I18NBundle;
 import dev.kage.client.core.ui.theme.KageSkin;
 
 /**
- * Ba dòng trạng thái của {@link CombatHud}: biển đấu tay đôi (rìa trái), dải hầm ngục và độ trễ (cột
- * góc trên-phải).
+ * Các dòng trạng thái của {@link CombatHud}: biển đấu tay đôi (rìa trái), dải hầm ngục, biển vùng (ADR-141) và độ trễ
+ * (cột góc trên-phải).
  */
 final class HudBanners {
 
@@ -25,6 +26,14 @@ final class HudBanners {
 
     private final Label dungeonLabel;
     private final Label dungeonHintLabel;
+
+    /** Biển vùng PvP/an toàn (ADR-141) — đỏ son khi trong dải PvP; cùng cách gỡ khỏi ô như dải hầm ngục. */
+    private final Table zoneGroup;
+
+    private final Label zoneLabel;
+
+    /** Ô chứa {@link #zoneGroup} — xem {@link #buildTopRightColumn}. */
+    private Cell<Table> zoneCell;
 
     /** Độ trễ đường truyền, đo từ {@code PongResponse} — xem {@link #setLatency(long)}. */
     private final Label latencyLabel;
@@ -51,6 +60,10 @@ final class HudBanners {
         dungeonGroup.add(dungeonLabel).row();
         dungeonGroup.add(dungeonHintLabel).padTop(2f).row();
         dungeonGroup.pad(8f);
+        this.zoneLabel = new Label("", skin.labelStyle);
+        this.zoneGroup = new Table();
+        zoneGroup.setBackground(skin.panel);
+        zoneGroup.add(zoneLabel).pad(6f);
         this.latencyLabel = new Label(i18n.get("hud.latency_unknown"), skin.statLabelStyle);
         latencyLabel.setFontScale(HudLayout.SMALL_LABEL_SCALE);
     }
@@ -75,6 +88,8 @@ final class HudBanners {
         // thước ưa thích của con nó dù con đang ẩn, nên hai cái Label rỗng bên trong sẽ đẩy cụm
         // nhiệm vụ tụt xuống ~2 dòng suốt cả phiên chơi ngoài hầm ngục. Ô rỗng thì cao 0.
         this.dungeonCell = column.add((Table) null).right();
+        column.row();
+        this.zoneCell = column.add((Table) null).right();
         column.row();
         column.add(questCard).right().padTop(8f).row();
         return column;
@@ -112,5 +127,11 @@ final class HudBanners {
         dungeonLabel.setText(banner);
         dungeonHintLabel.setText(exitHint);
         dungeonCell.setActor(banner.isEmpty() ? null : dungeonGroup);
+    }
+
+    void setZoneBanner(String text, Color color) {
+        zoneLabel.setText(text);
+        zoneLabel.setColor(color);
+        zoneCell.setActor(text.isEmpty() ? null : zoneGroup);
     }
 }

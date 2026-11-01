@@ -6,6 +6,8 @@ import com.badlogic.gdx.Input;
 
 import dev.kage.client.core.ui.hud.ReportPanel;
 import dev.kage.client.core.ui.theme.KageSkin;
+import dev.kage.protocol.ListZoneMapRequest;
+import dev.kage.protocol.Opcode;
 
 /** Cửa sổ/luồng lô 23 (ADR-115…126) — tách khỏi {@link CommunityWindows} để nó không phình thêm. */
 record ExpansionWindows(
@@ -29,7 +31,8 @@ record ExpansionWindows(
         TribulationCoordinator tribulation,
         ArtifactCoordinator artifact,
         FormationCoordinator formation,
-        CaveCoordinator cave) {
+        CaveCoordinator cave,
+        ZoneMapCoordinator zoneMap) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
@@ -67,7 +70,11 @@ record ExpansionWindows(
                 new TribulationCoordinator(sender, feeds.chat()),
                 new ArtifactCoordinator(sender, feeds.chat()),
                 new FormationCoordinator(feeds.chat()),
-                new CaveCoordinator(sender, feeds.chat()));
+                new CaveCoordinator(sender, feeds.chat()),
+                new ZoneMapCoordinator( // ADR-141
+                        () -> sender.sendReadRequest(
+                                Opcode.OPCODE_LIST_ZONE_MAP_REQUEST_VALUE, ListZoneMapRequest.getDefaultInstance()),
+                        feeds.chat()::showSystemNotice));
     }
 
     /** Đăng ký vào hub. */
@@ -87,6 +94,7 @@ record ExpansionWindows(
         panels.register(artifact);
         panels.register(formation);
         panels.register(cave);
+        panels.register(zoneMap);
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

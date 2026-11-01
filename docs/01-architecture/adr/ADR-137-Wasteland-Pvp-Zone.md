@@ -58,5 +58,5 @@ PvP" — để cho Khung UI tu tiên (mục cùng lô) hoặc lô sau.
 
 ## Việc cần làm tiếp theo
 
-- Chữ/viền cảnh báo "Vùng PvP" trên HUD khi bước vào dải (D4).
+- ~~Chữ/viền cảnh báo "Vùng PvP" trên HUD khi bước vào dải (D4).~~ ✅ [ADR-141](ADR-141-Zone-Map-HUD-And-Wasteland-Waypoints.md) (2026-11-01).
 - Cân nhắc phạt/thưởng khi hạ người trong Hoang Vực (rơi vàng, danh vọng) — cần chủ dự án quyết.

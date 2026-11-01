@@ -22,6 +22,7 @@ import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
 import dev.kage.server.database.PostgresDataSourceFactory;
 import dev.kage.world.domain.SafeZone;
+import dev.kage.world.domain.Waypoint;
 
 /**
  * Test bằng PostgreSQL THẬT qua Testcontainers — verify migration V35 ({@code safe_zone}) + V49
@@ -132,6 +133,28 @@ class SafeZoneIntegrationTest {
     void shouldReturnEmpty_forAWorldThatDeclaresNoZone() {
         assertThat(new PostgresSafeZoneAdapter(dataSource).listSafeZones("dungeon"))
                 .isEmpty();
+    }
+
+    /**
+     * ADR-141 (V114) — ba trạm truyền tống mới đặt giữa ba vùng an toàn: dời tới là đứng trong vùng an toàn, kể cả trạm
+     * 368 nằm giữa dải PvP {@code wasteland_deep}. Trạm cũ (V87) không thuộc phép đo này — V57 đã giãn trục sau đó.
+     */
+    @Test
+    void shouldLandEveryWastelandWaypointInsideASafeZone() {
+        List<SafeZone> zones = new PostgresSafeZoneAdapter(dataSource).listSafeZones(SafeZone.MAIN_WORLD_CODE);
+        List<Waypoint> waypoints = new PostgresWaypointAdapter(dataSource).listWaypoints();
+
+        assertThat(waypoints)
+                .extracting(Waypoint::code)
+                .contains("inner_sect_gate", "wasteland_descent", "deep_dead_vein");
+        for (String code : List.of("inner_sect_gate", "wasteland_descent", "deep_dead_vein")) {
+            Waypoint waypoint = waypoints.stream()
+                    .filter(w -> w.code().equals(code))
+                    .findFirst()
+                    .orElseThrow();
+            assertThat(zones).as("trạm %s @%s", code, waypoint.x()).anySatisfy(zone -> assertThat(waypoint.x())
+                    .isBetween(zone.minX(), zone.maxX()));
+        }
     }
 
     private static SafeZone zoneByCode(List<SafeZone> zones, String code) {

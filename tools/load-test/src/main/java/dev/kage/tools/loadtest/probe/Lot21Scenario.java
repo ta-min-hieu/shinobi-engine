@@ -56,6 +56,8 @@ import dev.kage.protocol.ListHerbNodesRequest;
 import dev.kage.protocol.ListHerbNodesResponse;
 import dev.kage.protocol.ListWaypointsRequest;
 import dev.kage.protocol.ListWaypointsResponse;
+import dev.kage.protocol.ListZoneMapRequest;
+import dev.kage.protocol.ListZoneMapResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.ProposeDaoLuCommand;
 import dev.kage.protocol.ProposeDaoLuResponse;
@@ -282,6 +284,12 @@ final class Lot21Scenario {
                         ListWaypointsRequest.getDefaultInstance(),
                         Opcode.OPCODE_LIST_WAYPOINTS_RESPONSE_VALUE,
                         Lot21Scenario::describeWaypoints);
+            case "zoneMap" -> // ADR-141
+                ask(
+                        Opcode.OPCODE_LIST_ZONE_MAP_REQUEST_VALUE,
+                        ListZoneMapRequest.getDefaultInstance(),
+                        Opcode.OPCODE_LIST_ZONE_MAP_RESPONSE_VALUE,
+                        Lot21Scenario::describeZoneMap);
             case "teleport" ->
                 ask(
                         Opcode.OPCODE_TELEPORT_COMMAND_VALUE,
@@ -403,6 +411,18 @@ final class Lot21Scenario {
                 .forEach(w ->
                         line.append(" | ").append(w.getCode()).append(" mở=").append(w.getOpen()));
         return line.toString();
+    }
+
+    private static String describeZoneMap(byte[] payload) throws InvalidProtocolBufferException {
+        ListZoneMapResponse r = ListZoneMapResponse.parseFrom(payload);
+        StringBuilder line = new StringBuilder("pvp=");
+        r.getPvpRangesList().forEach(z -> line.append(z.getCode())
+                .append('[')
+                .append(z.getMinX())
+                .append(',')
+                .append(z.getMaxX())
+                .append("] "));
+        return line.append("an_toàn=").append(r.getSafeRangesCount()).toString();
     }
 
     private static String describeBounty(byte[] payload) throws InvalidProtocolBufferException {

@@ -608,7 +608,8 @@ public final class GatewayBootstrap {
                         databaseBootstrap.wireBountyFacade(),
                         databaseBootstrap.wireGuildWarFacade(),
                         databaseBootstrap.wireTowerFacade(),
-                        databaseBootstrap.wireEscortRouteFacade()),
+                        databaseBootstrap.wireEscortRouteFacade(),
+                        databaseBootstrap.wireWorldGeometryFacade()),
                 new ServiceDeskFacades(
                         databaseBootstrap.wireServerNoticeFacade(),
                         databaseBootstrap.wireGiftCodeFacade(),

@@ -269,6 +269,7 @@ import dev.kage.protocol.ListSkillRanksRequest;
 import dev.kage.protocol.ListSkillRanksResponse;
 import dev.kage.protocol.ListStorageRequest;
 import dev.kage.protocol.ListWaypointsRequest;
+import dev.kage.protocol.ListZoneMapRequest;
 import dev.kage.protocol.MailAttachmentView;
 import dev.kage.protocol.MailView;
 import dev.kage.protocol.MoveCommand;
@@ -794,6 +795,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             ListWaypointsRequest.parser(),
                             Opcode.OPCODE_LIST_WAYPOINTS_RESPONSE_VALUE,
                             (h, id, c) -> h.adventure.waypoints(id))),
+            Map.entry( // ADR-141 — bản đồ vùng PvP/an toàn cho HUD
+                    Opcode.OPCODE_LIST_ZONE_MAP_REQUEST_VALUE,
+                    storageCommand(
+                            ListZoneMapRequest.parser(),
+                            Opcode.OPCODE_LIST_ZONE_MAP_RESPONSE_VALUE,
+                            (h, id, c) -> h.adventure.zoneMap())),
             Map.entry(
                     Opcode.OPCODE_TELEPORT_COMMAND_VALUE,
                     storageCommand(

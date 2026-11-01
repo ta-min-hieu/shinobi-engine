@@ -129,6 +129,8 @@ enum Opcode {
   OPCODE_CAVE_COMMAND = 335; // ADR-129 (2026-10-31) — động phủ: một lệnh, trường action
   OPCODE_CAVE_RESPONSE = 336;
   OPCODE_CAVE_INVITE_EVENT = 337; // bạn bè mời thăm động phủ
+  OPCODE_LIST_ZONE_MAP_REQUEST = 338; // ADR-141 (2026-11-01) — bản đồ vùng PvP/an toàn cho HUD
+  OPCODE_LIST_ZONE_MAP_RESPONSE = 339;
 
   // --- Combat / Skill (400-499) ---
   OPCODE_SET_TARGET_COMMAND = 400;
