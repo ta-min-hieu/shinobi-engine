@@ -5,6 +5,8 @@ import java.util.List;
 import com.badlogic.gdx.Input;
 
 import dev.kage.client.core.ui.hud.ReportPanel;
+import dev.kage.client.core.ui.theme.DisplaySettings;
+import dev.kage.client.core.ui.theme.GdxPreferencesDisplaySettingsStore;
 import dev.kage.client.core.ui.theme.KageSkin;
 import dev.kage.protocol.ListZoneMapRequest;
 import dev.kage.protocol.Opcode;
@@ -32,7 +34,9 @@ record ExpansionWindows(
         ArtifactCoordinator artifact,
         FormationCoordinator formation,
         CaveCoordinator cave,
-        ZoneMapCoordinator zoneMap) {
+        ZoneMapCoordinator zoneMap,
+        ReportPanel displaySettingsPanel,
+        DisplaySettingsCoordinator displaySettings) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
@@ -49,6 +53,8 @@ record ExpansionWindows(
         ReportPanel forgePanel = new ReportPanel(skin, "forge.title", Input.Keys.UNKNOWN, List.of());
         // Kỳ ngộ (ADR-121) — không phím, server mở khi gặp kỳ ngộ.
         ReportPanel encounterPanel = new ReportPanel(skin, "encounter.title", Input.Keys.UNKNOWN, List.of());
+        // Cài đặt hiển thị (ADR-143) — không phím, mở bằng lệnh chat /caidat.
+        ReportPanel displaySettingsPanel = new ReportPanel(skin, "settings.title", Input.Keys.UNKNOWN, List.of());
         return new ExpansionWindows(
                 new SecurityPinCoordinator(sender, feeds.chat()),
                 buyOrderPanel,
@@ -74,7 +80,12 @@ record ExpansionWindows(
                 new ZoneMapCoordinator( // ADR-141
                         () -> sender.sendReadRequest(
                                 Opcode.OPCODE_LIST_ZONE_MAP_REQUEST_VALUE, ListZoneMapRequest.getDefaultInstance()),
-                        feeds.chat()::showSystemNotice));
+                        feeds.chat()::showSystemNotice),
+                displaySettingsPanel,
+                new DisplaySettingsCoordinator(
+                        displaySettingsPanel,
+                        DisplaySettings.load(new GdxPreferencesDisplaySettingsStore()),
+                        feeds.chat()));
     }
 
     /** Đăng ký vào hub. */
@@ -95,6 +106,7 @@ record ExpansionWindows(
         panels.register(formation);
         panels.register(cave);
         panels.register(zoneMap);
+        panels.register(displaySettingsPanel, displaySettings);
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

@@ -47,4 +47,4 @@ thấy, ở không gian màn hình như chữ damage, vàng nhạt có bóng, c�
 
 ## Việc cần làm tiếp theo
 
-- Tuỳ chọn ẩn/hiện danh hiệu trong cài đặt (chưa có màn cài đặt đồ hoạ).
+- ~~Tuỳ chọn ẩn/hiện danh hiệu trong cài đặt (chưa có màn cài đặt đồ hoạ).~~ ✅ [ADR-143](ADR-143-Display-Settings.md) (2026-11-01).

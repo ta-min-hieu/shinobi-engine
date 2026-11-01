@@ -12,6 +12,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Graphics;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputProcessor;
+import com.badlogic.gdx.Preferences;
 import com.badlogic.gdx.backends.lwjgl3.Lwjgl3Files;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.utils.GdxNativesLoader;
@@ -142,6 +143,10 @@ final class HeadlessGdx {
         }
         if (type == double.class) {
             return 0d;
+        }
+        if (type == Preferences.class) {
+            // ADR-143 — cài đặt hiển thị đọc Preferences lúc dựng màn hình: bộ rỗng (contains = false ⇒ mặc định).
+            return proxy(Preferences.class, HeadlessGdx::invokeNeutral);
         }
         return null;
     }

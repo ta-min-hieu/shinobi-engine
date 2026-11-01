@@ -1,5 +1,7 @@
 package dev.kage.client.core.world;
 
+import java.util.function.BooleanSupplier;
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -94,6 +96,12 @@ final class HorizonBackdrop {
     private final Vector3 probe = new Vector3();
     private int width;
     private int height;
+    private BooleanSupplier parallax = () -> true;
+
+    /** ADR-143 — công tắc "hậu cảnh parallax"; tắt thì chỉ còn trời và biển mây phẳng (không núi, không mây trôi). */
+    void useSwitch(BooleanSupplier parallaxOn) {
+        this.parallax = parallaxOn;
+    }
 
     /**
      * Một lớp parallax: biên dạng tuần hoàn (độ cao chuẩn hoá [0, 1] của {@value #SAMPLES} mẫu trên một chu kỳ) + màu +
@@ -142,8 +150,11 @@ final class HorizonBackdrop {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
 
         shapeRenderer.rect(0f, top, width, height - top, SKY_HORIZON, SKY_HORIZON, SKY_TOP, SKY_TOP);
-        drawLayer(shapeRenderer, far, top, scroll);
-        drawLayer(shapeRenderer, near, top, scroll);
+        boolean layers = parallax.getAsBoolean();
+        if (layers) {
+            drawLayer(shapeRenderer, far, top, scroll);
+            drawLayer(shapeRenderer, near, top, scroll);
+        }
         float mist = MIST_HEIGHT * height;
         shapeRenderer.rect(0f, top, width, mist, MIST, MIST, MIST_CLEAR, MIST_CLEAR);
 
@@ -151,7 +162,9 @@ final class HorizonBackdrop {
         float crestBase = bottom - CLOUD_BAND_DEPTH * height;
         shapeRenderer.rect(0f, crestBase, width, bottom - crestBase, GAP_LOW, GAP_LOW, GAP_HIGH, GAP_HIGH);
         shapeRenderer.rect(0f, 0f, width, crestBase, CLOUD_SEA_BOTTOM, CLOUD_SEA_BOTTOM, CLOUD_CREST, CLOUD_CREST);
-        drawLayer(shapeRenderer, clouds, crestBase, scroll);
+        if (layers) {
+            drawLayer(shapeRenderer, clouds, crestBase, scroll);
+        }
 
         shapeRenderer.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);

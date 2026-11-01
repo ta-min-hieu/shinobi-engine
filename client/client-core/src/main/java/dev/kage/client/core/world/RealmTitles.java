@@ -1,5 +1,7 @@
 package dev.kage.client.core.world;
 
+import java.util.function.BooleanSupplier;
+
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
@@ -53,6 +55,8 @@ final class RealmTitles implements Disposable {
     private final Matrix4 screenProjection = new Matrix4();
     private final Vector3 scratch = new Vector3();
     private WorldToScreen projector;
+    private BooleanSupplier enabled = () -> true;
+    private boolean active;
     private float previousScaleX;
     private float previousScaleY;
 
@@ -60,7 +64,16 @@ final class RealmTitles implements Disposable {
         this.font = font;
     }
 
+    /** ADR-143 — công tắc "danh hiệu trên đầu" (kèm nhãn Ma Đầu); hỏi một lần mỗi khung ở {@link #begin}. */
+    void useSwitch(BooleanSupplier titlesOn) {
+        this.enabled = titlesOn;
+    }
+
     void begin(WorldToScreen activeProjector) {
+        active = enabled.getAsBoolean();
+        if (!active) {
+            return;
+        }
         this.projector = activeProjector;
         screenProjection.setToOrtho2D(0f, 0f, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST);
@@ -78,7 +91,7 @@ final class RealmTitles implements Disposable {
 
     /** Như {@link #draw(float, float, int)}, thêm dòng "Ma Đầu" đỏ phía trên nếu {@code outlaw} (ADR-142). */
     void draw(float x, float y, int level, boolean outlaw) {
-        if (level <= 0) {
+        if (!active || level <= 0) {
             return;
         }
         scratch.set(x, y, HEAD_HEIGHT_UNITS);
@@ -100,6 +113,9 @@ final class RealmTitles implements Disposable {
     }
 
     void end() {
+        if (!active) {
+            return;
+        }
         batch.end();
         font.getData().setScale(previousScaleX, previousScaleY);
         font.setColor(Color.WHITE);

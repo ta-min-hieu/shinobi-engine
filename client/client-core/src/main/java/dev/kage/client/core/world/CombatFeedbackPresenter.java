@@ -1,6 +1,7 @@
 package dev.kage.client.core.world;
 
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
@@ -41,6 +42,7 @@ final class CombatFeedbackPresenter implements Disposable {
     private final CombatHudController combat;
     private final SkillVfxRenderer skillVfx = new SkillVfxRenderer(VFX_TIER);
     private final FloatingCombatText floatingText;
+    private BooleanSupplier damageNumbers = () -> true;
     // Bundle RIÊNG đúng quy ước KageI18n (mỗi nơi tự nạp, không dùng chung instance) — cần cho nhãn
     // "Né!" của số damage bay lên.
     private final I18NBundle i18n = KageI18n.load();
@@ -185,7 +187,14 @@ final class CombatFeedbackPresenter implements Disposable {
      */
     void render(float deltaTime, Matrix4 projection, WorldToScreen projector) {
         skillVfx.render(deltaTime, projection);
-        floatingText.render(deltaTime, projector);
+        if (damageNumbers.getAsBoolean()) {
+            floatingText.render(deltaTime, projector);
+        }
+    }
+
+    /** ADR-143 — công tắc "chữ damage"; tắt thì số bay lên không vẽ (hiệu ứng skill vẫn vẽ). */
+    void useSwitch(BooleanSupplier damageNumbersOn) {
+        this.damageNumbers = damageNumbersOn;
     }
 
     @Override

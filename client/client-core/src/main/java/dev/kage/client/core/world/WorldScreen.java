@@ -498,9 +498,9 @@ public final class WorldScreen implements GameScreen {
         GuildWarCoordinator guildWars = reports.community().guildWars();
         guild.useGuildAuction(reports.community().auctions()::open);
         guild.useGuildWar(guildWars::open);
-        // ADR-141 — trong dải PvP Hoang Vực click người chơi cũng là nhắm họ (server vẫn phán quyết đòn).
-        ZoneMapCoordinator zoneMap = reports.community().expansion().zoneMap();
+        ZoneMapCoordinator zoneMap = reports.community().expansion().zoneMap(); // ADR-141 — biển + click nhắm
         zoneMap.useBanner(combatHud::setZoneBanner);
+        reports.community().expansion().displaySettings().applyTo(realmTitles, combatFeedback, backdrop); // ADR-143
         duelTargeting.useGuildWar(
                 zoneMap.orInPvpZone(guildWars::isMyWarActive),
                 dev.kage.client.core.ui.theme.KageI18n.textOrKey(i18n, "guildwar.target"));
