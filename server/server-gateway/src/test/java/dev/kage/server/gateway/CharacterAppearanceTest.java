@@ -23,6 +23,26 @@ class CharacterAppearanceTest {
     @Test
     void shouldCarryTheFactionAndTheTierOfTheLevel() {
         assertThat(CharacterAppearance.of(Faction.FACTION_LOI, 44))
-                .isEqualTo(new CharacterAppearance(Faction.FACTION_LOI, CostumeTier.COSTUME_TIER_B3));
+                .isEqualTo(new CharacterAppearance(Faction.FACTION_LOI, CostumeTier.COSTUME_TIER_B3, 44));
+    }
+
+    @Test
+    void shouldCountRealmsFromTheirOpeningLevels() {
+        assertThat(CharacterAppearance.realmIndex(18)).isZero();
+        assertThat(CharacterAppearance.realmIndex(19)).isEqualTo(1);
+        assertThat(CharacterAppearance.realmIndex(54)).isEqualTo(2);
+        assertThat(CharacterAppearance.realmIndex(55)).isEqualTo(3);
+        assertThat(CharacterAppearance.realmIndex(100)).isEqualTo(5);
+    }
+
+    /** ADR-140 — Cấp 55 không đổi bậc trang phục (B3 từ 37) nhưng mở Kim Đan: người đang nhìn vẫn phải được báo. */
+    @Test
+    void shouldReportAVisibleChange_whenOnlyTheRealmChanges() {
+        CharacterAppearance before = CharacterAppearance.of(Faction.FACTION_LOI, 54);
+
+        assertThat(CharacterAppearance.of(Faction.FACTION_LOI, 55).differsVisiblyFrom(before))
+                .isTrue();
+        assertThat(CharacterAppearance.of(Faction.FACTION_LOI, 53).differsVisiblyFrom(before))
+                .isFalse();
     }
 }

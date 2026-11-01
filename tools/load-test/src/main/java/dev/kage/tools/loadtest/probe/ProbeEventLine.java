@@ -312,7 +312,8 @@ final class ProbeEventLine {
 
     private static String characterSpawn(CharacterSpawnedEvent event) {
         return "characterId=" + event.getCharacterId() + " x=" + meters(event.getX()) + " y=" + meters(event.getY())
-                + " faction=" + event.getFaction() + " costume=" + event.getCostumeTier();
+                + " faction=" + event.getFaction() + " costume=" + event.getCostumeTier() + " level="
+                + event.getLevel();
     }
 
     private static String characterMove(CharacterMovedEvent event) {

@@ -44,6 +44,9 @@ final class RemoteCharacterPresenter {
 
     private final RemoteMotionTracker motionTracker = new RemoteMotionTracker();
 
+    /** ADR-140 — cấp từng người đang thấy (danh hiệu cảnh giới trên đầu); cùng tập khoá với {@link #entities}. */
+    private final LongMap<Integer> levels = new LongMap<>();
+
     private final long localCharacterId;
 
     /**
@@ -73,6 +76,7 @@ final class RemoteCharacterPresenter {
         entities.put(event.getCharacterId(), entity);
         pickables.put(event.getCharacterId(), new CharacterPoint(entity));
         models.addCharacter(event.getCharacterId(), CharacterModelKey.of(event.getFaction(), event.getCostumeTier()));
+        levels.put(event.getCharacterId(), event.getLevel());
     }
 
     /**
@@ -91,6 +95,7 @@ final class RemoteCharacterPresenter {
         }
         models.replaceCharacterModel(
                 event.getCharacterId(), CharacterModelKey.of(event.getFaction(), event.getCostumeTier()));
+        levels.put(event.getCharacterId(), event.getLevel());
     }
 
     void onMoved(CharacterMovedEvent event) {
@@ -132,6 +137,7 @@ final class RemoteCharacterPresenter {
         }
         models.remove(event.getCharacterId());
         motionTracker.remove(event.getCharacterId());
+        levels.remove(event.getCharacterId());
     }
 
     /**
@@ -148,10 +154,19 @@ final class RemoteCharacterPresenter {
             motionTracker.remove(entry.key);
         }
         entities.clear();
+        levels.clear();
         // Cùng tập với entities — bỏ sót ở đây thì người chơi của World CŨ vẫn click trúng được
         // (entity đã gỡ khỏi EcsWorld nhưng Ashley giữ nguyên PositionComponent của nó), và cú click
         // vào chỗ họ từng đứng chọn họ làm đối thủ thách đấu dù họ không còn ở đây.
         pickables.clear();
+    }
+
+    /** ADR-140 — danh hiệu cảnh giới trên đầu mọi người đang thấy (giữa {@code begin}/{@code end} của titles). */
+    void drawRealmTitles(RealmTitles titles) {
+        for (LongMap.Entry<KEntity> entry : entities.entries()) {
+            PositionComponent position = POSITION.get(entry.value);
+            titles.draw(position.x, position.y, levels.get(entry.key, 0));
+        }
     }
 
     /** True nếu {@code characterId} là một người chơi KHÁC đang hiển thị. */

@@ -130,6 +130,8 @@ public final class WorldScreen implements GameScreen {
     private final CombatHudController combatHudController;
     private final CombatAnimationTrigger combatAnimationTrigger;
     private final CombatHud combatHud = new CombatHud();
+    /** ADR-140 — danh hiệu cảnh giới trên đầu (chính mình + người đang thấy), chỉ nhánh 3D. */
+    private final RealmTitles realmTitles = new RealmTitles(combatHud.font());
 
     /** Số damage + hiệu ứng skill neo tại vị trí mục tiêu — xem {@link CombatFeedbackPresenter}. */
     private final CombatFeedbackPresenter combatFeedback;
@@ -976,6 +978,13 @@ public final class WorldScreen implements GameScreen {
             // VFX/số damage vẽ SAU cùng trong nhánh 3D — luôn hiện đè lên nhân vật/địa hình, đúng
             // thứ tự "nhân vật vẽ trước, VFX vẽ đè sau" của RENDERING.md §2.
             combatFeedback.render(Gdx.graphics.getDeltaTime(), models.combined(), modelProjector);
+            realmTitles.begin(modelProjector);
+            realmTitles.draw(
+                    InterpolatedPosition.x(localPlayer, alpha),
+                    InterpolatedPosition.y(localPlayer, alpha),
+                    characterLevel);
+            remoteCharacters.drawRealmTitles(realmTitles);
+            realmTitles.end();
         } else {
             backdrop.render(shapeRenderer, camera.combined, InterpolatedPosition.x(localPlayer, alpha));
             renderPlaceholderBoxes(alpha);
@@ -1075,6 +1084,7 @@ public final class WorldScreen implements GameScreen {
         // TRƯỚC combatHud: combatFeedback mượn font của HUD, dispose HUD trước là kéo font ra khỏi
         // dưới chân nó (dù ở đây nó không dùng font lúc dispose, giữ đúng thứ tự sở hữu).
         combatFeedback.dispose();
+        realmTitles.dispose();
         // Panel mượn skin của CombatHud nên phải trả tài nguyên trước chủ skin — PanelHub dọn
         // theo đúng thứ tự đăng ký, và HUD đăng ký cuối cùng chính vì vậy.
         panels.dispose();

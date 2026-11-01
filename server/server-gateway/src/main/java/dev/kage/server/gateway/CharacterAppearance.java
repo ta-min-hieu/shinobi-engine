@@ -11,7 +11,7 @@ import dev.kage.protocol.Faction;
  * <p>Dùng thẳng enum protobuf thay vì enum domain riêng vì giá trị này chỉ đi từ DB ra dây, không
  * có logic nghiệp vụ nào ở giữa — thêm một tầng enum nữa chỉ để dịch qua lại là thừa.
  */
-record CharacterAppearance(Faction faction, CostumeTier costumeTier) {
+record CharacterAppearance(Faction faction, CostumeTier costumeTier, int level) {
 
     /**
      * ADR-132 (lô 25, chủ dự án chọn) — bậc trang phục theo CẢNH GIỚI, không theo trang bị: B2 từ Trúc Cơ (Cấp 19,
@@ -22,6 +22,12 @@ record CharacterAppearance(Faction faction, CostumeTier costumeTier) {
     /** Xem {@link #SECOND_TIER_LEVEL}. */
     static final int THIRD_TIER_LEVEL = 37;
 
+    /**
+     * ADR-140 — cấp mở đầu từng cảnh giới (Trúc Cơ, Tử Phủ, Kim Đan, Nguyên Anh, Hoá Thần); khớp
+     * {@code BreakthroughHooks} và {@code CultivationRealm} phía client.
+     */
+    private static final int[] REALM_OPENING_LEVELS = {19, 37, 55, 73, 91};
+
     /** Bậc trang phục của một cấp. */
     static CostumeTier tierFor(int level) {
         if (level >= THIRD_TIER_LEVEL) {
@@ -30,9 +36,25 @@ record CharacterAppearance(Faction faction, CostumeTier costumeTier) {
         return level >= SECOND_TIER_LEVEL ? CostumeTier.COSTUME_TIER_B2 : CostumeTier.COSTUME_TIER_B1;
     }
 
+    /** Chỉ số cảnh giới của một cấp (0 = Luyện Khí) — danh hiệu trên đầu chỉ đổi khi số này đổi. */
+    static int realmIndex(int level) {
+        int index = 0;
+        for (int opening : REALM_OPENING_LEVELS) {
+            if (level >= opening) {
+                index++;
+            }
+        }
+        return index;
+    }
+
     /** Ngoại hình suy từ hệ phái thật (cột {@code character.faction}) và cấp hiện tại của nhân vật. */
     static CharacterAppearance of(Faction faction, int level) {
-        return new CharacterAppearance(faction, tierFor(level));
+        return new CharacterAppearance(faction, tierFor(level), level);
+    }
+
+    /** ADR-140 — người đang nhìn phải được báo lại: bậc trang phục hoặc CẢNH GIỚI (danh hiệu trên đầu) đã đổi. */
+    boolean differsVisiblyFrom(CharacterAppearance other) {
+        return costumeTier != other.costumeTier || realmIndex(level) != realmIndex(other.level);
     }
 
     /**
@@ -41,6 +63,6 @@ record CharacterAppearance(Faction faction, CostumeTier costumeTier) {
      * thế; đó là lựa chọn đúng hơn bỏ vẽ hẳn nhân vật.
      */
     static CharacterAppearance unknown() {
-        return new CharacterAppearance(Faction.FACTION_UNSPECIFIED, CostumeTier.COSTUME_TIER_UNSPECIFIED);
+        return new CharacterAppearance(Faction.FACTION_UNSPECIFIED, CostumeTier.COSTUME_TIER_UNSPECIFIED, 0);
     }
 }

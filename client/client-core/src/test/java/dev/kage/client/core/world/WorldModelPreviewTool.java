@@ -15,6 +15,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import dev.kage.client.core.ui.theme.KageSkin;
 import dev.kage.protocol.MonsterMovedEvent;
 import dev.kage.protocol.NpcSpawnedEvent;
 
@@ -313,6 +314,13 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
 
     private static final float ARC_FOUR_X = 180f;
     private static final long ARC_FOUR_FIRST_ID = -980L;
+
+    /** ADR-140 — dải arc 4 kèm danh hiệu cảnh giới trên đầu (cấp giả định tăng dần qua các cảnh giới). */
+    private static final int[] ARC_FOUR_TITLE_LEVELS = {5, 20, 40, 56, 75, 95};
+
+    private RealmTitles realmTitles;
+    private KageSkin titleSkin;
+    private boolean showingArcFour;
     private static final long CAVE_FIRST_ID = -950L;
 
     /** Tâm camera của dải đang chiếu (dải Q7 hay dải lô 24). */
@@ -344,6 +352,8 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         // tương đối giữa nhân vật, quái và dấu mục tiêu.
         models.resize(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS);
         shapeRenderer = new ShapeRenderer();
+        titleSkin = new KageSkin();
+        realmTitles = new RealmTitles(titleSkin.font());
         presenter = new MonsterPresenter(models);
         npcPresenter = new NpcPresenter(models);
 
@@ -590,6 +600,7 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
             putMonster(ARC_FOUR_FIRST_ID - index, ARC_FOUR_STRIP[index], left + LOT24_STEP * index);
         }
         stripCenterX = ARC_FOUR_X;
+        showingArcFour = true;
     }
 
     private void startCaveStrip() {
@@ -624,6 +635,14 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         npcPresenter.sync(stripCenterX);
         models.follow(stripCenterX, 0f);
         models.render(1f / 60f);
+        if (showingArcFour) {
+            float left = ARC_FOUR_X - LOT24_STEP * (ARC_FOUR_STRIP.length - 1) / 2f;
+            realmTitles.begin(models::project);
+            for (int index = 0; index < ARC_FOUR_STRIP.length; index++) {
+                realmTitles.draw(left + LOT24_STEP * index, 0f, ARC_FOUR_TITLE_LEVELS[index]);
+            }
+            realmTitles.end();
+        }
     }
 
     /**
@@ -686,6 +705,10 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         }
         if (shapeRenderer != null) {
             shapeRenderer.dispose();
+        }
+        if (realmTitles != null) {
+            realmTitles.dispose();
+            titleSkin.dispose();
         }
     }
 

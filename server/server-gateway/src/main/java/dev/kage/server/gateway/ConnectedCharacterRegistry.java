@@ -391,6 +391,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setY(y)
                 .setFaction(appearance.faction())
                 .setCostumeTier(appearance.costumeTier())
+                .setLevel(appearance.level())
                 .build();
         send(ctx, Opcode.OPCODE_CHARACTER_SPAWNED_EVENT_VALUE, 0, event.toByteArray());
     }
@@ -598,6 +599,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 .setCharacterId(changedCharacterId)
                 .setFaction(appearance.faction())
                 .setCostumeTier(appearance.costumeTier())
+                .setLevel(appearance.level())
                 .build();
         send(ctx, Opcode.OPCODE_CHARACTER_APPEARANCE_CHANGED_EVENT_VALUE, 0, event.toByteArray());
     }

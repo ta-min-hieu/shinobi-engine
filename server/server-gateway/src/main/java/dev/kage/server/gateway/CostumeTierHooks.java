@@ -25,7 +25,9 @@ final class CostumeTierHooks {
             CharacterAppearance next = CharacterAppearance.of(
                     FactionMapping.toProto(character.get().faction()), level);
             Optional<CharacterAppearance> previous = registry.updateAppearance(characterId, next);
-            if (previous.isPresent() && previous.get().costumeTier() != next.costumeTier()) {
+            // ADR-140 — cả khi chỉ cảnh giới đổi (Cấp 55/73/91 không đổi bậc trang phục): danh hiệu trên đầu phải đổi
+            // theo.
+            if (previous.isPresent() && previous.get().differsVisiblyFrom(next)) {
                 routes.find(characterId).ifPresent(world -> world.enqueueAppearanceChanged(characterId));
             }
         };

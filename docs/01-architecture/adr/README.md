@@ -171,6 +171,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-137](ADR-137-Wasteland-Pvp-Zone.md) | Vùng PvP Hoang Vực | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
 | [ADR-138](ADR-138-Cave-Decorations-In-3D.md) | Bày trí động phủ hiện hình 3D | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
 | [ADR-139](ADR-139-Arc-Four-Descend-The-Mountain.md) | Nội dung arc 4 — Hạ Sơn (Kim Đan, Lv55–72) | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
+| [ADR-140](ADR-140-Overhead-Realm-Title.md) | Danh hiệu cảnh giới trên đầu | ✅ **Accepted** *(2026-11-01, lô 25)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

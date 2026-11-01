@@ -31,7 +31,7 @@ này hoặc lô sau; người khác vẫn thấy đột phá qua dòng thông b�
 | # | Quyết định | Trạng thái |
 |---|---|---|
 | 1 | Báo toàn server ở cấp mở đầu cảnh giới; VFX client tự phát khi cảnh giới đổi | Accepted |
-| 2 | Danh hiệu trên đầu cần đổi protocol + bộ vẽ chữ 3D | Treo — chờ làm cùng Khung UI |
+| 2 | Danh hiệu trên đầu cần đổi protocol + bộ vẽ chữ 3D | ✅ Làm 2026-11-01 — [ADR-140](ADR-140-Overhead-Realm-Title.md) |
 
 ## ADR cần tạo
 
