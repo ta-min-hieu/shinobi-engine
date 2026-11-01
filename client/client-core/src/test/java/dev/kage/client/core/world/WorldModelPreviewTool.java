@@ -291,6 +291,17 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
 
     private static final long LOT24_FIRST_ID = -900L;
 
+    /**
+     * Phần sáu (lô 25) — bốn món bày trí động phủ (NPC động {@code cave_<mã>} của server) cạnh ĐỐI CHỨNG trực trạm đã
+     * duyệt, để chấm cỡ và độ đọc của đồ vật so với một người.
+     */
+    private static final String[] CAVE_STRIP = {
+        "waypost_attendant", "cave_spirit_pine", "cave_jade_lantern", "cave_cloud_screen", "cave_lotus_pond",
+    };
+
+    private static final float CAVE_X = 120f;
+    private static final long CAVE_FIRST_ID = -950L;
+
     /** Tâm camera của dải đang chiếu (dải Q7 hay dải lô 24). */
     private float stripCenterX = WEAPON_STRIP_X;
 
@@ -524,7 +535,9 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
             case 162 -> capture("7-lo24-sau-model-moi");
             case 164 -> showingBackdrop = true;
             case 168 -> capture("8-hau-canh-parallax");
-            case 172 -> Gdx.app.exit();
+            case 170 -> startCaveStrip();
+            case 176 -> capture("9-bay-tri-dong-phu");
+            case 180 -> Gdx.app.exit();
             default -> {
                 /* các khung còn lại chỉ để animation chạy tiếp */
             }
@@ -547,6 +560,14 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         }
         stripCenterX = LOT24_X;
         LOG.info("dải lô 24 dựng ở x={}", LOT24_X);
+    }
+
+    private void startCaveStrip() {
+        float left = CAVE_X - LOT24_STEP * (CAVE_STRIP.length - 1) / 2f;
+        for (int index = 0; index < CAVE_STRIP.length; index++) {
+            putNpc(CAVE_FIRST_ID - index, CAVE_STRIP[index], left + LOT24_STEP * index);
+        }
+        stripCenterX = CAVE_X;
     }
 
     /** Dựng năm nhân vật thành một hàng và dời camera sang đó. */

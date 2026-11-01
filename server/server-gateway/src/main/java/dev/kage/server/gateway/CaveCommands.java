@@ -2,6 +2,7 @@ package dev.kage.server.gateway;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import dev.kage.character.api.CharacterFacade;
@@ -14,6 +15,7 @@ import dev.kage.protocol.CaveInviteEvent;
 import dev.kage.protocol.CaveOutcome;
 import dev.kage.protocol.CaveResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.server.world.WorldFacade;
 import dev.kage.world.api.CaveFacade;
 import dev.kage.world.domain.CavePort;
 import dev.kage.world.domain.CaveRules;
@@ -29,6 +31,18 @@ final class CaveCommands {
     static final long CAVE_KEY_BASE = -(1L << 40);
 
     static final String INSTANCE_CODE = "cave_dwelling";
+
+    /**
+     * Lô 25 — món bày trí đã bày hiện hình 3D: mỗi món là một NPC ĐỘNG {@code cave_<mã>} trong World động phủ (đường
+     * {@code WorldFacade.placeNpc} của thương nhân du hành, ADR-131), client vẽ model {@code char_cave-<mã>} như mọi
+     * NPC. Không gói mới: khách vào cùng World cũng thấy, vì NPC là thực thể của World chứ không của người xem.
+     */
+    static final String DECORATION_NPC_PREFIX = "cave_";
+
+    /** Chỗ đứng của từng món theo thứ tự danh mục ({@code sort_order}): hai món mỗi bên chỗ vào (x = 0), lùi về sau. */
+    private static final float[] DECORATION_X = {-6f, -3f, 3f, 6f};
+
+    private static final float DECORATION_Y = 0.5f;
 
     /** Thứ lệnh này cần. */
     record Deps(
@@ -64,8 +78,7 @@ final class CaveCommands {
                         ? result(characterId, action, deps.caves().collect(characterId, now), now)
                         : view(characterId, action, CaveOutcome.CAVE_OUTCOME_NOT_IN_OWN_CAVE, now);
             case CAVE_ACTION_UPGRADE -> result(characterId, action, deps.caves().upgrade(characterId, now), now);
-            case CAVE_ACTION_DECORATE ->
-                result(characterId, action, deps.caves().decorate(characterId, command.getDecorationCode(), now), now);
+            case CAVE_ACTION_DECORATE -> decorate(characterId, command.getDecorationCode(), now);
             case CAVE_ACTION_INVITE -> invite(characterId, command.getTargetName(), now);
             case CAVE_ACTION_VISIT -> visit(characterId, command.getTargetName(), now);
             default -> view(characterId, CaveAction.CAVE_ACTION_VIEW, CaveOutcome.CAVE_OUTCOME_OK, now);
@@ -76,9 +89,39 @@ final class CaveCommands {
         return deps.dungeons().instanceKeyOf(characterId).equals(Optional.of(caveKey(characterId)));
     }
 
+    private CaveResponse decorate(long characterId, String decorationCode, Instant now) {
+        CavePort.Result decorated = deps.caves().decorate(characterId, decorationCode, now);
+        if (decorated.outcome() == CavePort.Outcome.OK && inOwnCave(characterId)) {
+            showDecorations(characterId, characterId, now);
+        }
+        return result(characterId, CaveAction.CAVE_ACTION_DECORATE, decorated, now);
+    }
+
+    /**
+     * Đặt mọi món chủ {@code ownerId} đã bày vào World động phủ {@code characterId} đang đứng. Chạy lại vô hại:
+     * {@code placeNpc} bỏ qua NPC đã đứng đúng chỗ.
+     */
+    private void showDecorations(long characterId, long ownerId, Instant now) {
+        Optional<WorldFacade> world = deps.dungeons().worldFacadeFor(characterId);
+        if (world.isEmpty()) {
+            return;
+        }
+        List<String> placed = deps.caves().cave(ownerId, now).decorations();
+        List<CavePort.Decoration> catalog = deps.caves().catalog();
+        for (int i = 0; i < Math.min(catalog.size(), DECORATION_X.length); i++) {
+            String code = catalog.get(i).code();
+            if (placed.contains(code)) {
+                world.get().placeNpc(DECORATION_NPC_PREFIX + code, DECORATION_X[i], DECORATION_Y);
+            }
+        }
+    }
+
     private CaveResponse entered(long characterId, long ownerId, CaveAction action, Instant now) {
         DungeonInstanceRegistry.EnterOutcome outcome =
                 deps.dungeons().enterShared(characterId, caveKey(ownerId), INSTANCE_CODE);
+        if (outcome == DungeonInstanceRegistry.EnterOutcome.OK) {
+            showDecorations(characterId, ownerId, now);
+        }
         return view(
                 characterId,
                 action,

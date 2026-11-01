@@ -37,6 +37,13 @@ import dev.kage.protocol.wire.PacketCodec;
  */
 final class DialogueCoordinator implements WindowFlow {
 
+    /**
+     * Món bày trí động phủ (lô 25) là NPC động {@code cave_<mã>} chỉ để HIỆN HÌNH — khớp
+     * {@code CaveCommands.DECORATION_NPC_PREFIX} phía server. Đồ vật không có cây hội thoại; bấm vào thì thôi, không
+     * gửi lệnh để rồi nhận lỗi.
+     */
+    private static final String DECORATION_PREFIX = "cave_";
+
     private final DialogueController controller = new DialogueController();
     private final DialoguePanel panel;
     private final WorldCommandSender sender;
@@ -56,6 +63,9 @@ final class DialogueCoordinator implements WindowFlow {
 
     /** Người chơi click trúng một NPC — mở hội thoại nếu chưa có cuộc nào đang mở. */
     void talkTo(String npcCode) {
+        if (npcCode.startsWith(DECORATION_PREFIX)) {
+            return;
+        }
         if (controller.beginTalk(npcCode)) {
             controller.onCommandSent(sender.talkToNpc(npcCode));
         }

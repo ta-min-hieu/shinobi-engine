@@ -58,4 +58,5 @@ Schema mới V108: `cave_dwelling`, `cave_decoration_template`, `cave_decoration
    −1.500 ⇒ 66/giờ, kho 1.584 ⇒ bày lại `ALREADY_PLACED`, mã lạ `UNKNOWN_DECORATION`; audit đủ 3 dòng. Mời Benkei (bạn) ⇒
    OK + Benkei nhận 337; mời hieutm (không phải bạn) ⇒ `NOT_FRIEND`. Benkei `/dongphu tham Kagemaru` ⇒ vào World động phủ,
    thu ⇒ `NOT_IN_OWN_CAVE`; Kagemaru vào sau ⇒ hai người thấy nhau (303) — CHUNG một World. hieutm thăm ⇒ `NOT_INVITED`.
-3. ⚠️ Chủ dự án xem: toàn bộ con số ở D2–D4 do AI chọn; chưa có hình động phủ / món bày trí (nền đất trống).
+3. ⚠️ Chủ dự án xem: toàn bộ con số ở D2–D4 do AI chọn. Món bày trí đã hiện hình 3D từ lô 25 —
+   [ADR-138](ADR-138-Cave-Decorations-In-3D.md); động phủ có hậu cảnh parallax chung.
