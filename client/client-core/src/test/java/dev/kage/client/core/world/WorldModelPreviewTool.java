@@ -267,6 +267,33 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     /** Id riêng cho dải chấm, không đụng id nào đang dùng. */
     private static final long WEAPON_STRIP_FIRST_ID = 20L;
 
+    /**
+     * Phần bốn (lô 25 — chấm 6 model lô 24): hai ĐỐI CHỨNG đã duyệt cùng dòng đứng đầu hàng
+     * ({@code foundation_warden} cho máy Linh Triều, {@code waypost_attendant} cho người của tông), rồi bốn quái arc 3
+     * và hai NPC mới. Chấm có đối chứng render, không chấm theo trí nhớ (bài học ART-ASSET-LOG).
+     */
+    private static final int LOT24_FIRST_FRAME = 146;
+
+    private static final float LOT24_X = 60f;
+
+    private static final float LOT24_STEP = 1.4f;
+
+    private static final String[][] LOT24_STRIP = {
+        {"monster", "foundation_warden"},
+        {"monster", "inner_trial_construct"},
+        {"monster", "blood_sand_infiltrator"},
+        {"monster", "bach_kinh_chi"},
+        {"monster", "blood_sand_altar_master"},
+        {"npc", "waypost_attendant"},
+        {"npc", "sect_blacksmith"},
+        {"npc", "traveling_merchant"},
+    };
+
+    private static final long LOT24_FIRST_ID = -900L;
+
+    /** Tâm camera của dải đang chiếu (dải Q7 hay dải lô 24). */
+    private float stripCenterX = WEAPON_STRIP_X;
+
     private final Map<Long, CombatHudController.MonsterState> monsters = new LinkedHashMap<>();
 
     private WorldModelRenderer models;
@@ -407,6 +434,10 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
      * đúng khung đầu (crossfade 0.15s = 9 khung) — chụp quá sớm thì mọi tư thế trông như nhau.
      */
     private void script() {
+        if (frame >= LOT24_FIRST_FRAME) {
+            lot24Script();
+            return;
+        }
         if (frame >= WEAPON_STRIP_FIRST_FRAME) {
             weaponScript();
             return;
@@ -470,11 +501,40 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
             case WEAPON_STRIP_FIRST_FRAME -> startWeaponStrip();
             // Đủ khung để crossfade 0,15s (9 khung) về hẳn idle trên CẢ NĂM model.
             case 140 -> capture("6-q7-vu-khi-nam-he");
-            case 146 -> Gdx.app.exit();
             default -> {
                 /* các khung còn lại chỉ để animation chạy tiếp */
             }
         }
+    }
+
+    /** Phần bốn — dải 6 model lô 24 cạnh hai đối chứng. */
+    private void lot24Script() {
+        switch (frame) {
+            case LOT24_FIRST_FRAME -> startLot24Strip();
+            case 162 -> capture("7-lo24-sau-model-moi");
+            case 168 -> Gdx.app.exit();
+            default -> {
+                /* các khung còn lại chỉ để animation chạy tiếp */
+            }
+        }
+    }
+
+    private void startLot24Strip() {
+        for (int index = 0; index < WEAPON_STRIP_MODELS.length; index++) {
+            models.setPosition(WEAPON_STRIP_FIRST_ID + index, CLOAK_TEST_OFFSCREEN_X, 0f, 0f);
+        }
+        float left = LOT24_X - LOT24_STEP * (LOT24_STRIP.length - 1) / 2f;
+        for (int index = 0; index < LOT24_STRIP.length; index++) {
+            long id = LOT24_FIRST_ID - index;
+            float x = left + LOT24_STEP * index;
+            if ("monster".equals(LOT24_STRIP[index][0])) {
+                putMonster(id, LOT24_STRIP[index][1], x);
+            } else {
+                putNpc(id, LOT24_STRIP[index][1], x);
+            }
+        }
+        stripCenterX = LOT24_X;
+        LOG.info("dải lô 24 dựng ở x={}", LOT24_X);
     }
 
     /** Dựng năm nhân vật thành một hàng và dời camera sang đó. */
@@ -497,9 +557,9 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     }
 
     private void renderWeaponStrip() {
-        presenter.sync(monsters, WEAPON_STRIP_X);
-        npcPresenter.sync(WEAPON_STRIP_X);
-        models.follow(WEAPON_STRIP_X, 0f);
+        presenter.sync(monsters, stripCenterX);
+        npcPresenter.sync(stripCenterX);
+        models.follow(stripCenterX, 0f);
         models.render(1f / 60f);
     }
 

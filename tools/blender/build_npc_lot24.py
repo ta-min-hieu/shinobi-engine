@@ -44,7 +44,9 @@ def _blacksmith():
     spec["accessories"] = [
         {"kind": "chest_plate", "color": "#7A5236"},
         {"kind": "arm_wrap", "color": "#B9A58A"},
-        {"kind": "scarf", "color": "#C2462E"},
+        # VÒNG B #1 (2026-11-01): khăn ĐỎ phạm luật màu ART-PIPELINE §2.2 (đỏ = Huyết Sa, cấm trên người của tông).
+        # Cam lửa lò — vẫn là điểm ấm duy nhất trên thân tối, nhưng không đọc ra phe địch.
+        {"kind": "scarf", "color": "#D9822B"},
     ]
     spec["weapon"] = "stone_mace"
     spec["weapon_color"] = "#5E5A55"

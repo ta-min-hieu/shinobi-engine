@@ -114,7 +114,9 @@ def _blood_sand_altar_master():
     spec["accessories"] = [
         {"kind": "shoulder_plate", "color": ALTAR_GOLD, "bone": "spine"},
         {"kind": "sash", "color": BLOOD_BRIGHT},
-        {"kind": "robe_hem", "color": ALTAR_GOLD},
+        # VÒNG B #1 (2026-11-01, runWorldPreview cạnh đối chứng): gấu áo VÀNG đọc ra một cái ĐẾ vàng dưới chân —
+        # trả về màu máu như dòng ringleader; vàng chỉ còn ở giáp vai và chuôi kiếm.
+        {"kind": "robe_hem", "color": BLOOD},
         {"kind": "arm_wrap", "color": "#1A0C0D"},
     ]
     spec["weapon_grip"] = ALTAR_GOLD
