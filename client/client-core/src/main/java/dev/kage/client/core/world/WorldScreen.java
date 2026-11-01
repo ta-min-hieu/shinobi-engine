@@ -104,6 +104,7 @@ public final class WorldScreen implements GameScreen {
     private final Viewport viewport =
             new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
+    private final HorizonBackdrop backdrop = new HorizonBackdrop();
     // MEDIUM tường minh — bản cài đóng gói đúng 1 tier mặc định theo ADR-028, không phải để trống
     // dựa vào default ngầm (không có default: WorldModelRenderer bắt buộc tham số tier).
     private final WorldModelRenderer models = new WorldModelRenderer(GraphicsTier.MEDIUM);
@@ -967,6 +968,8 @@ public final class WorldScreen implements GameScreen {
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
 
         if (models.isEnabled()) {
+            // Hậu cảnh trước model, ma trận khung trước (follow chạy trong renderModels) — lệch một khung không thấy.
+            backdrop.render(shapeRenderer, models.combined(), InterpolatedPosition.x(localPlayer, alpha));
             renderModels(alpha);
             renderMonsters(models.combined());
             DemoPlatforms.render(shapeRenderer, models.combined(), worldChange.currentKind());
@@ -974,6 +977,7 @@ public final class WorldScreen implements GameScreen {
             // thứ tự "nhân vật vẽ trước, VFX vẽ đè sau" của RENDERING.md §2.
             combatFeedback.render(Gdx.graphics.getDeltaTime(), models.combined(), modelProjector);
         } else {
+            backdrop.render(shapeRenderer, camera.combined, InterpolatedPosition.x(localPlayer, alpha));
             renderPlaceholderBoxes(alpha);
             renderMonsters(camera.combined);
             DemoPlatforms.render(shapeRenderer, camera.combined, worldChange.currentKind());

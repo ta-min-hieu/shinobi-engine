@@ -308,6 +308,11 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
     /** Từ khung này trở đi, cảnh chỉ còn dải chấm Q7 — xem {@link #WEAPON_STRIP_FIRST_FRAME}. */
     private boolean showingWeaponStrip;
 
+    /** Phần năm — dải lô 24 vẽ trên hậu cảnh parallax (lô 25), chấm độ đọc của model trên nền mới. */
+    private final HorizonBackdrop backdrop = new HorizonBackdrop();
+
+    private boolean showingBackdrop;
+
     @Override
     public void create() {
         models = new WorldModelRenderer(GraphicsTier.MEDIUM);
@@ -403,6 +408,11 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         // ảnh ra toàn đen, bẫy đã dính thật ở công cụ chẩn đoán trước.
         Gdx.gl.glClearColor(0.1f, 0.1f, 0.15f, 1f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
+        if (showingBackdrop) {
+            backdrop.render(shapeRenderer, models.combined(), PLAYER_X);
+            // Dải chấm (renderWeaponStrip) không vẽ nền đất; WorldScreen thì có — vẽ để khung giống game thật.
+            DemoPlatforms.render(shapeRenderer, models.combined());
+        }
 
         if (showingWeaponStrip) {
             renderWeaponStrip();
@@ -512,7 +522,9 @@ public final class WorldModelPreviewTool extends ApplicationAdapter {
         switch (frame) {
             case LOT24_FIRST_FRAME -> startLot24Strip();
             case 162 -> capture("7-lo24-sau-model-moi");
-            case 168 -> Gdx.app.exit();
+            case 164 -> showingBackdrop = true;
+            case 168 -> capture("8-hau-canh-parallax");
+            case 172 -> Gdx.app.exit();
             default -> {
                 /* các khung còn lại chỉ để animation chạy tiếp */
             }

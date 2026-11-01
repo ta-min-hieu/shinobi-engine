@@ -9,12 +9,14 @@ import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
+import com.badlogic.gdx.graphics.g2d.NinePatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.scenes.scene2d.ui.Label;
 import com.badlogic.gdx.scenes.scene2d.ui.ScrollPane;
 import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.ui.TextField;
 import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
+import com.badlogic.gdx.scenes.scene2d.utils.NinePatchDrawable;
 import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.Disposable;
 
@@ -57,10 +59,22 @@ public final class KageSkin implements Disposable {
      * {@link Pixmap} (chưa có atlas UI — xem javadoc lớp), nên tái hiện được BỐ CỤC + TÔNG MÀU +
      * KHUNG VIỀN, KHÔNG tái hiện được hoa văn. Khi có art UI thật thì thay ruột lớp này, chỗ gọi
      * không phải sửa.
+     *
+     * <p><b>Lô 25 (2026-11-01) — khung tu tiên "ngọc và lụa"</b> thay nâu-đen/vàng đồng: nền lụa mực xanh, viền ngọc,
+     * chỉ vàng bên trong, ngọc thoi ở góc cửa sổ ({@link JadeSilkFrames}, nine-patch). Thanh Máu/Khí/EXP giữ màu cũ.
      */
-    private static final Color PANEL_BACKGROUND = Color.valueOf("1A1008F0");
+    private static final Color PANEL_BACKGROUND = Color.valueOf("0F1C1BF0");
 
-    private static final Color PANEL_BORDER = Color.valueOf("C8922Eff");
+    private static final Color PANEL_BORDER = Color.valueOf("4FA58CFF");
+
+    /** Sợi chỉ vàng trong viền và vòng trong của nút tròn. */
+    private static final Color GOLD_THREAD = Color.valueOf("D4AF5AFF");
+
+    /** Viền khi nhấn: ngọc sáng hẳn lên. */
+    private static final Color JADE_BRIGHT = Color.valueOf("8FD9C0FF");
+
+    private static final JadeSilkFrames.Palette DISABLED =
+            new JadeSilkFrames.Palette(Color.valueOf("181C1BF0"), Color.valueOf("4A5A55FF"), Color.valueOf("6B5A3AFF"));
 
     private static final Color HEALTH_RED = Color.valueOf("D32F2F");
 
@@ -122,12 +136,14 @@ public final class KageSkin implements Disposable {
         this.chiFill = solid(CHI_BLUE);
         this.expFill = solid(EXP_AMBER);
 
-        this.panel = framed(64, 64, PANEL_BACKGROUND, PANEL_BORDER);
-        this.slot = framed(48, 48, Color.valueOf("20160BF0"), PANEL_BORDER);
-        this.slotPressed = framed(48, 48, Color.valueOf("4A3418F0"), Color.valueOf("F0C060"));
-        this.roundButton = disc(96, 4, Color.valueOf("241708E0"), PANEL_BORDER);
-        this.roundButtonPressed = disc(96, 4, Color.valueOf("4A3418E0"), Color.valueOf("F0C060"));
-        this.roundButtonDisabled = disc(96, 4, Color.valueOf("1A1A1AC0"), Color.valueOf("6B5A3A"));
+        this.panel = framed(64, new JadeSilkFrames.Palette(PANEL_BACKGROUND, PANEL_BORDER, GOLD_THREAD), true);
+        this.slot = framed(48, new JadeSilkFrames.Palette(Color.valueOf("142625F0"), PANEL_BORDER, GOLD_THREAD), false);
+        this.slotPressed =
+                framed(48, new JadeSilkFrames.Palette(Color.valueOf("24463FF0"), JADE_BRIGHT, GOLD_THREAD), false);
+        this.roundButton = disc(96, new JadeSilkFrames.Palette(Color.valueOf("142625E0"), PANEL_BORDER, GOLD_THREAD));
+        this.roundButtonPressed =
+                disc(96, new JadeSilkFrames.Palette(Color.valueOf("24463FE0"), JADE_BRIGHT, GOLD_THREAD));
+        this.roundButtonDisabled = disc(96, DISABLED);
 
         this.labelStyle = new Label.LabelStyle(font, Color.WHITE);
         this.statLabelStyle = new Label.LabelStyle(font, Color.valueOf("FFE9B0"));
@@ -135,7 +151,7 @@ public final class KageSkin implements Disposable {
         this.buttonStyle = new TextButton.TextButtonStyle();
         buttonStyle.up = slot;
         buttonStyle.down = slotPressed;
-        buttonStyle.disabled = framed(48, 48, Color.valueOf("181818F0"), Color.valueOf("6B5A3A"));
+        buttonStyle.disabled = framed(48, DISABLED, false);
         buttonStyle.font = font;
         buttonStyle.fontColor = Color.valueOf("FFE9B0");
         buttonStyle.disabledFontColor = Color.GRAY;
@@ -186,43 +202,41 @@ public final class KageSkin implements Disposable {
     }
 
     /**
-     * Ô chữ nhật nền {@code background} viền {@code border} dày {@link #BORDER_PX}, bo 4 góc bằng
-     * cách bỏ đúng 1 pixel mỗi góc — đủ để mắt đọc ra "khung có bo" ở kích thước HUD, không cần vẽ
-     * cung tròn thật.
+     * Khung ngọc-lụa vuông {@code size} ({@link JadeSilkFrames#frame}) dưới dạng NINE-PATCH: kéo giãn bao nhiêu thì
+     * viền ngọc, chỉ vàng và ngọc góc vẫn giữ nguyên độ dày — bản {@code TextureRegionDrawable} cũ thì viền phình
+     * theo tỉ lệ.
      *
-     * <p>Trả {@link TextureRegionDrawable} chứ KHÔNG phải {@code NinePatchDrawable}: widget HUD kéo
-     * giãn khung này ra kích thước bất kỳ, nên viền sẽ dày mỏng không đều theo tỉ lệ. Chấp nhận được
-     * cho bản dựng tạm bằng Pixmap; có atlas UI thật thì chuyển sang nine-patch để viền giữ nguyên độ
-     * dày.
+     * <p>⚠️ Giữ NGUYÊN hình học bố cục của bản cũ: padding (left/right/top/bottom width) về 0 và kích thước tối
+     * thiểu bằng cỡ ảnh. Để mặc định, {@link NinePatchDrawable} lấy {@link JadeSilkFrames#CORNER_PX} làm padding
+     * cho mọi Table/nút dùng nó làm nền — mọi panel sẽ co nội dung lại 10px mỗi bên và nhãn tiếng Việt trên nút bề
+     * rộng cố định tràn ra ngoài (đúng bẫy "nút bề rộng cố định" đã gặp).
      */
-    private Drawable framed(int width, int height, Color background, Color border) {
-        Pixmap pixmap = new Pixmap(width, height, Pixmap.Format.RGBA8888);
-        pixmap.setColor(border);
-        pixmap.fill();
-        pixmap.setColor(background);
-        pixmap.fillRectangle(BORDER_PX, BORDER_PX, width - (BORDER_PX * 2), height - (BORDER_PX * 2));
-        pixmap.setColor(Color.CLEAR);
-        pixmap.setBlending(Pixmap.Blending.None); // ghi ĐÈ alpha=0, không trộn — để góc trong suốt thật
-        pixmap.drawPixel(0, 0);
-        pixmap.drawPixel(width - 1, 0);
-        pixmap.drawPixel(0, height - 1);
-        pixmap.drawPixel(width - 1, height - 1);
-        return toDrawable(pixmap);
+    private Drawable framed(int size, JadeSilkFrames.Palette palette, boolean gems) {
+        Texture texture = own(JadeSilkFrames.frame(size, palette, gems));
+        int corner = JadeSilkFrames.CORNER_PX;
+        NinePatchDrawable drawable =
+                new NinePatchDrawable(new NinePatch(new TextureRegion(texture), corner, corner, corner, corner));
+        drawable.setLeftWidth(0f);
+        drawable.setRightWidth(0f);
+        drawable.setTopHeight(0f);
+        drawable.setBottomHeight(0f);
+        drawable.setMinWidth(size);
+        drawable.setMinHeight(size);
+        return drawable;
     }
 
-    /** Đĩa tròn nền {@code background} viền {@code border} — nút tròn kiểu Ninja School. */
-    private Drawable disc(int diameter, int borderPx, Color background, Color border) {
-        Pixmap pixmap = new Pixmap(diameter, diameter, Pixmap.Format.RGBA8888);
-        pixmap.setBlending(Pixmap.Blending.None); // nền phải trong suốt THẬT ngoài đường tròn
-        pixmap.setColor(Color.CLEAR);
-        pixmap.fill();
-        pixmap.setBlending(Pixmap.Blending.SourceOver);
-        int radius = (diameter / 2) - 1;
-        pixmap.setColor(border);
-        pixmap.fillCircle(diameter / 2, diameter / 2, radius);
-        pixmap.setColor(background);
-        pixmap.fillCircle(diameter / 2, diameter / 2, radius - borderPx);
-        return toDrawable(pixmap);
+    /** Nút tròn ngọc-lụa ({@link JadeSilkFrames#ring}), viền ngọc dày {@link #BORDER_PX} × 2. */
+    private Drawable disc(int diameter, JadeSilkFrames.Palette palette) {
+        return toDrawable(JadeSilkFrames.ring(diameter, BORDER_PX * 2, palette));
+    }
+
+    /** Texture từ Pixmap (lọc NEAREST — viền 1px của nine-patch không được nhoè sang ô bên cạnh), giải phóng Pixmap. */
+    private Texture own(Pixmap pixmap) {
+        Texture texture = new Texture(pixmap);
+        texture.setFilter(Texture.TextureFilter.Nearest, Texture.TextureFilter.Nearest);
+        pixmap.dispose();
+        ownedTextures.add(texture);
+        return texture;
     }
 
     private Drawable toDrawable(Pixmap pixmap) {

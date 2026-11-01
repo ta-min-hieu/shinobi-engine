@@ -182,8 +182,19 @@ Mô tả VFX từng skill (giữ từ bản cũ — mã skill và cơ chế khô
 Dải nền đất một trục X (world chính −61 → 305, khớp `MAIN_WORLD_MAX_X` server — hai nơi phải nới CÙNG lúc). Từ tây
 sang đông: sân khảo hạch + Tàng Thư Đường cũ · **sân tông Thanh Hư** (vùng an toàn, Chu Hoành, sư tỷ, thợ rèn) · linh
 mạch sơ cấp · vùng mạch chết Huyết Sa · rìa Hoang Vực · sân khảo hạch Trúc Cơ · **cổng nội môn** + sân bỉ võ (arc 3).
-Bảy trạm tiếp ứng (trận pháp nhỏ) rải dọc trục. Parallax/hậu cảnh chưa dựng — khi dựng: núi mây, bậc đá, đình đài,
-không mái ngói làng.
+Bảy trạm tiếp ứng (trận pháp nhỏ) rải dọc trục.
+
+**Hậu cảnh parallax (lô 25, 2026-11-01)** — `HorizonBackdrop`, vẽ thủ tục (không asset): trời chuyển xanh đậm → vàng
+nhạt chân trời · núi đá dựng đứng xa (trôi 0,04) và gần (0,12) sườn lõm kiểu thuỷ mặc · dải sương chân núi · biển mây
+dưới mép đất (gờ mây tròn trôi 0,3, đối lập hình nhọn của núi). Chân trời lấy từ hai mép dải nền đất chiếu qua camera
+thật, nên khớp mọi zoom/độ cao nhảy; lớp phủ ngày đêm làm tối luôn hậu cảnh. Chấm: khung `8-hau-canh-parallax` của
+`runWorldPreview`. Còn thiếu: bậc đá, đình đài (cần mesh/sprite — lô sau), và hậu cảnh riêng cho bí cảnh/Arena (hiện
+dùng chung).
+
+**Khung UI "ngọc và lụa" (lô 25, 2026-11-01)** — `JadeSilkFrames` + `KageSkin`: nền lụa mực xanh `#0F1C1B`, viền ngọc
+`#4FA58C` 2px, sợi chỉ vàng `#D4AF5A` 1px bên trong, ngọc thoi ở bốn góc khung cửa sổ (ô/nút không có). Nine-patch nên
+viền không phình khi kéo giãn; padding giữ 0 như bản cũ để không xô bố cục. Thanh Máu/Khí/EXP giữ màu cũ. Chấm bằng
+`:client:client-core:runHudPreview`. Chưa có hoa văn vẽ tay (cần atlas UI thật).
 
 ### 2.9 Di sản ninja còn sót
 
