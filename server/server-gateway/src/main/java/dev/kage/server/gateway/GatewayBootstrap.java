@@ -759,15 +759,18 @@ public final class GatewayBootstrap {
                 });
     }
 
-    /** Lên cấp: sư đồ (ADR-091) rồi bậc trang phục theo cảnh giới (ADR-132). */
+    /** Lên cấp: sư đồ (ADR-091), bậc trang phục theo cảnh giới (ADR-132), báo đột phá cảnh giới (ADR-136). */
     private static CharacterLevelSync.LevelListener levelListener(
             GatewayFacades facades, ConnectedCharacterRegistry characterRegistry, WorldGateway worldGateway) {
         CharacterLevelSync.LevelListener mentorship = mentorshipCommands(facades, characterRegistry)::onLevelReached;
         CharacterLevelSync.LevelListener costume = CostumeTierHooks.listener(
                 facades.characterFacade(), characterRegistry, WorldRouteLookup.of(worldGateway));
+        CharacterLevelSync.LevelListener breakthrough = // ADR-136
+                BreakthroughHooks.listener(facades.characterFacade(), characterRegistry);
         return (characterId, level) -> {
             mentorship.onLevelReached(characterId, level);
             costume.onLevelReached(characterId, level);
+            breakthrough.onLevelReached(characterId, level);
         };
     }
 

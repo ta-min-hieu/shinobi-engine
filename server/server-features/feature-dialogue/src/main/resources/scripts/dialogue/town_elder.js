@@ -393,6 +393,9 @@ if (ctx.quest_status("foundation_pill_run") === "IN_PROGRESS") {
             { label_key: "dialogue.option.accept_quest_daily_water_duty", action: "accept_quest:daily_water_duty" },
             // ADR-114 — hộ tống xe linh thảo (x = 0 → 82).
             { label_key: "dialogue.option.accept_quest_daily_caravan_escort", action: "accept_quest:daily_caravan_escort" },
+            // ADR-135 — nhiệm vụ ngày nội môn (tiền đề: qua khảo hạch nội môn; chưa qua thì server từ chối nhận).
+            { label_key: "dialogue.option.accept_quest_daily_inner_sparring", action: "accept_quest:daily_inner_sparring" },
+            { label_key: "dialogue.option.accept_quest_daily_gate_patrol", action: "accept_quest:daily_gate_patrol" },
             { label_key: "dialogue.option.back", action: "about_town" },
             { label_key: "dialogue.option.bye", action: "end" }
         ]

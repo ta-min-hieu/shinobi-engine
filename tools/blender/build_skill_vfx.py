@@ -574,6 +574,41 @@ def build_thien_kiep(main_hex, accent_hex):
     return {"cast": 3, "impact": 5}, 3.0, 0.15
 
 
+def build_dot_pha(main_hex, accent_hex):
+    """Đột phá cảnh giới (ADR-136) — cột sáng VÀNG trắng dâng từ chân lên + hai vòng hào quang nở ra + bốn đốm sáng
+    bay lên. Không phải skill người chơi: client tự phát vùng `vfx_dot_pha_impact` trên chính mình khi gói EXP báo
+    cảnh giới đổi. Khác `thien_kiep` (mây tối + sét giáng XUỐNG): ở đây ánh sáng đi LÊN, không có mây.
+    """
+    pillar = _prim("cylinder", "Pillar", radius=0.16, depth=1.2, vertices=8, loc=(0.0, -0.05, 0.6))
+    apply_toon(pillar, "#FFF6C2", shades=2)
+    _kf(pillar, 1, scale=(0.3, 0.3, 0.05))
+    _kf(pillar, 3, scale=(1.0, 1.0, 1.0))
+    _kf(pillar, 6, scale=(0.6, 0.6, 1.1))
+    _kf(pillar, 8, scale=(0.0, 0.0, 1.2))
+
+    rings = []
+    for index, (height, start) in enumerate(((0.05, 2), (0.45, 4))):
+        ring = _prim("torus", "Halo%d" % index, major_radius=0.30, minor_radius=0.035, loc=(0.0, -0.05, height))
+        ring.rotation_euler = (math.radians(90), 0, 0)
+        apply_toon(ring, "#E2B33C", shades=2)
+        _kf(ring, start, scale=(0.2, 0.2, 1.0))
+        _kf(ring, start + 2, scale=(1.2, 1.2, 1.0))
+        _kf(ring, start + 4, scale=(0.0, 0.0, 1.0))
+        rings.append(ring)
+
+    sparks = []
+    for index, x in enumerate((-0.30, -0.12, 0.12, 0.30)):
+        spark = _box_obj("Spark%d" % index, 0.03, 0.03, 0.05, loc=(x, -0.10, 0.2))
+        apply_toon(spark, "#FFFFFF", shades=2)
+        _kf(spark, 2 + index % 2, loc=(x, -0.10, 0.2), scale=0.0)
+        _kf(spark, 4 + index % 2, loc=(x, -0.10, 0.8), scale=1.0)
+        _kf(spark, 8, loc=(x, -0.10, 1.2), scale=0.0)
+        sparks.append(spark)
+
+    _linearize(pillar, *rings, *sparks)
+    return {"cast": 2, "impact": 6}, 3.0, 0.15
+
+
 SKILLS = {
     "fireball": ("hoa", build_fireball),
     "thuy_song_du": ("thuy", build_thuy_song_du),
@@ -594,6 +629,8 @@ SKILLS = {
     "loi_thien_loi": ("loi", build_loi_thien_loi),
     # ADR-126 — không phải skill người chơi; server gửi như SkillResultEvent mỗi đợt lôi kích.
     "thien_kiep": ("loi", build_thien_kiep),
+    # ADR-136 — không phải skill người chơi; client tự phát khi gói EXP báo cảnh giới đổi.
+    "dot_pha": ("tho", build_dot_pha),
 }
 
 

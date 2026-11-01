@@ -9,6 +9,7 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.I18NBundle;
 
+import dev.kage.client.core.ui.theme.CultivationRealm;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.engine.ecs.component.PositionComponent;
 import dev.kage.protocol.AttackResultEvent;
@@ -43,6 +44,9 @@ final class CombatFeedbackPresenter implements Disposable {
     // Bundle RIÊNG đúng quy ước KageI18n (mỗi nơi tự nạp, không dùng chung instance) — cần cho nhãn
     // "Né!" của số damage bay lên.
     private final I18NBundle i18n = KageI18n.load();
+
+    /** ADR-136 — mã VFX đột phá cảnh giới (vùng atlas {@code vfx_dot_pha_impact}). */
+    private static final String BREAKTHROUGH_VFX = "dot_pha";
     // Biến tạm TÁI DÙNG cho điểm neo — FloatingCombatText/SkillVfxRenderer đọc giá trị ngay trong
     // lời gọi nên an toàn (Điều 31).
     private final Vector3 anchor = new Vector3();
@@ -152,9 +156,21 @@ final class CombatFeedbackPresenter implements Disposable {
         floatingText.show(text, color, anchor);
     }
 
-    /** Vừa lên cấp — {@code leveled_up} của {@code ExperienceChangedEvent}. */
-    void showLevelUp() {
-        showSelfNotice("hud.exp.level_up", FloatingCombatText.LEVEL_UP);
+    /**
+     * Vừa lên cấp — {@code leveled_up} của {@code ExperienceChangedEvent}. ADR-136: cấp mới mở một CẢNH GIỚI mới
+     * (Trúc Cơ, Tử Phủ…) thì đó là đột phá — phát VFX {@code vfx_dot_pha} trên chính mình và báo tên cảnh giới thay
+     * chữ lên cấp thường. Cảnh giới suy bằng {@link CultivationRealm} (hiển thị thuần, không phải luật gameplay).
+     */
+    void showLevelUp(int level) {
+        CultivationRealm reached = CultivationRealm.of(level);
+        if (reached.nameKey().equals(CultivationRealm.of(level - 1).nameKey())) {
+            showSelfNotice("hud.exp.level_up", FloatingCombatText.LEVEL_UP);
+            return;
+        }
+        skillVfx.play(BREAKTHROUGH_VFX, localPosition.x, localPosition.y, localPosition.z);
+        showSelfText(
+                KageI18n.formatOrKey(i18n, "hud.exp.breakthrough", i18n.get(reached.nameKey())),
+                FloatingCombatText.LEVEL_UP);
     }
 
     void resize(int width, int height) {

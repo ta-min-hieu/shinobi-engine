@@ -166,6 +166,9 @@ record QuestFuzzSpec(
             // nên mô hình "CLAIMED là cuối" vẫn đúng.
             quest("daily_dummy_drill").killing("training_dummy", 5, CounterKind.COUNT, FELLED),
             quest("daily_mountain_patrol").killing("wandering_bandit", 3, CounterKind.COUNT, FELLED),
+            // ADR-135 — nhiệm vụ ngày nội môn (tiền đề inner_sect_examination).
+            quest("daily_inner_sparring").killing("inner_trial_construct", 2, CounterKind.COUNT, FELLED),
+            quest("daily_gate_patrol").killing("blood_sand_infiltrator", 3, CounterKind.COUNT, FELLED),
             quest("daily_water_duty").askingFirst(SENIOR_SISTER).reportingTo(TOWN_ELDER),
             // ADR-114 — hộ tống: không sự kiện quái/NPC nào làm nó xong, chỉ `escort_arrived`.
             quest("daily_caravan_escort").escorting());

@@ -909,7 +909,7 @@ public final class WorldScreen implements GameScreen {
         // đổi giữa phiên chơi, nên cũng là chỗ duy nhất lối vào đó có thể mở ra.
         faction.onLevel(event.getLevel());
         if (event.getLeveledUp()) {
-            combatFeedback.showLevelUp();
+            combatFeedback.showLevelUp(event.getLevel());
         }
     }
 
