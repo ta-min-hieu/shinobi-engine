@@ -52,7 +52,11 @@ final class InventoryCoordinator implements WindowFlow {
      * ngưỡng {@code ExcessiveParameterList} của PMD (config/pmd, minimum=5) — cùng lý do
      * {@link PlayContext} gộp {@code EcsWorld}+{@code InputMapper}.
      */
-    record DataSources(ItemCatalogCoordinator itemCatalog, GoldCoordinator gold, ChatCoordinator notices) {}
+    record DataSources(
+            ItemCatalogCoordinator itemCatalog,
+            GoldCoordinator gold,
+            ChatCoordinator notices,
+            AutoPotion.Vitals vitals) {}
 
     /**
      * 9 slot trang bị THẬT (7 gốc + phi kiếm ADR-070, linh thú ADR-072) — loại
@@ -71,6 +75,14 @@ final class InventoryCoordinator implements WindowFlow {
             EquipmentSlot.EQUIPMENT_SLOT_ARTIFACT);
 
     private final InventoryController controller = new InventoryController();
+
+    /** ADR-156 — tự uống đan, đọc túi đồ của luồng này; {@code WorldScreen} gọi {@code update} mỗi khung. */
+    private final AutoPotion autoPotion;
+
+    AutoPotion autoPotion() {
+        return autoPotion;
+    }
+
     private final InventoryPanel panel;
     private final WorldCommandSender sender;
     private final ItemCatalogCoordinator itemCatalog;
@@ -129,6 +141,8 @@ final class InventoryCoordinator implements WindowFlow {
                 itemTemplateId -> itemCatalog.byId(itemTemplateId).orElse(null), this::itemNameOrFallback);
         this.gold = dataSources.gold();
         this.notices = dataSources.notices();
+        this.autoPotion =
+                new AutoPotion(dataSources.vitals(), controller::items, itemCatalog::useEffect, sender::useItem);
         panel.setCanOpen(canOpen);
         panel.setOnRefresh(this::onOpened);
         panel.setOnSelect(this::onSelect);

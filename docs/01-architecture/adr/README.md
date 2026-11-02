@@ -187,6 +187,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-153](ADR-153-Realm-Milestone-Rewards.md) | Quà mốc cảnh giới: 6 mốc (cấp 10 + 19/37/55/73/91), nhận tay một lần trong `/mocgioi`, túi đầy quà vẫn chờ (V124, opcode 236–239) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 | [ADR-154](ADR-154-Weekly-Tasks.md) | Nhiệm vụ tuần cá nhân: 5 việc (hạ quái, thu thập, Bí Cảnh, truy nã, nhiệm vụ ngày) đếm qua đường lịch hoạt động, tuần thứ Hai giờ VN, nhận tay một lần (V125, opcode 240–243, `/nhiemvutuan`) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 | [ADR-155](ADR-155-Honor-Shop.md) | Cửa hàng điểm vinh dự: trận đấu trường thắng +10 / thua +3 (trần 100/ngày), 5 món đổi bằng điểm có trần lượt tuần, một giao dịch (V126, opcode 1615–1618, `/vinhdu`) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
+| [ADR-156](ADR-156-Auto-Potion.md) | Tự uống đan: công tắc `/caidat` mặc định tắt; máu < 35% thì client gửi `UseItemCommand` có sẵn cho món HEAL_HP, server vẫn kiểm hồi chiêu (không opcode, không schema) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -2,6 +2,7 @@ package dev.kage.client.core.world;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.LongPredicate;
 import java.util.function.Predicate;
 
@@ -214,30 +215,36 @@ final class ChatCoordinator implements WindowFlow {
         return "[" + text(channelNameKey(line.channel())) + "] " + line.senderName() + ": " + line.body();
     }
 
+    /**
+     * Tên kênh — bảng tra thay switch (thêm kênh BROADCAST của ADR-152 đẩy switch qua trần CyclomaticComplexity). Kênh
+     * không có trong bảng (UNSPECIFIED/UNRECOGNIZED: dòng hệ thống, hoặc server mới hơn client thêm kênh mới) nhận tên
+     * "Hệ thống" để không vỡ bố cục.
+     */
+    private static final Map<ChatChannel, String> CHANNEL_NAME_KEYS = Map.of(
+            ChatChannel.CHAT_CHANNEL_WORLD, "chat.channel.world",
+            ChatChannel.CHAT_CHANNEL_AREA, "chat.channel.area",
+            ChatChannel.CHAT_CHANNEL_PRIVATE, "chat.channel.private",
+            ChatChannel.CHAT_CHANNEL_GUILD, "chat.channel.guild",
+            ChatChannel.CHAT_CHANNEL_PARTY, "chat.channel.party",
+            ChatChannel.CHAT_CHANNEL_SWORN, "chat.channel.sworn",
+            ChatChannel.CHAT_CHANNEL_BROADCAST, "chat.channel.broadcast");
+
+    /** Màu dòng theo kênh — cùng lý do bảng tra; ngoài bảng là dòng hệ thống. */
+    private static final Map<ChatChannel, ChatPanel.LineKind> LINE_KINDS = Map.of(
+            ChatChannel.CHAT_CHANNEL_AREA, ChatPanel.LineKind.AREA,
+            ChatChannel.CHAT_CHANNEL_PRIVATE, ChatPanel.LineKind.PRIVATE,
+            ChatChannel.CHAT_CHANNEL_WORLD, ChatPanel.LineKind.WORLD,
+            ChatChannel.CHAT_CHANNEL_GUILD, ChatPanel.LineKind.WORLD,
+            ChatChannel.CHAT_CHANNEL_PARTY, ChatPanel.LineKind.WORLD,
+            ChatChannel.CHAT_CHANNEL_SWORN, ChatPanel.LineKind.WORLD,
+            ChatChannel.CHAT_CHANNEL_BROADCAST, ChatPanel.LineKind.BROADCAST);
+
     private static String channelNameKey(ChatChannel channel) {
-        return switch (channel) {
-            case CHAT_CHANNEL_WORLD -> "chat.channel.world";
-            case CHAT_CHANNEL_AREA -> "chat.channel.area";
-            case CHAT_CHANNEL_PRIVATE -> "chat.channel.private";
-            case CHAT_CHANNEL_GUILD -> "chat.channel.guild";
-            case CHAT_CHANNEL_PARTY -> "chat.channel.party";
-            case CHAT_CHANNEL_SWORN -> "chat.channel.sworn";
-            case CHAT_CHANNEL_BROADCAST -> "chat.channel.broadcast";
-            // Không gửi được nhưng NHẬN được: server mới hơn client thêm kênh mới, hoặc dòng hệ
-            // thống (không thuộc kênh nào). Cả hai đều cần một cái tên để không vỡ bố cục.
-            case CHAT_CHANNEL_UNSPECIFIED, UNRECOGNIZED -> "chat.channel.system";
-        };
+        return CHANNEL_NAME_KEYS.getOrDefault(channel, "chat.channel.system");
     }
 
     private static ChatPanel.LineKind kindOf(ChatChannel channel) {
-        return switch (channel) {
-            case CHAT_CHANNEL_AREA -> ChatPanel.LineKind.AREA;
-            case CHAT_CHANNEL_PRIVATE -> ChatPanel.LineKind.PRIVATE;
-            case CHAT_CHANNEL_WORLD, CHAT_CHANNEL_GUILD, CHAT_CHANNEL_PARTY, CHAT_CHANNEL_SWORN ->
-                ChatPanel.LineKind.WORLD;
-            case CHAT_CHANNEL_BROADCAST -> ChatPanel.LineKind.BROADCAST;
-            case CHAT_CHANNEL_UNSPECIFIED, UNRECOGNIZED -> ChatPanel.LineKind.SYSTEM;
-        };
+        return LINE_KINDS.getOrDefault(channel, ChatPanel.LineKind.SYSTEM);
     }
 
     /** Tra bản dịch, thiếu thì hiện thẳng khoá — cùng lý do {@code DialoguePanel#text}. */

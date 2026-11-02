@@ -28,12 +28,15 @@ class DisplaySettingsTest {
     }
 
     @Test
-    void shouldStartWithEverythingOn() {
+    void shouldStartWithEachOptionsDefault() {
         DisplaySettings settings = DisplaySettings.load(new MemoryStore());
 
         for (DisplaySettings.Option option : DisplaySettings.Option.values()) {
-            assertThat(settings.isOn(option)).isTrue();
+            assertThat(settings.isOn(option)).as(option.name()).isEqualTo(option.defaultOn());
         }
+        assertThat(DisplaySettings.Option.AUTO_POTION.defaultOn())
+                .as("ADR-156 — tự uống đan đổi cách chơi, phải tự bật")
+                .isFalse();
     }
 
     @Test

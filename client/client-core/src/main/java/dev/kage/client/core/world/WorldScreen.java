@@ -31,6 +31,7 @@ import dev.kage.client.core.ui.hud.PartyPanel;
 import dev.kage.client.core.ui.hud.QuestLogPanel;
 import dev.kage.client.core.ui.hud.ShopPanel;
 import dev.kage.client.core.ui.hud.TradePanel;
+import dev.kage.client.core.ui.theme.DisplaySettings;
 import dev.kage.client.core.world.ReportWindows.Feeds;
 import dev.kage.engine.core.GameScreen;
 import dev.kage.engine.ecs.ComponentMapper;
@@ -435,7 +436,18 @@ public final class WorldScreen implements GameScreen {
         return new InventoryCoordinator(
                 inventoryPanel,
                 sender,
-                new InventoryCoordinator.DataSources(itemCatalog, gold, chat),
+                new InventoryCoordinator.DataSources(
+                        itemCatalog,
+                        gold,
+                        chat,
+                        new AutoPotion.Vitals( // ADR-156 — tự uống đan
+                                reports.community()
+                                        .expansion()
+                                        .displaySettings()
+                                        .settings()
+                                        .switchFor(DisplaySettings.Option.AUTO_POTION),
+                                combatHudController::playerHp,
+                                combatHudController::playerMaxHp)),
                 panels::noneOpen);
     }
 
@@ -1029,6 +1041,7 @@ public final class WorldScreen implements GameScreen {
     }
 
     private void syncCombatHud() {
+        inventory.autoPotion().update(System.nanoTime()); // ADR-156
         combatHud.setPlayerHp(combatHudController.playerHp(), combatHudController.playerMaxHp());
         combatHud.setPlayerChi(combatHudController.playerChi(), combatHudController.playerMaxChi());
         combatHud.setLevel(characterLevel);

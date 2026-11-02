@@ -21,12 +21,25 @@ public final class DisplaySettings {
         /** Núi xa/gần và mây trôi của hậu cảnh (ART-PIPELINE §2.8) — tắt còn trời và biển mây phẳng. */
         PARALLAX("display.parallax"),
         /** Mưa linh khí / bão cát theo vùng (ADR-144). */
-        WEATHER("display.weather");
+        WEATHER("display.weather"),
+        /** ADR-156 — tự uống đan hồi máu khi máu thấp; mặc định TẮT (đổi hành vi chơi, không chỉ hiển thị). */
+        AUTO_POTION("display.auto_potion", false);
 
         private final String key;
+        private final boolean defaultOn;
 
         Option(String key) {
+            this(key, true);
+        }
+
+        Option(String key, boolean defaultOn) {
             this.key = key;
+            this.defaultOn = defaultOn;
+        }
+
+        /** Giá trị khi người chơi chưa từng bật/tắt. */
+        public boolean defaultOn() {
+            return defaultOn;
         }
 
         /** Khoá lưu và cũng là gốc khoá i18n ({@code settings.<key>}). */
@@ -64,7 +77,7 @@ public final class DisplaySettings {
     private DisplaySettings(Store store) {
         this.store = store;
         for (Option option : Option.values()) {
-            flags.put(option, new Flag(store.read(option.key()).orElse(true)));
+            flags.put(option, new Flag(store.read(option.key()).orElse(option.defaultOn())));
         }
     }
 
