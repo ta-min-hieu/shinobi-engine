@@ -5,6 +5,7 @@ import dev.kage.character.api.RenameFacade;
 import dev.kage.character.api.TribulationFacade;
 import dev.kage.chat.api.SectQuiz;
 import dev.kage.checkin.api.FortuneFacade;
+import dev.kage.checkin.api.LuckyWheelFacade;
 import dev.kage.market.api.BuyOrderFacade;
 import dev.kage.pvp.api.TournamentFacade;
 import dev.kage.shop.api.TravelingMerchantFacade;
@@ -34,7 +35,8 @@ record ExpansionFacades(
         KillingIntentFacade killingIntent,
         TreasureFacade treasure,
         RenameFacade rename,
-        FortuneFacade fortune) {
+        FortuneFacade fortune,
+        LuckyWheelFacade luckyWheel) {
 
     /** Composition không có các tính năng này (test). */
     static final ExpansionFacades DISABLED = new ExpansionFacades(
@@ -53,5 +55,6 @@ record ExpansionFacades(
             KillingIntentFacade.DISABLED,
             TreasureFacade.DISABLED,
             RenameFacade.DISABLED,
-            FortuneFacade.DISABLED);
+            FortuneFacade.DISABLED,
+            LuckyWheelFacade.DISABLED);
 }

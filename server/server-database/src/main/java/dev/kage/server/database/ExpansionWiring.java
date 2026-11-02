@@ -59,6 +59,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.checkin.PostgresFortuneAdapter(dataSource));
     }
 
+    /** Vòng quay may mắn (ADR-151). */
+    public dev.kage.checkin.api.LuckyWheelFacade wireLuckyWheelFacade() {
+        return new dev.kage.checkin.api.LuckyWheelFacade(
+                new dev.kage.server.database.checkin.PostgresLuckyWheelAdapter(dataSource));
+    }
+
     /** Hỏi đáp tông môn (ADR-122) — {@code starts} là giờ bắt đầu phiên theo giờ Việt Nam. */
     public SectQuiz wireSectQuiz(List<LocalTime> starts) {
         return new SectQuiz(new PostgresQuizAdapter(dataSource), starts, System.nanoTime());

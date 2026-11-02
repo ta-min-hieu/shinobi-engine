@@ -182,6 +182,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-148](ADR-148-Rename-Talisman.md) | Dịch Danh Phù: đổi tên bằng phù bán ở cửa hàng, luật tên như lúc tạo, một giao dịch, hồi chiêu 7 ngày, lịch sử tên + audit (V120, opcode 228/229, `/doiten`) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
 | [ADR-149](ADR-149-Daily-Fortune.md) | Quẻ bói hằng ngày: gieo ở trưởng lão Chu Hoành, năm quẻ Đại Cát→Hung, ±% EXP đánh quái tới hết ngày + quà (V121, opcode 230/231, `/xinque`) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
 | [ADR-150](ADR-150-Group-Loot-Rolls.md) | Xúc xắc chia đồ nhóm: trang bị rơi khi có đồng đội cùng World ⇒ Cần/Tham/Bỏ 15 giây, server tung 1–100, cả nhóm Bỏ về người hạ, túi đầy gửi thư (opcode 1328–1331) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
+| [ADR-151](ADR-151-Lucky-Wheel.md) | Vòng quay may mắn: 1 lượt miễn phí + 10 lượt mua 1.000 linh thạch mỗi ngày giờ VN, 8 ô theo trọng số, một giao dịch, từ chối thì không mất lượt/tiền (V122, opcode 232–235, `/vongquay`) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

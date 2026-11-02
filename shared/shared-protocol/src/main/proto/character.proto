@@ -406,3 +406,44 @@ message DrawFortuneResponse {
   int64 item_template_id = 7;
   int32 quantity = 8;
 }
+
+// ADR-151 (2026-11-02) — Vòng quay may mắn. Mỗi ngày (giờ Việt Nam) 1 lượt miễn phí, rồi tối đa 10 lượt mua.
+message WheelPrizeView {
+  int32 index = 1;
+  string label_key = 2;
+  int64 gold = 3;
+  int64 item_template_id = 4;  // 0 = ô chỉ có linh thạch
+  int32 quantity = 5;
+}
+
+// Request: Client -> Server (OPCODE_GET_LUCKY_WHEEL_REQUEST = 232). Chỉ đọc.
+message GetLuckyWheelRequest {}
+
+// Response: Server -> Client (OPCODE_GET_LUCKY_WHEEL_RESPONSE = 233).
+message GetLuckyWheelResponse {
+  repeated WheelPrizeView prizes = 1;
+  int32 free_spins_left = 2;
+  int32 paid_spins_left = 3;
+  int64 spin_cost = 4;
+}
+
+// Command: Client -> Server (OPCODE_SPIN_LUCKY_WHEEL_COMMAND = 234). Còn lượt miễn phí thì dùng nó, không thì lượt mua.
+message SpinLuckyWheelCommand {}
+
+enum SpinLuckyWheelOutcome {
+  SPIN_LUCKY_WHEEL_OUTCOME_UNSPECIFIED = 0;
+  SPIN_LUCKY_WHEEL_OUTCOME_OK = 1;
+  SPIN_LUCKY_WHEEL_OUTCOME_NO_SPINS_LEFT = 2;      // hết lượt hôm nay
+  SPIN_LUCKY_WHEEL_OUTCOME_INSUFFICIENT_GOLD = 3;  // không đủ linh thạch cho lượt mua
+  SPIN_LUCKY_WHEEL_OUTCOME_BAG_FULL = 4;           // ô trúng có vật phẩm mà túi đầy — không mất lượt, không mất tiền
+  SPIN_LUCKY_WHEEL_OUTCOME_GOLD_CAP = 5;           // ô trúng làm vàng vượt trần — như trên
+}
+
+// Response: Server -> Client (OPCODE_SPIN_LUCKY_WHEEL_RESPONSE = 235). prize chỉ có khi OK; *_spins_left là SAU lệnh.
+message SpinLuckyWheelResponse {
+  SpinLuckyWheelOutcome outcome = 1;
+  WheelPrizeView prize = 2;
+  bool paid = 3;
+  int32 free_spins_left = 4;
+  int32 paid_spins_left = 5;
+}

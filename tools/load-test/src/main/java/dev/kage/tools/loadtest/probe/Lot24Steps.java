@@ -9,12 +9,16 @@ import dev.kage.protocol.CaveDecorationView;
 import dev.kage.protocol.CaveResponse;
 import dev.kage.protocol.DrawFortuneCommand;
 import dev.kage.protocol.DrawFortuneResponse;
+import dev.kage.protocol.GetLuckyWheelRequest;
+import dev.kage.protocol.GetLuckyWheelResponse;
 import dev.kage.protocol.LootRollChoice;
 import dev.kage.protocol.LootRollChoiceCommand;
 import dev.kage.protocol.LootRollChoiceResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.RenameCharacterCommand;
 import dev.kage.protocol.RenameCharacterResponse;
+import dev.kage.protocol.SpinLuckyWheelCommand;
+import dev.kage.protocol.SpinLuckyWheelResponse;
 import dev.kage.protocol.TreasureAction;
 import dev.kage.protocol.TreasureHuntCommand;
 import dev.kage.protocol.TreasureHuntResponse;
@@ -22,7 +26,8 @@ import dev.kage.protocol.TreasureHuntResponse;
 /**
  * Bước lô 24: động phủ (ADR-129) {@code cave:<view|enter|collect|upgrade|decorate/<mã>|invite/<tên>|visit/<tên>>}.
  * Lô 27: Tàng Bảo Đồ (ADR-147) {@code treasure:<status|read|dig>}, Dịch Danh Phù (ADR-148) {@code rename:<tên mới>},
- * quẻ bói (ADR-149) {@code fortune}, xúc xắc chia đồ (ADR-150) {@code lootRoll:<rollId>:<need|greed|pass>}.
+ * quẻ bói (ADR-149) {@code fortune}, xúc xắc chia đồ (ADR-150) {@code lootRoll:<rollId>:<need|greed|pass>},
+ * vòng quay (ADR-151) {@code wheel}, {@code spin}.
  */
 final class Lot24Steps {
 
@@ -36,6 +41,8 @@ final class Lot24Steps {
         return switch (verb) {
             case "cave" -> cave(arg);
             case "treasure" -> treasure(arg);
+            case "wheel" -> wheel();
+            case "spin" -> spin();
             case "lootRoll" -> lootRoll(arg);
             case "fortune" ->
                 asker.ask(
@@ -111,5 +118,32 @@ final class Lot24Steps {
                         .build(),
                 Opcode.OPCODE_LOOT_ROLL_CHOICE_RESPONSE_VALUE,
                 p -> LootRollChoiceResponse.parseFrom(p).getOutcome().name());
+    }
+
+    private String wheel() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_LUCKY_WHEEL_REQUEST_VALUE,
+                GetLuckyWheelRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_LUCKY_WHEEL_RESPONSE_VALUE,
+                p -> {
+                    GetLuckyWheelResponse r = GetLuckyWheelResponse.parseFrom(p);
+                    return "ô=" + r.getPrizesCount() + " free=" + r.getFreeSpinsLeft() + " paid=" + r.getPaidSpinsLeft()
+                            + " giá=" + r.getSpinCost();
+                });
+    }
+
+    private String spin() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SPIN_LUCKY_WHEEL_COMMAND_VALUE,
+                SpinLuckyWheelCommand.getDefaultInstance(),
+                Opcode.OPCODE_SPIN_LUCKY_WHEEL_RESPONSE_VALUE,
+                p -> {
+                    SpinLuckyWheelResponse r = SpinLuckyWheelResponse.parseFrom(p);
+                    return r.getOutcome().name() + " ô=" + r.getPrize().getLabelKey() + " vàng="
+                            + r.getPrize().getGold() + " tpl"
+                            + r.getPrize().getItemTemplateId() + "x"
+                            + r.getPrize().getQuantity() + " paid=" + r.getPaid() + " free="
+                            + r.getFreeSpinsLeft() + " paidLeft=" + r.getPaidSpinsLeft();
+                });
     }
 }
