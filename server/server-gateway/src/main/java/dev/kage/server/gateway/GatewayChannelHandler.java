@@ -917,6 +917,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.ChooseEncounterOptionCommand.parser(),
                             Opcode.OPCODE_CHOOSE_ENCOUNTER_OPTION_RESPONSE_VALUE,
                             (h, id, c) -> h.worldGateway.registry().encounters.choose(id, c))),
+            // Lô 27 — Tàng Bảo Đồ (ADR-147).
+            Map.entry(
+                    Opcode.OPCODE_TREASURE_HUNT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.TreasureHuntCommand.parser(),
+                            Opcode.OPCODE_TREASURE_HUNT_RESPONSE_VALUE,
+                            (h, id, c) -> h.worldGateway.registry().treasure.handle(id, c))),
             // Lô 23 — luyện khí (ADR-120), cùng lò với luyện đan.
             Map.entry(
                     Opcode.OPCODE_LIST_FORGE_RECIPES_REQUEST_VALUE,

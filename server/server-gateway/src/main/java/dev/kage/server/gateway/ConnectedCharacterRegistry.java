@@ -139,6 +139,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-121 — kỳ ngộ sau lượt hạ quái ở world chính + lệnh chọn; nối sau khi DB đã dựng. */
     final EncounterHooks encounters = new EncounterHooks();
 
+    /** ADR-147 — Tàng Bảo Đồ: đọc bản đồ, đào kho, gọi quái canh kho; nối sau khi DB đã dựng. */
+    final TreasureHooks treasure = new TreasureHooks();
+
     /** ADR-122 — hỏi đáp tông môn: nhịp đồng hồ + chấm chat kênh thế giới; nối sau khi DB đã dựng. */
     final QuizHooks quiz = new QuizHooks();
 

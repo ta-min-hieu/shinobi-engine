@@ -670,7 +670,8 @@ public final class GatewayBootstrap {
                 databaseBootstrap.expansion().wireTribulationFacade(),
                 databaseBootstrap.expansion().wireArtifactFacade(),
                 databaseBootstrap.expansion().wireCaveFacade(),
-                databaseBootstrap.expansion().wireKillingIntentFacade());
+                databaseBootstrap.expansion().wireKillingIntentFacade(),
+                databaseBootstrap.expansion().wireTreasureFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -754,6 +755,15 @@ public final class GatewayBootstrap {
                         || worldGateway.arenaInstanceRegistry().isInDuel(characterId),
                 routes::find,
                 // Vừa vào world chưa nhúc nhích thì registry chưa có vị trí — đọc chỗ đã lưu (như NpcProximity).
+                id -> java.util.Optional.ofNullable(characterRegistry.lastKnownPosition(id))
+                        .or(() ->
+                                java.util.Optional.of(facades.characterFacade().loadPosition(id))),
+                java.time.Clock.systemUTC()));
+        characterRegistry.treasure.bind(new TreasureHooks.Deps(
+                facades.progression().expansion().treasure(),
+                characterId -> worldGateway.dungeonInstanceRegistry().isInDungeon(characterId)
+                        || worldGateway.arenaInstanceRegistry().isInDuel(characterId),
+                routes::find,
                 id -> java.util.Optional.ofNullable(characterRegistry.lastKnownPosition(id))
                         .or(() ->
                                 java.util.Optional.of(facades.characterFacade().loadPosition(id))),

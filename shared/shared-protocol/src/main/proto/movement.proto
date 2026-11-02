@@ -568,3 +568,44 @@ message WeatherZone {
 message WeatherEvent {
   repeated WeatherZone zones = 1;
 }
+
+// ADR-147 (2026-11-02) — Tàng Bảo Đồ. Một lệnh, trường action (khuôn động phủ ADR-129).
+enum TreasureAction {
+  TREASURE_ACTION_UNSPECIFIED = 0;
+  TREASURE_ACTION_STATUS = 1;  // chỉ hỏi cuộc tìm đang mở (không tiêu gì)
+  TREASURE_ACTION_READ = 2;    // đọc một Tàng Bảo Đồ — server chọn điểm chôn
+  TREASURE_ACTION_DIG = 3;     // đào ở chỗ đang đứng
+}
+
+// Command: Client -> Server (OPCODE_TREASURE_HUNT_COMMAND = 341).
+message TreasureHuntCommand {
+  TreasureAction action = 1;
+}
+
+enum TreasureOutcome {
+  TREASURE_OUTCOME_UNSPECIFIED = 0;
+  TREASURE_OUTCOME_OK = 1;
+  TREASURE_OUTCOME_NO_HUNT = 2;            // chưa đọc bản đồ nào
+  TREASURE_OUTCOME_NO_MAP = 3;             // không có Tàng Bảo Đồ trong túi
+  TREASURE_OUTCOME_ALREADY_HUNTING = 4;    // đang có một cuộc tìm — đào xong mới đọc tấm khác
+  TREASURE_OUTCOME_TOO_FAR = 5;            // chưa đứng đúng chỗ (distance cho biết còn bao xa)
+  TREASURE_OUTCOME_NOT_IN_MAIN_WORLD = 6;  // đang ở hầm ngục / đấu trường
+  TREASURE_OUTCOME_BAG_FULL = 7;           // cuộc tìm vẫn còn — dọn túi rồi đào lại
+}
+
+// Response: Server -> Client (OPCODE_TREASURE_HUNT_RESPONSE = 342). Luôn kèm cuộc tìm đang mở SAU lệnh (hunting).
+// distance = khoảng cách theo X tới điểm chôn, -1 nếu không biết (không ở world chính / không có cuộc tìm).
+// Phần thưởng (result_key, gold, item_*, guardian_spawned) chỉ có nghĩa khi action = DIG và outcome = OK.
+message TreasureHuntResponse {
+  TreasureAction action = 1;
+  TreasureOutcome outcome = 2;
+  bool hunting = 3;
+  string spot_name_key = 4;
+  float spot_x = 5;
+  float distance = 6;
+  string result_key = 7;
+  int64 gold = 8;
+  int64 item_template_id = 9;  // 0 = không thưởng vật phẩm
+  int32 quantity = 10;
+  bool guardian_spawned = 11;
+}

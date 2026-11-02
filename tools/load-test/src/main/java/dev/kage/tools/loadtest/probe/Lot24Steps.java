@@ -8,8 +8,14 @@ import dev.kage.protocol.CaveCommand;
 import dev.kage.protocol.CaveDecorationView;
 import dev.kage.protocol.CaveResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.TreasureAction;
+import dev.kage.protocol.TreasureHuntCommand;
+import dev.kage.protocol.TreasureHuntResponse;
 
-/** Bước lô 24: động phủ (ADR-129) {@code cave:<view|enter|collect|upgrade|decorate/<mã>|invite/<tên>|visit/<tên>>}. */
+/**
+ * Bước lô 24: động phủ (ADR-129) {@code cave:<view|enter|collect|upgrade|decorate/<mã>|invite/<tên>|visit/<tên>>}. Lô
+ * 27: Tàng Bảo Đồ (ADR-147) {@code treasure:<status|read|dig>}.
+ */
 final class Lot24Steps {
 
     private final Lot23Scenario.Asker asker;
@@ -21,6 +27,7 @@ final class Lot24Steps {
     String step(String verb, String arg) throws IOException {
         return switch (verb) {
             case "cave" -> cave(arg);
+            case "treasure" -> treasure(arg);
             default -> "bước không hiểu";
         };
     }
@@ -47,6 +54,21 @@ final class Lot24Steps {
                             + " stored=" + r.getStored() + "/" + r.getCapacity() + " upgrade=" + r.getUpgradeCost()
                             + " collected=" + r.getCollected() + " placed=["
                             + placed.toString().strip() + "]";
+                });
+    }
+
+    private String treasure(String arg) throws IOException {
+        TreasureAction action = TreasureAction.valueOf("TREASURE_ACTION_" + arg.toUpperCase(Locale.ROOT));
+        return asker.ask(
+                Opcode.OPCODE_TREASURE_HUNT_COMMAND_VALUE,
+                TreasureHuntCommand.newBuilder().setAction(action).build(),
+                Opcode.OPCODE_TREASURE_HUNT_RESPONSE_VALUE,
+                p -> {
+                    TreasureHuntResponse r = TreasureHuntResponse.parseFrom(p);
+                    return r.getOutcome().name() + " hunting=" + r.getHunting() + " spot=" + r.getSpotNameKey()
+                            + " x=" + r.getSpotX() + " distance=" + r.getDistance() + " result=" + r.getResultKey()
+                            + " vàng=" + r.getGold() + " tpl" + r.getItemTemplateId() + "x" + r.getQuantity()
+                            + " quái=" + r.getGuardianSpawned();
                 });
     }
 }

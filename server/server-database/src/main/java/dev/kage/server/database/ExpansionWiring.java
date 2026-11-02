@@ -41,6 +41,12 @@ public final class ExpansionWiring {
         return new EncounterFacade(new PostgresEncounterAdapter(dataSource));
     }
 
+    /** Tàng Bảo Đồ (ADR-147). */
+    public dev.kage.world.api.TreasureFacade wireTreasureFacade() {
+        return new dev.kage.world.api.TreasureFacade(
+                new dev.kage.server.database.world.PostgresTreasureAdapter(dataSource));
+    }
+
     /** Hỏi đáp tông môn (ADR-122) — {@code starts} là giờ bắt đầu phiên theo giờ Việt Nam. */
     public SectQuiz wireSectQuiz(List<LocalTime> starts) {
         return new SectQuiz(new PostgresQuizAdapter(dataSource), starts, System.nanoTime());
