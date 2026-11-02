@@ -53,6 +53,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.character.PostgresRenameAdapter(dataSource));
     }
 
+    /** Quẻ bói hằng ngày (ADR-149). */
+    public dev.kage.checkin.api.FortuneFacade wireFortuneFacade() {
+        return new dev.kage.checkin.api.FortuneFacade(
+                new dev.kage.server.database.checkin.PostgresFortuneAdapter(dataSource));
+    }
+
     /** Hỏi đáp tông môn (ADR-122) — {@code starts} là giờ bắt đầu phiên theo giờ Việt Nam. */
     public SectQuiz wireSectQuiz(List<LocalTime> starts) {
         return new SectQuiz(new PostgresQuizAdapter(dataSource), starts, System.nanoTime());

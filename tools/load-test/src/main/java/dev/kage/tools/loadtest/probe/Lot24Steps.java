@@ -7,6 +7,11 @@ import dev.kage.protocol.CaveAction;
 import dev.kage.protocol.CaveCommand;
 import dev.kage.protocol.CaveDecorationView;
 import dev.kage.protocol.CaveResponse;
+import dev.kage.protocol.DrawFortuneCommand;
+import dev.kage.protocol.DrawFortuneResponse;
+import dev.kage.protocol.LootRollChoice;
+import dev.kage.protocol.LootRollChoiceCommand;
+import dev.kage.protocol.LootRollChoiceResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.RenameCharacterCommand;
 import dev.kage.protocol.RenameCharacterResponse;
@@ -15,8 +20,9 @@ import dev.kage.protocol.TreasureHuntCommand;
 import dev.kage.protocol.TreasureHuntResponse;
 
 /**
- * Bước lô 24: động phủ (ADR-129) {@code cave:<view|enter|collect|upgrade|decorate/<mã>|invite/<tên>|visit/<tên>>}. Lô
- * 27: Tàng Bảo Đồ (ADR-147) {@code treasure:<status|read|dig>}, Dịch Danh Phù (ADR-148) {@code rename:<tên mới>}.
+ * Bước lô 24: động phủ (ADR-129) {@code cave:<view|enter|collect|upgrade|decorate/<mã>|invite/<tên>|visit/<tên>>}.
+ * Lô 27: Tàng Bảo Đồ (ADR-147) {@code treasure:<status|read|dig>}, Dịch Danh Phù (ADR-148) {@code rename:<tên mới>},
+ * quẻ bói (ADR-149) {@code fortune}, xúc xắc chia đồ (ADR-150) {@code lootRoll:<rollId>:<need|greed|pass>}.
  */
 final class Lot24Steps {
 
@@ -30,6 +36,17 @@ final class Lot24Steps {
         return switch (verb) {
             case "cave" -> cave(arg);
             case "treasure" -> treasure(arg);
+            case "lootRoll" -> lootRoll(arg);
+            case "fortune" ->
+                asker.ask(
+                        Opcode.OPCODE_DRAW_FORTUNE_COMMAND_VALUE,
+                        DrawFortuneCommand.getDefaultInstance(),
+                        Opcode.OPCODE_DRAW_FORTUNE_RESPONSE_VALUE,
+                        p -> {
+                            DrawFortuneResponse r = DrawFortuneResponse.parseFrom(p);
+                            return r.getOutcome().name() + " quẻ=" + r.getFortuneCode() + " exp%=" + r.getExpPercent()
+                                    + " vàng=" + r.getGold() + " tpl" + r.getItemTemplateId() + "x" + r.getQuantity();
+                        });
             case "rename" ->
                 asker.ask(
                         Opcode.OPCODE_RENAME_CHARACTER_COMMAND_VALUE,
@@ -82,5 +99,17 @@ final class Lot24Steps {
                             + " vàng=" + r.getGold() + " tpl" + r.getItemTemplateId() + "x" + r.getQuantity()
                             + " quái=" + r.getGuardianSpawned();
                 });
+    }
+
+    private String lootRoll(String arg) throws IOException {
+        String[] parts = arg.split(":", 2);
+        return asker.ask(
+                Opcode.OPCODE_LOOT_ROLL_CHOICE_COMMAND_VALUE,
+                LootRollChoiceCommand.newBuilder()
+                        .setRollId(Long.parseLong(parts[0]))
+                        .setChoice(LootRollChoice.valueOf("LOOT_ROLL_CHOICE_" + parts[1].toUpperCase(Locale.ROOT)))
+                        .build(),
+                Opcode.OPCODE_LOOT_ROLL_CHOICE_RESPONSE_VALUE,
+                p -> LootRollChoiceResponse.parseFrom(p).getOutcome().name());
     }
 }

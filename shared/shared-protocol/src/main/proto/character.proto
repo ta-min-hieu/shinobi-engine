@@ -381,3 +381,28 @@ message RenameCharacterResponse {
   string name = 2;
   int64 next_allowed_at_epoch_ms = 3;
 }
+
+// ADR-149 (2026-11-02) — Quẻ bói hằng ngày. Command: Client -> Server (OPCODE_DRAW_FORTUNE_COMMAND = 230). Phải đứng
+// gần trưởng lão Chu Hoành ở Tông Môn; mỗi ngày (giờ Việt Nam) một quẻ.
+message DrawFortuneCommand {}
+
+enum DrawFortuneOutcome {
+  DRAW_FORTUNE_OUTCOME_UNSPECIFIED = 0;
+  DRAW_FORTUNE_OUTCOME_OK = 1;
+  DRAW_FORTUNE_OUTCOME_ALREADY_DRAWN = 2;  // hôm nay đã gieo — kèm lại quẻ hôm nay, không quà lần hai
+  DRAW_FORTUNE_OUTCOME_TOO_FAR = 3;        // không đứng gần trưởng lão
+  DRAW_FORTUNE_OUTCOME_BAG_FULL = 4;       // quẻ có quà mà túi đầy — chưa tính là đã gieo
+}
+
+// Response: Server -> Client (OPCODE_DRAW_FORTUNE_RESPONSE = 231). exp_percent: cộng (âm = trừ) vào EXP đánh quái tới
+// hết ngày. gold/item_*: quà kèm quẻ, chỉ có khi outcome = OK.
+message DrawFortuneResponse {
+  DrawFortuneOutcome outcome = 1;
+  string fortune_code = 2;
+  string name_key = 3;
+  string text_key = 4;
+  int32 exp_percent = 5;
+  int64 gold = 6;
+  int64 item_template_id = 7;
+  int32 quantity = 8;
+}

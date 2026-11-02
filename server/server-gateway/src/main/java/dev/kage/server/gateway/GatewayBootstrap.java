@@ -672,7 +672,8 @@ public final class GatewayBootstrap {
                 databaseBootstrap.expansion().wireCaveFacade(),
                 databaseBootstrap.expansion().wireKillingIntentFacade(),
                 databaseBootstrap.expansion().wireTreasureFacade(),
-                databaseBootstrap.expansion().wireRenameFacade());
+                databaseBootstrap.expansion().wireRenameFacade(),
+                databaseBootstrap.expansion().wireFortuneFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -760,6 +761,13 @@ public final class GatewayBootstrap {
                         .or(() ->
                                 java.util.Optional.of(facades.characterFacade().loadPosition(id))),
                 java.time.Clock.systemUTC()));
+        characterRegistry.lootRolls.bind(new LootRollHooks.Deps(
+                characterRegistry,
+                facades.inventoryFacade(),
+                facades.characterFacade(),
+                id -> partyMembers(facades.contentFacades().socialFacades().partyFacade(), id),
+                routes::find,
+                new PlayerNotices(facades.contentFacades().socialFacades().mailFacade(), characterRegistry)));
         characterRegistry.treasure.bind(new TreasureHooks.Deps(
                 facades.progression().expansion().treasure(),
                 characterId -> worldGateway.dungeonInstanceRegistry().isInDungeon(characterId)
@@ -848,7 +856,7 @@ public final class GatewayBootstrap {
 
     /**
      * Registry kết nối — kiêm WorldOutboundSink; EXP đánh quái nhân sự kiện (ADR-067), rồi kỹ năng bang (ADR-085), rồi
-     * thưởng đạo lữ cùng nhóm (ADR-094).
+     * thưởng đạo lữ cùng nhóm (ADR-094), rồi quẻ bói hôm nay (ADR-149).
      */
     private static ConnectedCharacterRegistry newCharacterRegistry(
             GatewayFacades facades, MetricsContext metricsContext) {
@@ -860,23 +868,34 @@ public final class GatewayBootstrap {
                 (characterId, amount) -> facades.characterFacade()
                         .grantExperience(
                                 characterId,
-                                SwornEffects.boostedExp(
-                                        facades.progression().relationships().sworn(),
+                                fortuneBoosted(
+                                        facades,
                                         characterId,
-                                        DaoLuEffects.boostedExp(
+                                        SwornEffects.boostedExp(
                                                 facades.progression()
                                                         .relationships()
-                                                        .daoLu(),
+                                                        .sworn(),
                                                 characterId,
-                                                GuildSkillEffects.boostedExp(
-                                                        facades.progression().guildSkills(),
+                                                DaoLuEffects.boostedExp(
+                                                        facades.progression()
+                                                                .relationships()
+                                                                .daoLu(),
                                                         characterId,
-                                                        amount
-                                                                * facades.progression()
-                                                                        .gameEvents()
-                                                                        .multiplier(GameEventKind.EXP)),
-                                                id -> partyMembers(partyFacade, id)),
-                                        id -> partyMembers(partyFacade, id))),
+                                                        GuildSkillEffects.boostedExp(
+                                                                facades.progression()
+                                                                        .guildSkills(),
+                                                                characterId,
+                                                                amount
+                                                                        * facades.progression()
+                                                                                .gameEvents()
+                                                                                .multiplier(GameEventKind.EXP)),
+                                                        id -> partyMembers(partyFacade, id)),
+                                                id -> partyMembers(partyFacade, id)))),
                 metricsContext.networkMetrics());
+    }
+
+    /** ADR-149 — quẻ bói hôm nay cộng/trừ phần trăm EXP đánh quái (sau mọi hệ số khác). */
+    private static long fortuneBoosted(GatewayFacades facades, long characterId, long amount) {
+        return facades.progression().expansion().fortune().boostedExp(characterId, amount, java.time.Instant.now());
     }
 }

@@ -139,6 +139,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-121 — kỳ ngộ sau lượt hạ quái ở world chính + lệnh chọn; nối sau khi DB đã dựng. */
     final EncounterHooks encounters = new EncounterHooks();
 
+    /** ADR-150 — tung xúc xắc chia đồ hiếm trong nhóm (RAM); nối sau khi DB đã dựng. */
+    final LootRollHooks lootRolls = new LootRollHooks();
+
     /** ADR-147 — Tàng Bảo Đồ: đọc bản đồ, đào kho, gọi quái canh kho; nối sau khi DB đã dựng. */
     final TreasureHooks treasure = new TreasureHooks();
 
@@ -815,7 +818,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     }
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {
-        List<ItemStack> granted = inventoryFacade.grantLoot(killerCharacterId, monsterCode);
+        // ADR-150 — có đồng đội online cùng World thì trang bị rơi ra đi vào lượt tung xúc xắc, không vào túi ai ngay.
+        List<ItemStack> granted = lootRolls.grantLoot(inventoryFacade, killerCharacterId, monsterCode);
         ChannelHandlerContext ctx = contextsByCharacterId.get(killerCharacterId);
         if (ctx == null) {
             return; // đã ngắt kết nối giữa lúc roll loot — item đã lưu DB thật, chỉ mất thông báo.

@@ -138,6 +138,28 @@ class GrantLootUseCaseTest {
     }
 
     @Test
+    void divertedStacksShouldStayOutOfTheBag_untilGrantedToTheRollWinner() {
+        List<DropTableEntry> entries =
+                List.of(new DropTableEntry(100L, 100, 2, 2), new DropTableEntry(200L, 100, 1, 1));
+        FakeInventoryPort inventoryPort = new FakeInventoryPort(new Inventory(1L, 10, List.of()));
+        List<String> audited = new java.util.ArrayList<>();
+        GrantLootUseCase useCase = new GrantLootUseCase(
+                        new FakeDropTablePort(entries), inventoryPort, templatePortWithMaxStack(1), DIRECT_TX)
+                .auditedBy((tx, characterId, action, detailJson) -> audited.add(characterId + " " + action));
+
+        GrantLootUseCase.Loot loot = useCase.execute(1L, "stone_ogre", stack -> stack.itemTemplateId() == 200L);
+
+        assertThat(loot.granted()).containsExactly(ItemStack.newItem(100L, 2, 0));
+        assertThat(loot.diverted()).containsExactly(ItemStack.newItem(200L, 1, 0));
+        assertThat(inventoryPort.saved.items()).containsExactly(ItemStack.newItem(100L, 2, 0));
+        assertThat(audited).as("món tách ra chưa vào túi ai thì chưa có audit").containsExactly("1 LOOT_GRANT");
+
+        assertThat(useCase.grantRolled(1L, "stone_ogre", loot.diverted().get(0)))
+                .hasSize(1);
+        assertThat(audited).containsExactly("1 LOOT_GRANT", "1 LOOT_GRANT");
+    }
+
+    @Test
     void shouldGrantNothing_whenEntryNeverDrops() {
         List<DropTableEntry> entries = List.of(new DropTableEntry(100L, 0, 1, 1));
         FakeDropTablePort dropTablePort = new FakeDropTablePort(entries);

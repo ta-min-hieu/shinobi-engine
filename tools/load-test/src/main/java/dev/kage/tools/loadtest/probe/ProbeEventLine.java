@@ -283,7 +283,7 @@ final class ProbeEventLine {
                         + dev.kage.protocol.WeatherEvent.parseFrom(payload).getZonesList().stream()
                                 .map(z -> z.getCode() + "[" + z.getMinX() + "," + z.getMaxX() + "]:" + z.getKind())
                                 .toList());
-            default -> Optional.empty();
+            default -> LootRollEventLine.describe(opcode, payload); // ADR-150
         };
     }
 

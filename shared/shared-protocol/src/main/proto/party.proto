@@ -237,3 +237,60 @@ message RemovePartyFinderResponse {
   bool removed = 1;
   ListPartyFinderResponse board = 2;
 }
+
+// ADR-150 (2026-11-02) — tung xúc xắc chia đồ hiếm trong nhóm.
+enum LootRollChoice {
+  LOOT_ROLL_CHOICE_UNSPECIFIED = 0;
+  LOOT_ROLL_CHOICE_NEED = 1;   // Cần — thắng mọi người chọn Tham
+  LOOT_ROLL_CHOICE_GREED = 2;  // Tham
+  LOOT_ROLL_CHOICE_PASS = 3;   // Bỏ (không chọn trong hạn cũng là Bỏ)
+}
+
+// Event: Server -> Client (OPCODE_LOOT_ROLL_STARTED_EVENT = 1328) — gửi MỌI người được chia, kể cả người ra đòn cuối.
+message LootRollStartedEvent {
+  int64 roll_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int32 seconds = 4;
+}
+
+// Command: Client -> Server (OPCODE_LOOT_ROLL_CHOICE_COMMAND = 1329).
+message LootRollChoiceCommand {
+  int64 roll_id = 1;
+  LootRollChoice choice = 2;
+}
+
+enum LootRollChoiceOutcome {
+  LOOT_ROLL_CHOICE_OUTCOME_UNSPECIFIED = 0;
+  LOOT_ROLL_CHOICE_OUTCOME_OK = 1;
+  LOOT_ROLL_CHOICE_OUTCOME_NOT_FOUND = 2;       // lượt tung đã xong / không tồn tại
+  LOOT_ROLL_CHOICE_OUTCOME_NOT_ELIGIBLE = 3;    // không nằm trong danh sách được chia
+  LOOT_ROLL_CHOICE_OUTCOME_ALREADY_CHOSEN = 4;
+  LOOT_ROLL_CHOICE_OUTCOME_INVALID_CHOICE = 5;
+}
+
+// Response: Server -> Client (OPCODE_LOOT_ROLL_CHOICE_RESPONSE = 1330).
+message LootRollChoiceResponse {
+  int64 roll_id = 1;
+  LootRollChoiceOutcome outcome = 2;
+}
+
+// Một người trong kết quả. roll = 0 khi Bỏ.
+message LootRollEntry {
+  int64 character_id = 1;
+  string name = 2;
+  LootRollChoice choice = 3;
+  int32 roll = 4;
+}
+
+// Event: Server -> Client (OPCODE_LOOT_ROLL_RESULT_EVENT = 1331) — gửi mọi người được chia. Cả nhóm Bỏ ⇒ món về người
+// ra đòn cuối. by_mail = túi người thắng đầy, món đi bằng thư hệ thống.
+message LootRollResultEvent {
+  int64 roll_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int64 winner_character_id = 4;
+  string winner_name = 5;
+  repeated LootRollEntry entries = 6;
+  bool by_mail = 7;
+}

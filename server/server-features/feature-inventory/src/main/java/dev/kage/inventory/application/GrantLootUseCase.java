@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntSupplier;
+import java.util.function.Predicate;
 
 import dev.kage.inventory.domain.AuditPort;
 import dev.kage.inventory.domain.DropTableEntry;
@@ -98,11 +99,51 @@ public final class GrantLootUseCase {
      *     "nhận được 17". Trước đó mỗi lần rơi luôn tạo ô mới nên hai con số tình cờ bằng nhau.
      */
     public List<ItemStack> execute(long characterId, String dropTableCode) {
-        List<DropTableEntry> entries = dropTablePort.findEntries(dropTableCode);
-        List<ItemStack> drops = new ArrayList<>(LootRoller.roll(entries));
-        for (int extra = rollCount.getAsInt() - 1; extra > 0; extra--) {
-            drops.addAll(LootRoller.roll(entries));
+        return execute(characterId, dropTableCode, stack -> false).granted();
+    }
+
+    /**
+     * Kết quả một lượt rơi đồ có tách: {@code granted} đã vào túi (biên lai như {@link #execute(long, String)}),
+     * {@code diverted} KHÔNG vào túi ai — phía gọi tự chia (ADR-150 tung xúc xắc trong nhóm) rồi cấp bằng
+     * {@link #grantRolled}.
+     */
+    public record Loot(List<ItemStack> granted, List<ItemStack> diverted) {
+
+        public Loot {
+            granted = List.copyOf(granted);
+            diverted = List.copyOf(diverted);
         }
+    }
+
+    /**
+     * Như {@link #execute(long, String)} nhưng chồng nào {@code divert} nhận thì để riêng, không cộng vào túi người hạ
+     * gục (ADR-150). Roll vẫn ở đây, chỉ sinh ở server.
+     */
+    public Loot execute(long characterId, String dropTableCode, Predicate<ItemStack> divert) {
+        List<DropTableEntry> entries = dropTablePort.findEntries(dropTableCode);
+        List<ItemStack> rolled = new ArrayList<>(LootRoller.roll(entries));
+        for (int extra = rollCount.getAsInt() - 1; extra > 0; extra--) {
+            rolled.addAll(LootRoller.roll(entries));
+        }
+        List<ItemStack> drops = new ArrayList<>(rolled.size());
+        List<ItemStack> diverted = new ArrayList<>();
+        for (ItemStack stack : rolled) {
+            (divert.test(stack) ? diverted : drops).add(stack);
+        }
+        return new Loot(place(characterId, dropTableCode, drops), diverted);
+    }
+
+    /**
+     * Cấp một chồng đã tách ra ở {@link #execute(long, String, Predicate)} cho người thắng — cùng giao dịch, cùng
+     * dòng audit {@value #AUDIT_ACTION} như đồ rơi thường.
+     *
+     * @return biên lai (rỗng nếu túi đầy — phía gọi tự gửi cách khác)
+     */
+    public List<ItemStack> grantRolled(long characterId, String dropTableCode, ItemStack stack) {
+        return place(characterId, dropTableCode, List.of(stack));
+    }
+
+    private List<ItemStack> place(long characterId, String dropTableCode, List<ItemStack> drops) {
         if (drops.isEmpty()) {
             return List.of();
         }

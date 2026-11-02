@@ -180,6 +180,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-146](ADR-146-Heart-Demon.md) | Tâm ma khi độ kiếp: từ kiếp thứ hai, sau đợt sét thứ hai, tâm ma hiện — lôi kiếp ngừng, hạ trong 60 giây hoặc thua (V118, 2 loại sự kiện 332 + `seconds_left`) | ✅ **Accepted** *(2026-11-01, lô 26)* | — |
 | [ADR-147](ADR-147-Treasure-Maps.md) | Tàng Bảo Đồ: bản đồ rơi từ quái, đọc ⇒ server chọn 1/6 điểm chôn ngoài dải PvP, đào ≤ 2,5 m trong một giao dịch, phần thưởng theo trọng số có thể gọi quái canh kho (V119, opcode 341–344, `/tangbaodo`) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
 | [ADR-148](ADR-148-Rename-Talisman.md) | Dịch Danh Phù: đổi tên bằng phù bán ở cửa hàng, luật tên như lúc tạo, một giao dịch, hồi chiêu 7 ngày, lịch sử tên + audit (V120, opcode 228/229, `/doiten`) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
+| [ADR-149](ADR-149-Daily-Fortune.md) | Quẻ bói hằng ngày: gieo ở trưởng lão Chu Hoành, năm quẻ Đại Cát→Hung, ±% EXP đánh quái tới hết ngày + quà (V121, opcode 230/231, `/xinque`) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
+| [ADR-150](ADR-150-Group-Loot-Rolls.md) | Xúc xắc chia đồ nhóm: trang bị rơi khi có đồng đội cùng World ⇒ Cần/Tham/Bỏ 15 giây, server tung 1–100, cả nhóm Bỏ về người hạ, túi đầy gửi thư (opcode 1328–1331) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

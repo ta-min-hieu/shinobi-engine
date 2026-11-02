@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import dev.kage.inventory.application.AddItemUseCase;
@@ -139,6 +140,23 @@ public final class InventoryFacade {
      */
     public List<ItemStack> grantLoot(long characterId, String dropTableCode) {
         return withCharacterLock(characterId, () -> grantLootUseCase.execute(characterId, dropTableCode));
+    }
+
+    /**
+     * Như {@link #grantLoot(long, String)} nhưng chồng nào {@code divert} nhận thì KHÔNG vào túi — trả riêng để phía
+     * gọi chia (ADR-150 — tung xúc xắc trong nhóm).
+     */
+    public GrantLootUseCase.Loot grantLoot(long characterId, String dropTableCode, Predicate<ItemStack> divert) {
+        return withCharacterLock(characterId, () -> grantLootUseCase.execute(characterId, dropTableCode, divert));
+    }
+
+    /**
+     * Cấp cho {@code characterId} một chồng đồ rơi đã tách ra (ADR-150) — cùng audit {@code LOOT_GRANT}.
+     *
+     * @return biên lai; rỗng nếu túi đầy
+     */
+    public List<ItemStack> grantRolledLoot(long characterId, String dropTableCode, ItemStack stack) {
+        return withCharacterLock(characterId, () -> grantLootUseCase.grantRolled(characterId, dropTableCode, stack));
     }
 
     /**

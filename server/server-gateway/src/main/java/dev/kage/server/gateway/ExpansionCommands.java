@@ -15,7 +15,8 @@ record ExpansionCommands(
         TamingCommands taming,
         ArtifactCommands artifacts,
         CaveCommands cave,
-        RenameCommands rename) {
+        RenameCommands rename,
+        FortuneCommands fortune) {
 
     static ExpansionCommands of(GatewayFacades facades, WorldGateway worldGateway, NpcProximity proximity) {
         ExpansionFacades expansion = facades.progression().expansion();
@@ -45,6 +46,7 @@ record ExpansionCommands(
                         worldGateway.dungeonInstanceRegistry(),
                         worldGateway.registry(),
                         clock)),
-                new RenameCommands(expansion.rename(), clock));
+                new RenameCommands(expansion.rename(), clock),
+                new FortuneCommands(expansion.fortune(), proximity, clock));
     }
 }

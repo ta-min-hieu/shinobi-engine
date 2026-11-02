@@ -320,3 +320,11 @@ những gì ảnh hưởng tới cách viết code trong module này:
 - `InventoryPort#isSocketed`: đường dời đồ bằng xoá/tạo dòng (kho) phải từ chối món đã khảm; thư và phường
   thị chặn thẳng trong SQL của adapter (`NOT EXISTS item_socket`). Giao dịch dời nguyên dòng nên giữ ngọc.
 
+### ADR-150 (Accepted 2026-11-02, lô 27): tung xúc xắc chia đồ nhóm
+
+- `GrantLootUseCase.execute(characterId, code, Predicate<ItemStack> divert)` trả `Loot(granted, diverted)`: chồng nào
+  `divert` nhận thì KHÔNG vào túi, KHÔNG audit — gateway (`LootRollHooks`) mở lượt tung. `grantRolled` cấp chồng đó
+  cho người thắng qua đúng giao dịch + audit `LOOT_GRANT` của đồ rơi. Bản cũ `execute(characterId, code)` = không tách.
+- Module này vẫn không biết nhóm/đồng đội là gì — "món nào phải tung" là predicate của gateway (trang bị = có
+  `equipSlot`).
+
