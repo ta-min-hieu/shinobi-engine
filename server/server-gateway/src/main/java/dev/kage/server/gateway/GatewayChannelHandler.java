@@ -917,6 +917,26 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.ChooseEncounterOptionCommand.parser(),
                             Opcode.OPCODE_CHOOSE_ENCOUNTER_OPTION_RESPONSE_VALUE,
                             (h, id, c) -> h.worldGateway.registry().encounters.choose(id, c))),
+            // Lô 28 — quà mốc cảnh giới (ADR-153).
+            Map.entry(
+                    Opcode.OPCODE_GET_REALM_MILESTONES_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetRealmMilestonesRequest.parser(),
+                            Opcode.OPCODE_GET_REALM_MILESTONES_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.milestones().board(id))),
+            Map.entry(
+                    Opcode.OPCODE_CLAIM_REALM_MILESTONE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ClaimRealmMilestoneCommand.parser(),
+                            Opcode.OPCODE_CLAIM_REALM_MILESTONE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.milestones().claim(id, c))),
+            // Lô 28 — Truyền Âm Phù (ADR-152).
+            Map.entry(
+                    Opcode.OPCODE_BROADCAST_MESSAGE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.BroadcastMessageCommand.parser(),
+                            Opcode.OPCODE_BROADCAST_MESSAGE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.broadcast().broadcast(id, c))),
             // Lô 27 — vòng quay may mắn (ADR-151).
             Map.entry(
                     Opcode.OPCODE_GET_LUCKY_WHEEL_REQUEST_VALUE,

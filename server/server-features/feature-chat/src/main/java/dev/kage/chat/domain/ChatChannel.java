@@ -12,5 +12,7 @@ public enum ChatChannel {
     GUILD,
     PARTY,
     /** ADR-110 (2026-10-25) — huynh đệ kết nghĩa. */
-    SWORN
+    SWORN,
+    /** ADR-152 (2026-11-02) — loa thế giới bằng Truyền Âm Phù; không đi lệnh chat thường. */
+    BROADCAST
 }

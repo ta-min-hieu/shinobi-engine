@@ -1,6 +1,7 @@
 package dev.kage.server.gateway;
 
 import dev.kage.account.api.SecurityPinFacade;
+import dev.kage.character.api.MilestoneFacade;
 import dev.kage.character.api.RenameFacade;
 import dev.kage.character.api.TribulationFacade;
 import dev.kage.chat.api.SectQuiz;
@@ -36,7 +37,8 @@ record ExpansionFacades(
         TreasureFacade treasure,
         RenameFacade rename,
         FortuneFacade fortune,
-        LuckyWheelFacade luckyWheel) {
+        LuckyWheelFacade luckyWheel,
+        MilestoneFacade milestones) {
 
     /** Composition không có các tính năng này (test). */
     static final ExpansionFacades DISABLED = new ExpansionFacades(
@@ -56,5 +58,6 @@ record ExpansionFacades(
             TreasureFacade.DISABLED,
             RenameFacade.DISABLED,
             FortuneFacade.DISABLED,
-            LuckyWheelFacade.DISABLED);
+            LuckyWheelFacade.DISABLED,
+            MilestoneFacade.DISABLED);
 }

@@ -447,3 +447,44 @@ message SpinLuckyWheelResponse {
   int32 free_spins_left = 4;
   int32 paid_spins_left = 5;
 }
+
+// ADR-153 (2026-11-02) — Quà mốc cảnh giới. Đạt cấp của mốc thì nhận quà MỘT lần.
+message RealmMilestoneView {
+  int32 level = 1;
+  string name_key = 2;
+  int64 gold = 3;
+  int64 item_template_id = 4;  // 0 = chỉ linh thạch
+  int32 quantity = 5;
+  bool claimed = 6;
+}
+
+// Request: Client -> Server (OPCODE_GET_REALM_MILESTONES_REQUEST = 236). Chỉ đọc.
+message GetRealmMilestonesRequest {}
+
+// Response: Server -> Client (OPCODE_GET_REALM_MILESTONES_RESPONSE = 237).
+message GetRealmMilestonesResponse {
+  int32 character_level = 1;
+  repeated RealmMilestoneView milestones = 2;
+}
+
+// Command: Client -> Server (OPCODE_CLAIM_REALM_MILESTONE_COMMAND = 238).
+message ClaimRealmMilestoneCommand {
+  int32 level = 1;
+}
+
+enum ClaimRealmMilestoneOutcome {
+  CLAIM_REALM_MILESTONE_OUTCOME_UNSPECIFIED = 0;
+  CLAIM_REALM_MILESTONE_OUTCOME_OK = 1;
+  CLAIM_REALM_MILESTONE_OUTCOME_UNKNOWN_MILESTONE = 2;
+  CLAIM_REALM_MILESTONE_OUTCOME_LEVEL_TOO_LOW = 3;
+  CLAIM_REALM_MILESTONE_OUTCOME_ALREADY_CLAIMED = 4;
+  CLAIM_REALM_MILESTONE_OUTCOME_BAG_FULL = 5;   // quà vẫn chờ — dọn túi rồi nhận lại
+  CLAIM_REALM_MILESTONE_OUTCOME_GOLD_CAP = 6;
+}
+
+// Response: Server -> Client (OPCODE_CLAIM_REALM_MILESTONE_RESPONSE = 239). Kèm bảng mốc SAU lệnh.
+message ClaimRealmMilestoneResponse {
+  ClaimRealmMilestoneOutcome outcome = 1;
+  int32 level = 2;
+  GetRealmMilestonesResponse board = 3;
+}

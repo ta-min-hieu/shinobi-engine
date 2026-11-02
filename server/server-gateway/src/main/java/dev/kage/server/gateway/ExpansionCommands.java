@@ -17,7 +17,9 @@ record ExpansionCommands(
         CaveCommands cave,
         RenameCommands rename,
         FortuneCommands fortune,
-        LuckyWheelCommands luckyWheel) {
+        LuckyWheelCommands luckyWheel,
+        BroadcastCommands broadcast,
+        MilestoneCommands milestones) {
 
     static ExpansionCommands of(GatewayFacades facades, WorldGateway worldGateway, NpcProximity proximity) {
         ExpansionFacades expansion = facades.progression().expansion();
@@ -49,6 +51,13 @@ record ExpansionCommands(
                         clock)),
                 new RenameCommands(expansion.rename(), clock),
                 new FortuneCommands(expansion.fortune(), proximity, clock),
-                new LuckyWheelCommands(expansion.luckyWheel(), clock));
+                new LuckyWheelCommands(expansion.luckyWheel(), clock),
+                new BroadcastCommands(new BroadcastCommands.Deps(
+                        facades.contentFacades().socialFacades().chatFacade(),
+                        facades.characterFacade(),
+                        expansion.consumables(),
+                        worldGateway.registry(),
+                        clock)),
+                new MilestoneCommands(expansion.milestones(), clock));
     }
 }

@@ -3,14 +3,20 @@ package dev.kage.tools.loadtest.probe;
 import java.io.IOException;
 import java.util.Locale;
 
+import dev.kage.protocol.BroadcastMessageCommand;
+import dev.kage.protocol.BroadcastMessageResponse;
 import dev.kage.protocol.CaveAction;
 import dev.kage.protocol.CaveCommand;
 import dev.kage.protocol.CaveDecorationView;
 import dev.kage.protocol.CaveResponse;
+import dev.kage.protocol.ClaimRealmMilestoneCommand;
+import dev.kage.protocol.ClaimRealmMilestoneResponse;
 import dev.kage.protocol.DrawFortuneCommand;
 import dev.kage.protocol.DrawFortuneResponse;
 import dev.kage.protocol.GetLuckyWheelRequest;
 import dev.kage.protocol.GetLuckyWheelResponse;
+import dev.kage.protocol.GetRealmMilestonesRequest;
+import dev.kage.protocol.GetRealmMilestonesResponse;
 import dev.kage.protocol.LootRollChoice;
 import dev.kage.protocol.LootRollChoiceCommand;
 import dev.kage.protocol.LootRollChoiceResponse;
@@ -27,7 +33,8 @@ import dev.kage.protocol.TreasureHuntResponse;
  * Bước lô 24: động phủ (ADR-129) {@code cave:<view|enter|collect|upgrade|decorate/<mã>|invite/<tên>|visit/<tên>>}.
  * Lô 27: Tàng Bảo Đồ (ADR-147) {@code treasure:<status|read|dig>}, Dịch Danh Phù (ADR-148) {@code rename:<tên mới>},
  * quẻ bói (ADR-149) {@code fortune}, xúc xắc chia đồ (ADR-150) {@code lootRoll:<rollId>:<need|greed|pass>},
- * vòng quay (ADR-151) {@code wheel}, {@code spin}.
+ * vòng quay (ADR-151) {@code wheel}, {@code spin}. Lô 28: loa (ADR-152) {@code shout:<nội dung>},
+ * quà mốc (ADR-153) {@code milestones}, {@code claimMilestone:<cấp>}.
  */
 final class Lot24Steps {
 
@@ -43,6 +50,9 @@ final class Lot24Steps {
             case "treasure" -> treasure(arg);
             case "wheel" -> wheel();
             case "spin" -> spin();
+            case "shout" -> shout(arg);
+            case "milestones" -> milestones();
+            case "claimMilestone" -> claimMilestone(Integer.parseInt(arg));
             case "lootRoll" -> lootRoll(arg);
             case "fortune" ->
                 asker.ask(
@@ -145,5 +155,42 @@ final class Lot24Steps {
                             + r.getPrize().getQuantity() + " paid=" + r.getPaid() + " free="
                             + r.getFreeSpinsLeft() + " paidLeft=" + r.getPaidSpinsLeft();
                 });
+    }
+
+    private String shout(String arg) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_BROADCAST_MESSAGE_COMMAND_VALUE,
+                BroadcastMessageCommand.newBuilder().setBody(arg).build(),
+                Opcode.OPCODE_BROADCAST_MESSAGE_RESPONSE_VALUE,
+                p -> {
+                    BroadcastMessageResponse r = BroadcastMessageResponse.parseFrom(p);
+                    return r.getOutcome().name() + " còn=" + r.getSecondsLeft() + "s";
+                });
+    }
+
+    private String milestones() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_REALM_MILESTONES_REQUEST_VALUE,
+                GetRealmMilestonesRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_REALM_MILESTONES_RESPONSE_VALUE,
+                p -> describe(GetRealmMilestonesResponse.parseFrom(p)));
+    }
+
+    private String claimMilestone(int level) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_CLAIM_REALM_MILESTONE_COMMAND_VALUE,
+                ClaimRealmMilestoneCommand.newBuilder().setLevel(level).build(),
+                Opcode.OPCODE_CLAIM_REALM_MILESTONE_RESPONSE_VALUE,
+                p -> {
+                    ClaimRealmMilestoneResponse r = ClaimRealmMilestoneResponse.parseFrom(p);
+                    return r.getOutcome().name() + " " + describe(r.getBoard());
+                });
+    }
+
+    private static String describe(GetRealmMilestonesResponse board) {
+        StringBuilder line = new StringBuilder("cấp=").append(board.getCharacterLevel());
+        board.getMilestonesList()
+                .forEach(m -> line.append(" Lv").append(m.getLevel()).append(m.getClaimed() ? "✓" : "·"));
+        return line.toString();
     }
 }

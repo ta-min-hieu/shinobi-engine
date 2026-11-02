@@ -18,6 +18,7 @@ enum ChatChannel {
   CHAT_CHANNEL_GUILD = 4;
   CHAT_CHANNEL_PARTY = 5;
   CHAT_CHANNEL_SWORN = 6;   // ADR-110 (2026-10-25) — huynh đệ kết nghĩa
+  CHAT_CHANNEL_BROADCAST = 7; // ADR-152 (2026-11-02) — loa thế giới (Truyền Âm Phù); CHỈ server phát, lệnh chat thường gửi kênh này bị từ chối
 }
 
 // Command: Client -> Server (OPCODE_SEND_CHAT_MESSAGE_COMMAND). target_name CHỈ có ý nghĩa khi
@@ -144,4 +145,27 @@ message QuizRevealEvent {
   string answer_key = 2;
   string winner_name = 3;
   int64 reward_gold = 4;
+}
+
+// ADR-152 (2026-11-02) — Truyền Âm Phù. Command: Client -> Server (OPCODE_BROADCAST_MESSAGE_COMMAND = 810). Tốn một
+// Truyền Âm Phù; mọi người online nhận ChatMessageEvent kênh CHAT_CHANNEL_BROADCAST.
+message BroadcastMessageCommand {
+  string body = 1;
+}
+
+enum BroadcastMessageOutcome {
+  BROADCAST_MESSAGE_OUTCOME_UNSPECIFIED = 0;
+  BROADCAST_MESSAGE_OUTCOME_OK = 1;
+  BROADCAST_MESSAGE_OUTCOME_NO_TALISMAN = 2;
+  BROADCAST_MESSAGE_OUTCOME_COOLDOWN = 3;       // seconds_left cho biết còn bao lâu
+  BROADCAST_MESSAGE_OUTCOME_MUTED = 4;
+  BROADCAST_MESSAGE_OUTCOME_BLANK = 5;
+  BROADCAST_MESSAGE_OUTCOME_TOO_LONG = 6;
+  BROADCAST_MESSAGE_OUTCOME_BANNED_WORD = 7;
+}
+
+// Response: Server -> Client (OPCODE_BROADCAST_MESSAGE_RESPONSE = 811). Bị từ chối thì không mất phù.
+message BroadcastMessageResponse {
+  BroadcastMessageOutcome outcome = 1;
+  int32 seconds_left = 2;
 }

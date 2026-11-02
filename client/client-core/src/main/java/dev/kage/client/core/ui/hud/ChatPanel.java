@@ -97,6 +97,8 @@ public final class ChatPanel implements HudWindow {
 
     /** Vàng đồng nhạt — dòng của hệ thống (lý do gửi hỏng), tông của viền HUD. */
     private static final Color SYSTEM_COLOR = Color.valueOf("E0B860");
+    /** ADR-152 — loa thế giới: cam sáng, khác vàng nhạt của dòng hệ thống; tiền tố [Loa] mang nghĩa, màu chỉ phụ. */
+    private static final Color BROADCAST_COLOR = Color.valueOf("FF9F43");
 
     private final Stage stage;
     private final Table panel;
@@ -336,7 +338,9 @@ public final class ChatPanel implements HudWindow {
         WORLD,
         AREA,
         PRIVATE,
-        SYSTEM
+        SYSTEM,
+        /** ADR-152 — loa thế giới (Truyền Âm Phù). */
+        BROADCAST
     }
 
     private static Color colorOf(LineKind kind) {
@@ -345,6 +349,7 @@ public final class ChatPanel implements HudWindow {
             case PRIVATE -> PRIVATE_COLOR;
             case SYSTEM -> SYSTEM_COLOR;
             case WORLD -> WORLD_COLOR;
+            case BROADCAST -> BROADCAST_COLOR;
         };
     }
 

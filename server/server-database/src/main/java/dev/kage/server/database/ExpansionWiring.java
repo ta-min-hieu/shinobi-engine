@@ -65,6 +65,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.checkin.PostgresLuckyWheelAdapter(dataSource));
     }
 
+    /** Quà mốc cảnh giới (ADR-153). */
+    public dev.kage.character.api.MilestoneFacade wireMilestoneFacade() {
+        return new dev.kage.character.api.MilestoneFacade(
+                new dev.kage.server.database.character.PostgresMilestoneAdapter(dataSource));
+    }
+
     /** Hỏi đáp tông môn (ADR-122) — {@code starts} là giờ bắt đầu phiên theo giờ Việt Nam. */
     public SectQuiz wireSectQuiz(List<LocalTime> starts) {
         return new SectQuiz(new PostgresQuizAdapter(dataSource), starts, System.nanoTime());

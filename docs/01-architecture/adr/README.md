@@ -183,6 +183,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-149](ADR-149-Daily-Fortune.md) | Quẻ bói hằng ngày: gieo ở trưởng lão Chu Hoành, năm quẻ Đại Cát→Hung, ±% EXP đánh quái tới hết ngày + quà (V121, opcode 230/231, `/xinque`) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
 | [ADR-150](ADR-150-Group-Loot-Rolls.md) | Xúc xắc chia đồ nhóm: trang bị rơi khi có đồng đội cùng World ⇒ Cần/Tham/Bỏ 15 giây, server tung 1–100, cả nhóm Bỏ về người hạ, túi đầy gửi thư (opcode 1328–1331) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
 | [ADR-151](ADR-151-Lucky-Wheel.md) | Vòng quay may mắn: 1 lượt miễn phí + 10 lượt mua 1.000 linh thạch mỗi ngày giờ VN, 8 ô theo trọng số, một giao dịch, từ chối thì không mất lượt/tiền (V122, opcode 232–235, `/vongquay`) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
+| [ADR-152](ADR-152-Broadcast-Talisman.md) | Truyền Âm Phù: `/loa` tốn một phù (2.000), hồi chiêu 30 s, kiểm như chat (khoá chat, từ cấm, audit), từ chối thì trả phù, phát kênh BROADCAST cho mọi người online (V123, opcode 810/811) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
+| [ADR-153](ADR-153-Realm-Milestone-Rewards.md) | Quà mốc cảnh giới: 6 mốc (cấp 10 + 19/37/55/73/91), nhận tay một lần trong `/mocgioi`, túi đầy quà vẫn chờ (V124, opcode 236–239) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)
