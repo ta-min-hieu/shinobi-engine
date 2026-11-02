@@ -30,7 +30,7 @@ hỏi DB một lần, gieo xong ghi đè ngay.
 **D4 — Lệch mô tả lượt hỏi**: mô tả có "rơi đồ/vàng". **Bản này chỉ có EXP + quà kèm quẻ.** Tỉ lệ rơi đồ hiện là MỘT
 hệ số chung cả server (`GrantLootUseCase.withRollCount(IntSupplier)` — không biết ai hạ quái); cho nó theo từng người là
 đổi API của feature-inventory, và quái chưa rơi linh thạch nên "vàng theo quẻ" không có chỗ để nhân. Quà linh thạch/vật
-phẩm lúc gieo thay cho phần đó. Muốn rơi đồ theo quẻ ⇒ ADR riêng.
+phẩm lúc gieo thay cho phần đó. Muốn rơi đồ theo quẻ ⇒ ADR riêng. ✅ **Đã làm 2026-11-02: [ADR-158](ADR-158-Fortune-Drop-Bonus.md).**
 
 **D5 — Giao thức, chỉ thêm**: 230/231 `DrawFortuneCommand{}` / `DrawFortuneResponse{outcome, fortune_code, name_key,
 text_key, exp_percent, gold, item_template_id, quantity}`. `protocolVersion` không tăng.

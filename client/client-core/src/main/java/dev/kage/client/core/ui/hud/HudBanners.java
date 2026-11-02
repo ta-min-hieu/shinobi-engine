@@ -35,6 +35,12 @@ final class HudBanners {
     /** Ô chứa {@link #zoneGroup} — xem {@link #buildTopRightColumn}. */
     private Cell<Table> zoneCell;
 
+    /** ADR-157 — bảng sát thương boss thế giới trực tiếp; cùng cách gỡ khỏi ô như biển vùng. */
+    private final Table bossGroup;
+
+    private final Label bossLabel;
+    private Cell<Table> bossCell;
+
     /** Độ trễ đường truyền, đo từ {@code PongResponse} — xem {@link #setLatency(long)}. */
     private final Label latencyLabel;
 
@@ -64,6 +70,10 @@ final class HudBanners {
         this.zoneGroup = new Table();
         zoneGroup.setBackground(skin.panel);
         zoneGroup.add(zoneLabel).pad(6f);
+        this.bossLabel = new Label("", skin.statLabelStyle);
+        this.bossGroup = new Table();
+        bossGroup.setBackground(skin.panel);
+        bossGroup.add(bossLabel).pad(6f);
         this.latencyLabel = new Label(i18n.get("hud.latency_unknown"), skin.statLabelStyle);
         latencyLabel.setFontScale(HudLayout.SMALL_LABEL_SCALE);
     }
@@ -90,6 +100,8 @@ final class HudBanners {
         this.dungeonCell = column.add((Table) null).right();
         column.row();
         this.zoneCell = column.add((Table) null).right();
+        column.row();
+        this.bossCell = column.add((Table) null).right().padTop(4f);
         column.row();
         column.add(questCard).right().padTop(8f).row();
         return column;
@@ -133,5 +145,11 @@ final class HudBanners {
         zoneLabel.setText(text);
         zoneLabel.setColor(color);
         zoneCell.setActor(text.isEmpty() ? null : zoneGroup);
+    }
+
+    /** ADR-157 — nhiều dòng chữ ĐÃ dịch; rỗng = gỡ bảng. */
+    void setBossBoard(String text) {
+        bossLabel.setText(text);
+        bossCell.setActor(text.isEmpty() ? null : bossGroup);
     }
 }

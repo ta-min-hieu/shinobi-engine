@@ -130,6 +130,11 @@ final class MainWorldChannelRegistry {
         channels.add(new Channel(firstChannelFacade, DEFAULT_CAPACITY));
     }
 
+    /** Khu vực đầu tiên — nơi boss thế giới xuất hiện (ADR-081); bảng sát thương trực tiếp (ADR-157) hỏi ở đây. */
+    WorldFacade firstChannel() {
+        return firstChannelFacade;
+    }
+
     /**
      * Sổ hồi chiêu dùng chung cho MỌI World của tiến trình (README dòng 37iii) — khu vực world chính,
      * hầm ngục, đấu trường. Nằm ở đây cùng lý do {@link #worldContent()}: hai registry kia vốn đã

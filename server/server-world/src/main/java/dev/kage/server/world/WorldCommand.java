@@ -146,6 +146,13 @@ sealed interface WorldCommand {
     record HealCharacterCommand(long characterId, int amount) implements WorldCommand {}
 
     /**
+     * ADR-157 — xin ảnh chụp sổ sát thương boss thế giới. {@code reply} được gọi TRÊN tick thread nên chỉ được giao
+     * việc đi chỗ khác (không chặn, không chạm DB).
+     */
+    record WorldBossStandingsCommand(java.util.function.Consumer<java.util.List<WorldBossStanding>> reply)
+            implements WorldCommand {}
+
+    /**
      * Cấp của {@code characterId} vừa lên GIỮA PHIÊN (EXP hạ quái hoặc thưởng quest) — world chỉ
      * NÂNG {@code CharacterLevelComponent}, không bao giờ hạ: các lượt cộng EXP chạy trên những
      * Virtual Thread riêng nên hai lệnh có thể về ngược thứ tự, và lệnh mang cấp thấp hơn cấp đang

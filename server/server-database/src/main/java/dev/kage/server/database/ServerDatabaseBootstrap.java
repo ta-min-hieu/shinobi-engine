@@ -272,6 +272,7 @@ public final class ServerDatabaseBootstrap {
     private final java.util.SplittableRandom lootRandom = new java.util.SplittableRandom();
 
     private GameEventFacade gameEvents;
+    private ExpansionWiring expansionWiring;
     private final RedisClient redisClient;
     private final RetentionJanitor retentionJanitor;
 
@@ -668,7 +669,10 @@ public final class ServerDatabaseBootstrap {
             JdbcInventoryTransactionRunner transactionRunner) {
         return new GrantLootUseCase(dropTablePort, inventoryPort, itemTemplatePort, transactionRunner)
                 .auditedBy(new PostgresAuditAdapter())
-                .withRollCount(() -> wireGameEventFacade().multiplier(GameEventKind.DROP) * nightLootRolls());
+                .withRollCount(() -> wireGameEventFacade().multiplier(GameEventKind.DROP) * nightLootRolls())
+                .withBonusRollPercent(
+                        characterId -> // ADR-158 — quẻ bói hôm nay của người hạ gục
+                        expansion().wireFortuneFacade().dropBonusPercent(characterId, java.time.Instant.now()));
     }
 
     /** ADR-123 — đêm có thêm một lượt tung rơi đồ với 20% (ngẫu nhiên ở server). */
@@ -784,8 +788,12 @@ public final class ServerDatabaseBootstrap {
     }
 
     /** Facade lô 23 phần 2–3 (linh điền, kỳ ngộ, hỏi đáp, thu phục, luận võ) — xem {@link ExpansionWiring}. */
-    public ExpansionWiring expansion() {
-        return new ExpansionWiring(dataSource);
+    public synchronized ExpansionWiring expansion() {
+        // MỘT bản (ADR-158): nó giữ FortuneFacade dùng chung cho đường gieo quẻ và đường rơi đồ.
+        if (expansionWiring == null) {
+            expansionWiring = new ExpansionWiring(dataSource);
+        }
+        return expansionWiring;
     }
 
     /** Khoá an toàn — PIN cấp 2 (ADR-115). */

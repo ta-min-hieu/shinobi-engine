@@ -160,6 +160,25 @@ class GrantLootUseCaseTest {
     }
 
     @Test
+    void bonusRollPercentShouldApplyOnlyToThatCharacter() {
+        List<DropTableEntry> entries = List.of(new DropTableEntry(100L, 100, 1, 1));
+        FakeInventoryPort lucky = new FakeInventoryPort(new Inventory(1L, 10, List.of()));
+        GrantLootUseCase useCase = new GrantLootUseCase(
+                        new FakeDropTablePort(entries), lucky, templatePortWithMaxStack(1), DIRECT_TX)
+                .withBonusRollPercent(characterId -> characterId == 1L ? 100 : 0);
+
+        assertThat(useCase.execute(1L, "any_code"))
+                .as("100% ⇒ luôn thêm một lượt")
+                .hasSize(2);
+
+        FakeInventoryPort plain = new FakeInventoryPort(new Inventory(2L, 10, List.of()));
+        GrantLootUseCase other = new GrantLootUseCase(
+                        new FakeDropTablePort(entries), plain, templatePortWithMaxStack(1), DIRECT_TX)
+                .withBonusRollPercent(characterId -> characterId == 1L ? 100 : 0);
+        assertThat(other.execute(2L, "any_code")).hasSize(1);
+    }
+
+    @Test
     void shouldGrantNothing_whenEntryNeverDrops() {
         List<DropTableEntry> entries = List.of(new DropTableEntry(100L, 0, 1, 1));
         FakeDropTablePort dropTablePort = new FakeDropTablePort(entries);

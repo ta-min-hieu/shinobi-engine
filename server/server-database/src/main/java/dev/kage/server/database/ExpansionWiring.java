@@ -26,6 +26,8 @@ import dev.kage.world.api.TamingFacade;
 public final class ExpansionWiring {
 
     private final DataSource dataSource;
+    // ADR-158 — MỘT bản cho cả đường gieo quẻ (gateway) lẫn đường rơi đồ: bộ nhớ quẻ-theo-ngày phải là cùng một chỗ.
+    private dev.kage.checkin.api.FortuneFacade fortune;
 
     ExpansionWiring(DataSource dataSource) {
         this.dataSource = dataSource;
@@ -54,9 +56,12 @@ public final class ExpansionWiring {
     }
 
     /** Quẻ bói hằng ngày (ADR-149). */
-    public dev.kage.checkin.api.FortuneFacade wireFortuneFacade() {
-        return new dev.kage.checkin.api.FortuneFacade(
-                new dev.kage.server.database.checkin.PostgresFortuneAdapter(dataSource));
+    public synchronized dev.kage.checkin.api.FortuneFacade wireFortuneFacade() {
+        if (fortune == null) {
+            fortune = new dev.kage.checkin.api.FortuneFacade(
+                    new dev.kage.server.database.checkin.PostgresFortuneAdapter(dataSource));
+        }
+        return fortune;
     }
 
     /** Vòng quay may mắn (ADR-151). */

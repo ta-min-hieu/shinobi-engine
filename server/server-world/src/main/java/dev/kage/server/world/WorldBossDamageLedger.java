@@ -1,6 +1,8 @@
 package dev.kage.server.world;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -53,6 +55,14 @@ final class WorldBossDamageLedger {
             return Optional.empty();
         }
         return Optional.of(new Defeat(code, Map.copyOf(ledger)));
+    }
+
+    /** ADR-157 — ảnh chụp mọi boss đang có sổ (bản sao, gọi trên tick thread; vài giây một lần, không mỗi khung). */
+    List<WorldBossStanding> standings() {
+        List<WorldBossStanding> standings = new ArrayList<>(codeByMonsterId.size());
+        codeByMonsterId.forEach((monsterId, code) ->
+                standings.add(new WorldBossStanding(code, damageByMonsterId.getOrDefault(monsterId, Map.of()))));
+        return standings;
     }
 
     /** Một boss thế giới đã chết kèm sổ sát thương. */

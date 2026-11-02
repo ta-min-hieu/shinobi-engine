@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.IntSupplier;
+import java.util.function.LongToIntFunction;
 import java.util.function.Predicate;
 
 import dev.kage.inventory.domain.AuditPort;
@@ -32,6 +33,8 @@ public final class GrantLootUseCase {
     private final TransactionRunner tx;
     private final AuditPort auditPort;
     private final IntSupplier rollCount;
+    // ADR-158 — % cơ hội tung bảng rơi thêm một lượt, RIÊNG từng người hạ gục (quẻ bói). Mặc định 0.
+    private final LongToIntFunction bonusRollPercent;
 
     /** Bản KHÔNG ghi audit — cho test chỉ quan tâm tới túi đồ. Production dùng {@link #auditedBy}. */
     public GrantLootUseCase(
@@ -45,15 +48,26 @@ public final class GrantLootUseCase {
         this.tx = tx;
         this.auditPort = NO_AUDIT;
         this.rollCount = GrantLootUseCase::oneRoll;
+        this.bonusRollPercent = characterId -> 0;
     }
 
-    private GrantLootUseCase(GrantLootUseCase source, AuditPort auditPort, IntSupplier rollCount) {
+    private GrantLootUseCase(
+            GrantLootUseCase source, AuditPort auditPort, IntSupplier rollCount, LongToIntFunction bonusRollPercent) {
         this.dropTablePort = source.dropTablePort;
         this.inventoryPort = source.inventoryPort;
         this.itemTemplatePort = source.itemTemplatePort;
         this.tx = source.tx;
         this.auditPort = auditPort;
         this.rollCount = rollCount;
+        this.bonusRollPercent = bonusRollPercent;
+    }
+
+    /**
+     * ADR-158 — {@code percent.applyAsInt(characterId)} % cơ hội tung bảng rơi THÊM một lượt cho riêng người hạ gục đó
+     * (quẻ bói hôm nay). Module này không biết quẻ là gì, chỉ biết một con số 0–100; random vẫn sinh ở server.
+     */
+    public GrantLootUseCase withBonusRollPercent(LongToIntFunction percent) {
+        return new GrantLootUseCase(this, auditPort, rollCount, percent);
     }
 
     /**
@@ -61,7 +75,7 @@ public final class GrantLootUseCase {
      * module này không biết sự kiện là gì, chỉ biết một con số {@code >= 1}.
      */
     public GrantLootUseCase withRollCount(IntSupplier count) {
-        return new GrantLootUseCase(this, auditPort, count);
+        return new GrantLootUseCase(this, auditPort, count, bonusRollPercent);
     }
 
     /**
@@ -73,13 +87,18 @@ public final class GrantLootUseCase {
      * tham số constructor thứ năm: constructor đã chạm trần 4 tham số của Checkstyle.
      */
     public GrantLootUseCase auditedBy(AuditPort port) {
-        return new GrantLootUseCase(this, port, rollCount);
+        return new GrantLootUseCase(this, port, rollCount, bonusRollPercent);
     }
 
     /** {@code audit_log.action} của một chồng đồ rơi. */
     public static final String AUDIT_ACTION = "LOOT_GRANT";
 
     private static final AuditPort NO_AUDIT = (transaction, characterId, action, detailJson) -> {};
+
+    /** 1 nếu trúng cơ hội tung thêm của người này (ADR-158), không thì 0 — random ở {@link LootRoller}. */
+    private int bonusRoll(long characterId) {
+        return LootRoller.rollsBonus(bonusRollPercent.applyAsInt(characterId)) ? 1 : 0;
+    }
 
     /** Mặc định: một lượt roll mỗi con quái. */
     private static int oneRoll() {
@@ -122,7 +141,7 @@ public final class GrantLootUseCase {
     public Loot execute(long characterId, String dropTableCode, Predicate<ItemStack> divert) {
         List<DropTableEntry> entries = dropTablePort.findEntries(dropTableCode);
         List<ItemStack> rolled = new ArrayList<>(LootRoller.roll(entries));
-        for (int extra = rollCount.getAsInt() - 1; extra > 0; extra--) {
+        for (int extra = rollCount.getAsInt() - 1 + bonusRoll(characterId); extra > 0; extra--) {
             rolled.addAll(LootRoller.roll(entries));
         }
         List<ItemStack> drops = new ArrayList<>(rolled.size());

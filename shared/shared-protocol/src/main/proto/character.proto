@@ -405,6 +405,7 @@ message DrawFortuneResponse {
   int64 gold = 6;
   int64 item_template_id = 7;
   int32 quantity = 8;
+  int32 drop_bonus_percent = 9;  // ADR-158 — % cơ hội rơi thêm một lượt khi hạ quái, tới hết ngày
 }
 
 // ADR-151 (2026-11-02) — Vòng quay may mắn. Mỗi ngày (giờ Việt Nam) 1 lượt miễn phí, rồi tối đa 10 lượt mua.

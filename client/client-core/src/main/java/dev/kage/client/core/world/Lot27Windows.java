@@ -6,7 +6,7 @@ import dev.kage.client.core.ui.theme.KageSkin;
  * Luồng lô 27–28 — Tàng Bảo Đồ (ADR-147), Dịch Danh Phù (ADR-148), quẻ bói (ADR-149), xúc xắc chia đồ (ADR-150),
  * vòng quay may mắn (ADR-151),
  * Truyền Âm Phù (ADR-152), quà mốc cảnh giới (ADR-153), nhiệm vụ tuần (ADR-154),
- * cửa hàng vinh dự (ADR-155).
+ * cửa hàng vinh dự (ADR-155), bảng sát thương boss trực tiếp (ADR-157).
  * Gom thành MỘT thành phần của {@link ExpansionWindows} để {@code create} ở đó không vượt trần {@code MethodLength}.
  */
 record Lot27Windows(
@@ -18,7 +18,8 @@ record Lot27Windows(
         BroadcastCoordinator broadcast,
         MilestoneCoordinator milestones,
         WeeklyTaskCoordinator weeklyTasks,
-        HonorShopCoordinator honorShop) {
+        HonorShopCoordinator honorShop,
+        WorldBossBoardCoordinator bossBoard) {
 
     static Lot27Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot27Windows(
@@ -30,7 +31,8 @@ record Lot27Windows(
                 new BroadcastCoordinator(sender, feeds.chat()),
                 MilestoneCoordinator.create(skin, sender, feeds),
                 WeeklyTaskCoordinator.create(skin, sender, feeds),
-                HonorShopCoordinator.create(skin, sender, feeds));
+                HonorShopCoordinator.create(skin, sender, feeds),
+                new WorldBossBoardCoordinator());
     }
 
     /** Đăng ký vào hub. */
@@ -44,5 +46,6 @@ record Lot27Windows(
         panels.register(milestones.panel(), milestones);
         panels.register(weeklyTasks.panel(), weeklyTasks);
         panels.register(honorShop.panel(), honorShop);
+        panels.register(bossBoard);
     }
 }

@@ -22,6 +22,7 @@ public interface FortunePort {
      * Một quẻ.
      *
      * @param expPercent phần trăm cộng (âm = trừ) vào EXP đánh quái tới hết ngày
+     * @param dropBonusPercent % cơ hội tung bảng rơi thêm một lượt khi hạ quái (ADR-158)
      * @param itemTemplateId 0 nếu quẻ không kèm vật phẩm
      */
     record Fortune(
@@ -31,7 +32,8 @@ public interface FortunePort {
             int expPercent,
             long gold,
             long itemTemplateId,
-            int quantity) {}
+            int quantity,
+            int dropBonusPercent) {}
 
     /** Kết quả gieo: {@code fortune} là quẻ của ngày (vừa gieo, hoặc đã gieo từ trước). */
     record Draw(Outcome outcome, Optional<Fortune> fortune) {}

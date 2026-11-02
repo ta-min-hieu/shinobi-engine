@@ -31,8 +31,8 @@ public final class FortuneFacade {
         }
     });
 
-    /** Phần trăm EXP của một nhân vật trong một ngày. */
-    private record Today(LocalDate day, int expPercent) {}
+    /** Phần trăm EXP và % rơi thêm của một nhân vật trong một ngày. */
+    private record Today(LocalDate day, int expPercent, int dropBonusPercent) {}
 
     private final FortunePort port;
     private final SplittableRandom random = new SplittableRandom();
@@ -47,7 +47,9 @@ public final class FortuneFacade {
     public FortunePort.Draw draw(long characterId, Instant now) {
         LocalDate day = FortuneRules.day(now);
         FortunePort.Draw draw = port.draw(characterId, day, now, this::pick);
-        draw.fortune().ifPresent(fortune -> cache.put(characterId, new Today(day, fortune.expPercent())));
+        draw.fortune()
+                .ifPresent(fortune ->
+                        cache.put(characterId, new Today(day, fortune.expPercent(), fortune.dropBonusPercent())));
         return draw;
     }
 
@@ -56,17 +58,26 @@ public final class FortuneFacade {
         return FortuneRules.boosted(amount, expPercent(characterId, now));
     }
 
+    /** ADR-158 — % cơ hội tung bảng rơi thêm một lượt hôm nay (chưa gieo ⇒ 0). Đường hạ quái gọi mỗi lần rơi đồ. */
+    public int dropBonusPercent(long characterId, Instant now) {
+        return today(characterId, now).dropBonusPercent();
+    }
+
     private int expPercent(long characterId, Instant now) {
+        return today(characterId, now).expPercent();
+    }
+
+    private Today today(long characterId, Instant now) {
         LocalDate day = FortuneRules.day(now);
         Today cached = cache.get(characterId);
         if (cached != null && cached.day().equals(day)) {
-            return cached.expPercent();
+            return cached;
         }
-        int percent = port.today(characterId, day)
-                .map(FortunePort.Fortune::expPercent)
-                .orElse(0);
-        cache.put(characterId, new Today(day, percent));
-        return percent;
+        Today fresh = port.today(characterId, day)
+                .map(f -> new Today(day, f.expPercent(), f.dropBonusPercent()))
+                .orElse(new Today(day, 0, 0));
+        cache.put(characterId, fresh);
+        return fresh;
     }
 
     private int pick(int[] weights) {

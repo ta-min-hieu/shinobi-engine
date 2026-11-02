@@ -34,7 +34,8 @@ final class FortuneCommands {
             response.setFortuneCode(fortune.code())
                     .setNameKey(fortune.nameKey())
                     .setTextKey(fortune.textKey())
-                    .setExpPercent(fortune.expPercent());
+                    .setExpPercent(fortune.expPercent())
+                    .setDropBonusPercent(fortune.dropBonusPercent());
             if (draw.outcome() == FortunePort.Outcome.OK) {
                 response.setGold(fortune.gold())
                         .setItemTemplateId(fortune.itemTemplateId())

@@ -776,6 +776,14 @@ public final class WorldFacade {
     }
 
     /**
+     * ADR-157 — xin ảnh chụp sổ sát thương các boss thế giới đang sống của World này. {@code reply} chạy TRÊN tick
+     * thread: người gọi phải tự đẩy việc nặng sang luồng khác.
+     */
+    public void requestWorldBossStandings(java.util.function.Consumer<java.util.List<WorldBossStanding>> reply) {
+        inbox.add(new WorldCommand.WorldBossStandingsCommand(reply));
+    }
+
+    /**
      * ADR-046 D5 — đan dược: hồi {@code amount} máu cho nhân vật. Gọi từ {@code server-gateway}
      * SAU khi {@code feature-inventory} đã trừ số lượng trong transaction của nó.
      *
@@ -1155,6 +1163,7 @@ public final class WorldFacade {
                     handleAreaChatMessage(c.characterId(), c.senderName(), c.body());
                 case WorldCommand.AppearanceChangedCommand c -> handleAppearanceChanged(c.characterId());
                 case WorldCommand.HealCharacterCommand c -> handleHealCharacter(c.characterId(), c.amount());
+                case WorldCommand.WorldBossStandingsCommand c -> c.reply().accept(worldBossLedger.standings());
                 case WorldCommand.RaiseCharacterLevelCommand c -> handleRaiseCharacterLevel(c.characterId(), c.level());
                 case WorldCommand.ChangeCharacterElementCommand c ->
                     handleChangeCharacterElement(c.characterId(), c.element());

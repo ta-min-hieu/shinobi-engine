@@ -297,6 +297,11 @@ public final class CombatHud implements HudWindow {
         banners.setZoneBanner(text, color);
     }
 
+    /** ADR-157 — bảng sát thương boss thế giới trực tiếp (chữ đã dịch, nhiều dòng); rỗng = ẩn. */
+    public void setBossBoard(String text) {
+        banners.setBossBoard(text);
+    }
+
     public void setOnClaimQuestClicked(Runnable listener) {
         quest.setOnClaimClicked(listener);
     }

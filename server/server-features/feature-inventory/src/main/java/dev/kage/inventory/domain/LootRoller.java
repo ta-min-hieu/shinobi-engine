@@ -26,4 +26,9 @@ public final class LootRoller {
         }
         return drops;
     }
+
+    /** ADR-158 — {@code percent}% (0–100) cơ hội tung thêm một lượt; ≤ 0 ⇒ không bao giờ. */
+    public static boolean rollsBonus(int percent) {
+        return percent > 0 && ThreadLocalRandom.current().nextInt(100) < percent;
+    }
 }

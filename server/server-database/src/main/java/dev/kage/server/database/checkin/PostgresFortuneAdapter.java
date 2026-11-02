@@ -31,7 +31,7 @@ public final class PostgresFortuneAdapter implements FortunePort {
 
     private static final String COLUMNS = """
             f.code, f.name_key, f.text_key, f.exp_percent, f.reward_gold,
-            COALESCE(f.reward_item_template_id, 0), f.reward_quantity
+            COALESCE(f.reward_item_template_id, 0), f.reward_quantity, f.drop_bonus_percent
             """;
 
     private static final String TODAY = "SELECT " + COLUMNS + """
@@ -122,7 +122,8 @@ public final class PostgresFortuneAdapter implements FortunePort {
                 rs.getInt(first + 3),
                 rs.getLong(first + 4),
                 rs.getLong(first + 5),
-                rs.getInt(first + 6));
+                rs.getInt(first + 6),
+                rs.getInt(first + 7));
     }
 
     /** Từ chối giữa transaction — ném để rollback. */

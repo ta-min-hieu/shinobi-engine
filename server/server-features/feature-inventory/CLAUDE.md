@@ -327,4 +327,5 @@ những gì ảnh hưởng tới cách viết code trong module này:
   cho người thắng qua đúng giao dịch + audit `LOOT_GRANT` của đồ rơi. Bản cũ `execute(characterId, code)` = không tách.
 - Module này vẫn không biết nhóm/đồng đội là gì — "món nào phải tung" là predicate của gateway (trang bị = có
   `equipSlot`).
-
+- ADR-158 (2026-11-02): `withBonusRollPercent(LongToIntFunction)` — % cơ hội tung thêm một lượt RIÊNG theo người hạ gục
+  (quẻ bói); cộng sau hệ số chung `withRollCount`. Module không biết quẻ là gì.

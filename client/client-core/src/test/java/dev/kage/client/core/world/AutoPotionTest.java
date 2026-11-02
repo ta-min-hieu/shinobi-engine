@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test;
 import dev.kage.protocol.ItemUseEffect;
 
 /** ADR-156 — chỉ uống khi bật, còn sống, dưới ngưỡng, có món hồi máu; không dội lệnh trong hồi chiêu. */
-class AutoPotionTest {
+final class AutoPotionTest {
 
     private static final long PILL_ITEM_ID = 42L;
     private static final long PILL_TEMPLATE = 7L;

@@ -398,7 +398,12 @@ public final class GatewayBootstrap {
                 WeatherJob.job(
                         geometry.listWeatherRegions(dev.kage.world.domain.SafeZone.MAIN_WORLD_CODE),
                         characterRegistry,
-                        java.time.Clock.systemUTC()));
+                        java.time.Clock.systemUTC()),
+                new WorldBossBoardJob( // ADR-157
+                                worldGateway.mainWorldChannels().firstChannel(),
+                                characterRegistry,
+                                facades.characterFacade())
+                        .job());
     }
 
     /**

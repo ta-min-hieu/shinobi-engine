@@ -28,4 +28,23 @@ class WorldBossDamageLedgerTest {
         assertThat(defeat.damageByCharacter()).isEqualTo(Map.of(1L, 42L, 2L, 5L + 44L));
         assertThat(ledger.close(-10L)).as("đóng một lần").isEmpty();
     }
+
+    @Test
+    void standingsShouldBeACopyOfLiveBossesOnly() {
+        WorldBossDamageLedger ledger = new WorldBossDamageLedger();
+        ledger.track(-10L, "demon_king", 1000);
+        ledger.record(-10L, 1L, 30, 970);
+
+        java.util.List<WorldBossStanding> standings = ledger.standings();
+        ledger.record(-10L, 1L, 10, 960);
+
+        assertThat(standings).singleElement().satisfies(standing -> {
+            assertThat(standing.bossCode()).isEqualTo("demon_king");
+            assertThat(standing.damageByCharacter())
+                    .as("ảnh chụp, không phải sổ sống")
+                    .isEqualTo(Map.of(1L, 30L));
+        });
+        ledger.close(-10L);
+        assertThat(ledger.standings()).isEmpty();
+    }
 }

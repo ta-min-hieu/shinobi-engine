@@ -85,6 +85,20 @@ public final class PostgresMilestoneAdapter implements MilestonePort {
         if (JdbcOperations.update(connection, CLAIM, characterId, level, Timestamp.from(now)) == 0) {
             throw new Abort(Outcome.ALREADY_CLAIMED);
         }
+        grant(connection, characterId, milestone);
+        JdbcOperations.update(
+                connection,
+                AUDIT,
+                characterId,
+                "MILESTONE_CLAIM",
+                "{\"level\":" + level + ",\"gold\":" + milestone.gold() + ",\"itemTemplateId\":"
+                        + milestone.itemTemplateId() + ",\"quantity\":" + milestone.quantity() + "}",
+                Timestamp.from(now));
+        return Outcome.OK;
+    }
+
+    /** Trao quà — túi đầy ⇒ Abort; vượt trần vàng ⇒ {@code GoldCapExceededException} (rollback trọn). */
+    private static void grant(Connection connection, long characterId, Milestone milestone) {
         if (milestone.itemTemplateId() != 0
                 && !InventoryStackMerge.mergeIntoExistingStack(
                         connection, characterId, milestone.itemTemplateId(), milestone.quantity())
@@ -95,15 +109,6 @@ public final class PostgresMilestoneAdapter implements MilestonePort {
         if (milestone.gold() > 0) {
             GoldLedger.credit(connection, characterId, milestone.gold(), REASON);
         }
-        JdbcOperations.update(
-                connection,
-                AUDIT,
-                characterId,
-                "MILESTONE_CLAIM",
-                "{\"level\":" + level + ",\"gold\":" + milestone.gold() + ",\"itemTemplateId\":"
-                        + milestone.itemTemplateId() + ",\"quantity\":" + milestone.quantity() + "}",
-                Timestamp.from(now));
-        return Outcome.OK;
     }
 
     private static Milestone milestone(ResultSet rs) throws SQLException {

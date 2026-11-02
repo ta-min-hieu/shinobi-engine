@@ -133,6 +133,7 @@ record ExpansionWindows(
             CombatFeedbackPresenter feedback,
             HorizonBackdrop backdrop) {
         zoneMap.useBanner(hud::setZoneBanner);
+        lot27.bossBoard().useBoard(hud::setBossBoard); // ADR-157
         displaySettings.applyTo(titles, feedback, backdrop, weather.overlay());
     }
 

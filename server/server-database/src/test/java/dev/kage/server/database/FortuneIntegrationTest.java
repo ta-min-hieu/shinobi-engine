@@ -116,6 +116,15 @@ class FortuneIntegrationTest {
         fortunes.draw(hero, FortuneRules.day(NOW), NOW, weights -> indexOf(weights, HUNG));
 
         assertThat(new FortuneFacade(fortunes).boostedExp(hero, 100L, NOW)).isEqualTo(90L);
+        assertThat(new FortuneFacade(fortunes).dropBonusPercent(hero, NOW))
+                .as("Hung không có rơi thêm")
+                .isZero();
+
+        long lucky = character("XinQue04");
+        fortunes.draw(lucky, FortuneRules.day(NOW), NOW, weights -> indexOf(weights, DAI_CAT));
+        assertThat(new FortuneFacade(fortunes).dropBonusPercent(lucky, NOW))
+                .as("ADR-158 — Đại Cát")
+                .isEqualTo(30);
     }
 
     private static int indexOf(int[] weights, int weight) {

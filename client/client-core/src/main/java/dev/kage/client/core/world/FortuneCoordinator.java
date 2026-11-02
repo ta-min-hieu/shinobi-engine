@@ -80,6 +80,9 @@ final class FortuneCoordinator implements WindowFlow {
                     .append(KageI18n.formatOrKey(
                             i18n, percent > 0 ? "fortune.exp.up" : "fortune.exp.down", Math.abs(percent)));
         }
+        if (response.getDropBonusPercent() > 0) { // ADR-158
+            line.append(' ').append(KageI18n.formatOrKey(i18n, "fortune.drop.up", response.getDropBonusPercent()));
+        }
         if (response.getGold() > 0) {
             line.append(' ').append(KageI18n.formatOrKey(i18n, "fortune.reward.gold", response.getGold()));
         }

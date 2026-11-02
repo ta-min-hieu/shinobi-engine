@@ -198,3 +198,21 @@ message BossTelegraphEvent {
   float radius = 4;
   float seconds = 5;
 }
+
+// ADR-157 (2026-11-02) — bảng sát thương boss thế giới TRỰC TIẾP. Một dòng của top.
+message WorldBossBoardEntry {
+  string name = 1;
+  int64 damage = 2;
+}
+
+// Event: Server -> Client (OPCODE_WORLD_BOSS_BOARD_EVENT = 414). Gửi mỗi ~2 giây cho người ĐANG có tên trong sổ sát
+// thương của một boss thế giới còn sống. ended = boss vừa chết / biến mất — client ẩn bảng. Thưởng vẫn theo ADR-081
+// (thư cho top khi boss chết) — gói này chỉ hiển thị.
+message WorldBossBoardEvent {
+  string boss_code = 1;
+  repeated WorldBossBoardEntry top = 2;
+  int32 my_rank = 3;      // 1-based; 0 = không có trong sổ
+  int64 my_damage = 4;
+  int32 participants = 5;
+  bool ended = 6;
+}

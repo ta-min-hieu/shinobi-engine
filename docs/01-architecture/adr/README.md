@@ -188,6 +188,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-154](ADR-154-Weekly-Tasks.md) | Nhiệm vụ tuần cá nhân: 5 việc (hạ quái, thu thập, Bí Cảnh, truy nã, nhiệm vụ ngày) đếm qua đường lịch hoạt động, tuần thứ Hai giờ VN, nhận tay một lần (V125, opcode 240–243, `/nhiemvutuan`) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 | [ADR-155](ADR-155-Honor-Shop.md) | Cửa hàng điểm vinh dự: trận đấu trường thắng +10 / thua +3 (trần 100/ngày), 5 món đổi bằng điểm có trần lượt tuần, một giao dịch (V126, opcode 1615–1618, `/vinhdu`) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 | [ADR-156](ADR-156-Auto-Potion.md) | Tự uống đan: công tắc `/caidat` mặc định tắt; máu < 35% thì client gửi `UseItemCommand` có sẵn cho món HEAL_HP, server vẫn kiểm hồi chiêu (không opcode, không schema) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
+| [ADR-157](ADR-157-Live-World-Boss-Board.md) | Bảng sát thương boss thế giới trực tiếp: ảnh chụp sổ qua inbox World mỗi 2 s, top 5 + hạng mình cho người đang đánh, ended khi boss chết; chỉ hiển thị (opcode 414) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
+| [ADR-158](ADR-158-Fortune-Drop-Bonus.md) | Rơi đồ theo quẻ bói: % cơ hội tung bảng rơi thêm một lượt theo quẻ (Đại Cát 30 … Hung 0), riêng từng người, hook mới `withBonusRollPercent`, một FortuneFacade dùng chung (V127, field 9 của 231) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)
