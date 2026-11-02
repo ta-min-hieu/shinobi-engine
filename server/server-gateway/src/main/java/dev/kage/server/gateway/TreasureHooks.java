@@ -6,6 +6,7 @@ import java.util.function.LongFunction;
 import java.util.function.LongPredicate;
 
 import dev.kage.character.domain.PositionSnapshot;
+import dev.kage.protocol.GetTreasureHuntResponse;
 import dev.kage.protocol.TreasureAction;
 import dev.kage.protocol.TreasureHuntCommand;
 import dev.kage.protocol.TreasureHuntResponse;
@@ -60,6 +61,23 @@ final class TreasureHooks {
             case TREASURE_ACTION_DIG -> dig(d, characterId);
             default -> status(d, characterId);
         };
+    }
+
+    /** D9 — hỏi cuộc tìm đang mở, chỉ đọc (Virtual Thread). */
+    GetTreasureHuntResponse view(long characterId) {
+        Optional<Deps> current = deps;
+        if (current.isEmpty()) {
+            return GetTreasureHuntResponse.newBuilder()
+                    .setDistance(UNKNOWN_DISTANCE)
+                    .build();
+        }
+        TreasureHuntResponse status = status(current.get(), characterId);
+        return GetTreasureHuntResponse.newBuilder()
+                .setHunting(status.getHunting())
+                .setSpotNameKey(status.getSpotNameKey())
+                .setSpotX(status.getSpotX())
+                .setDistance(status.getDistance())
+                .build();
     }
 
     private static TreasureHuntResponse status(Deps d, long characterId) {

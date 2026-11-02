@@ -576,6 +576,7 @@ public final class WorldScreen implements GameScreen {
             dungeon.onWorldChanged(event);
             // SAU khi đã dọn: đối thủ đấu trường chỉ được nhắm khi spawn của World mới tới.
             duelTargeting.onWorldChanged(event.getWorldKind());
+            reports.community().expansion().lot27().treasure().onWorldChanged(event.getWorldKind()); // ADR-147
         });
         // Bậc trang phục của chính mình chưa suy được từ đâu (xem CharacterAppearance phía server) —
         // dùng đúng giá trị mặc định server đang phát cho người khác, để mình và người khác nhìn
@@ -662,6 +663,7 @@ public final class WorldScreen implements GameScreen {
         itemCatalog.request();
         quests.requestLog();
         reports.community().expansion().zoneMap().request(); // ADR-141
+        reports.community().expansion().lot27().treasure().refresh(); // ADR-147 — dấu X sau khi đăng nhập lại
     }
 
     @Override
@@ -1018,6 +1020,12 @@ public final class WorldScreen implements GameScreen {
                 .telegraphs()
                 .render( // ADR-145 — vòng báo trước dậm đất
                         shapeRenderer, projection, Gdx.graphics.getDeltaTime());
+        reports.community()
+                .expansion()
+                .lot27()
+                .treasure()
+                .marker()
+                .render(shapeRenderer, projection, Gdx.graphics.getDeltaTime()); // ADR-147 — dấu X chỗ chôn
     }
 
     private void syncCombatHud() {

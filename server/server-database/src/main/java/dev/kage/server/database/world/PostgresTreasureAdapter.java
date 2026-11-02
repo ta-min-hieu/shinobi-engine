@@ -39,8 +39,18 @@ public final class PostgresTreasureAdapter implements TreasurePort {
 
     private static final String ACTIVE_FOR_UPDATE = ACTIVE + "   FOR UPDATE OF h\n";
 
-    private static final String SPOTS =
-            "SELECT id, name_key, x, y, guardian_monster_code FROM treasure_spot ORDER BY id";
+    // ADR-147 D7 — chỉ điểm chôn có quái canh không cao cấp hơn người đọc; người đọc thấp hơn MỌI loài canh thì vẫn
+    // có điểm: trần là max(cấp người đọc, cấp loài canh dễ nhất).
+    private static final String SPOTS = """
+            SELECT s.id, s.name_key, s.x, s.y, s.guardian_monster_code
+              FROM treasure_spot s
+              JOIN monster_template m ON m.code = s.guardian_monster_code
+             WHERE m.level <= GREATEST(
+                       (SELECT level FROM character WHERE id = ?),
+                       (SELECT MIN(m2.level) FROM treasure_spot s2
+                          JOIN monster_template m2 ON m2.code = s2.guardian_monster_code))
+             ORDER BY s.id
+            """;
 
     private static final String MAP_TEMPLATE = "SELECT id FROM item_template WHERE code = ?";
 
@@ -88,7 +98,7 @@ public final class PostgresTreasureAdapter implements TreasurePort {
             if (current.isPresent()) {
                 return new ReadResult(Outcome.ALREADY_HUNTING, current);
             }
-            List<Spot> spots = JdbcOperations.query(connection, SPOTS, PostgresTreasureAdapter::spot);
+            List<Spot> spots = JdbcOperations.query(connection, SPOTS, PostgresTreasureAdapter::spot, characterId);
             Optional<Long> mapTemplate =
                     JdbcOperations.queryOne(connection, MAP_TEMPLATE, rs -> rs.getLong(1), TreasureRules.MAP_ITEM_CODE);
             if (spots.isEmpty()

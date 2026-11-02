@@ -1,6 +1,7 @@
 package dev.kage.server.gateway;
 
 import dev.kage.account.api.SecurityPinFacade;
+import dev.kage.character.api.RenameFacade;
 import dev.kage.character.api.TribulationFacade;
 import dev.kage.chat.api.SectQuiz;
 import dev.kage.market.api.BuyOrderFacade;
@@ -30,7 +31,8 @@ record ExpansionFacades(
         ArtifactFacade artifacts,
         CaveFacade caves,
         KillingIntentFacade killingIntent,
-        TreasureFacade treasure) {
+        TreasureFacade treasure,
+        RenameFacade rename) {
 
     /** Composition không có các tính năng này (test). */
     static final ExpansionFacades DISABLED = new ExpansionFacades(
@@ -47,5 +49,6 @@ record ExpansionFacades(
             ArtifactFacade.DISABLED,
             CaveFacade.DISABLED,
             KillingIntentFacade.DISABLED,
-            TreasureFacade.DISABLED);
+            TreasureFacade.DISABLED,
+            RenameFacade.DISABLED);
 }

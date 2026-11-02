@@ -8,13 +8,15 @@ import dev.kage.protocol.CaveCommand;
 import dev.kage.protocol.CaveDecorationView;
 import dev.kage.protocol.CaveResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.RenameCharacterCommand;
+import dev.kage.protocol.RenameCharacterResponse;
 import dev.kage.protocol.TreasureAction;
 import dev.kage.protocol.TreasureHuntCommand;
 import dev.kage.protocol.TreasureHuntResponse;
 
 /**
  * Bước lô 24: động phủ (ADR-129) {@code cave:<view|enter|collect|upgrade|decorate/<mã>|invite/<tên>|visit/<tên>>}. Lô
- * 27: Tàng Bảo Đồ (ADR-147) {@code treasure:<status|read|dig>}.
+ * 27: Tàng Bảo Đồ (ADR-147) {@code treasure:<status|read|dig>}, Dịch Danh Phù (ADR-148) {@code rename:<tên mới>}.
  */
 final class Lot24Steps {
 
@@ -28,6 +30,16 @@ final class Lot24Steps {
         return switch (verb) {
             case "cave" -> cave(arg);
             case "treasure" -> treasure(arg);
+            case "rename" ->
+                asker.ask(
+                        Opcode.OPCODE_RENAME_CHARACTER_COMMAND_VALUE,
+                        RenameCharacterCommand.newBuilder().setNewName(arg).build(),
+                        Opcode.OPCODE_RENAME_CHARACTER_RESPONSE_VALUE,
+                        p -> {
+                            RenameCharacterResponse r = RenameCharacterResponse.parseFrom(p);
+                            return r.getOutcome().name() + " name=" + r.getName() + " next="
+                                    + r.getNextAllowedAtEpochMs();
+                        });
             default -> "bước không hiểu";
         };
     }

@@ -609,3 +609,16 @@ message TreasureHuntResponse {
   int32 quantity = 10;
   bool guardian_spawned = 11;
 }
+
+// ADR-147 D9 (2026-11-02) — hỏi cuộc tìm đang mở bằng opcode CHỈ ĐỌC (client tự hỏi lúc vào world / về world chính /
+// mở cửa sổ — một gói đến không được kéo theo lệnh ghi, kể cả lệnh 341 với action STATUS).
+// Request: Client -> Server (OPCODE_GET_TREASURE_HUNT_REQUEST = 343).
+message GetTreasureHuntRequest {}
+
+// Response: Server -> Client (OPCODE_GET_TREASURE_HUNT_RESPONSE = 344). distance = -1 nếu không biết.
+message GetTreasureHuntResponse {
+  bool hunting = 1;
+  string spot_name_key = 2;
+  float spot_x = 3;
+  float distance = 4;
+}

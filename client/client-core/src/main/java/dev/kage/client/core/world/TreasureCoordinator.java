@@ -10,11 +10,14 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.client.core.ui.hud.ReportPanel;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.client.core.ui.theme.KageSkin;
+import dev.kage.protocol.GetTreasureHuntRequest;
+import dev.kage.protocol.GetTreasureHuntResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.TreasureAction;
 import dev.kage.protocol.TreasureHuntCommand;
 import dev.kage.protocol.TreasureHuntResponse;
 import dev.kage.protocol.TreasureOutcome;
+import dev.kage.protocol.WorldKind;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -33,6 +36,7 @@ final class TreasureCoordinator implements WindowFlow {
     private final WorldCommandSender sender;
     private final ItemCatalogCoordinator itemCatalog;
     private final ChatCoordinator chat;
+    private final TreasureMarker marker = new TreasureMarker();
     private final I18NBundle i18n = KageI18n.load();
 
     /** Cửa sổ riêng — không phím, mở bằng lệnh chat. */
@@ -46,7 +50,7 @@ final class TreasureCoordinator implements WindowFlow {
         this.sender = sender;
         this.itemCatalog = feeds.itemCatalog();
         this.chat = feeds.chat();
-        panel.setOnRefresh(() -> send(TreasureAction.TREASURE_ACTION_STATUS));
+        panel.setOnRefresh(this::refresh);
         panel.setOnRowAction(this::onRowAction);
         panel.setRows(List.of(
                 new ReportPanel.Row(text("treasure.row.read"), false, "treasure.action.read"),
@@ -77,6 +81,26 @@ final class TreasureCoordinator implements WindowFlow {
                 TreasureHuntCommand.newBuilder().setAction(action).build());
     }
 
+    /** Dấu chỗ chôn để {@code WorldScreen} vẽ. */
+    TreasureMarker marker() {
+        return marker;
+    }
+
+    /** Hỏi cuộc tìm đang mở — lúc vào world, để dấu X hiện lại sau khi đăng nhập. */
+    void refresh() {
+        // D9 — opcode chỉ đọc: được gọi cả từ gói đến (đổi World), nên không được là lệnh 341.
+        sender.sendReadRequest(
+                Opcode.OPCODE_GET_TREASURE_HUNT_REQUEST_VALUE, GetTreasureHuntRequest.getDefaultInstance());
+    }
+
+    /** Dấu X chỉ có nghĩa ở world chính: rời đi thì ẩn, quay về thì hỏi lại server. */
+    void onWorldChanged(WorldKind kind) {
+        marker.hide();
+        if (kind == WorldKind.WORLD_KIND_MAIN) {
+            refresh();
+        }
+    }
+
     ReportPanel panel() {
         return panel;
     }
@@ -93,10 +117,29 @@ final class TreasureCoordinator implements WindowFlow {
 
     @Override
     public boolean dispatch(PacketCodec.Frame frame) throws InvalidProtocolBufferException {
-        if (frame.header().opcode() != Opcode.OPCODE_TREASURE_HUNT_RESPONSE_VALUE) {
+        int opcode = frame.header().opcode();
+        if (opcode == Opcode.OPCODE_GET_TREASURE_HUNT_RESPONSE_VALUE) {
+            GetTreasureHuntResponse view = GetTreasureHuntResponse.parseFrom(frame.payload());
+            marker.apply(view);
+            panel.setStatus(describe(TreasureHuntResponse.newBuilder()
+                    .setAction(TreasureAction.TREASURE_ACTION_STATUS)
+                    .setOutcome(
+                            view.getHunting()
+                                    ? TreasureOutcome.TREASURE_OUTCOME_OK
+                                    : TreasureOutcome.TREASURE_OUTCOME_NO_HUNT)
+                    .setHunting(view.getHunting())
+                    .setSpotNameKey(view.getSpotNameKey())
+                    .setSpotX(view.getSpotX())
+                    .setDistance(view.getDistance())
+                    .build()));
+            return true;
+        }
+        if (opcode != Opcode.OPCODE_TREASURE_HUNT_RESPONSE_VALUE) {
             return false;
         }
-        panel.setStatus(describe(TreasureHuntResponse.parseFrom(frame.payload())));
+        TreasureHuntResponse response = TreasureHuntResponse.parseFrom(frame.payload());
+        marker.apply(response); // ADR-147 D8 — dấu X ở chỗ chôn
+        panel.setStatus(describe(response));
         return true;
     }
 
@@ -170,6 +213,7 @@ final class TreasureCoordinator implements WindowFlow {
     @Override
     public void reset() {
         panel.close();
+        marker.hide();
         panel.setStatus(text("treasure.hint"));
     }
 }

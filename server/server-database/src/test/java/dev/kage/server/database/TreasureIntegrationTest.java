@@ -39,6 +39,9 @@ class TreasureIntegrationTest {
     /** Thứ tự id của V119 — điểm chôn thứ ba (khe đá Linh Mạch, X = 95). */
     private static final int SPIRIT_VEIN_ROCKS = 2;
 
+    /** Đủ cấp cho mọi loài canh kho của V119 (cao nhất stone_ogre Lv6) ⇒ cả sáu điểm đều chọn được. */
+    private static final int VETERAN_LEVEL = 10;
+
     /** Trọng số V119 của các phần thưởng test chọn — mỗi số chỉ thuộc về MỘT phần thưởng. */
     private static final int SMALL_CACHE = 40;
 
@@ -66,6 +69,7 @@ class TreasureIntegrationTest {
     @Test
     void readingShouldConsumeOneMapAndOpenOneHuntAtATime() {
         long hunter = character("tbd_reader");
+        setLevel(hunter, VETERAN_LEVEL);
         PostgresTreasureAdapter treasure = new PostgresTreasureAdapter(dataSource);
 
         assertThat(treasure.read(hunter, NOW, weights -> 0).outcome()).isEqualTo(TreasurePort.Outcome.NO_MAP);
@@ -89,6 +93,7 @@ class TreasureIntegrationTest {
     @Test
     void digShouldKeepTheHuntOnFullBag_payOnce_andRefuseAStaleSpot() {
         long hunter = character("tbd_digger");
+        setLevel(hunter, VETERAN_LEVEL);
         PostgresTreasureAdapter treasure = new PostgresTreasureAdapter(dataSource);
         setGold(hunter, 0L);
         give(hunter, "treasure_map", 1, 0);
@@ -132,8 +137,25 @@ class TreasureIntegrationTest {
     }
 
     @Test
+    void lowLevelReadersShouldOnlyGetSpotsTheirLevelCanHandle() {
+        long novice = character("tbd_novice");
+        PostgresTreasureAdapter treasure = new PostgresTreasureAdapter(dataSource);
+        give(novice, "treasure_map", 1, 0);
+
+        // Lv1 thấp hơn MỌI loài canh ⇒ trần = loài dễ nhất (wandering_bandit Lv3): hai điểm phía tây.
+        TreasurePort.ReadResult read = treasure.read(novice, NOW, weights -> {
+            assertThat(weights).as("chỉ các điểm canh bởi loài dễ nhất").hasSize(2);
+            return 1;
+        });
+
+        assertThat(read.outcome()).isEqualTo(TreasurePort.Outcome.OK);
+        assertThat(read.spot().orElseThrow().guardianMonsterCode()).isEqualTo("wandering_bandit");
+    }
+
+    @Test
     void guardedCacheShouldAskForTheSpotsGuardian() {
         long hunter = character("tbd_guard");
+        setLevel(hunter, VETERAN_LEVEL);
         PostgresTreasureAdapter treasure = new PostgresTreasureAdapter(dataSource);
         give(hunter, "treasure_map", 1, 0);
         TreasurePort.Spot spot =
@@ -187,6 +209,10 @@ class TreasureIntegrationTest {
     private static long scalar(String sql, Object... params) {
         return JdbcOperations.queryOne(dataSource, sql, rs -> rs.getLong(1), params)
                 .orElseThrow();
+    }
+
+    private static void setLevel(long characterId, int level) {
+        JdbcOperations.update(dataSource, "UPDATE character SET level = ? WHERE id = ?", level, characterId);
     }
 
     private static void setGold(long characterId, long gold) {

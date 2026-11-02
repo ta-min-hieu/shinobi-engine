@@ -356,3 +356,28 @@ message BestiaryEntryView {
 message GetBestiaryResponse {
   repeated BestiaryEntryView entries = 1;
 }
+
+// ADR-148 (2026-11-02) — Dịch Danh Phù. Command: Client -> Server (OPCODE_RENAME_CHARACTER_COMMAND = 228).
+// Tên mới qua đúng luật tên lúc tạo nhân vật (server chuẩn hoá NFC rồi kiểm).
+message RenameCharacterCommand {
+  string new_name = 1;
+}
+
+enum RenameCharacterOutcome {
+  RENAME_CHARACTER_OUTCOME_UNSPECIFIED = 0;
+  RENAME_CHARACTER_OUTCOME_OK = 1;
+  RENAME_CHARACTER_OUTCOME_INVALID_NAME = 2;
+  RENAME_CHARACTER_OUTCOME_SAME_NAME = 3;
+  RENAME_CHARACTER_OUTCOME_NAME_TAKEN = 4;
+  RENAME_CHARACTER_OUTCOME_NO_TALISMAN = 5;   // không có Dịch Danh Phù trong túi
+  RENAME_CHARACTER_OUTCOME_ON_COOLDOWN = 6;   // đổi lần trước chưa đủ 7 ngày
+  RENAME_CHARACTER_OUTCOME_NOT_FOUND = 7;     // không thấy nhân vật (đã xoá / chưa nối DB)
+}
+
+// Response: Server -> Client (OPCODE_RENAME_CHARACTER_RESPONSE = 229). name = tên SAU lệnh;
+// next_allowed_at_epoch_ms = lúc được đổi lần sau (0 = không áp dụng).
+message RenameCharacterResponse {
+  RenameCharacterOutcome outcome = 1;
+  string name = 2;
+  int64 next_allowed_at_epoch_ms = 3;
+}
