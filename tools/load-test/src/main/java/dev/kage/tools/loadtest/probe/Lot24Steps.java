@@ -5,18 +5,26 @@ import java.util.Locale;
 
 import dev.kage.protocol.BroadcastMessageCommand;
 import dev.kage.protocol.BroadcastMessageResponse;
+import dev.kage.protocol.BuyHonorItemCommand;
+import dev.kage.protocol.BuyHonorItemResponse;
 import dev.kage.protocol.CaveAction;
 import dev.kage.protocol.CaveCommand;
 import dev.kage.protocol.CaveDecorationView;
 import dev.kage.protocol.CaveResponse;
 import dev.kage.protocol.ClaimRealmMilestoneCommand;
 import dev.kage.protocol.ClaimRealmMilestoneResponse;
+import dev.kage.protocol.ClaimWeeklyTaskCommand;
+import dev.kage.protocol.ClaimWeeklyTaskResponse;
 import dev.kage.protocol.DrawFortuneCommand;
 import dev.kage.protocol.DrawFortuneResponse;
+import dev.kage.protocol.GetHonorShopRequest;
+import dev.kage.protocol.GetHonorShopResponse;
 import dev.kage.protocol.GetLuckyWheelRequest;
 import dev.kage.protocol.GetLuckyWheelResponse;
 import dev.kage.protocol.GetRealmMilestonesRequest;
 import dev.kage.protocol.GetRealmMilestonesResponse;
+import dev.kage.protocol.GetWeeklyTasksRequest;
+import dev.kage.protocol.GetWeeklyTasksResponse;
 import dev.kage.protocol.LootRollChoice;
 import dev.kage.protocol.LootRollChoiceCommand;
 import dev.kage.protocol.LootRollChoiceResponse;
@@ -34,7 +42,8 @@ import dev.kage.protocol.TreasureHuntResponse;
  * Lô 27: Tàng Bảo Đồ (ADR-147) {@code treasure:<status|read|dig>}, Dịch Danh Phù (ADR-148) {@code rename:<tên mới>},
  * quẻ bói (ADR-149) {@code fortune}, xúc xắc chia đồ (ADR-150) {@code lootRoll:<rollId>:<need|greed|pass>},
  * vòng quay (ADR-151) {@code wheel}, {@code spin}. Lô 28: loa (ADR-152) {@code shout:<nội dung>},
- * quà mốc (ADR-153) {@code milestones}, {@code claimMilestone:<cấp>}.
+ * quà mốc (ADR-153) {@code milestones}, {@code claimMilestone:<cấp>}, nhiệm vụ tuần (ADR-154) {@code weekly},
+ * {@code claimWeekly:<mã>}, cửa hàng vinh dự (ADR-155) {@code honorShop}, {@code buyHonor:<templateId>}.
  */
 final class Lot24Steps {
 
@@ -53,6 +62,10 @@ final class Lot24Steps {
             case "shout" -> shout(arg);
             case "milestones" -> milestones();
             case "claimMilestone" -> claimMilestone(Integer.parseInt(arg));
+            case "weekly" -> weekly();
+            case "claimWeekly" -> claimWeekly(arg);
+            case "honorShop" -> honorShop();
+            case "buyHonor" -> buyHonor(Long.parseLong(arg));
             case "lootRoll" -> lootRoll(arg);
             case "fortune" ->
                 asker.ask(
@@ -191,6 +204,72 @@ final class Lot24Steps {
         StringBuilder line = new StringBuilder("cấp=").append(board.getCharacterLevel());
         board.getMilestonesList()
                 .forEach(m -> line.append(" Lv").append(m.getLevel()).append(m.getClaimed() ? "✓" : "·"));
+        return line.toString();
+    }
+
+    private String weekly() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_WEEKLY_TASKS_REQUEST_VALUE,
+                GetWeeklyTasksRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_WEEKLY_TASKS_RESPONSE_VALUE,
+                p -> describe(GetWeeklyTasksResponse.parseFrom(p)));
+    }
+
+    private String claimWeekly(String code) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_CLAIM_WEEKLY_TASK_COMMAND_VALUE,
+                ClaimWeeklyTaskCommand.newBuilder().setTaskCode(code).build(),
+                Opcode.OPCODE_CLAIM_WEEKLY_TASK_RESPONSE_VALUE,
+                p -> {
+                    ClaimWeeklyTaskResponse r = ClaimWeeklyTaskResponse.parseFrom(p);
+                    return r.getOutcome().name() + " " + describe(r.getTasks());
+                });
+    }
+
+    private static String describe(GetWeeklyTasksResponse tasks) {
+        StringBuilder line = new StringBuilder();
+        tasks.getTasksList().forEach(t -> line.append(' ')
+                .append(t.getCode())
+                .append('=')
+                .append(t.getProgress())
+                .append('/')
+                .append(t.getTarget())
+                .append(t.getClaimed() ? "✓" : ""));
+        return line.toString().strip();
+    }
+
+    private String honorShop() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_HONOR_SHOP_REQUEST_VALUE,
+                GetHonorShopRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_HONOR_SHOP_RESPONSE_VALUE,
+                p -> describe(GetHonorShopResponse.parseFrom(p)));
+    }
+
+    private String buyHonor(long itemTemplateId) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_BUY_HONOR_ITEM_COMMAND_VALUE,
+                BuyHonorItemCommand.newBuilder()
+                        .setItemTemplateId(itemTemplateId)
+                        .build(),
+                Opcode.OPCODE_BUY_HONOR_ITEM_RESPONSE_VALUE,
+                p -> {
+                    BuyHonorItemResponse r = BuyHonorItemResponse.parseFrom(p);
+                    return r.getOutcome().name() + " " + describe(r.getShop());
+                });
+    }
+
+    private static String describe(GetHonorShopResponse shop) {
+        StringBuilder line = new StringBuilder("điểm=").append(shop.getAvailable());
+        shop.getItemsList().forEach(i -> line.append(" tpl")
+                .append(i.getItemTemplateId())
+                .append('@')
+                .append(i.getPrice())
+                .append('(')
+                .append(i.getBoughtThisWeek())
+                .append('/')
+                .append(i.getWeeklyLimit())
+                .append(')'));
         return line.toString();
     }
 }

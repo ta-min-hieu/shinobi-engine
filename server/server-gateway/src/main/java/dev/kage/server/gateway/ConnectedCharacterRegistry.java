@@ -139,6 +139,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-121 — kỳ ngộ sau lượt hạ quái ở world chính + lệnh chọn; nối sau khi DB đã dựng. */
     final EncounterHooks encounters = new EncounterHooks();
 
+    /** ADR-155 — điểm vinh dự sau mỗi trận đấu trường chốt xong; nối sau khi DB đã dựng. */
+    final HonorHooks honor = new HonorHooks();
+
     /** ADR-150 — tung xúc xắc chia đồ hiếm trong nhóm (RAM); nối sau khi DB đã dựng. */
     final LootRollHooks lootRolls = new LootRollHooks();
 
@@ -701,12 +704,10 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
                 killerCharacterId,
                 monsterCode,
                 () -> guildProgress.onMonsterKilled(killerCharacterId));
-        lootExecutor.dispatch( // truy nã (ADR-101) + sổ sưu tầm (ADR-108) — chỉ người ra đòn cuối; mỗi bên tự nuốt lỗi
-                KillRewardDispatcher.Step.BOUNTY, killerCharacterId, monsterCode, () -> {
-                    bounties.onMonsterKilled(killerCharacterId, monsterCode);
-                    collections.onMonsterKilled(killerCharacterId, monsterCode);
-                    encounters.onMonsterKilled(killerCharacterId); // kỳ ngộ (ADR-121)
-                });
+        lootExecutor.dispatch( // việc phụ chỉ của người ra đòn cuối — xem KillerSideEffects
+                KillRewardDispatcher.Step.BOUNTY, killerCharacterId, monsterCode, () -> new KillerSideEffects(
+                                bounties, collections, encounters, activity)
+                        .run(killerCharacterId, monsterCode));
         // Phần ĐỒNG ĐỘI (2026-10-11) — việc RIÊNG: tra nhóm chạm DB, hỏng thì phần người ra đòn cuối không suy suyển.
         lootExecutor.dispatch(
                 KillRewardDispatcher.Step.PARTY_SHARE,

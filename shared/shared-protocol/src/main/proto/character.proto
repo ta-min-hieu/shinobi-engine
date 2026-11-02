@@ -488,3 +488,45 @@ message ClaimRealmMilestoneResponse {
   int32 level = 2;
   GetRealmMilestonesResponse board = 3;
 }
+
+// ADR-154 (2026-11-02) — Nhiệm vụ tuần cá nhân. Tuần bắt đầu thứ Hai 0h giờ Việt Nam.
+message WeeklyTaskView {
+  string code = 1;
+  string name_key = 2;
+  int32 target = 3;
+  int32 progress = 4;
+  bool claimed = 5;
+  int64 gold = 6;
+  int64 item_template_id = 7;  // 0 = chỉ linh thạch
+  int32 quantity = 8;
+}
+
+// Request: Client -> Server (OPCODE_GET_WEEKLY_TASKS_REQUEST = 240). Chỉ đọc.
+message GetWeeklyTasksRequest {}
+
+// Response: Server -> Client (OPCODE_GET_WEEKLY_TASKS_RESPONSE = 241).
+message GetWeeklyTasksResponse {
+  repeated WeeklyTaskView tasks = 1;
+}
+
+// Command: Client -> Server (OPCODE_CLAIM_WEEKLY_TASK_COMMAND = 242).
+message ClaimWeeklyTaskCommand {
+  string task_code = 1;
+}
+
+enum ClaimWeeklyTaskOutcome {
+  CLAIM_WEEKLY_TASK_OUTCOME_UNSPECIFIED = 0;
+  CLAIM_WEEKLY_TASK_OUTCOME_OK = 1;
+  CLAIM_WEEKLY_TASK_OUTCOME_UNKNOWN_TASK = 2;
+  CLAIM_WEEKLY_TASK_OUTCOME_NOT_DONE = 3;
+  CLAIM_WEEKLY_TASK_OUTCOME_ALREADY_CLAIMED = 4;
+  CLAIM_WEEKLY_TASK_OUTCOME_BAG_FULL = 5;   // thưởng vẫn chờ
+  CLAIM_WEEKLY_TASK_OUTCOME_GOLD_CAP = 6;
+}
+
+// Response: Server -> Client (OPCODE_CLAIM_WEEKLY_TASK_RESPONSE = 243). Kèm danh sách SAU lệnh.
+message ClaimWeeklyTaskResponse {
+  ClaimWeeklyTaskOutcome outcome = 1;
+  string task_code = 2;
+  GetWeeklyTasksResponse tasks = 3;
+}

@@ -148,3 +148,41 @@ message TournamentNoticeEvent {
   int32 round = 2;
   string name = 3;
 }
+
+// ADR-155 (2026-11-02) — Cửa hàng điểm vinh dự đấu trường. Thắng +10, thua +3, tối đa 100/ngày giờ Việt Nam.
+message HonorShopItemView {
+  int64 item_template_id = 1;
+  int32 price = 2;
+  int32 quantity = 3;           // số cái mỗi lần đổi
+  int32 weekly_limit = 4;
+  int32 bought_this_week = 5;
+}
+
+// Request: Client -> Server (OPCODE_GET_HONOR_SHOP_REQUEST = 1615). Chỉ đọc.
+message GetHonorShopRequest {}
+
+// Response: Server -> Client (OPCODE_GET_HONOR_SHOP_RESPONSE = 1616). available = điểm còn tiêu được.
+message GetHonorShopResponse {
+  int64 available = 1;
+  repeated HonorShopItemView items = 2;
+}
+
+// Command: Client -> Server (OPCODE_BUY_HONOR_ITEM_COMMAND = 1617).
+message BuyHonorItemCommand {
+  int64 item_template_id = 1;
+}
+
+enum BuyHonorItemOutcome {
+  BUY_HONOR_ITEM_OUTCOME_UNSPECIFIED = 0;
+  BUY_HONOR_ITEM_OUTCOME_OK = 1;
+  BUY_HONOR_ITEM_OUTCOME_UNKNOWN_ITEM = 2;
+  BUY_HONOR_ITEM_OUTCOME_NOT_ENOUGH_HONOR = 3;
+  BUY_HONOR_ITEM_OUTCOME_WEEKLY_LIMIT = 4;
+  BUY_HONOR_ITEM_OUTCOME_BAG_FULL = 5;   // không trừ điểm
+}
+
+// Response: Server -> Client (OPCODE_BUY_HONOR_ITEM_RESPONSE = 1618). Kèm cửa hàng SAU lệnh.
+message BuyHonorItemResponse {
+  BuyHonorItemOutcome outcome = 1;
+  GetHonorShopResponse shop = 2;
+}

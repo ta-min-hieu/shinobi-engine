@@ -7,7 +7,9 @@ import dev.kage.character.api.TribulationFacade;
 import dev.kage.chat.api.SectQuiz;
 import dev.kage.checkin.api.FortuneFacade;
 import dev.kage.checkin.api.LuckyWheelFacade;
+import dev.kage.checkin.api.WeeklyTaskFacade;
 import dev.kage.market.api.BuyOrderFacade;
+import dev.kage.pvp.api.HonorFacade;
 import dev.kage.pvp.api.TournamentFacade;
 import dev.kage.shop.api.TravelingMerchantFacade;
 import dev.kage.world.api.ArtifactFacade;
@@ -38,7 +40,9 @@ record ExpansionFacades(
         RenameFacade rename,
         FortuneFacade fortune,
         LuckyWheelFacade luckyWheel,
-        MilestoneFacade milestones) {
+        MilestoneFacade milestones,
+        WeeklyTaskFacade weeklyTasks,
+        HonorFacade honor) {
 
     /** Composition không có các tính năng này (test). */
     static final ExpansionFacades DISABLED = new ExpansionFacades(
@@ -59,5 +63,7 @@ record ExpansionFacades(
             RenameFacade.DISABLED,
             FortuneFacade.DISABLED,
             LuckyWheelFacade.DISABLED,
-            MilestoneFacade.DISABLED);
+            MilestoneFacade.DISABLED,
+            WeeklyTaskFacade.DISABLED,
+            HonorFacade.DISABLED);
 }

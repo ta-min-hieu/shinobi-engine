@@ -917,6 +917,32 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.ChooseEncounterOptionCommand.parser(),
                             Opcode.OPCODE_CHOOSE_ENCOUNTER_OPTION_RESPONSE_VALUE,
                             (h, id, c) -> h.worldGateway.registry().encounters.choose(id, c))),
+            // Lô 28 — cửa hàng điểm vinh dự (ADR-155).
+            Map.entry(
+                    Opcode.OPCODE_GET_HONOR_SHOP_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetHonorShopRequest.parser(),
+                            Opcode.OPCODE_GET_HONOR_SHOP_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.honor().shop(id))),
+            Map.entry(
+                    Opcode.OPCODE_BUY_HONOR_ITEM_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.BuyHonorItemCommand.parser(),
+                            Opcode.OPCODE_BUY_HONOR_ITEM_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.honor().buy(id, c))),
+            // Lô 28 — nhiệm vụ tuần cá nhân (ADR-154).
+            Map.entry(
+                    Opcode.OPCODE_GET_WEEKLY_TASKS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetWeeklyTasksRequest.parser(),
+                            Opcode.OPCODE_GET_WEEKLY_TASKS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.weeklyTasks().list(id))),
+            Map.entry(
+                    Opcode.OPCODE_CLAIM_WEEKLY_TASK_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ClaimWeeklyTaskCommand.parser(),
+                            Opcode.OPCODE_CLAIM_WEEKLY_TASK_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.weeklyTasks().claim(id, c))),
             // Lô 28 — quà mốc cảnh giới (ADR-153).
             Map.entry(
                     Opcode.OPCODE_GET_REALM_MILESTONES_REQUEST_VALUE,

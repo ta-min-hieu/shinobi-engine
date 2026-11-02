@@ -185,6 +185,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-151](ADR-151-Lucky-Wheel.md) | Vòng quay may mắn: 1 lượt miễn phí + 10 lượt mua 1.000 linh thạch mỗi ngày giờ VN, 8 ô theo trọng số, một giao dịch, từ chối thì không mất lượt/tiền (V122, opcode 232–235, `/vongquay`) | ✅ **Accepted** *(2026-11-02, lô 27)* | — |
 | [ADR-152](ADR-152-Broadcast-Talisman.md) | Truyền Âm Phù: `/loa` tốn một phù (2.000), hồi chiêu 30 s, kiểm như chat (khoá chat, từ cấm, audit), từ chối thì trả phù, phát kênh BROADCAST cho mọi người online (V123, opcode 810/811) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 | [ADR-153](ADR-153-Realm-Milestone-Rewards.md) | Quà mốc cảnh giới: 6 mốc (cấp 10 + 19/37/55/73/91), nhận tay một lần trong `/mocgioi`, túi đầy quà vẫn chờ (V124, opcode 236–239) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
+| [ADR-154](ADR-154-Weekly-Tasks.md) | Nhiệm vụ tuần cá nhân: 5 việc (hạ quái, thu thập, Bí Cảnh, truy nã, nhiệm vụ ngày) đếm qua đường lịch hoạt động, tuần thứ Hai giờ VN, nhận tay một lần (V125, opcode 240–243, `/nhiemvutuan`) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
+| [ADR-155](ADR-155-Honor-Shop.md) | Cửa hàng điểm vinh dự: trận đấu trường thắng +10 / thua +3 (trần 100/ngày), 5 món đổi bằng điểm có trần lượt tuần, một giao dịch (V126, opcode 1615–1618, `/vinhdu`) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 ---
 
 ## ADR cần tạo (chưa viết)

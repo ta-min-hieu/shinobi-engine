@@ -19,7 +19,9 @@ record ExpansionCommands(
         FortuneCommands fortune,
         LuckyWheelCommands luckyWheel,
         BroadcastCommands broadcast,
-        MilestoneCommands milestones) {
+        MilestoneCommands milestones,
+        WeeklyTaskCommands weeklyTasks,
+        HonorCommands honor) {
 
     static ExpansionCommands of(GatewayFacades facades, WorldGateway worldGateway, NpcProximity proximity) {
         ExpansionFacades expansion = facades.progression().expansion();
@@ -58,6 +60,8 @@ record ExpansionCommands(
                         expansion.consumables(),
                         worldGateway.registry(),
                         clock)),
-                new MilestoneCommands(expansion.milestones(), clock));
+                new MilestoneCommands(expansion.milestones(), clock),
+                new WeeklyTaskCommands(expansion.weeklyTasks(), clock),
+                new HonorCommands(expansion.honor(), clock));
     }
 }

@@ -71,6 +71,17 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.character.PostgresMilestoneAdapter(dataSource));
     }
 
+    /** Nhiệm vụ tuần cá nhân (ADR-154). */
+    public dev.kage.checkin.api.WeeklyTaskFacade wireWeeklyTaskFacade() {
+        return new dev.kage.checkin.api.WeeklyTaskFacade(
+                new dev.kage.server.database.checkin.PostgresWeeklyTaskAdapter(dataSource));
+    }
+
+    /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
+    public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
+        return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));
+    }
+
     /** Hỏi đáp tông môn (ADR-122) — {@code starts} là giờ bắt đầu phiên theo giờ Việt Nam. */
     public SectQuiz wireSectQuiz(List<LocalTime> starts) {
         return new SectQuiz(new PostgresQuizAdapter(dataSource), starts, System.nanoTime());
