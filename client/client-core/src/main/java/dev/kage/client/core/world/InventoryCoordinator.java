@@ -26,6 +26,7 @@ import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SetItemLockCommand;
+import dev.kage.protocol.SortInventoryCommand;
 import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.UseItemResponse;
 import dev.kage.protocol.wire.PacketCodec;
@@ -153,6 +154,9 @@ final class InventoryCoordinator implements WindowFlow {
         panel.setOnSellSelected(this::onSellSelected);
         // ADR-097 — kết quả về DailyCoordinator (báo chat + làm mới túi).
         panel.setOnLockSelected(this::onLockSelected);
+        // ADR-160 — sắp xếp túi; kết quả về BagActionsCoordinator (báo chat + hỏi lại túi).
+        panel.setOnSortSelected(() -> sender.sendReadRequest(
+                Opcode.OPCODE_SORT_INVENTORY_COMMAND_VALUE, SortInventoryCommand.getDefaultInstance()));
         panel.setOnDismantleSelected(() -> unlockedSelection()
                 .ifPresent(item -> sender.sendReadRequest(
                         Opcode.OPCODE_DISMANTLE_ITEM_COMMAND_VALUE,
@@ -312,7 +316,7 @@ final class InventoryCoordinator implements WindowFlow {
         return selected;
     }
 
-    /** ADR-159 — đảo trạng thái khoá của món đang chọn; kết quả về {@code ItemLockCoordinator}. */
+    /** ADR-159 — đảo trạng thái khoá của món đang chọn; kết quả về {@code BagActionsCoordinator}. */
     private void onLockSelected() {
         controller
                 .selected()

@@ -191,6 +191,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-157](ADR-157-Live-World-Boss-Board.md) | Bảng sát thương boss thế giới trực tiếp: ảnh chụp sổ qua inbox World mỗi 2 s, top 5 + hạng mình cho người đang đánh, ended khi boss chết; chỉ hiển thị (opcode 414) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 | [ADR-158](ADR-158-Fortune-Drop-Bonus.md) | Rơi đồ theo quẻ bói: % cơ hội tung bảng rơi thêm một lượt theo quẻ (Đại Cát 30 … Hung 0), riêng từng người, hook mới `withBonusRollPercent`, một FortuneFacade dùng chung (V127, field 9 của 231) | ✅ **Accepted** *(2026-11-02, lô 28)* | — |
 | [ADR-159](ADR-159-Item-Lock.md) | Khoá vật phẩm: cột `inventory_item.locked` (V128); món khoá bị chặn như món đang mặc ở mọi đường rời túi (bán/giao dịch/thư/phường thị/kho/phân giải/nộp nhiệm vụ/lò đan), dùng trực tiếp vẫn được; 528/529 qua cổng PIN; nút Khoá trong túi đồ | ✅ Accepted (lô 29) |
+| [ADR-160](ADR-160-Bag-Sort.md) | Sắp xếp túi đồ: luật thuần `BagSortPolicy` (trang bị theo ô → dùng được → khác → đang mặc), gom chồng gộp được cùng loại + cùng trạng thái khoá; danh sách túi nay đọc theo `slot_index`, dòng mới nối cuối; 530/531; nút Sắp xếp | ✅ Accepted (lô 29) |
 ---
 
 ## ADR cần tạo (chưa viết)

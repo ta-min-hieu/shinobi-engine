@@ -58,9 +58,10 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
             DELETE FROM inventory_item WHERE id = ?
             """;
 
+    // ADR-160 — nối CUỐI túi người nhận (MAX + 1), cùng lý do InventoryStackMerge.INSERT_ITEM.
     private static final String INSERT_ROW = """
             INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(slot_index) + 1, 0) FROM inventory_item WHERE character_id = ?))
             """;
 
     private final DataSource dataSource;
@@ -192,7 +193,7 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
                 original.itemTemplateId(),
                 request.quantity(),
                 original.enhanceLevel(),
-                countItems(connection, request.toCharacterId()));
+                request.toCharacterId());
     }
 
     private static OwnedItemSnapshot mapRow(ResultSet rs) throws SQLException {

@@ -12,11 +12,13 @@ import dev.kage.protocol.SellItemCommand;
 import dev.kage.protocol.SellItemResponse;
 import dev.kage.protocol.SetItemLockCommand;
 import dev.kage.protocol.SetItemLockResponse;
+import dev.kage.protocol.SortInventoryCommand;
+import dev.kage.protocol.SortInventoryResponse;
 
 /**
  * Bước lô 29: túi đồ {@code bag} (in id:templateId×số lượng, 🔒 nếu khoá), khoá vật phẩm (ADR-159) {@code
  * lock:<itemId>}, {@code unlock:<itemId>}, cùng hai đường làm đồ rời túi để thử khoá: {@code sell:<itemId>}, {@code
- * dismantle:<itemId>}.
+ * dismantle:<itemId>}; sắp xếp túi (ADR-160) {@code sortBag}.
  */
 final class Lot29Steps {
 
@@ -33,6 +35,7 @@ final class Lot29Steps {
             case "unlock" -> lock(Long.parseLong(arg), false);
             case "sell" -> sell(Long.parseLong(arg));
             case "dismantle" -> dismantle(Long.parseLong(arg));
+            case "sortBag" -> sortBag();
             default -> "bước không hiểu";
         };
     }
@@ -66,6 +69,17 @@ final class Lot29Steps {
                 p -> {
                     SetItemLockResponse r = SetItemLockResponse.parseFrom(p);
                     return r.getOutcome().name() + " item=" + r.getItemId() + " locked=" + r.getLocked();
+                });
+    }
+
+    private String sortBag() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SORT_INVENTORY_COMMAND_VALUE,
+                SortInventoryCommand.getDefaultInstance(),
+                Opcode.OPCODE_SORT_INVENTORY_RESPONSE_VALUE,
+                p -> {
+                    SortInventoryResponse r = SortInventoryResponse.parseFrom(p);
+                    return "ok=" + r.getOk() + " gom=" + r.getMergedRows();
                 });
     }
 

@@ -176,6 +176,7 @@ public final class InventoryPanel implements HudWindow {
         private Runnable onToggleProtection;
         private Runnable onDismantleSelected;
         private Runnable onLockSelected;
+        private Runnable onSortSelected;
         private IntConsumer onUnequip;
         private Runnable onOpened;
 
@@ -322,21 +323,32 @@ public final class InventoryPanel implements HudWindow {
     }
 
     private Table closeHint() {
-        Table row = new Table();
+        Table block = new Table();
         Label hint = new Label(text("inventory.hint.close"), skin.labelStyle);
         hint.setColor(SECTION_COLOR);
-        row.add(hint).left().expandX().padRight(6f);
+        block.add(hint).left().expandX().row();
+        // ADR-160 — hàng nút riêng dưới chữ gợi ý: 4 × 104 + 3 khe 6 = 434 ≤ 560 (chung một hàng với chữ thì tràn).
+        Table row = new Table();
+        block.add(row).right().padTop(4f);
+        row.add(actionButton("inventory.action.sort", () -> fire(listeners.onSortSelected)))
+                .width(ACTION_BUTTON_WIDTH_PX)
+                .padRight(6f);
         // ADR-097 — phân giải món đang chọn; ở hàng này vì hàng hành động đã kín bề rộng khung.
         row.add(actionButton("inventory.action.dismantle", () -> fire(listeners.onDismantleSelected)))
                 .width(ACTION_BUTTON_WIDTH_PX)
                 .padRight(6f);
-        // ADR-159 — khoá/mở khoá món đang chọn. Hàng này: chữ gợi ý + 3 × 104 + 2 khe 6 = chữ + 324 ≤ 560.
+        // ADR-159 — khoá/mở khoá món đang chọn.
         this.lockButton = actionButton("inventory.action.lock", () -> fire(listeners.onLockSelected));
         lockButton.setVisible(false);
         row.add(lockButton).width(ACTION_BUTTON_WIDTH_PX).padRight(6f);
         row.add(actionButton("inventory.action.refresh", () -> fire(listeners.onOpened)))
                 .width(ACTION_BUTTON_WIDTH_PX);
-        return row;
+        return block;
+    }
+
+    /** ADR-160 — người chơi bấm Sắp xếp: server gom chồng và xếp lại túi. */
+    public void setOnSortSelected(Runnable listener) {
+        listeners.onSortSelected = listener;
     }
 
     /**

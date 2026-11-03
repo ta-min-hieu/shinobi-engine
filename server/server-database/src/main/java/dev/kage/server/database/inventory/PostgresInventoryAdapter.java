@@ -51,9 +51,11 @@ public final class PostgresInventoryAdapter implements InventoryPort {
             SELECT COUNT(*) FROM equipment_slot WHERE character_id = ? AND inventory_item_id IS NOT NULL
             """;
 
+    // ADR-160 — thứ tự túi theo slot_index (sắp xếp túi ghi 0..n-1), id phá hoà. Trước đó theo id: cột slot_index chỉ
+    // được ghi chứ không được đọc, nên mọi dòng mới vốn đã nối cuối — thứ tự cũ không đổi với túi chưa từng sắp.
     private static final String FIND_BY_CHARACTER = """
             SELECT id, item_template_id, quantity, enhance_level
-              FROM inventory_item WHERE character_id = ? ORDER BY id
+              FROM inventory_item WHERE character_id = ? ORDER BY slot_index, id
             """;
 
     // FOR UPDATE: xem InventoryPort#findOwnedItemForUpdate. Postgres đánh giá lại WHERE sau khi chờ

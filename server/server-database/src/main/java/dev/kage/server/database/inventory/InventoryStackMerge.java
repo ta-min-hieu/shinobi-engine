@@ -72,9 +72,11 @@ public final class InventoryStackMerge {
                AND NOT EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = ii.id)
             """;
 
+    // ADR-160 — dòng mới luôn nối CUỐI túi (MAX + 1): túi nay liệt kê theo slot_index, và "số dòng đang có" (cách cũ)
+    // nhỏ hơn slot cuối khi có đồ đang mặc hay lỗ sau khi dòng bị xoá — dòng mới sẽ chen vào giữa túi.
     private static final String INSERT_ITEM = """
             INSERT INTO inventory_item (character_id, item_template_id, quantity, enhance_level, slot_index)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, (SELECT COALESCE(MAX(slot_index) + 1, 0) FROM inventory_item WHERE character_id = ?))
             """;
 
     private InventoryStackMerge() {}
@@ -136,9 +138,9 @@ public final class InventoryStackMerge {
         int remaining = quantity;
         for (int row = 0; row < rowsNeeded; row++) {
             int rowQuantity = Math.min(maxStack, remaining);
-            // slot_index — nối vào cuối danh sách hiện có (cột chỉ để sắp xếp, V27).
+            // slot_index — nối vào cuối túi (ADR-160, xem INSERT_ITEM).
             JdbcOperations.update(
-                    connection, INSERT_ITEM, characterId, itemTemplateId, rowQuantity, enhanceLevel, used + row);
+                    connection, INSERT_ITEM, characterId, itemTemplateId, rowQuantity, enhanceLevel, characterId);
             remaining -= rowQuantity;
         }
         return true;

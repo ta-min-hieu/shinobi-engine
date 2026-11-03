@@ -465,3 +465,13 @@ message SetItemLockResponse {
   int64 item_id = 2;
   bool locked = 3;  // trạng thái SAU lệnh (OK) — client làm mới túi để thấy
 }
+
+// Command: Client -> Server (OPCODE_SORT_INVENTORY_COMMAND = 530) — ADR-160. Gom chồng cùng loại + xếp lại túi của
+// CHÍNH người gửi. Server quyết thứ tự; client hỏi lại túi để thấy.
+message SortInventoryCommand {}
+
+// Response: Server -> Client (OPCODE_SORT_INVENTORY_RESPONSE = 531).
+message SortInventoryResponse {
+  bool ok = 1;
+  int32 merged_rows = 2;  // số chồng đã gom vào chồng khác (0 = chỉ đổi thứ tự)
+}

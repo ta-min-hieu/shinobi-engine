@@ -88,6 +88,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.inventory.PostgresItemLockAdapter(dataSource));
     }
 
+    /** ADR-160 — sắp xếp túi đồ. */
+    public dev.kage.inventory.api.BagSortFacade wireBagSortFacade() {
+        return new dev.kage.inventory.api.BagSortFacade(
+                new dev.kage.server.database.inventory.PostgresBagSortAdapter(dataSource));
+    }
+
     /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
     public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
         return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));
