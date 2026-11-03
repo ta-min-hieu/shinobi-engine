@@ -3,8 +3,12 @@ package dev.kage.tools.loadtest.probe;
 import java.io.IOException;
 import java.util.UUID;
 
+import dev.kage.protocol.CombineGemsCommand;
+import dev.kage.protocol.CombineGemsResponse;
 import dev.kage.protocol.DismantleItemCommand;
 import dev.kage.protocol.DismantleItemResponse;
+import dev.kage.protocol.GetGemRecipesRequest;
+import dev.kage.protocol.GetGemRecipesResponse;
 import dev.kage.protocol.ListInventoryRequest;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.Opcode;
@@ -18,7 +22,8 @@ import dev.kage.protocol.SortInventoryResponse;
 /**
  * Bước lô 29: túi đồ {@code bag} (in id:templateId×số lượng, 🔒 nếu khoá), khoá vật phẩm (ADR-159) {@code
  * lock:<itemId>}, {@code unlock:<itemId>}, cùng hai đường làm đồ rời túi để thử khoá: {@code sell:<itemId>}, {@code
- * dismantle:<itemId>}; sắp xếp túi (ADR-160) {@code sortBag}.
+ * dismantle:<itemId>}; sắp xếp túi (ADR-160) {@code sortBag}; ghép
+ * ngọc (ADR-161) {@code gemRecipes}, {@code combineGem:<templateId nguồn>}.
  */
 final class Lot29Steps {
 
@@ -36,6 +41,8 @@ final class Lot29Steps {
             case "sell" -> sell(Long.parseLong(arg));
             case "dismantle" -> dismantle(Long.parseLong(arg));
             case "sortBag" -> sortBag();
+            case "gemRecipes" -> gemRecipes();
+            case "combineGem" -> combineGem(Long.parseLong(arg));
             default -> "bước không hiểu";
         };
     }
@@ -81,6 +88,39 @@ final class Lot29Steps {
                     SortInventoryResponse r = SortInventoryResponse.parseFrom(p);
                     return "ok=" + r.getOk() + " gom=" + r.getMergedRows();
                 });
+    }
+
+    private String gemRecipes() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_GEM_RECIPES_REQUEST_VALUE,
+                GetGemRecipesRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_GEM_RECIPES_RESPONSE_VALUE,
+                p -> describe(GetGemRecipesResponse.parseFrom(p)));
+    }
+
+    private String combineGem(long sourceTemplateId) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_COMBINE_GEMS_COMMAND_VALUE,
+                CombineGemsCommand.newBuilder()
+                        .setSourceItemTemplateId(sourceTemplateId)
+                        .build(),
+                Opcode.OPCODE_COMBINE_GEMS_RESPONSE_VALUE,
+                p -> {
+                    CombineGemsResponse r = CombineGemsResponse.parseFrom(p);
+                    return r.getOutcome().name() + " ra=" + r.getResultItemTemplateId() + " "
+                            + describe(r.getRecipes());
+                });
+    }
+
+    private static String describe(GetGemRecipesResponse recipes) {
+        StringBuilder line = new StringBuilder();
+        recipes.getRecipesList().forEach(r -> line.append(' ')
+                .append(r.getSourceItemTemplateId())
+                .append('>')
+                .append(r.getResultItemTemplateId())
+                .append(" có=")
+                .append(r.getOwned()));
+        return line.toString().strip();
     }
 
     private String sell(long itemId) throws IOException {

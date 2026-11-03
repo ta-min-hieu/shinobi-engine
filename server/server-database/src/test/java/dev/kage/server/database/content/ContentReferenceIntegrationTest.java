@@ -91,8 +91,19 @@ class ContentReferenceIntegrationTest {
      */
     // 2026-10-31 — trả hết 27 món nợ icon (lô 15–23). Món mới lên trước art thì thêm lại vào đây.
     // 2026-11-03 — nợ mới của lô 27–28 (Tàng Bảo Đồ ADR-147, Dịch Danh Phù ADR-148, Truyền Âm Phù ADR-152).
-    private static final Set<String> ITEMS_KNOWN_TO_LACK_AN_ICON =
-            Set.of("treasure_map", "rename_talisman", "broadcast_talisman");
+    private static final Set<String> ITEMS_KNOWN_TO_LACK_AN_ICON = Set.of(
+            "treasure_map",
+            "rename_talisman",
+            "broadcast_talisman",
+            // 2026-11-03 — Linh Ngọc bậc 2/3 (ADR-161).
+            "spirit_jade_fire_2",
+            "spirit_jade_earth_2",
+            "spirit_jade_water_2",
+            "spirit_jade_wood_2",
+            "spirit_jade_fire_3",
+            "spirit_jade_earth_3",
+            "spirit_jade_water_3",
+            "spirit_jade_wood_3");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

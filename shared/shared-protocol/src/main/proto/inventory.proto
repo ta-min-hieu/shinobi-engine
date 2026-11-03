@@ -475,3 +475,42 @@ message SortInventoryResponse {
   bool ok = 1;
   int32 merged_rows = 2;  // số chồng đã gom vào chồng khác (0 = chỉ đổi thứ tự)
 }
+
+// ===== ADR-161 — ghép Linh Ngọc: N viên cùng loại cùng bậc + vàng ⇒ 1 viên bậc trên. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_GET_GEM_RECIPES_REQUEST = 532).
+message GetGemRecipesRequest {}
+
+message GemRecipeView {
+  int64 source_item_template_id = 1;
+  int64 result_item_template_id = 2;
+  int32 source_quantity = 3;
+  int64 gold_fee = 4;
+  int32 owned = 5;  // số viên nguồn người hỏi đem ghép được (chưa khoá)
+}
+
+// Response: Server -> Client (OPCODE_GET_GEM_RECIPES_RESPONSE = 533).
+message GetGemRecipesResponse {
+  repeated GemRecipeView recipes = 1;
+}
+
+// Command: Client -> Server (OPCODE_COMBINE_GEMS_COMMAND = 534). Ghép MỘT lần theo công thức của viên nguồn.
+message CombineGemsCommand {
+  int64 source_item_template_id = 1;
+}
+
+enum CombineGemsOutcome {
+  COMBINE_GEMS_OUTCOME_UNSPECIFIED = 0;
+  COMBINE_GEMS_OUTCOME_OK = 1;
+  COMBINE_GEMS_OUTCOME_UNKNOWN_RECIPE = 2;
+  COMBINE_GEMS_OUTCOME_NOT_ENOUGH_GEMS = 3;
+  COMBINE_GEMS_OUTCOME_NOT_ENOUGH_GOLD = 4;
+  COMBINE_GEMS_OUTCOME_BAG_FULL = 5;
+}
+
+// Response: Server -> Client (OPCODE_COMBINE_GEMS_RESPONSE = 535). recipes = bảng sau lần ghép.
+message CombineGemsResponse {
+  CombineGemsOutcome outcome = 1;
+  int64 result_item_template_id = 2;
+  GetGemRecipesResponse recipes = 3;
+}

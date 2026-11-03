@@ -213,6 +213,10 @@ enum Opcode {
   OPCODE_SET_ITEM_LOCK_RESPONSE = 529;
   OPCODE_SORT_INVENTORY_COMMAND = 530;  // ADR-160 (2026-11-03) — sắp xếp túi đồ
   OPCODE_SORT_INVENTORY_RESPONSE = 531;
+  OPCODE_GET_GEM_RECIPES_REQUEST = 532;  // ADR-161 (2026-11-03) — ghép Linh Ngọc
+  OPCODE_GET_GEM_RECIPES_RESPONSE = 533;
+  OPCODE_COMBINE_GEMS_COMMAND = 534;
+  OPCODE_COMBINE_GEMS_RESPONSE = 535;
   // 511 để TRỐNG CÓ CHỦ Ý — dành sẵn cho ITEM_REMOVED_EVENT (ADR-035 Revisit Trigger #3, chỉ
   // thêm khi ĐO thấy việc hỏi lại toàn bộ túi sau mỗi hành động tốn thật). ĐỪNG cấp cho packet khác.
 
