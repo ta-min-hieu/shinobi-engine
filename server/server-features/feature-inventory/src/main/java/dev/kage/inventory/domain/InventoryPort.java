@@ -70,6 +70,11 @@ public interface InventoryPort {
         return false;
     }
 
+    /** ADR-159 — người chơi đã khoá món này chưa; đường làm món rời nhân vật phải từ chối. Fake ở test: chưa khoá. */
+    default boolean isLocked(Transaction tx, long itemId) {
+        return false;
+    }
+
     /**
      * Mở rộng túi thêm {@code amount} ô (ADR-088 — Túi Càn Khôn) nếu không vượt trần; trong giao dịch dùng vật phẩm.
      * Mặc định không hỗ trợ (fake ở test) ⇒ {@code false}, không ai mất vật phẩm.

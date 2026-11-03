@@ -40,6 +40,8 @@ public final class StorageUseCase {
         ITEM_IN_TRADE,
         /** Món đang khảm Linh Ngọc — kho chưa chở được ngọc (ADR-064 D5). */
         SOCKETED,
+        /** ADR-159 — người chơi đã khoá món này. */
+        LOCKED,
         STORAGE_FULL,
         BAG_FULL
     }
@@ -149,6 +151,9 @@ public final class StorageUseCase {
         }
         if (ports.inventoryPort().isSocketed(t, item.id())) {
             return Optional.of(Outcome.SOCKETED);
+        }
+        if (ports.inventoryPort().isLocked(t, item.id())) {
+            return Optional.of(Outcome.LOCKED);
         }
         if (item.quantity() - ports.tradeOfferPort().offeredQuantity(t, characterId, item.id()) < quantity) {
             return Optional.of(Outcome.ITEM_IN_TRADE);

@@ -45,6 +45,8 @@ public final class PostgresInventoryAdapter implements InventoryPort {
     // Đồ đang mặc không chiếm ô túi (quyết định chủ dự án 2026-10-11). `Inventory` chứa MỌI dòng
     // `inventory_item` của nhân vật, kể cả món đang mặc, và không biết món nào đang mặc — nên sức chứa
     // nó nhận là "20 ô túi + số món đang mặc": số món nằm trong túi vì thế vẫn bị chặn ở đúng 20.
+    private static final String IS_LOCKED = "SELECT locked FROM inventory_item WHERE id = ?";
+
     private static final String COUNT_EQUIPPED = """
             SELECT COUNT(*) FROM equipment_slot WHERE character_id = ? AND inventory_item_id IS NOT NULL
             """;
@@ -217,5 +219,11 @@ public final class PostgresInventoryAdapter implements InventoryPort {
         return JdbcOperations.queryOne(connection, IS_SOCKETED, rs -> rs.getInt(1), itemId, itemId, itemId)
                         .orElse(0)
                 > 0;
+    }
+
+    @Override
+    public boolean isLocked(Transaction tx, long itemId) {
+        return JdbcOperations.queryOne(((JdbcTransaction) tx).connection(), IS_LOCKED, rs -> rs.getBoolean(1), itemId)
+                .orElse(false);
     }
 }

@@ -94,13 +94,20 @@ final class InventoryController {
     /** Xem {@link #useProtection()} — mặc định TẮT. */
     private boolean useProtection;
 
+    /** ADR-159 — id các món đang khoá, THAY cùng ảnh chụp túi. */
+    private final java.util.Set<Long> lockedIds = new java.util.HashSet<>();
+
     /**
      * Ảnh chụp túi mới từ server — THAY hoàn toàn, không trộn với bản cũ, cùng luật
      * {@link MailController#onMailList}.
      */
     void onInventory(ListInventoryResponse response) {
         items.clear();
+        lockedIds.clear();
         for (InventoryItemView view : response.getItemsList()) {
+            if (view.getLocked()) {
+                lockedIds.add(view.getItemId());
+            }
             items.add(new Item(
                     view.getItemId(),
                     view.getItemTemplateId(),
@@ -117,6 +124,11 @@ final class InventoryController {
         if (byId(selectedItemId).isEmpty()) {
             selectedItemId = 0L;
         }
+    }
+
+    /** ADR-159 — món này server báo đang khoá (từ ảnh chụp túi gần nhất). */
+    boolean isLocked(long itemId) {
+        return lockedIds.contains(itemId);
     }
 
     /** Vật phẩm trong túi, đã sắp theo {@code slotIndex}. */

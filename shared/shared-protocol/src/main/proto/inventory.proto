@@ -175,6 +175,7 @@ message InventoryItemView {
   int32 enhance_level = 4;
   int32 slot_index = 5;
   int64 socket_gem_template_id = 6; // ADR-064 — item_template.id của Linh Ngọc đang khảm; 0 = chưa khảm
+  bool locked = 7;                  // ADR-159 — người chơi đã khoá: không bán/giao dịch/gửi thư/gửi kho/phân giải được
 }
 
 // Response: Server -> Client (OPCODE_LIST_INVENTORY_RESPONSE = 508). Ảnh chụp TOÀN BỘ túi tại thời
@@ -309,6 +310,7 @@ enum StorageOutcome {
   STORAGE_OUTCOME_BAG_FULL = 7;
   STORAGE_OUTCOME_TOO_FAR = 8;          // không đứng gần người giữ kho
   STORAGE_OUTCOME_SOCKETED = 9;         // ADR-064 — món đang khảm Linh Ngọc, kho chưa chở được ngọc
+  STORAGE_OUTCOME_LOCKED = 10;          // ADR-159 — người chơi đã khoá món này
 }
 
 // Command: Client -> Server (OPCODE_DEPOSIT_ITEM_COMMAND = 516). inventory_item_id là id THẬT trong túi.
@@ -441,4 +443,25 @@ message RefineItemResponse {
   RefineItemOutcome outcome = 1;
   ListRefinementsResponse status = 2;
   int32 max_hp = 3;
+}
+
+// Command: Client -> Server (OPCODE_SET_ITEM_LOCK_COMMAND = 528) — ADR-159. Khoá (locked=true) hoặc mở khoá một món
+// trong túi của CHÍNH người gửi (characterId lấy từ session). Mở khoá chịu cổng Mật Khẩu Bảo Hộ (ADR-118) như mọi
+// thao tác làm đồ rời túi.
+message SetItemLockCommand {
+  int64 item_id = 1;
+  bool locked = 2;
+}
+
+enum SetItemLockOutcome {
+  SET_ITEM_LOCK_OUTCOME_UNSPECIFIED = 0;
+  SET_ITEM_LOCK_OUTCOME_OK = 1;
+  SET_ITEM_LOCK_OUTCOME_NOT_FOUND = 2;  // món không có trong túi người gửi
+}
+
+// Response: Server -> Client (OPCODE_SET_ITEM_LOCK_RESPONSE = 529).
+message SetItemLockResponse {
+  SetItemLockOutcome outcome = 1;
+  int64 item_id = 2;
+  bool locked = 3;  // trạng thái SAU lệnh (OK) — client làm mới túi để thấy
 }

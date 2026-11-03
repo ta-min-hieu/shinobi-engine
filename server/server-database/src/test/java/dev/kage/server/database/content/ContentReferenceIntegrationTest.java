@@ -90,7 +90,9 @@ class ContentReferenceIntegrationTest {
      * đỏ, mà vẽ xong icon cho một món ở đây cũng đỏ — để danh sách không bao giờ nói dối.
      */
     // 2026-10-31 — trả hết 27 món nợ icon (lô 15–23). Món mới lên trước art thì thêm lại vào đây.
-    private static final Set<String> ITEMS_KNOWN_TO_LACK_AN_ICON = Set.of();
+    // 2026-11-03 — nợ mới của lô 27–28 (Tàng Bảo Đồ ADR-147, Dịch Danh Phù ADR-148, Truyền Âm Phù ADR-152).
+    private static final Set<String> ITEMS_KNOWN_TO_LACK_AN_ICON =
+            Set.of("treasure_map", "rename_talisman", "broadcast_talisman");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

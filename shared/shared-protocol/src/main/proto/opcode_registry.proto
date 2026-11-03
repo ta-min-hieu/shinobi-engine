@@ -209,6 +209,8 @@ enum Opcode {
   OPCODE_LIST_REFINEMENTS_RESPONSE = 525;
   OPCODE_REFINE_ITEM_COMMAND = 526;
   OPCODE_REFINE_ITEM_RESPONSE = 527;
+  OPCODE_SET_ITEM_LOCK_COMMAND = 528;  // ADR-159 (2026-11-03) — khoá/mở khoá vật phẩm
+  OPCODE_SET_ITEM_LOCK_RESPONSE = 529;
   // 511 để TRỐNG CÓ CHỦ Ý — dành sẵn cho ITEM_REMOVED_EVENT (ADR-035 Revisit Trigger #3, chỉ
   // thêm khi ĐO thấy việc hỏi lại toàn bộ túi sau mỗi hành động tốn thật). ĐỪNG cấp cho packet khác.
 

@@ -20,7 +20,8 @@ public final class PostgresMarketInventoryAdapter implements MarketInventoryPort
     /** Dòng của CHÍNH người bán, kèm phần đang chào giao dịch và cờ đang mặc — khoá dòng. */
     private static final String SELECT_FOR_UPDATE = "SELECT ii.item_template_id, ii.quantity, ii.enhance_level, "
             + TradeOfferedQuantity.OF_II
-            + " AS offered, EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = ii.id) AS equipped,"
+            + " AS offered, (EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = ii.id) OR ii.locked)"
+            + " AS equipped," // ADR-159: món khoá bị chặn như món đang mặc
             + " (EXISTS (SELECT 1 FROM item_socket s WHERE s.inventory_item_id = ii.id)"
             + " OR EXISTS (SELECT 1 FROM pet_state p WHERE p.inventory_item_id = ii.id)"
             + " OR EXISTS (SELECT 1 FROM item_refinement r WHERE r.inventory_item_id = ii.id)) AS socketed"

@@ -25,7 +25,8 @@ public final class PostgresDismantleAdapter implements DismantlePort {
 
     private static final String LOCK_ITEM = """
             SELECT it.equip_slot, it.required_level, inventory_item.enhance_level,
-                   EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id) AS equipped,
+                   (EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id)
+                    OR inventory_item.locked) AS equipped, -- ADR-159: món khoá bị chặn như món đang mặc
                    EXISTS (SELECT 1 FROM item_socket s WHERE s.inventory_item_id = inventory_item.id) AS socketed,
             """ + TradeOfferedQuantity.OF_INVENTORY_ITEM + """
                     AS offered

@@ -51,6 +51,21 @@ class InventoryControllerTest {
     }
 
     @Test
+    @DisplayName("ADR-159 — cờ locked lấy từ ảnh chụp túi mới nhất, và ảnh chụp sau THAY hẳn ảnh trước")
+    void tracksLockedItemsFromTheLatestSnapshot() {
+        InventoryItemView locked = item(5L, 1L, 0).toBuilder().setLocked(true).build();
+
+        controller.onInventory(list(10, locked, item(6L, 1L, 1)));
+
+        assertThat(controller.isLocked(5L)).isTrue();
+        assertThat(controller.isLocked(6L)).isFalse();
+
+        controller.onInventory(list(10, item(5L, 1L, 0)));
+
+        assertThat(controller.isLocked(5L)).isFalse();
+    }
+
+    @Test
     @DisplayName("Vật phẩm được sắp theo slot_index — không phải thứ tự server gửi")
     void sortsBySlotIndex() {
         controller.onInventory(list(10, item(1L, 1L, 3), item(2L, 1L, 0), item(3L, 1L, 1)));

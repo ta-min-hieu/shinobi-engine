@@ -82,6 +82,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.checkin.PostgresWeeklyTaskAdapter(dataSource));
     }
 
+    /** ADR-159 — khoá vật phẩm. */
+    public dev.kage.inventory.api.ItemLockFacade wireItemLockFacade() {
+        return new dev.kage.inventory.api.ItemLockFacade(
+                new dev.kage.server.database.inventory.PostgresItemLockAdapter(dataSource));
+    }
+
     /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
     public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
         return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));

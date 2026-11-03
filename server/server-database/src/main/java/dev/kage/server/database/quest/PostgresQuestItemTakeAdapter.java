@@ -18,7 +18,7 @@ public final class PostgresQuestItemTakeAdapter implements QuestItemTakePort {
 
     @Override
     public boolean takeItemByCode(Transaction tx, long characterId, String itemTemplateCode, int quantity) {
-        return InventoryItemTake.takeByCode(
+        return InventoryItemTake.takeUnlockedByCode( // ADR-159
                 ((JdbcTransaction) tx).connection(), characterId, itemTemplateCode, quantity);
     }
 }

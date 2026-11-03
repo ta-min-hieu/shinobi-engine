@@ -34,6 +34,7 @@ public final class InventoryItemTake {
              WHERE ii.character_id = ?
                AND it.code = ?
                AND ii.enhance_level = 0
+               AND (NOT ii.locked OR ?)
                AND NOT EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = ii.id)
              ORDER BY ii.id
                FOR UPDATE OF ii
@@ -52,8 +53,27 @@ public final class InventoryItemTake {
 
     private InventoryItemTake() {}
 
-    /** {@code false} = không đủ (chưa ghi gì). Mã không tồn tại cũng là {@code false}. */
+    /**
+     * {@code false} = không đủ (chưa ghi gì). Mã không tồn tại cũng là {@code false}. Dùng trực tiếp — lấy cả chồng
+     * khoá (ADR-159 D3).
+     */
     public static boolean takeByCode(Connection connection, long characterId, String itemTemplateCode, int quantity) {
+        return take(connection, characterId, new Want(itemTemplateCode, quantity, true));
+    }
+
+    /** ADR-159 — nộp vật phẩm (nhiệm vụ): KHÔNG lấy chồng người chơi đã khoá. */
+    public static boolean takeUnlockedByCode(
+            Connection connection, long characterId, String itemTemplateCode, int quantity) {
+        return take(connection, characterId, new Want(itemTemplateCode, quantity, false));
+    }
+
+    /** Lấy bao nhiêu cái mã nào, có được lấy chồng đã khoá không (ADR-159). */
+    private record Want(String itemTemplateCode, int quantity, boolean includeLocked) {}
+
+    private static boolean take(Connection connection, long characterId, Want want) {
+        String itemTemplateCode = want.itemTemplateCode();
+        int quantity = want.quantity();
+        boolean includeLocked = want.includeLocked();
         List<TakeableStack> stacks = JdbcOperations.query(
                 connection,
                 LOCK_TAKEABLE_STACKS,
@@ -62,7 +82,8 @@ public final class InventoryItemTake {
                         rs.getInt("quantity"),
                         Math.max(0, rs.getInt("quantity") - rs.getInt("offered"))),
                 characterId,
-                itemTemplateCode);
+                itemTemplateCode,
+                includeLocked);
         long available = 0L;
         for (TakeableStack stack : stacks) {
             available += stack.takeable();

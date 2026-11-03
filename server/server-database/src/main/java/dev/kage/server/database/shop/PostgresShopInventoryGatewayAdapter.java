@@ -31,7 +31,8 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
     // đang chào trong giao dịch còn mở (dòng 80) — xem TradeOfferedQuantity.
     private static final String SELECT_FOR_UPDATE = """
             SELECT quantity,
-                   EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id) AS equipped,
+                   (EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id)
+                    OR inventory_item.locked) AS equipped, -- ADR-159: món khoá bị chặn như món đang mặc
             """ + TradeOfferedQuantity.OF_INVENTORY_ITEM + """
                     AS offered
               FROM inventory_item

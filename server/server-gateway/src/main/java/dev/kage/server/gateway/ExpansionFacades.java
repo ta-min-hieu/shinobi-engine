@@ -42,7 +42,8 @@ record ExpansionFacades(
         LuckyWheelFacade luckyWheel,
         MilestoneFacade milestones,
         WeeklyTaskFacade weeklyTasks,
-        HonorFacade honor) {
+        HonorFacade honor,
+        Lot29Facades lot29) {
 
     /** Composition không có các tính năng này (test). */
     static final ExpansionFacades DISABLED = new ExpansionFacades(
@@ -65,5 +66,6 @@ record ExpansionFacades(
             LuckyWheelFacade.DISABLED,
             MilestoneFacade.DISABLED,
             WeeklyTaskFacade.DISABLED,
-            HonorFacade.DISABLED);
+            HonorFacade.DISABLED,
+            Lot29Facades.DISABLED);
 }

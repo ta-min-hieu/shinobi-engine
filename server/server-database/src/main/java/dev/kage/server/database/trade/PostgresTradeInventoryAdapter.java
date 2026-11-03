@@ -31,9 +31,11 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
             SELECT character_id, item_template_id, quantity, enhance_level FROM inventory_item WHERE id = ? FOR UPDATE
             """;
 
-    // Đọc SAU khi dòng nguồn đã khoá FOR UPDATE ở cùng transaction — xem #transferItem.
+    // Đọc SAU khi dòng nguồn đã khoá FOR UPDATE ở cùng transaction — xem #transferItem. ADR-159: món người chơi
+    // đã KHOÁ bị chặn y như món đang mặc.
     private static final String IS_EQUIPPED_BY = """
-            SELECT COUNT(*) FROM equipment_slot WHERE character_id = ? AND inventory_item_id = ?
+            SELECT (SELECT COUNT(*) FROM equipment_slot WHERE character_id = ? AND inventory_item_id = ?)
+                 + (SELECT COUNT(*) FROM inventory_item WHERE id = ? AND locked)
             """;
 
     // Chỉ đếm món NẰM TRONG TÚI: đồ đang mặc không chiếm ô (quyết định chủ dự án 2026-10-11). Trước đó
@@ -171,7 +173,7 @@ public final class PostgresTradeInventoryAdapter implements TradeInventoryPort {
     }
 
     private static boolean isEquippedBy(Connection connection, long characterId, long itemId) {
-        return JdbcOperations.queryOne(connection, IS_EQUIPPED_BY, rs -> rs.getInt(1), characterId, itemId)
+        return JdbcOperations.queryOne(connection, IS_EQUIPPED_BY, rs -> rs.getInt(1), characterId, itemId, itemId)
                         .orElse(0)
                 > 0;
     }

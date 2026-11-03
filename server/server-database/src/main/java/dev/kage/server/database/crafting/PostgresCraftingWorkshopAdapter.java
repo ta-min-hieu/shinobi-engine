@@ -13,6 +13,7 @@ import dev.kage.server.database.GoldLedger;
 import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.inventory.CharacterInventoryLock;
 import dev.kage.server.database.inventory.InventoryStackMerge;
+import dev.kage.server.database.inventory.ItemLine;
 import dev.kage.server.database.inventory.TemplateQuantityConsumer;
 
 /**
@@ -45,7 +46,8 @@ public final class PostgresCraftingWorkshopAdapter implements CraftingWorkshopPo
 
     @Override
     public boolean consumeMaterial(Transaction tx, long characterId, long itemTemplateId, int quantity) {
-        return TemplateQuantityConsumer.consume(connection(tx), characterId, itemTemplateId, quantity);
+        return TemplateQuantityConsumer.consumeUnlocked( // ADR-159 — nguyên liệu đã khoá không bị đem luyện
+                connection(tx), characterId, new ItemLine(itemTemplateId, quantity, 0));
     }
 
     @Override

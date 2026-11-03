@@ -175,6 +175,7 @@ public final class InventoryPanel implements HudWindow {
         private Runnable onEnhanceSelected;
         private Runnable onToggleProtection;
         private Runnable onDismantleSelected;
+        private Runnable onLockSelected;
         private IntConsumer onUnequip;
         private Runnable onOpened;
 
@@ -187,6 +188,9 @@ public final class InventoryPanel implements HudWindow {
 
     /** Nút chính đang mang nghĩa gì — xem {@link #showDetail}. */
     private PrimaryAction primaryAction = PrimaryAction.NONE;
+
+    /** ADR-159 — "Khoá"/"Mở khoá" món đang chọn; chữ đổi theo {@link #setLockState}. */
+    private TextButton lockButton;
 
     /**
      * @param skin bộ style MƯỢN của {@code CombatHud} — lớp này KHÔNG dispose nó, cùng quy ước
@@ -326,9 +330,27 @@ public final class InventoryPanel implements HudWindow {
         row.add(actionButton("inventory.action.dismantle", () -> fire(listeners.onDismantleSelected)))
                 .width(ACTION_BUTTON_WIDTH_PX)
                 .padRight(6f);
+        // ADR-159 — khoá/mở khoá món đang chọn. Hàng này: chữ gợi ý + 3 × 104 + 2 khe 6 = chữ + 324 ≤ 560.
+        this.lockButton = actionButton("inventory.action.lock", () -> fire(listeners.onLockSelected));
+        lockButton.setVisible(false);
+        row.add(lockButton).width(ACTION_BUTTON_WIDTH_PX).padRight(6f);
         row.add(actionButton("inventory.action.refresh", () -> fire(listeners.onOpened)))
                 .width(ACTION_BUTTON_WIDTH_PX);
         return row;
+    }
+
+    /**
+     * ADR-159 — nút khoá cho món đang chọn: ẩn khi không chọn gì; chữ "Mở khoá" khi món đó đang khoá. Khoá được hay
+     * không vẫn là server quyết; client chỉ đọc cờ {@code locked} server gửi trong danh sách túi.
+     */
+    public void setLockState(boolean visible, boolean locked) {
+        lockButton.setVisible(visible);
+        lockButton.setText(text(locked ? "inventory.action.unlock" : "inventory.action.lock"));
+    }
+
+    /** ADR-159 — người chơi bấm Khoá/Mở khoá trên món đang chọn. */
+    public void setOnLockSelected(Runnable listener) {
+        listeners.onLockSelected = listener;
     }
 
     private Label sectionTitle(String key) {

@@ -32,6 +32,7 @@ final class SectStorageCommands {
         OUTCOMES.put(StorageUseCase.Outcome.EQUIPPED, StorageOutcome.STORAGE_OUTCOME_EQUIPPED);
         OUTCOMES.put(StorageUseCase.Outcome.ITEM_IN_TRADE, StorageOutcome.STORAGE_OUTCOME_ITEM_IN_TRADE);
         OUTCOMES.put(StorageUseCase.Outcome.SOCKETED, StorageOutcome.STORAGE_OUTCOME_SOCKETED);
+        OUTCOMES.put(StorageUseCase.Outcome.LOCKED, StorageOutcome.STORAGE_OUTCOME_LOCKED);
         OUTCOMES.put(StorageUseCase.Outcome.STORAGE_FULL, StorageOutcome.STORAGE_OUTCOME_STORAGE_FULL);
         OUTCOMES.put(StorageUseCase.Outcome.BAG_FULL, StorageOutcome.STORAGE_OUTCOME_BAG_FULL);
     }

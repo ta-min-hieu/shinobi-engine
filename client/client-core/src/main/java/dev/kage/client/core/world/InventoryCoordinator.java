@@ -3,6 +3,7 @@ package dev.kage.client.core.world;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.IntConsumer;
 import java.util.function.LongConsumer;
@@ -24,6 +25,7 @@ import dev.kage.protocol.ItemUseEffect;
 import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SellItemResponse;
+import dev.kage.protocol.SetItemLockCommand;
 import dev.kage.protocol.UnequipItemResponse;
 import dev.kage.protocol.UseItemResponse;
 import dev.kage.protocol.wire.PacketCodec;
@@ -150,8 +152,8 @@ final class InventoryCoordinator implements WindowFlow {
         panel.setOnUseSelected(this::onUseSelected);
         panel.setOnSellSelected(this::onSellSelected);
         // ADR-097 — kết quả về DailyCoordinator (báo chat + làm mới túi).
-        panel.setOnDismantleSelected(() -> controller
-                .selected()
+        panel.setOnLockSelected(this::onLockSelected);
+        panel.setOnDismantleSelected(() -> unlockedSelection()
                 .ifPresent(item -> sender.sendReadRequest(
                         Opcode.OPCODE_DISMANTLE_ITEM_COMMAND_VALUE,
                         DismantleItemCommand.newBuilder()
@@ -294,12 +296,37 @@ final class InventoryCoordinator implements WindowFlow {
      * — túi đồ không có ô nhập số lượng, và bán nhầm cả chồng đồ là thứ không hoàn tác được.
      */
     private void onSellSelected() {
-        controller.selected().ifPresent(item -> onSellRequested.accept(item.itemId()));
+        unlockedSelection().ifPresent(item -> onSellRequested.accept(item.itemId()));
+    }
+
+    /**
+     * ADR-159 — món đang chọn, trừ khi nó đang khoá: khi đó báo ngay "mở khoá trước" thay vì gửi một lệnh chắc chắn bị
+     * server từ chối bằng câu của luật khác ("đang mặc"). Server vẫn chặn độc lập — đây chỉ là lời nói rõ hơn.
+     */
+    private Optional<InventoryController.Item> unlockedSelection() {
+        Optional<InventoryController.Item> selected = controller.selected();
+        if (selected.isPresent() && controller.isLocked(selected.get().itemId())) {
+            panel.setStatus(text("item_lock.blocked"));
+            return Optional.empty();
+        }
+        return selected;
+    }
+
+    /** ADR-159 — đảo trạng thái khoá của món đang chọn; kết quả về {@code ItemLockCoordinator}. */
+    private void onLockSelected() {
+        controller
+                .selected()
+                .ifPresent(item -> sender.sendReadRequest(
+                        Opcode.OPCODE_SET_ITEM_LOCK_COMMAND_VALUE,
+                        SetItemLockCommand.newBuilder()
+                                .setItemId(item.itemId())
+                                .setLocked(!controller.isLocked(item.itemId()))
+                                .build()));
     }
 
     /** Bấm Giao dịch trên item đang chọn — đưa ĐÚNG MỘT món vào lời chào, cùng lý do nút Bán. */
     private void onOfferSelected() {
-        controller.selected().ifPresent(item -> onOfferRequested.accept(item.itemId()));
+        unlockedSelection().ifPresent(item -> onOfferRequested.accept(item.itemId()));
     }
 
     /**
@@ -454,7 +481,13 @@ final class InventoryCoordinator implements WindowFlow {
         itemRows.clear();
         for (int index = 0; index < shown; index++) {
             InventoryController.Item item = all.get(index);
-            itemRows.add(new InventoryPanel.ItemRow(item.itemId(), iconCodeOf(item), itemText.describe(item)));
+            String described = itemText.describe(item);
+            itemRows.add(new InventoryPanel.ItemRow(
+                    item.itemId(),
+                    iconCodeOf(item),
+                    controller.isLocked(item.itemId())
+                            ? KageI18n.formatOrKey(i18n, "item_lock.row", described) // ADR-159
+                            : described));
         }
         panel.setItems(itemRows, capacityText(all.size()), listNotice(all.size(), all.size() - shown));
         refreshEquipment();
@@ -488,6 +521,10 @@ final class InventoryCoordinator implements WindowFlow {
      * người chơi dù server vẫn xử lý được (OK, không hỏng).
      */
     private void refreshDetail() {
+        Optional<InventoryController.Item> selected = controller.selected();
+        boolean selectedLocked =
+                selected.map(item -> controller.isLocked(item.itemId())).orElse(false);
+        panel.setLockState(selected.isPresent(), selectedLocked);
         controller
                 .selected()
                 .ifPresentOrElse(

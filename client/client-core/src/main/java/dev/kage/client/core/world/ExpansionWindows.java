@@ -39,7 +39,8 @@ record ExpansionWindows(
         DisplaySettingsCoordinator displaySettings,
         WeatherCoordinator weather,
         BossTelegraphPresenter telegraphs,
-        Lot27Windows lot27) {
+        Lot27Windows lot27,
+        Lot29Windows lot29) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
@@ -88,7 +89,8 @@ record ExpansionWindows(
                         feeds.chat()),
                 new WeatherCoordinator(), // ADR-144
                 new BossTelegraphPresenter(), // ADR-145
-                Lot27Windows.create(skin, sender, feeds)); // ADR-147 /tangbaodo, ADR-148 /doiten
+                Lot27Windows.create(skin, sender, feeds), // ADR-147 /tangbaodo, ADR-148 /doiten
+                Lot29Windows.create(skin, sender, feeds)); // ADR-159 khoá vật phẩm
     }
 
     /** ADR-141 — biển vùng PvP: hỏi bản đồ vùng qua {@code sender}, báo vào/ra qua kênh hệ thống. */
@@ -121,6 +123,7 @@ record ExpansionWindows(
         panels.register(weather);
         panels.register(telegraphs);
         lot27.registerInto(panels);
+        lot29.registerInto(panels);
     }
 
     /**

@@ -19,7 +19,7 @@ public final class TemplateQuantityConsumer {
     // mặc khỏi phần được trừ (vẫn khoá nó như cũ — KHÔNG đổi thứ tự khoá). Cột offered: phần đang chào
     // trong giao dịch còn mở cũng không được trừ (dòng 80) — xem TradeOfferedQuantity.
     private static final String SELECT_STACKS_FOR_UPDATE = """
-            SELECT id, quantity,
+            SELECT id, quantity, locked,
                    EXISTS (SELECT 1 FROM equipment_slot es WHERE es.inventory_item_id = inventory_item.id) AS equipped,
             """ + TradeOfferedQuantity.OF_INVENTORY_ITEM + """
                     AS offered
@@ -48,6 +48,19 @@ public final class TemplateQuantityConsumer {
 
     /** Như trên, chỉ trừ chồng ở đúng cấp cường hoá của {@code line} (thư chở đồ cường hoá — ADR-083). */
     public static boolean consume(Connection connection, long characterId, ItemLine line) {
+        return consume(connection, characterId, line, false);
+    }
+
+    /**
+     * ADR-159 — như {@link #consume(Connection, long, ItemLine)} nhưng KHÔNG trừ chồng người chơi đã khoá: dùng cho
+     * đường làm vật phẩm RỜI nhân vật hoặc bị đổi lấy thứ khác (thư, nguyên liệu lò đan). Dùng trực tiếp (đan, phù)
+     * vẫn đi {@link #consume(Connection, long, ItemLine)}.
+     */
+    public static boolean consumeUnlocked(Connection connection, long characterId, ItemLine line) {
+        return consume(connection, characterId, line, true);
+    }
+
+    private static boolean consume(Connection connection, long characterId, ItemLine line, boolean skipLocked) {
         long itemTemplateId = line.itemTemplateId();
         int quantity = line.quantity();
         int enhanceLevel = line.enhanceLevel();
@@ -55,7 +68,10 @@ public final class TemplateQuantityConsumer {
                 connection,
                 SELECT_STACKS_FOR_UPDATE,
                 rs -> new Stack(
-                        rs.getLong("id"), rs.getInt("quantity"), rs.getBoolean("equipped"), rs.getInt("offered")),
+                        rs.getLong("id"),
+                        rs.getInt("quantity"),
+                        rs.getBoolean("equipped") || (skipLocked && rs.getBoolean("locked")),
+                        rs.getInt("offered")),
                 characterId,
                 itemTemplateId,
                 enhanceLevel);

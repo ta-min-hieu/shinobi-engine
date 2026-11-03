@@ -21,7 +21,8 @@ record ExpansionCommands(
         BroadcastCommands broadcast,
         MilestoneCommands milestones,
         WeeklyTaskCommands weeklyTasks,
-        HonorCommands honor) {
+        HonorCommands honor,
+        Lot29Commands lot29) {
 
     static ExpansionCommands of(GatewayFacades facades, WorldGateway worldGateway, NpcProximity proximity) {
         ExpansionFacades expansion = facades.progression().expansion();
@@ -62,6 +63,7 @@ record ExpansionCommands(
                         clock)),
                 new MilestoneCommands(expansion.milestones(), clock),
                 new WeeklyTaskCommands(expansion.weeklyTasks(), clock),
-                new HonorCommands(expansion.honor(), clock));
+                new HonorCommands(expansion.honor(), clock),
+                Lot29Commands.of(expansion.lot29()));
     }
 }

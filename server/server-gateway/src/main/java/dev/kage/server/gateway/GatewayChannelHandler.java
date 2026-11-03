@@ -917,6 +917,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.ChooseEncounterOptionCommand.parser(),
                             Opcode.OPCODE_CHOOSE_ENCOUNTER_OPTION_RESPONSE_VALUE,
                             (h, id, c) -> h.worldGateway.registry().encounters.choose(id, c))),
+            // Lô 29 — khoá vật phẩm (ADR-159); cổng Mật Khẩu Bảo Hộ như các đường làm đồ rời túi.
+            Map.entry(
+                    Opcode.OPCODE_SET_ITEM_LOCK_COMMAND_VALUE,
+                    pinGuarded(storageCommand(
+                            dev.kage.protocol.SetItemLockCommand.parser(),
+                            Opcode.OPCODE_SET_ITEM_LOCK_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot29().itemLock().set(id, c)))),
             // Lô 28 — cửa hàng điểm vinh dự (ADR-155).
             Map.entry(
                     Opcode.OPCODE_GET_HONOR_SHOP_REQUEST_VALUE,
@@ -2916,6 +2923,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleListInventoryBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
         InventorySnapshot snapshot = inventoryFacade.listInventory(characterId);
         Map<Long, Long> sockets = inventoryFacade.socketsOf(characterId);
+        java.util.Set<Long> locked = expansion.lot29().itemLock().lockedOf(characterId); // ADR-159
         ListInventoryResponse.Builder response = ListInventoryResponse.newBuilder()
                 .setCapacity(snapshot.inventory().capacity());
         List<ItemStack> items = snapshot.inventory().items();
@@ -2930,6 +2938,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setEnhanceLevel(stack.enhanceLevel())
                     .setSlotIndex(slotIndex)
                     .setSocketGemTemplateId(sockets.getOrDefault(stack.id(), 0L))
+                    .setLocked(locked.contains(stack.id()))
                     .build());
         }
         snapshot.equipment()

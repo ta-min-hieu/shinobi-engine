@@ -22,14 +22,16 @@ import dev.kage.protocol.Opcode;
  * Bước lô 28: loa (ADR-152) {@code shout:<nội dung>}, quà mốc (ADR-153) {@code milestones}, {@code
  * claimMilestone:<cấp>}, nhiệm vụ tuần (ADR-154) {@code weekly}, {@code claimWeekly:<mã>}, cửa hàng vinh dự (ADR-155)
  * {@code honorShop}, {@code buyHonor:<templateId>}. Tách khỏi {@link Lot24Steps} vì switch ở đó chạm trần
- * CyclomaticComplexity.
+ * CyclomaticComplexity. Bước lô 29: xem {@link Lot29Steps}.
  */
 final class Lot28Steps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot29Steps lot29;
 
     Lot28Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot29 = new Lot29Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -41,7 +43,7 @@ final class Lot28Steps {
             case "claimWeekly" -> claimWeekly(arg);
             case "honorShop" -> honorShop();
             case "buyHonor" -> buyHonor(Long.parseLong(arg));
-            default -> "bước không hiểu";
+            default -> lot29.step(verb, arg);
         };
     }
 

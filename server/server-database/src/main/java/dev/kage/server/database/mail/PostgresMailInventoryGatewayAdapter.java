@@ -123,7 +123,8 @@ public final class PostgresMailInventoryGatewayAdapter implements InventoryGatew
     /** ADR-083 — trừ đúng chồng ở cấp cường hoá đó; món khảm ngọc/linh thú vẫn không đi thư được. */
     @Override
     public boolean consumeItem(Transaction tx, long characterId, MailAttachment attachment) {
-        return TemplateQuantityConsumer.consume(((JdbcTransaction) tx).connection(), characterId, line(attachment));
+        return TemplateQuantityConsumer.consumeUnlocked( // ADR-159 — món khoá không đi thư
+                ((JdbcTransaction) tx).connection(), characterId, line(attachment));
     }
 
     private static ItemLine line(MailAttachment attachment) {
