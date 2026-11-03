@@ -2,17 +2,21 @@ package dev.kage.tools.loadtest.probe;
 
 import java.io.IOException;
 
+import dev.kage.protocol.CostumeTier;
 import dev.kage.protocol.GetLuckyBagsRequest;
 import dev.kage.protocol.GetLuckyBagsResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.OpenLuckyBagCommand;
 import dev.kage.protocol.OpenLuckyBagResponse;
+import dev.kage.protocol.SetCostumeCommand;
+import dev.kage.protocol.SetCostumeResponse;
 import dev.kage.protocol.SweepDungeonCommand;
 import dev.kage.protocol.SweepDungeonResponse;
 
 /**
  * Bước lô 29 (phần hoạt động): quét Bí Cảnh (ADR-162) {@code sweep[:<mã>]}, túi phúc (ADR-163) {@code luckyBags},
- * {@code openBag:<templateId>}. Tách khỏi {@link Lot29Steps} vì switch ở đó chạm trần CyclomaticComplexity.
+ * {@code openBag:<templateId>}, huyễn hình trang phục (ADR-166) {@code costume:<0-3>}. Tách khỏi {@link Lot29Steps}
+ * vì switch ở đó chạm trần CyclomaticComplexity.
  */
 final class Lot29ActivitySteps {
 
@@ -27,6 +31,7 @@ final class Lot29ActivitySteps {
             case "sweep" -> sweep(arg.isEmpty() ? "sample_dungeon" : arg);
             case "luckyBags" -> luckyBags();
             case "openBag" -> openBag(Long.parseLong(arg));
+            case "costume" -> costume(Integer.parseInt(arg));
             default -> "bước không hiểu";
         };
     }
@@ -84,5 +89,18 @@ final class Lot29ActivitySteps {
                 .append(" quà=")
                 .append(b.getRewardsCount()));
         return line.toString().strip();
+    }
+
+    private String costume(int tier) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SET_COSTUME_COMMAND_VALUE,
+                SetCostumeCommand.newBuilder()
+                        .setTier(CostumeTier.forNumber(tier))
+                        .build(),
+                Opcode.OPCODE_SET_COSTUME_RESPONSE_VALUE,
+                p -> {
+                    SetCostumeResponse r = SetCostumeResponse.parseFrom(p);
+                    return r.getOutcome().name() + " hiện=" + r.getShownTier().name() + " phí=" + r.getFee();
+                });
     }
 }

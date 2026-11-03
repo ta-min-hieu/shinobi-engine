@@ -9,6 +9,7 @@ record Lot29Commands(
         DungeonSweepCommands dungeonSweep,
         LuckyBagCommands luckyBag,
         ExpBuffCommands expBuff,
+        CostumeCommands costume,
         Lot29Facades facades) {
 
     static Lot29Commands of(GatewayFacades gateway, WorldGateway worldGateway) {
@@ -25,6 +26,12 @@ record Lot29Commands(
                                 gateway.contentFacades().socialFacades().mailFacade(), worldGateway.registry()))),
                 new LuckyBagCommands(facades.luckyBag()),
                 new ExpBuffCommands(facades.expBuff(), worldGateway.registry(), java.time.Clock.systemUTC()),
+                new CostumeCommands(
+                        facades.costume(),
+                        gateway.characterFacade(),
+                        CostumeTierHooks.listener(
+                                gateway.characterFacade(), worldGateway.registry(), WorldRouteLookup.of(worldGateway)),
+                        java.time.Clock.systemUTC()),
                 facades);
     }
 

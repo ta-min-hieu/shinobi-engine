@@ -142,6 +142,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-155 — điểm vinh dự sau mỗi trận đấu trường chốt xong; nối sau khi DB đã dựng. */
     final HonorHooks honor = new HonorHooks();
 
+    /** ADR-166 — huyễn hình trang phục: áp bậc đã chọn mỗi lần ghi ngoại hình. */
+    final CostumeChoiceHooks costumeChoice = new CostumeChoiceHooks();
+
     /** ADR-150 — tung xúc xắc chia đồ hiếm trong nhóm (RAM); nối sau khi DB đã dựng. */
     final LootRollHooks lootRolls = new LootRollHooks();
 
@@ -188,7 +191,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
      */
     void register(long characterId, ChannelHandlerContext ctx, CharacterAppearance appearance) {
         contextsByCharacterId.put(characterId, ctx);
-        appearanceByCharacterId.put(characterId, appearance);
+        appearanceByCharacterId.put(characterId, costumeChoice.apply(characterId, appearance));
         lastSentExperience.remove(characterId);
     }
 
@@ -211,9 +214,10 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     Optional<CharacterAppearance> updateAppearance(long characterId, CharacterAppearance appearance) {
         // ADR-132 — trả ngoại hình CŨ để người gọi biết bậc trang phục có đổi không (chỉ khi đổi mới phát 307).
         CharacterAppearance[] previous = new CharacterAppearance[1];
+        CharacterAppearance shown = costumeChoice.apply(characterId, appearance); // ADR-166
         appearanceByCharacterId.computeIfPresent(characterId, (id, old) -> {
             previous[0] = old;
-            return appearance;
+            return shown;
         });
         return Optional.ofNullable(previous[0]);
     }

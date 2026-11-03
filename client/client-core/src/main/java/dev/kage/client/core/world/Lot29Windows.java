@@ -5,7 +5,8 @@ import dev.kage.client.core.ui.theme.KageSkin;
 /**
  * Luồng lô 29 — khoá vật phẩm (ADR-159), sắp xếp túi (ADR-160), ghép Linh Ngọc
  * (ADR-161), quét nhanh Bí Cảnh (ADR-162), túi phúc (ADR-163), đan x2
- * kinh nghiệm (ADR-164). Gom thành MỘT thành phần của
+ * kinh nghiệm (ADR-164), huyễn
+ * hình trang phục (ADR-166). Gom thành MỘT thành phần của
  * {@link ExpansionWindows} để {@code create} ở đó không vượt trần {@code MethodLength}.
  */
 record Lot29Windows(
@@ -13,7 +14,8 @@ record Lot29Windows(
         GemCombineCoordinator gemCombine,
         DungeonSweepCoordinator dungeonSweep,
         LuckyBagCoordinator luckyBag,
-        ExpBuffCoordinator expBuff) {
+        ExpBuffCoordinator expBuff,
+        CostumeCoordinator costume) {
 
     static Lot29Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot29Windows(
@@ -21,7 +23,8 @@ record Lot29Windows(
                 GemCombineCoordinator.create(skin, sender, feeds),
                 new DungeonSweepCoordinator(sender, feeds),
                 LuckyBagCoordinator.create(skin, sender, feeds),
-                new ExpBuffCoordinator());
+                new ExpBuffCoordinator(),
+                new CostumeCoordinator(sender, feeds.chat()));
     }
 
     /** Đăng ký vào hub. */
@@ -31,5 +34,6 @@ record Lot29Windows(
         panels.register(dungeonSweep);
         panels.register(luckyBag.panel(), luckyBag);
         panels.register(expBuff);
+        panels.register(costume);
     }
 }

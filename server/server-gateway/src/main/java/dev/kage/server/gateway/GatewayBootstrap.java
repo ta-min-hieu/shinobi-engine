@@ -690,7 +690,8 @@ public final class GatewayBootstrap {
                         databaseBootstrap.expansion().wireGemCombineFacade(),
                         databaseBootstrap.expansion().wireDungeonSweepFacade(),
                         databaseBootstrap.expansion().wireLuckyBagFacade(),
-                        databaseBootstrap.expansion().wireExpBuffFacade()));
+                        databaseBootstrap.expansion().wireExpBuffFacade(),
+                        databaseBootstrap.expansion().wireCostumeFacade()));
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -801,6 +802,8 @@ public final class GatewayBootstrap {
         characterRegistry.activity.bind(facades.progression().serviceDesk().activity());
         characterRegistry.activity.bindWeekly(facades.progression().expansion().weeklyTasks()); // ADR-154
         characterRegistry.honor.bind(facades.progression().expansion().honor()); // ADR-155
+        characterRegistry.costumeChoice.bind(
+                facades.progression().expansion().lot29().costume()::chosenTier); // ADR-166
     }
 
     /** ADR-099 — lượt Bí Cảnh + thư thưởng lần đầu hạ boss (5.000 linh thạch + 3 Yêu Đan). */

@@ -97,6 +97,8 @@ enum Opcode {
   OPCODE_CLAIM_WEEKLY_TASK_COMMAND = 242;
   OPCODE_CLAIM_WEEKLY_TASK_RESPONSE = 243;
   OPCODE_EXP_BUFF_CHANGED_EVENT = 244;  // ADR-164 (2026-11-03) — đan x2 kinh nghiệm: thời gian x2 còn lại
+  OPCODE_SET_COSTUME_COMMAND = 245;  // ADR-166 (2026-11-03) — huyễn hình trang phục
+  OPCODE_SET_COSTUME_RESPONSE = 246;
 
   // --- Movement / World (300-399) ---
   OPCODE_MOVE_COMMAND = 300;

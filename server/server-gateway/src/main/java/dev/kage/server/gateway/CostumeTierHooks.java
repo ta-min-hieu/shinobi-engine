@@ -27,7 +27,9 @@ final class CostumeTierHooks {
             Optional<CharacterAppearance> previous = registry.updateAppearance(characterId, next);
             // ADR-140 — cả khi chỉ cảnh giới đổi (Cấp 55/73/91 không đổi bậc trang phục): danh hiệu trên đầu phải đổi
             // theo.
-            if (previous.isPresent() && previous.get().differsVisiblyFrom(next)) {
+            // ADR-166 — so với ngoại hình THẬT SỰ hiện (đã áp bậc huyễn hình), không phải bậc theo cảnh giới.
+            CharacterAppearance shown = registry.costumeChoice.apply(characterId, next);
+            if (previous.isPresent() && previous.get().differsVisiblyFrom(shown)) {
                 routes.find(characterId).ifPresent(world -> world.enqueueAppearanceChanged(characterId));
             }
         };

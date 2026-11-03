@@ -537,3 +537,23 @@ message ClaimWeeklyTaskResponse {
 message ExpBuffChangedEvent {
   int64 seconds_left = 1;
 }
+
+// Command: Client -> Server (OPCODE_SET_COSTUME_COMMAND = 245) — ADR-166. Chọn HIỂN THỊ một bậc trang phục đã mở;
+// COSTUME_TIER_UNSPECIFIED = trở về tự theo cảnh giới (miễn phí). Đổi sang một bậc cụ thể tốn vàng.
+message SetCostumeCommand {
+  CostumeTier tier = 1;
+}
+
+enum SetCostumeOutcome {
+  SET_COSTUME_OUTCOME_UNSPECIFIED = 0;
+  SET_COSTUME_OUTCOME_OK = 1;
+  SET_COSTUME_OUTCOME_TIER_LOCKED = 2;     // bậc cao hơn bậc cảnh giới hiện tại đã mở
+  SET_COSTUME_OUTCOME_NOT_ENOUGH_GOLD = 3;
+}
+
+// Response: Server -> Client (OPCODE_SET_COSTUME_RESPONSE = 246). shown_tier = bậc đang HIỆN sau lệnh.
+message SetCostumeResponse {
+  SetCostumeOutcome outcome = 1;
+  CostumeTier shown_tier = 2;
+  int64 fee = 3;
+}
