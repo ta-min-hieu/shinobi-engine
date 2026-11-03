@@ -34,10 +34,12 @@ final class GmDeskCommands {
     record Deps(ServiceDeskFacades desk, InventoryFacade inventory, ConnectedCharacterRegistry registry) {}
 
     private final Deps deps;
+    private final GmCompensationCommand compensation;
     private final Clock clock;
 
-    GmDeskCommands(Deps deps, Clock clock) {
+    GmDeskCommands(Deps deps, GmCompensationCommand compensation, Clock clock) {
         this.deps = deps;
+        this.compensation = compensation;
         this.clock = clock;
     }
 
@@ -46,6 +48,7 @@ final class GmDeskCommands {
         return switch (command) {
             case GmCommand.Motd motd -> motd(motd, actorId, ticket);
             case GmCommand.CreateGiftCode code -> createCode(code, actorId, ticket);
+            case GmCommand.Compensate compensate -> compensation.run(compensate, actorId, ticket); // ADR-165
             case GmCommand.Reports _ -> reports(ticket);
             case GmCommand.ShowReport show -> showReport(show.reportId(), ticket);
             case GmCommand.ResolveReport resolve -> resolve(resolve.reportId(), actorId, ticket);

@@ -196,6 +196,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-162](ADR-162-Dungeon-Sweep.md) | Quét nhanh Bí Cảnh: cần đã hạ boss, tốn một lượt ngày chung (ADR-099) + 1.000 vàng, +400 EXP cộng thẳng, đồ bảng rơi boss đi bằng thư (V130); 1510/1511; `/quetbicanh` | ✅ Accepted (lô 29) |
 | [ADR-163](ADR-163-Lucky-Bag.md) | Túi phúc: bảng quà theo trọng số trong DB (V131, 10 quà tổng 100), server rút, lệnh mở riêng một transaction, % công khai; rơi từ boss Bí Cảnh/boss thế giới; 536–539; `/tuiphuc` | ✅ Accepted (lô 29) |
 | [ADR-164](ADR-164-Double-Exp-Pill.md) | Đan x2 kinh nghiệm: nút Dùng chung, hạn ghi trong giao dịch dùng (V132), dồn 30 phút/viên tới trần 300, ×2 EXP đánh quái ở cuối chuỗi hệ số; event 244 + dòng HUD | ✅ Accepted (lô 29) |
+| [ADR-165](ADR-165-GM-Mass-Compensation.md) | GM thư bồi thường hàng loạt: `/gm compensate <MÃ> <vàng> <đồ|-> <số> <cấp>` (ADMIN), thư hệ thống tới mọi nhân vật cấp ≥ ngưỡng, khoá chống trùng tất định + sổ đợt V133 | ✅ Accepted (lô 29) |
 ---
 
 ## ADR cần tạo (chưa viết)

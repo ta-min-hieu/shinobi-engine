@@ -62,6 +62,36 @@ final class GmDeskCommandParser {
         return new GmCommandParser.Parsed.Ok(new GmCommand.CreateGiftCode(code, gold, itemCode, quantity, uses, days));
     }
 
+    /** Trần cấp tối thiểu trong {@code /gm compensate}. */
+    static final int MAX_LEVEL = 100;
+
+    private static final int COMPENSATE_ARGS = 6;
+
+    /** ADR-165 — {@code compensate <MÃ> <vàng> <item_code|-> <số lượng> <cấp tối thiểu>}. */
+    static GmCommandParser.Parsed compensate(String[] words) {
+        String usage = "compensate <CODE> <gold> <item_code|-> <quantity 0-" + GmCommandParser.MAX_GIVE_QUANTITY
+                + "> <min level 1-" + MAX_LEVEL + ">";
+        if (words.length != COMPENSATE_ARGS) {
+            return GmCommandParser.invalid(usage);
+        }
+        String code = GiftCode.normalize(words[1]);
+        long gold = GmCommandParser.parseLong(words[2]);
+        String itemCode = NO_ITEM.equals(words[3]) ? "" : words[3];
+        int quantity = GmCommandParser.parseInt(words[4]);
+        int minLevel = GmCommandParser.parseInt(words[5]);
+        boolean amountsValid = gold >= 0
+                && gold <= GmCommandParser.MAX_GOLD
+                && quantity >= 0
+                && quantity <= GmCommandParser.MAX_GIVE_QUANTITY;
+        boolean rewardPresent = gold > 0 || (!itemCode.isEmpty() && quantity > 0);
+        boolean itemValid = itemCode.isEmpty() || GmCommandParser.isItemCode(itemCode);
+        boolean levelValid = minLevel >= 1 && minLevel <= MAX_LEVEL;
+        if (!GiftCode.isWellFormed(code) || !amountsValid || !rewardPresent || !itemValid || !levelValid) {
+            return GmCommandParser.invalid(usage);
+        }
+        return new GmCommandParser.Parsed.Ok(new GmCommand.Compensate(code, gold, itemCode, quantity, minLevel));
+    }
+
     /** {@code report <id>} / {@code resolve <id>}. */
     static GmCommandParser.Parsed reportId(String[] words, boolean resolve) {
         String usage = (resolve ? "resolve" : "report") + " <report id>";

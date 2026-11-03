@@ -73,6 +73,7 @@ public final class GmCommandParser {
             // Lô 22 — bàn trực (ADR-103/104/105).
             Map.entry("motd", GmDeskCommandParser::motd),
             Map.entry("code", GmDeskCommandParser::code),
+            Map.entry("compensate", GmDeskCommandParser::compensate), // ADR-165
             Map.entry("reports", words -> new Parsed.Ok(new GmCommand.Reports())),
             Map.entry("report", words -> GmDeskCommandParser.reportId(words, false)),
             Map.entry("resolve", words -> GmDeskCommandParser.reportId(words, true)));

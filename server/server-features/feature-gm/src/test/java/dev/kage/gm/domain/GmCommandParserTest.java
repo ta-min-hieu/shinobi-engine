@@ -112,6 +112,29 @@ class GmCommandParserTest {
         assertThat(stop.requiredRole()).isEqualTo(GmRole.ADMIN);
     }
 
+    @Test
+    void compensateShouldParseGoldAndItemRewards_andNeedAdmin() {
+        assertThat(ok("/gm compensate maint01 500 - 0 1"))
+                .isEqualTo(new GmCommand.Compensate("MAINT01", 500L, "", 0, 1));
+        GmCommand withItem = ok("/gm compensate MAINT02 0 minor_healing_pill 5 10");
+        assertThat(withItem).isEqualTo(new GmCommand.Compensate("MAINT02", 0L, "minor_healing_pill", 5, 10));
+        assertThat(withItem.requiredRole()).isEqualTo(GmRole.ADMIN);
+    }
+
+    @ParameterizedTest
+    @ValueSource(
+            strings = {
+                "/gm compensate MAINT 0 - 0 1",
+                "/gm compensate MAINT 500 - 0 0",
+                "/gm compensate MAINT 500 - 0 101",
+                "/gm compensate MAINT 500 - 0",
+                "/gm compensate MAINT 9999999 - 0 1",
+                "/gm compensate MAINT 0 minor_healing_pill 100 1"
+            })
+    void compensateShouldRejectEmptyOrOutOfRangeRewards(String line) {
+        assertThat(GmCommandParser.parse(line)).isInstanceOf(GmCommandParser.Parsed.Invalid.class);
+    }
+
     private static GmCommand ok(String line) {
         GmCommandParser.Parsed parsed = GmCommandParser.parse(line);
         assertThat(parsed).isInstanceOf(GmCommandParser.Parsed.Ok.class);

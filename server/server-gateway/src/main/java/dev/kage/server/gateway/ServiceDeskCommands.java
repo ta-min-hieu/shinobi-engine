@@ -76,7 +76,13 @@ final class ServiceDeskCommands {
 
     /** Phần GM cùng nguồn dữ liệu ({@code /gm motd|code|reports|report|resolve}). */
     GmDeskCommands gmDesk(InventoryFacade inventory) {
-        return new GmDeskCommands(new GmDeskCommands.Deps(deps.desk(), inventory, deps.registry()), clock);
+        return new GmDeskCommands(
+                new GmDeskCommands.Deps(deps.desk(), inventory, deps.registry()),
+                new GmCompensationCommand(
+                        new GmCompensationCommand.Deps(
+                                deps.desk().compensations(), deps.mail(), inventory, deps.registry()),
+                        clock),
+                clock);
     }
 
     /** ADR-103 D3 — gửi thông báo (nếu có) cho người vừa vào world. Không chạm DB. */

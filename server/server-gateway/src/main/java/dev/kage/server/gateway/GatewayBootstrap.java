@@ -645,7 +645,8 @@ public final class GatewayBootstrap {
                         databaseBootstrap.wireServerNoticeFacade(),
                         databaseBootstrap.wireGiftCodeFacade(),
                         databaseBootstrap.wirePlayerReportFacade(),
-                        databaseBootstrap.wireActivityFacade()),
+                        databaseBootstrap.wireActivityFacade(),
+                        databaseBootstrap.expansion().wireCompensationFacade()),
                 new CollectionFacades(
                         databaseBootstrap.wireBestiaryFacade(),
                         databaseBootstrap.wireReputationFacade(),

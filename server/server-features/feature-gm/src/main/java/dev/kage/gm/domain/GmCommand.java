@@ -224,6 +224,22 @@ public sealed interface GmCommand {
         }
     }
 
+    /**
+     * ADR-165 — thư bồi thường cho MỌI nhân vật cấp ≥ {@code minLevel}; tạo tài sản ⇒ ADMIN, cùng lý do {@link Give}.
+     * {@code itemCode} rỗng = chỉ vàng.
+     */
+    record Compensate(String code, long gold, String itemCode, int quantity, int minLevel) implements Desk {
+        @Override
+        public String name() {
+            return "compensate";
+        }
+
+        @Override
+        public GmRole requiredRole() {
+            return GmRole.ADMIN;
+        }
+    }
+
     /** Liệt kê báo cáo chưa xử lý. */
     record Reports() implements Desk {
         @Override

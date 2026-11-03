@@ -119,6 +119,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.character.PostgresExpBuffAdapter(dataSource));
     }
 
+    /** ADR-165 — sổ các đợt thư bồi thường. */
+    public dev.kage.gm.api.CompensationFacade wireCompensationFacade() {
+        return new dev.kage.gm.api.CompensationFacade(
+                new dev.kage.server.database.gm.PostgresCompensationAdapter(dataSource));
+    }
+
     /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
     public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
         return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));

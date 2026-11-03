@@ -222,7 +222,7 @@ final class GmCommandRouter {
     private static String help(GmFacade.AuditTicket ticket) {
         ticket.finish(GmOutcome.OK, "{}");
         return "GM: help who inspect kick mute unmute announce heal goto summon reports report resolve"
-                + " | ADMIN: give gold event motd code";
+                + " | ADMIN: give gold event motd code compensate";
     }
 
     private String who(Character target, GmFacade.AuditTicket ticket) {
