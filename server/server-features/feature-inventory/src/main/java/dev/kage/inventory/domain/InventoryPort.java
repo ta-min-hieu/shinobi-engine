@@ -70,6 +70,14 @@ public interface InventoryPort {
         return false;
     }
 
+    /**
+     * ADR-164 — cộng {@code minutes} phút x2 EXP (dồn vào phần còn lại) trong giao dịch dùng vật phẩm; vượt trần ⇒
+     * {@code false}, không ghi gì. Mặc định (fake ở test) không hỗ trợ ⇒ {@code false}, không ai mất viên đan.
+     */
+    default boolean extendDoubleExp(Transaction tx, long characterId, int minutes) {
+        return false;
+    }
+
     /** ADR-159 — người chơi đã khoá món này chưa; đường làm món rời nhân vật phải từ chối. Fake ở test: chưa khoá. */
     default boolean isLocked(Transaction tx, long itemId) {
         return false;

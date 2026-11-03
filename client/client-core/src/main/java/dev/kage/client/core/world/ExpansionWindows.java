@@ -137,6 +137,7 @@ record ExpansionWindows(
             HorizonBackdrop backdrop) {
         zoneMap.useBanner(hud::setZoneBanner);
         lot27.bossBoard().useBoard(hud::setBossBoard); // ADR-157
+        lot29.expBuff().useBanner(hud::setExpBuff); // ADR-164
         displaySettings.applyTo(titles, feedback, backdrop, weather.overlay());
     }
 

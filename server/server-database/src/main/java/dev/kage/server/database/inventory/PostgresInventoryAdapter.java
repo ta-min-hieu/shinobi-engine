@@ -47,6 +47,19 @@ public final class PostgresInventoryAdapter implements InventoryPort {
     // nó nhận là "20 ô túi + số món đang mặc": số món nằm trong túi vì thế vẫn bị chặn ở đúng 20.
     private static final String IS_LOCKED = "SELECT locked FROM inventory_item WHERE id = ?";
 
+    /** ADR-164 — trần thời gian x2 EXP còn lại sau khi dồn (phút). */
+    private static final int DOUBLE_EXP_CAP_MINUTES = 300;
+
+    // ADR-164 — dồn vào phần CÒN LẠI (hết hạn thì tính từ bây giờ); vượt trần thì không dòng nào đổi ⇒ từ chối.
+    private static final String EXTEND_DOUBLE_EXP = """
+            INSERT INTO character_exp_buff AS b (character_id, expires_at)
+            SELECT ?, now() + make_interval(mins => ?)
+             WHERE ? <= ?
+            ON CONFLICT (character_id) DO UPDATE
+               SET expires_at = GREATEST(b.expires_at, now()) + make_interval(mins => ?)
+             WHERE GREATEST(b.expires_at, now()) + make_interval(mins => ?) <= now() + make_interval(mins => ?)
+            """;
+
     private static final String COUNT_EQUIPPED = """
             SELECT COUNT(*) FROM equipment_slot WHERE character_id = ? AND inventory_item_id IS NOT NULL
             """;
@@ -227,5 +240,21 @@ public final class PostgresInventoryAdapter implements InventoryPort {
     public boolean isLocked(Transaction tx, long itemId) {
         return JdbcOperations.queryOne(((JdbcTransaction) tx).connection(), IS_LOCKED, rs -> rs.getBoolean(1), itemId)
                 .orElse(false);
+    }
+
+    @Override
+    public boolean extendDoubleExp(Transaction tx, long characterId, int minutes) {
+        int cap = DOUBLE_EXP_CAP_MINUTES;
+        return JdbcOperations.update(
+                        ((JdbcTransaction) tx).connection(),
+                        EXTEND_DOUBLE_EXP,
+                        characterId,
+                        minutes,
+                        minutes,
+                        cap,
+                        minutes,
+                        minutes,
+                        cap)
+                > 0;
     }
 }

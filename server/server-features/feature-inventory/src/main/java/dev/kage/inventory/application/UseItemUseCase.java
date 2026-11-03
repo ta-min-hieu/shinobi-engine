@@ -62,7 +62,9 @@ public final class UseItemUseCase {
         /** Linh thú đang mặc đã ở bậc cao nhất. Không trừ viên đan. */
         PET_ALREADY_EVOLVED,
         /** Túi đã đạt sức chứa tối đa (ADR-088). Không trừ Túi Càn Khôn. */
-        BAG_AT_MAX
+        BAG_AT_MAX,
+        /** Đan x2 EXP (ADR-164) nhưng thời gian còn lại đã chạm trần. Không trừ viên đan. */
+        EXP_BUFF_AT_MAX
     }
 
     /**
@@ -128,15 +130,9 @@ public final class UseItemUseCase {
         if (item.quantity() - tradeOfferPort.offeredQuantity(t, characterId, inventoryItemId) < 1) {
             return UseItemResult.failed(Outcome.ITEM_IN_TRADE);
         }
-        if (template.get().useEffect() == ItemUseEffect.EXPAND_BAG
-                && !inventoryPort.expandCapacity(t, characterId, template.get().useValue())) {
-            return UseItemResult.failed(Outcome.BAG_AT_MAX);
-        }
-        if (template.get().useEffect() == ItemUseEffect.EVOLVE_PET) {
-            Optional<Outcome> refused = evolveEquippedPet(t, characterId);
-            if (refused.isPresent()) {
-                return UseItemResult.failed(refused.get());
-            }
+        Optional<Outcome> refused = applyEffect(t, characterId, template.get());
+        if (refused.isPresent()) {
+            return UseItemResult.failed(refused.get());
         }
 
         inventory.consumeOne(inventoryItemId);
@@ -153,6 +149,25 @@ public final class UseItemUseCase {
                 remaining,
                 template.get().useEffect(),
                 template.get().useValue());
+    }
+
+    /**
+     * Hiệu ứng phải ghi TRONG giao dịch dùng (trước khi trừ món) — từ chối thì chưa ghi gì, món chưa bị trừ. Tách khỏi
+     * {@link #useInTransaction} vì trần CyclomaticComplexity.
+     */
+    private Optional<Outcome> applyEffect(Transaction t, long characterId, ItemTemplate template) {
+        return switch (template.useEffect()) {
+            case EXPAND_BAG ->
+                inventoryPort.expandCapacity(t, characterId, template.useValue())
+                        ? Optional.empty()
+                        : Optional.of(Outcome.BAG_AT_MAX);
+            case DOUBLE_EXP ->
+                inventoryPort.extendDoubleExp(t, characterId, template.useValue())
+                        ? Optional.empty()
+                        : Optional.of(Outcome.EXP_BUFF_AT_MAX);
+            case EVOLVE_PET -> evolveEquippedPet(t, characterId);
+            case HEAL_HP -> Optional.empty();
+        };
     }
 
     /**

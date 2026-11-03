@@ -41,6 +41,12 @@ final class HudBanners {
     private final Label bossLabel;
     private Cell<Table> bossCell;
 
+    /** ADR-164 — dòng "x2 EXP"; cùng cách gỡ khỏi ô như bảng boss. */
+    private final Table expBuffGroup;
+
+    private final Label expBuffLabel;
+    private Cell<Table> expBuffCell;
+
     /** Độ trễ đường truyền, đo từ {@code PongResponse} — xem {@link #setLatency(long)}. */
     private final Label latencyLabel;
 
@@ -74,6 +80,10 @@ final class HudBanners {
         this.bossGroup = new Table();
         bossGroup.setBackground(skin.panel);
         bossGroup.add(bossLabel).pad(6f);
+        this.expBuffLabel = new Label("", skin.statLabelStyle);
+        this.expBuffGroup = new Table();
+        expBuffGroup.setBackground(skin.panel);
+        expBuffGroup.add(expBuffLabel).pad(6f);
         this.latencyLabel = new Label(i18n.get("hud.latency_unknown"), skin.statLabelStyle);
         latencyLabel.setFontScale(HudLayout.SMALL_LABEL_SCALE);
     }
@@ -102,6 +112,8 @@ final class HudBanners {
         this.zoneCell = column.add((Table) null).right();
         column.row();
         this.bossCell = column.add((Table) null).right().padTop(4f);
+        column.row();
+        this.expBuffCell = column.add((Table) null).right().padTop(4f);
         column.row();
         column.add(questCard).right().padTop(8f).row();
         return column;
@@ -151,5 +163,11 @@ final class HudBanners {
     void setBossBoard(String text) {
         bossLabel.setText(text);
         bossCell.setActor(text.isEmpty() ? null : bossGroup);
+    }
+
+    /** ADR-164 — một dòng đã dịch; rỗng = gỡ. */
+    void setExpBuff(String text) {
+        expBuffLabel.setText(text);
+        expBuffCell.setActor(text.isEmpty() ? null : expBuffGroup);
     }
 }

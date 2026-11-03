@@ -531,3 +531,9 @@ message ClaimWeeklyTaskResponse {
   string task_code = 2;
   GetWeeklyTasksResponse tasks = 3;
 }
+
+// Event: Server -> Client (OPCODE_EXP_BUFF_CHANGED_EVENT = 244) — ADR-164. Gửi khi vừa dùng Đan x2 kinh nghiệm và khi
+// vào world mà x2 còn hạn. Client tự đếm ngược từ lúc nhận (chỉ để HIỂN THỊ — server mới là bên nhân EXP).
+message ExpBuffChangedEvent {
+  int64 seconds_left = 1;
+}

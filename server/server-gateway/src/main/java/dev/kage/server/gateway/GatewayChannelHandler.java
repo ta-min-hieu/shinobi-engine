@@ -1542,6 +1542,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             worldGateway.registry().achievements.onEnteredWorld(characterId, character.level());
             // ADR-095/096 — quỹ bế quan + giờ vào world; việc phụ, lỗi dừng bên trong.
             daily.onEnteredWorld(characterId);
+            // ADR-164 — x2 EXP còn hạn thì báo HUD; việc phụ, lỗi dừng bên trong.
+            expansion.lot29().expBuff().announce(characterId);
             // ADR-103 — thông báo server (RAM, không chạm DB).
             serviceDesk.sendNoticeOnEnter(characterId);
         } catch (CharacterNotFoundException e) {
@@ -2365,6 +2367,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             currentWorldFacadeIfPresent(characterId)
                     .ifPresent(facade -> facade.enqueueHealCharacter(characterId, result.value()));
         }
+        if (result.outcome() == UseItemUseCase.Outcome.OK && result.effect() == ItemUseEffect.DOUBLE_EXP) {
+            expansion.lot29().expBuff().announce(characterId); // ADR-164 — đọc lại hạn + báo HUD
+        }
         if (result.outcome() == UseItemUseCase.Outcome.OK && result.effect() == ItemUseEffect.EVOLVE_PET) {
             // ADR-078 — chỉ số linh thú vừa nhân bậc 2: tính lại như sau khi mặc đồ.
             applyEquipmentBonusAndComputeMaxHp(characterId);
@@ -2385,6 +2390,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case HEAL_HP -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_HEAL_HP;
             case EVOLVE_PET -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_EVOLVE_PET;
             case EXPAND_BAG -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_EXPAND_BAG;
+            case DOUBLE_EXP -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_DOUBLE_EXP;
         };
     }
 
@@ -2398,6 +2404,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case PET_LEVEL_TOO_LOW -> "error.pet_level_too_low";
             case PET_ALREADY_EVOLVED -> "error.pet_already_evolved";
             case BAG_AT_MAX -> "error.bag_at_max";
+            case EXP_BUFF_AT_MAX -> "error.exp_buff_at_max";
         };
     }
 

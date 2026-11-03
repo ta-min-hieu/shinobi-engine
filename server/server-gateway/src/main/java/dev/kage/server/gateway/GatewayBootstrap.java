@@ -688,7 +688,8 @@ public final class GatewayBootstrap {
                         databaseBootstrap.expansion().wireBagSortFacade(),
                         databaseBootstrap.expansion().wireGemCombineFacade(),
                         databaseBootstrap.expansion().wireDungeonSweepFacade(),
-                        databaseBootstrap.expansion().wireLuckyBagFacade()));
+                        databaseBootstrap.expansion().wireLuckyBagFacade(),
+                        databaseBootstrap.expansion().wireExpBuffFacade()));
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */
@@ -913,6 +914,9 @@ public final class GatewayBootstrap {
 
     /** ADR-149 — quẻ bói hôm nay cộng/trừ phần trăm EXP đánh quái (sau mọi hệ số khác). */
     private static long fortuneBoosted(GatewayFacades facades, long characterId, long amount) {
-        return facades.progression().expansion().fortune().boostedExp(characterId, amount, java.time.Instant.now());
+        java.time.Instant now = java.time.Instant.now();
+        long afterFortune = facades.progression().expansion().fortune().boostedExp(characterId, amount, now);
+        // ADR-164 — Đan x2 kinh nghiệm nhân đôi SAU mọi hệ số khác (đọc từ RAM, không chạm DB mỗi lần hạ quái).
+        return facades.progression().expansion().lot29().expBuff().boosted(characterId, afterFortune, now);
     }
 }

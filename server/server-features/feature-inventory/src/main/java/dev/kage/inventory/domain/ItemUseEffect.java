@@ -17,5 +17,7 @@ public enum ItemUseEffect {
     /** Tiến hoá linh thú ĐANG MẶC lên bậc 2 (ADR-078) — {@link ItemTemplate#useValue()} không dùng. */
     EVOLVE_PET,
     /** Mở rộng túi đồ thêm {@link ItemTemplate#useValue()} ô (ADR-088), tới trần. */
-    EXPAND_BAG
+    EXPAND_BAG,
+    /** EXP đánh quái nhân đôi thêm {@link ItemTemplate#useValue()} phút, cộng dồn tới trần (ADR-164). */
+    DOUBLE_EXP
 }

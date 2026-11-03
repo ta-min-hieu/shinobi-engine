@@ -113,6 +113,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.inventory.PostgresLuckyBagAdapter(dataSource));
     }
 
+    /** ADR-164 — đan x2 kinh nghiệm (đọc hạn). */
+    public dev.kage.character.api.ExpBuffFacade wireExpBuffFacade() {
+        return new dev.kage.character.api.ExpBuffFacade(
+                new dev.kage.server.database.character.PostgresExpBuffAdapter(dataSource));
+    }
+
     /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
     public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
         return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));

@@ -302,6 +302,11 @@ public final class CombatHud implements HudWindow {
         banners.setBossBoard(text);
     }
 
+    /** ADR-164 — dòng "x2 EXP" (chữ đã dịch); rỗng = ẩn. */
+    public void setExpBuff(String text) {
+        banners.setExpBuff(text);
+    }
+
     public void setOnClaimQuestClicked(Runnable listener) {
         quest.setOnClaimClicked(listener);
     }

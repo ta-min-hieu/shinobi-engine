@@ -1,5 +1,6 @@
 package dev.kage.server.gateway;
 
+import dev.kage.character.api.ExpBuffFacade;
 import dev.kage.inventory.api.BagSortFacade;
 import dev.kage.inventory.api.GemCombineFacade;
 import dev.kage.inventory.api.ItemLockFacade;
@@ -12,7 +13,8 @@ record Lot29Facades(
         BagSortFacade bagSort,
         GemCombineFacade gemCombine,
         DungeonSweepFacade dungeonSweep,
-        LuckyBagFacade luckyBag) {
+        LuckyBagFacade luckyBag,
+        ExpBuffFacade expBuff) {
 
     /** Composition không có các tính năng này (test). */
     static final Lot29Facades DISABLED = new Lot29Facades(
@@ -20,5 +22,6 @@ record Lot29Facades(
             BagSortFacade.DISABLED,
             GemCombineFacade.DISABLED,
             DungeonSweepFacade.DISABLED,
-            LuckyBagFacade.DISABLED);
+            LuckyBagFacade.DISABLED,
+            ExpBuffFacade.DISABLED);
 }

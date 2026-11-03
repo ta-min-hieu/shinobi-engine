@@ -105,7 +105,9 @@ class ContentReferenceIntegrationTest {
             "spirit_jade_water_3",
             "spirit_jade_wood_3",
             // 2026-11-03 — túi phúc (ADR-163).
-            "lucky_bag");
+            "lucky_bag",
+            // 2026-11-03 — đan x2 kinh nghiệm (ADR-164).
+            "double_exp_pill");
 
     @Container
     static final PostgreSQLContainer POSTGRES =

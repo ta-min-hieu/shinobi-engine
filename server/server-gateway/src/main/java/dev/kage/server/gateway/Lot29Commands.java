@@ -8,6 +8,7 @@ record Lot29Commands(
         GemCombineCommands gemCombine,
         DungeonSweepCommands dungeonSweep,
         LuckyBagCommands luckyBag,
+        ExpBuffCommands expBuff,
         Lot29Facades facades) {
 
     static Lot29Commands of(GatewayFacades gateway, WorldGateway worldGateway) {
@@ -23,6 +24,7 @@ record Lot29Commands(
                         new PlayerNotices(
                                 gateway.contentFacades().socialFacades().mailFacade(), worldGateway.registry()))),
                 new LuckyBagCommands(facades.luckyBag()),
+                new ExpBuffCommands(facades.expBuff(), worldGateway.registry(), java.time.Clock.systemUTC()),
                 facades);
     }
 
