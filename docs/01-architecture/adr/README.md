@@ -194,6 +194,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-160](ADR-160-Bag-Sort.md) | Sắp xếp túi đồ: luật thuần `BagSortPolicy` (trang bị theo ô → dùng được → khác → đang mặc), gom chồng gộp được cùng loại + cùng trạng thái khoá; danh sách túi nay đọc theo `slot_index`, dòng mới nối cuối; 530/531; nút Sắp xếp | ✅ Accepted (lô 29) |
 | [ADR-161](ADR-161-Gem-Combine.md) | Ghép Linh Ngọc: thêm bậc 2/3 cho 4 loại ngọc (V129), 3 viên + vàng ⇒ 1 viên bậc trên 100%, ngọc khoá không bị ghép; 532–535; cửa sổ `/ghepngoc` | ✅ Accepted (lô 29) |
 | [ADR-162](ADR-162-Dungeon-Sweep.md) | Quét nhanh Bí Cảnh: cần đã hạ boss, tốn một lượt ngày chung (ADR-099) + 1.000 vàng, +400 EXP cộng thẳng, đồ bảng rơi boss đi bằng thư (V130); 1510/1511; `/quetbicanh` | ✅ Accepted (lô 29) |
+| [ADR-163](ADR-163-Lucky-Bag.md) | Túi phúc: bảng quà theo trọng số trong DB (V131, 10 quà tổng 100), server rút, lệnh mở riêng một transaction, % công khai; rơi từ boss Bí Cảnh/boss thế giới; 536–539; `/tuiphuc` | ✅ Accepted (lô 29) |
 ---
 
 ## ADR cần tạo (chưa viết)

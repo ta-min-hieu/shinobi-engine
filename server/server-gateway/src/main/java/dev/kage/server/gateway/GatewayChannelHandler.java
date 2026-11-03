@@ -924,6 +924,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetItemLockCommand.parser(),
                             Opcode.OPCODE_SET_ITEM_LOCK_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot29().itemLock().set(id, c)))),
+            // Lô 29 — túi phúc (ADR-163).
+            Map.entry(
+                    Opcode.OPCODE_GET_LUCKY_BAGS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetLuckyBagsRequest.parser(),
+                            Opcode.OPCODE_GET_LUCKY_BAGS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot29().luckyBag().bags(id))),
+            Map.entry(
+                    Opcode.OPCODE_OPEN_LUCKY_BAG_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.OpenLuckyBagCommand.parser(),
+                            Opcode.OPCODE_OPEN_LUCKY_BAG_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot29().luckyBag().open(id, c))),
             // Lô 29 — quét nhanh Bí Cảnh (ADR-162).
             Map.entry(
                     Opcode.OPCODE_SWEEP_DUNGEON_COMMAND_VALUE,

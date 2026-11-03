@@ -514,3 +514,48 @@ message CombineGemsResponse {
   int64 result_item_template_id = 2;
   GetGemRecipesResponse recipes = 3;
 }
+
+// ===== ADR-163 — túi phúc: mở một túi ra MỘT phần quà rút theo trọng số (server rút). CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_GET_LUCKY_BAGS_REQUEST = 536).
+message GetLuckyBagsRequest {}
+
+// Một phần quà: vàng (item_template_id = 0) hoặc một chồng đồ. weight / tổng weight = tỉ lệ rút.
+message LuckyBagRewardView {
+  int64 gold = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int32 weight = 4;
+}
+
+message LuckyBagView {
+  int64 bag_item_template_id = 1;
+  int32 owned = 2;
+  repeated LuckyBagRewardView rewards = 3;
+}
+
+// Response: Server -> Client (OPCODE_GET_LUCKY_BAGS_RESPONSE = 537).
+message GetLuckyBagsResponse {
+  repeated LuckyBagView bags = 1;
+}
+
+// Command: Client -> Server (OPCODE_OPEN_LUCKY_BAG_COMMAND = 538). Mở MỘT túi loại này.
+message OpenLuckyBagCommand {
+  int64 bag_item_template_id = 1;
+}
+
+enum OpenLuckyBagOutcome {
+  OPEN_LUCKY_BAG_OUTCOME_UNSPECIFIED = 0;
+  OPEN_LUCKY_BAG_OUTCOME_OK = 1;
+  OPEN_LUCKY_BAG_OUTCOME_NOT_A_BAG = 2;
+  OPEN_LUCKY_BAG_OUTCOME_NO_BAG = 3;
+  OPEN_LUCKY_BAG_OUTCOME_BAG_FULL = 4;
+  OPEN_LUCKY_BAG_OUTCOME_GOLD_FULL = 5;
+}
+
+// Response: Server -> Client (OPCODE_OPEN_LUCKY_BAG_RESPONSE = 539). bags = bảng sau lần mở.
+message OpenLuckyBagResponse {
+  OpenLuckyBagOutcome outcome = 1;
+  LuckyBagRewardView reward = 2;
+  GetLuckyBagsResponse bags = 3;
+}

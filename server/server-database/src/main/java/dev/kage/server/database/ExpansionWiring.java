@@ -107,6 +107,12 @@ public final class ExpansionWiring {
                 java.time.Clock.systemUTC());
     }
 
+    /** ADR-163 — túi phúc. */
+    public dev.kage.inventory.api.LuckyBagFacade wireLuckyBagFacade() {
+        return new dev.kage.inventory.api.LuckyBagFacade(
+                new dev.kage.server.database.inventory.PostgresLuckyBagAdapter(dataSource));
+    }
+
     /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
     public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
         return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));
