@@ -102,7 +102,9 @@ class HealingPillIntegrationTest {
         assertThat(catalog)
                 .filteredOn(entry -> !PILL_CODE.equals(entry.code())
                         && !"spirit_beast_pill".equals(entry.code())
-                        && !"bag_expansion_pouch".equals(entry.code()))
+                        && !"bag_expansion_pouch".equals(entry.code())
+                        // ADR-164 — Đan x2 kinh nghiệm, hiệu ứng riêng DOUBLE_EXP.
+                        && !"double_exp_pill".equals(entry.code()))
                 .isNotEmpty()
                 .allSatisfy(entry -> assertThat(entry.useEffect()).isNull());
     }
