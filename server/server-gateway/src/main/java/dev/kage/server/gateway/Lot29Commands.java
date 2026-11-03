@@ -3,11 +3,25 @@ package dev.kage.server.gateway;
 import dev.kage.protocol.SortInventoryResponse;
 
 /** Lớp lệnh lô 29 (ADR-159…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
-record Lot29Commands(ItemLockCommands itemLock, GemCombineCommands gemCombine, Lot29Facades facades) {
+record Lot29Commands(
+        ItemLockCommands itemLock,
+        GemCombineCommands gemCombine,
+        DungeonSweepCommands dungeonSweep,
+        Lot29Facades facades) {
 
-    static Lot29Commands of(Lot29Facades facades) {
+    static Lot29Commands of(GatewayFacades gateway, WorldGateway worldGateway) {
+        Lot29Facades facades = gateway.progression().expansion().lot29();
         return new Lot29Commands(
-                new ItemLockCommands(facades.itemLock()), new GemCombineCommands(facades.gemCombine()), facades);
+                new ItemLockCommands(facades.itemLock()),
+                new GemCombineCommands(facades.gemCombine()),
+                new DungeonSweepCommands(new DungeonSweepCommands.Deps(
+                        facades.dungeonSweep(),
+                        gateway.inventoryFacade(),
+                        gateway.characterFacade(),
+                        worldGateway.registry(),
+                        new PlayerNotices(
+                                gateway.contentFacades().socialFacades().mailFacade(), worldGateway.registry()))),
+                facades);
     }
 
     /** ADR-160 — Virtual Thread; {@code characterId} từ session. */

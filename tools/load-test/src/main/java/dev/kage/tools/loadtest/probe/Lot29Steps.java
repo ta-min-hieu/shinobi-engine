@@ -18,12 +18,15 @@ import dev.kage.protocol.SetItemLockCommand;
 import dev.kage.protocol.SetItemLockResponse;
 import dev.kage.protocol.SortInventoryCommand;
 import dev.kage.protocol.SortInventoryResponse;
+import dev.kage.protocol.SweepDungeonCommand;
+import dev.kage.protocol.SweepDungeonResponse;
 
 /**
  * Bước lô 29: túi đồ {@code bag} (in id:templateId×số lượng, 🔒 nếu khoá), khoá vật phẩm (ADR-159) {@code
  * lock:<itemId>}, {@code unlock:<itemId>}, cùng hai đường làm đồ rời túi để thử khoá: {@code sell:<itemId>}, {@code
  * dismantle:<itemId>}; sắp xếp túi (ADR-160) {@code sortBag}; ghép
- * ngọc (ADR-161) {@code gemRecipes}, {@code combineGem:<templateId nguồn>}.
+ * ngọc (ADR-161) {@code gemRecipes}, {@code combineGem:<templateId nguồn>}; quét Bí
+ * Cảnh (ADR-162) {@code sweep[:<mã>]}.
  */
 final class Lot29Steps {
 
@@ -43,6 +46,7 @@ final class Lot29Steps {
             case "sortBag" -> sortBag();
             case "gemRecipes" -> gemRecipes();
             case "combineGem" -> combineGem(Long.parseLong(arg));
+            case "sweep" -> sweep(arg.isEmpty() ? "sample_dungeon" : arg);
             default -> "bước không hiểu";
         };
     }
@@ -109,6 +113,26 @@ final class Lot29Steps {
                     CombineGemsResponse r = CombineGemsResponse.parseFrom(p);
                     return r.getOutcome().name() + " ra=" + r.getResultItemTemplateId() + " "
                             + describe(r.getRecipes());
+                });
+    }
+
+    private String sweep(String dungeonCode) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SWEEP_DUNGEON_COMMAND_VALUE,
+                SweepDungeonCommand.newBuilder().setDungeonCode(dungeonCode).build(),
+                Opcode.OPCODE_SWEEP_DUNGEON_RESPONSE_VALUE,
+                p -> {
+                    SweepDungeonResponse r = SweepDungeonResponse.parseFrom(p);
+                    StringBuilder line = new StringBuilder(r.getOutcome().name())
+                            .append(" exp=")
+                            .append(r.getExpGained())
+                            .append(" còn=")
+                            .append(r.getEntriesLeft());
+                    r.getLootList().forEach(l -> line.append(' ')
+                            .append(l.getItemTemplateId())
+                            .append('x')
+                            .append(l.getQuantity()));
+                    return line.toString();
                 });
     }
 

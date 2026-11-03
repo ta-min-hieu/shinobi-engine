@@ -64,6 +64,6 @@ record ExpansionCommands(
                 new MilestoneCommands(expansion.milestones(), clock),
                 new WeeklyTaskCommands(expansion.weeklyTasks(), clock),
                 new HonorCommands(expansion.honor(), clock),
-                Lot29Commands.of(expansion.lot29()));
+                Lot29Commands.of(facades, worldGateway));
     }
 }

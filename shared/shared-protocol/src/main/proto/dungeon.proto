@@ -116,3 +116,32 @@ message GetTowerStatusResponse {
   int32 next_monster_count = 5;
   repeated TowerClimberView top = 6;
 }
+
+// ===== ADR-162 — quét nhanh Bí Cảnh đã từng hạ boss. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_SWEEP_DUNGEON_COMMAND = 1510).
+message SweepDungeonCommand {
+  string dungeon_code = 1;
+}
+
+enum SweepDungeonOutcome {
+  SWEEP_DUNGEON_OUTCOME_UNSPECIFIED = 0;
+  SWEEP_DUNGEON_OUTCOME_OK = 1;
+  SWEEP_DUNGEON_OUTCOME_UNKNOWN_DUNGEON = 2;
+  SWEEP_DUNGEON_OUTCOME_NOT_CLEARED = 3;          // chưa từng hạ boss Bí Cảnh này
+  SWEEP_DUNGEON_OUTCOME_DAILY_LIMIT_REACHED = 4;  // hết lượt hôm nay (chung với lượt vào thật)
+  SWEEP_DUNGEON_OUTCOME_NOT_ENOUGH_GOLD = 5;
+}
+
+message SweepLootView {
+  int64 item_template_id = 1;
+  int32 quantity = 2;
+}
+
+// Response: Server -> Client (OPCODE_SWEEP_DUNGEON_RESPONSE = 1511). loot đi bằng thư hệ thống.
+message SweepDungeonResponse {
+  SweepDungeonOutcome outcome = 1;
+  int64 exp_gained = 2;
+  int32 entries_left = 3;
+  repeated SweepLootView loot = 4;
+}

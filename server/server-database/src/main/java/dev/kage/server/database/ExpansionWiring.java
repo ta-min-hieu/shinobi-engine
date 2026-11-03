@@ -100,6 +100,13 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.inventory.PostgresGemCombineAdapter(dataSource));
     }
 
+    /** ADR-162 — quét nhanh Bí Cảnh. */
+    public dev.kage.world.api.DungeonSweepFacade wireDungeonSweepFacade() {
+        return new dev.kage.world.api.DungeonSweepFacade(
+                new dev.kage.server.database.world.PostgresDungeonSweepAdapter(dataSource),
+                java.time.Clock.systemUTC());
+    }
+
     /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
     public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
         return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));
