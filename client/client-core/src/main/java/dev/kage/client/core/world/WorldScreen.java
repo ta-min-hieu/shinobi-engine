@@ -1042,6 +1042,7 @@ public final class WorldScreen implements GameScreen {
 
     private void syncCombatHud() {
         inventory.autoPotion().update(System.nanoTime()); // ADR-156
+        reports.community().expansion().lot30().restReminder().update(System.nanoTime()); // ADR-174
         combatHud.setPlayerHp(combatHudController.playerHp(), combatHudController.playerMaxHp());
         combatHud.setPlayerChi(combatHudController.playerChi(), combatHudController.playerMaxChi());
         combatHud.setLevel(characterLevel);

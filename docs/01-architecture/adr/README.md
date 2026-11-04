@@ -205,6 +205,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-171](ADR-171-Inspect-Player.md) | Soi trang bị người khác: `/soi <tên>` (cả offline) — cảnh giới, Lực Chiến (công thức ADR-056), món đang mặc; riêng tư lưu server (V137), công tắc trong /caidat; 249–252 | ✅ Accepted (lô 30) |
 | [ADR-172](ADR-172-Guild-Rename.md) | Đổi tên bang hội: bang chủ, luật tên như tạo bang, 20.000 vàng của bang chủ (không có quỹ vàng bang), 30 ngày (V138), báo 720 RENAMED; 741/742; `/doitenbang` | ✅ Accepted (lô 30) |
 | [ADR-173](ADR-173-Friend-Notes.md) | Ghi chú bạn bè: ghi chú riêng ≤ 24 ký tự cho người đang là bạn (V139 `friend_note`), `FriendView.note`, 1145/1146; `/ghichu` | ✅ Accepted (lô 30) |
+| [ADR-174](ADR-174-Rest-Reminder.md) | Nhắc nghỉ ngơi: thuần client, dòng hệ thống sau 2 giờ chơi liên tục rồi mỗi giờ; công tắc `/caidat` mặc định bật | ✅ Accepted (lô 30) |
 ---
 
 ## ADR cần tạo (chưa viết)

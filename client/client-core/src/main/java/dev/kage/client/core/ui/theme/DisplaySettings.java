@@ -27,7 +27,9 @@ public final class DisplaySettings {
         /**
          * ADR-171 — cho người khác soi trang bị của mình; công tắc này được gửi lên SERVER (server mới là bên từ chối).
          */
-        ALLOW_INSPECT("display.allow_inspect");
+        ALLOW_INSPECT("display.allow_inspect"),
+        /** ADR-174 — nhắc nghỉ ngơi sau 2 giờ chơi liên tục, rồi mỗi giờ. */
+        REST_REMINDER("display.rest_reminder");
 
         private final String key;
         private final boolean defaultOn;
