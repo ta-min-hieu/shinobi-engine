@@ -27,9 +27,11 @@ import dev.kage.protocol.UnsocketGemResponse;
 final class Lot30Steps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot30SocialSteps social;
 
     Lot30Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.social = new Lot30SocialSteps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -41,7 +43,7 @@ final class Lot30Steps {
             case "sellJunk" -> sellJunk();
             case "inspect" -> inspect(arg);
             case "hideGear" -> hideGear(Boolean.parseBoolean(arg));
-            default -> "bước không hiểu";
+            default -> social.step(verb, arg);
         };
     }
 

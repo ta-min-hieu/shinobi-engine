@@ -171,6 +171,7 @@ enum GuildChangeReason {
   GUILD_CHANGE_REASON_YOU_WERE_ACCEPTED = 6;
   GUILD_CHANGE_REASON_LEVEL_UP = 7;                // ADR-068 — bang vừa lên cấp
   GUILD_CHANGE_REASON_WEEKLY_QUEST_COMPLETED = 8;  // ADR-069 — thưởng đã gửi qua thư
+  GUILD_CHANGE_REASON_RENAMED = 9;                 // ADR-172 — bang vừa đổi tên
 }
 
 // Event: Server -> Client (OPCODE_GUILD_CHANGED_EVENT = 720).
@@ -410,4 +411,28 @@ enum BidGuildAuctionOutcome {
 message BidGuildAuctionResponse {
   BidGuildAuctionOutcome outcome = 1;
   ListGuildAuctionsResponse status = 2;
+}
+
+// Command: Client -> Server (OPCODE_RENAME_GUILD_COMMAND = 741) — ADR-172. Chỉ bang chủ; tốn vàng của bang chủ.
+message RenameGuildCommand {
+  string new_name = 1;
+}
+
+enum RenameGuildOutcome {
+  RENAME_GUILD_OUTCOME_UNSPECIFIED = 0;
+  RENAME_GUILD_OUTCOME_OK = 1;
+  RENAME_GUILD_OUTCOME_NOT_IN_GUILD = 2;
+  RENAME_GUILD_OUTCOME_NOT_LEADER = 3;
+  RENAME_GUILD_OUTCOME_INVALID_NAME = 4;
+  RENAME_GUILD_OUTCOME_NAME_TAKEN = 5;
+  RENAME_GUILD_OUTCOME_ON_COOLDOWN = 6;
+  RENAME_GUILD_OUTCOME_NOT_ENOUGH_GOLD = 7;
+}
+
+// Response: Server -> Client (OPCODE_RENAME_GUILD_RESPONSE = 742).
+message RenameGuildResponse {
+  RenameGuildOutcome outcome = 1;
+  string name = 2;
+  int64 next_allowed_at_epoch_ms = 3;  // OK / ON_COOLDOWN: lúc được đổi lần sau
+  int64 fee = 4;
 }

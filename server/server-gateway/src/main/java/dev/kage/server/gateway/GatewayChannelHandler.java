@@ -924,6 +924,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetItemLockCommand.parser(),
                             Opcode.OPCODE_SET_ITEM_LOCK_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot29().itemLock().set(id, c)))),
+            // Lô 30 — đổi tên bang hội (ADR-172).
+            Map.entry(
+                    Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.RenameGuildCommand.parser(),
+                            Opcode.OPCODE_RENAME_GUILD_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot30().guildRename().rename(id, c))),
             // Lô 30 — soi trang bị người khác (ADR-171); Lực Chiến theo đúng công thức bảng nhân vật.
             Map.entry(
                     Opcode.OPCODE_INSPECT_CHARACTER_REQUEST_VALUE,

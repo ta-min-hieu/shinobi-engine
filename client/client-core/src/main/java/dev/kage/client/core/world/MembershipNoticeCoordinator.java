@@ -34,7 +34,8 @@ final class MembershipNoticeCoordinator implements WindowFlow {
             GuildChangeReason.GUILD_CHANGE_REASON_DISBANDED, "guild.notice.your_guild_disbanded",
             GuildChangeReason.GUILD_CHANGE_REASON_YOU_WERE_ACCEPTED, "guild.notice.you_were_accepted",
             GuildChangeReason.GUILD_CHANGE_REASON_LEVEL_UP, "guild.notice.level_up",
-            GuildChangeReason.GUILD_CHANGE_REASON_WEEKLY_QUEST_COMPLETED, "guild.notice.weekly_quest_completed");
+            GuildChangeReason.GUILD_CHANGE_REASON_WEEKLY_QUEST_COMPLETED, "guild.notice.weekly_quest_completed",
+            GuildChangeReason.GUILD_CHANGE_REASON_RENAMED, "guild.notice.renamed"); // ADR-172
 
     private final ChatCoordinator chat;
     private final PartyCoordinator party;

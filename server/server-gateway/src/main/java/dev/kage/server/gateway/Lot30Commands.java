@@ -17,6 +17,7 @@ record Lot30Commands(
         MailBulkCommands mailBulk,
         JunkSaleCommands junkSale,
         InspectCommands inspect,
+        GuildRenameCommands guildRename,
         Lot30Facades facades,
         Clock clock) {
 
@@ -28,6 +29,11 @@ record Lot30Commands(
                         gateway.characterFacade(),
                         gateway.inventoryFacade(),
                         gateway.progression().expansion().lot30().inspectPrivacy())),
+                new GuildRenameCommands(new GuildRenameCommands.Deps(
+                        gateway.progression().expansion().lot30().guildRename(),
+                        gateway.contentFacades().socialFacades().guildFacade(),
+                        worldGateway.registry(),
+                        Clock.systemUTC())),
                 gateway.progression().expansion().lot30(),
                 Clock.systemUTC());
     }

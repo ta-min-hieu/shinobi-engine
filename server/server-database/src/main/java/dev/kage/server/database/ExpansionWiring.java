@@ -155,6 +155,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.character.PostgresInspectPrivacyAdapter(dataSource));
     }
 
+    /** ADR-172 — đổi tên bang hội. */
+    public dev.kage.guild.api.GuildRenameFacade wireGuildRenameFacade() {
+        return new dev.kage.guild.api.GuildRenameFacade(
+                new dev.kage.server.database.guild.PostgresGuildRenameAdapter(dataSource));
+    }
+
     /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
     public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
         return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));

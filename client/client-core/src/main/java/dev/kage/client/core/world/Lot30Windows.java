@@ -4,7 +4,8 @@ import dev.kage.client.core.ui.theme.KageSkin;
 
 /**
  * Luồng lô 30 — nhận hết thư (ADR-167), tháo Linh Ngọc (ADR-168), sổ vàng (ADR-169), bán rác
- * (ADR-170), soi trang bị (ADR-171). Gom thành MỘT thành phần của
+ * (ADR-170), soi trang bị (ADR-171), đổi tên bang
+ * (ADR-172). Gom thành MỘT thành phần của
  * {@link ExpansionWindows} để {@code create} ở đó không vượt trần {@code MethodLength}.
  */
 record Lot30Windows(
@@ -12,7 +13,8 @@ record Lot30Windows(
         GemRemovalCoordinator gemRemoval,
         GoldHistoryCoordinator goldHistory,
         JunkSaleCoordinator junkSale,
-        InspectCoordinator inspect) {
+        InspectCoordinator inspect,
+        GuildRenameCoordinator guildRename) {
 
     static Lot30Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot30Windows(
@@ -20,7 +22,8 @@ record Lot30Windows(
                 new GemRemovalCoordinator(sender, feeds),
                 GoldHistoryCoordinator.create(skin, sender, feeds),
                 JunkSaleCoordinator.create(skin, sender, feeds),
-                InspectCoordinator.create(skin, sender, feeds));
+                InspectCoordinator.create(skin, sender, feeds),
+                new GuildRenameCoordinator(sender, feeds.chat()));
     }
 
     /** Đăng ký vào hub. */
@@ -30,5 +33,6 @@ record Lot30Windows(
         panels.register(goldHistory.panel(), goldHistory);
         panels.register(junkSale.panel(), junkSale);
         panels.register(inspect.panel(), inspect);
+        panels.register(guildRename);
     }
 }
