@@ -141,3 +141,18 @@ enum RedeemGiftCodeOutcome {
 message RedeemGiftCodeResponse {
   RedeemGiftCodeOutcome outcome = 1;
 }
+
+// Command: Client -> Server (OPCODE_CLAIM_ALL_MAIL_COMMAND = 911) — ADR-167. Lĩnh vàng/đồ của MỌI thư chưa lĩnh (dừng ở
+// thư đầu tiên túi không chứa nổi), rồi nếu delete_claimed thì xoá mọi thư đã lĩnh xong / không còn gì để lĩnh.
+message ClaimAllMailCommand {
+  bool delete_claimed = 1;
+}
+
+// Response: Server -> Client (OPCODE_CLAIM_ALL_MAIL_RESPONSE = 912).
+message ClaimAllMailResponse {
+  int32 claimed = 1;   // số thư vừa lĩnh
+  int64 gold = 2;      // tổng vàng vừa lĩnh
+  int32 items = 3;     // tổng số món vừa lĩnh
+  int32 deleted = 4;   // số thư đã xoá
+  bool bag_full = 5;   // dừng giữa chừng vì túi đầy — còn thư chưa lĩnh
+}

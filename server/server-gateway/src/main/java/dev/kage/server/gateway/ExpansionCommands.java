@@ -22,7 +22,8 @@ record ExpansionCommands(
         MilestoneCommands milestones,
         WeeklyTaskCommands weeklyTasks,
         HonorCommands honor,
-        Lot29Commands lot29) {
+        Lot29Commands lot29,
+        Lot30Commands lot30) {
 
     static ExpansionCommands of(GatewayFacades facades, WorldGateway worldGateway, NpcProximity proximity) {
         ExpansionFacades expansion = facades.progression().expansion();
@@ -64,6 +65,7 @@ record ExpansionCommands(
                 new MilestoneCommands(expansion.milestones(), clock),
                 new WeeklyTaskCommands(expansion.weeklyTasks(), clock),
                 new HonorCommands(expansion.honor(), clock),
-                Lot29Commands.of(facades, worldGateway));
+                Lot29Commands.of(facades, worldGateway),
+                Lot30Commands.of(facades, worldGateway));
     }
 }

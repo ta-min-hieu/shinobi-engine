@@ -21,9 +21,11 @@ import dev.kage.protocol.SweepDungeonResponse;
 final class Lot29ActivitySteps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot30Steps lot30;
 
     Lot29ActivitySteps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot30 = new Lot30Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -32,7 +34,7 @@ final class Lot29ActivitySteps {
             case "luckyBags" -> luckyBags();
             case "openBag" -> openBag(Long.parseLong(arg));
             case "costume" -> costume(Integer.parseInt(arg));
-            default -> "bước không hiểu";
+            default -> lot30.step(verb, arg);
         };
     }
 

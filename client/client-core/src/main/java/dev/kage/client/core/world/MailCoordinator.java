@@ -12,6 +12,7 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.client.core.ui.hud.MailPanel;
 import dev.kage.client.core.ui.hud.ScrollingList;
 import dev.kage.client.core.ui.theme.KageI18n;
+import dev.kage.protocol.ClaimAllMailCommand;
 import dev.kage.protocol.ClaimMailResponse;
 import dev.kage.protocol.DeleteMailResponse;
 import dev.kage.protocol.ListMailResponse;
@@ -78,6 +79,10 @@ final class MailCoordinator implements WindowFlow {
         panel.setOnRead(this::onRead);
         panel.setOnClaim(this::onClaim);
         panel.setOnDelete(sender::deleteMail);
+        // ADR-167 — kết quả về MailBulkCoordinator (dòng hệ thống + hỏi lại hộp thư và túi).
+        panel.setOnClaimAll(() -> sender.sendReadRequest(
+                Opcode.OPCODE_CLAIM_ALL_MAIL_COMMAND_VALUE,
+                ClaimAllMailCommand.newBuilder().setDeleteClaimed(true).build()));
         panel.setOnSend(this::onSend);
         panel.setStatus(text("mail.hint.open"));
         refreshView();

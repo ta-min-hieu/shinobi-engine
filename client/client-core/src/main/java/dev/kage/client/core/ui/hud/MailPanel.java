@@ -174,6 +174,9 @@ public final class MailPanel implements HudWindow {
     private Consumer<Composed> onSend;
     private Runnable onOpened;
 
+    /** ADR-167 — bấm "Nhận hết". */
+    private Runnable onClaimAll = () -> {};
+
     /**
      * Có được phép mở bằng phím M lúc này không. Mặc định là LUÔN được — panel không biết trên màn
      * hình còn khung nào khác, xem {@link #setCanOpen}.
@@ -331,6 +334,10 @@ public final class MailPanel implements HudWindow {
         Label hint = new Label(text("mail.hint.close"), skin.labelStyle);
         hint.setColor(SECTION_COLOR);
         row.add(hint).left().expandX().padRight(6f);
+        // ADR-167 — lĩnh mọi thư còn đồ/vàng rồi dọn thư đã xong.
+        row.add(actionButton("mail.action.claim_all", () -> fire(onClaimAll)))
+                .width(REFRESH_BUTTON_WIDTH_PX)
+                .padRight(6f);
         row.add(actionButton("mail.action.refresh", () -> fire(onOpened))).width(REFRESH_BUTTON_WIDTH_PX);
         return row;
     }
@@ -440,6 +447,11 @@ public final class MailPanel implements HudWindow {
      */
     public void setCanOpen(BooleanSupplier condition) {
         this.canOpen = condition;
+    }
+
+    /** ADR-167 — người chơi bấm "Nhận hết". */
+    public void setOnClaimAll(Runnable listener) {
+        this.onClaimAll = listener;
     }
 
     /** Id lá thư người chơi vừa bấm Đọc. */

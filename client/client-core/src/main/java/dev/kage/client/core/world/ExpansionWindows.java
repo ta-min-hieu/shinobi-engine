@@ -40,15 +40,15 @@ record ExpansionWindows(
         WeatherCoordinator weather,
         BossTelegraphPresenter telegraphs,
         Lot27Windows lot27,
-        Lot29Windows lot29) {
+        Lot29Windows lot29,
+        Lot30Windows lot30) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
         ReportPanel buyOrderPanel =
                 new ReportPanel(skin, "buyorder.title", Input.Keys.UNKNOWN, BuyOrderCoordinator.TAB_KEYS);
-        // Hồi sinh (ADR-117) — không phím, server mở khi mình gục.
+        // Hồi sinh (ADR-117, server mở khi mình gục) + thương nhân du hành (ADR-118, /thuongnhan) — không phím.
         ReportPanel revivalPanel = new ReportPanel(skin, "revive.title", Input.Keys.UNKNOWN, List.of());
-        // Thương nhân du hành (ADR-118) — không phím, mở bằng lệnh chat /thuongnhan.
         ReportPanel merchantPanel = new ReportPanel(skin, "merchant.title", Input.Keys.UNKNOWN, List.of());
         // Linh điền (ADR-119) — không phím, mở bằng lệnh chat /linhdien.
         ReportPanel fieldPanel =
@@ -90,7 +90,8 @@ record ExpansionWindows(
                 new WeatherCoordinator(), // ADR-144
                 new BossTelegraphPresenter(), // ADR-145
                 Lot27Windows.create(skin, sender, feeds), // ADR-147 /tangbaodo, ADR-148 /doiten
-                Lot29Windows.create(skin, sender, feeds)); // ADR-159 khoá vật phẩm
+                Lot29Windows.create(skin, sender, feeds), // ADR-159 khoá vật phẩm
+                Lot30Windows.create(skin, sender, feeds)); // ADR-167 nhận hết thư
     }
 
     /** ADR-141 — biển vùng PvP: hỏi bản đồ vùng qua {@code sender}, báo vào/ra qua kênh hệ thống. */
@@ -124,6 +125,7 @@ record ExpansionWindows(
         panels.register(telegraphs);
         lot27.registerInto(panels);
         lot29.registerInto(panels);
+        lot30.registerInto(panels);
     }
 
     /**
