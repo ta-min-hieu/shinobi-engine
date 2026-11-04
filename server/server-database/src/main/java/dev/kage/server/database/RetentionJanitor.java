@@ -42,12 +42,17 @@ final class RetentionJanitor {
     /** Dòng audit chat (có nội dung tin) cũ hơn ngần này bị xoá. */
     static final Duration CHAT_AUDIT_RETENTION = Duration.ofDays(30);
 
+    /** ADR-169 — sổ vàng cá nhân giữ 30 ngày. */
+    static final Duration GOLD_LEDGER_RETENTION = Duration.ofDays(30);
+
     private static final Duration FIRST_RUN_DELAY = Duration.ofMinutes(1);
     private static final Duration PERIOD = Duration.ofHours(6);
 
     private static final String DELETE_KEYS_OLDER_THAN = """
             DELETE FROM idempotency_key WHERE created_at < ?
             """;
+
+    private static final String DELETE_GOLD_LEDGER_OLDER_THAN = "DELETE FROM gold_ledger_entry WHERE created_at < ?";
 
     private static final String DELETE_CHAT_AUDIT_OLDER_THAN = """
             DELETE FROM audit_log WHERE action = 'CHAT_MESSAGE' AND created_at < ?
@@ -84,6 +89,11 @@ final class RetentionJanitor {
     }
 
     /** Xoá mọi dòng audit chat ghi trước {@code now - CHAT_AUDIT_RETENTION}. Package-private để test gọi thẳng. */
+    int purgeGoldLedger(Instant now) {
+        return JdbcOperations.update(
+                dataSource, DELETE_GOLD_LEDGER_OLDER_THAN, Timestamp.from(now.minus(GOLD_LEDGER_RETENTION)));
+    }
+
     int purgeChatAudit(Instant now) {
         return JdbcOperations.update(
                 dataSource, DELETE_CHAT_AUDIT_OLDER_THAN, Timestamp.from(now.minus(CHAT_AUDIT_RETENTION)));
@@ -110,6 +120,14 @@ final class RetentionJanitor {
             }
         } catch (RuntimeException e) {
             LOG.warn("Dọn audit chat thất bại — lượt sau dọn bù", e);
+        }
+        try {
+            int deleted = purgeGoldLedger(now);
+            if (deleted > 0) {
+                LOG.info("Đã dọn {} dòng sổ vàng cũ hơn {} ngày", deleted, GOLD_LEDGER_RETENTION.toDays());
+            }
+        } catch (RuntimeException e) {
+            LOG.warn("Dọn sổ vàng thất bại — lượt sau dọn bù", e);
         }
     }
 }

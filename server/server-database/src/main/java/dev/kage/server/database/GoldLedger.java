@@ -45,6 +45,9 @@ public final class GoldLedger {
 
     // RETURNING gold: lấy số dư mới trong CHÍNH câu UPDATE. Một câu SELECT thứ hai sẽ mở cửa sổ
     // race với giao dịch song song và có thể báo về số dư của người khác vừa ghi đè.
+    private static final String RECORD_ENTRY =
+            "INSERT INTO gold_ledger_entry (character_id, delta, balance, reason_key) VALUES (?, ?, ?, ?)";
+
     private static final String DEDUCT_IF_ENOUGH = """
             UPDATE character_stat SET gold = gold - ? WHERE character_id = ? AND gold >= ? RETURNING gold
             """;
@@ -165,6 +168,9 @@ public final class GoldLedger {
     }
 
     private static void stage(Connection connection, GoldChange change) {
+        // ADR-169 — sổ vàng: ghi cùng transaction với lần đổi (rollback thì dòng sổ cũng mất).
+        JdbcOperations.update(
+                connection, RECORD_ENTRY, change.characterId(), change.delta(), change.gold(), change.reasonKey());
         PENDING.computeIfAbsent(connection, key -> new ArrayList<GoldChange>()).add(change);
     }
 

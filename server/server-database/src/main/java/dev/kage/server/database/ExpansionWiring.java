@@ -137,6 +137,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.inventory.PostgresGemRemovalAdapter(dataSource));
     }
 
+    /** ADR-169 — sổ vàng cá nhân. */
+    public dev.kage.character.api.GoldHistoryFacade wireGoldHistoryFacade() {
+        return new dev.kage.character.api.GoldHistoryFacade(
+                new dev.kage.server.database.character.PostgresGoldHistoryAdapter(dataSource));
+    }
+
     /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
     public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
         return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));

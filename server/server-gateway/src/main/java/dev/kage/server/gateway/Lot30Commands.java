@@ -3,8 +3,11 @@ package dev.kage.server.gateway;
 import java.time.Clock;
 import java.util.function.LongToIntFunction;
 
+import dev.kage.character.domain.GoldHistoryPort;
 import dev.kage.inventory.api.GemRemovalFacade;
 import dev.kage.inventory.domain.GemRemovalPort;
+import dev.kage.protocol.GetGoldHistoryResponse;
+import dev.kage.protocol.GoldHistoryEntry;
 import dev.kage.protocol.UnsocketGemCommand;
 import dev.kage.protocol.UnsocketGemOutcome;
 import dev.kage.protocol.UnsocketGemResponse;
@@ -17,6 +20,19 @@ record Lot30Commands(MailBulkCommands mailBulk, Lot30Facades facades, Clock cloc
                 new MailBulkCommands(gateway.contentFacades().socialFacades().mailFacade()),
                 gateway.progression().expansion().lot30(),
                 Clock.systemUTC());
+    }
+
+    /** ADR-169 — Virtual Thread; sổ vàng của chính {@code characterId} (từ session). */
+    GetGoldHistoryResponse goldHistory(long characterId) {
+        GetGoldHistoryResponse.Builder response = GetGoldHistoryResponse.newBuilder();
+        for (GoldHistoryPort.Entry entry : facades.goldHistory().recent(characterId)) {
+            response.addEntries(GoldHistoryEntry.newBuilder()
+                    .setDelta(entry.delta())
+                    .setBalance(entry.balance())
+                    .setReasonKey(entry.reasonKey())
+                    .setAtEpochMs(entry.at().toEpochMilli()));
+        }
+        return response.build();
     }
 
     /**
