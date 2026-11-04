@@ -924,6 +924,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetItemLockCommand.parser(),
                             Opcode.OPCODE_SET_ITEM_LOCK_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot29().itemLock().set(id, c)))),
+            // Lô 30 — soi trang bị người khác (ADR-171); Lực Chiến theo đúng công thức bảng nhân vật.
+            Map.entry(
+                    Opcode.OPCODE_INSPECT_CHARACTER_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.InspectCharacterRequest.parser(),
+                            Opcode.OPCODE_INSPECT_CHARACTER_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot30().inspect().inspect(id, c, target -> h.statSheetOf(target)
+                                    .combatPower()))),
+            Map.entry(
+                    Opcode.OPCODE_SET_INSPECT_PRIVACY_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetInspectPrivacyCommand.parser(),
+                            Opcode.OPCODE_SET_INSPECT_PRIVACY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot30().inspect().setPrivacy(id, c))),
             // Lô 30 — bán nhanh đồ rác (ADR-170).
             Map.entry(
                     Opcode.OPCODE_GET_JUNK_PREVIEW_REQUEST_VALUE,

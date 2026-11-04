@@ -13,12 +13,21 @@ import dev.kage.protocol.UnsocketGemOutcome;
 import dev.kage.protocol.UnsocketGemResponse;
 
 /** Lớp lệnh lô 30 (ADR-167…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
-record Lot30Commands(MailBulkCommands mailBulk, JunkSaleCommands junkSale, Lot30Facades facades, Clock clock) {
+record Lot30Commands(
+        MailBulkCommands mailBulk,
+        JunkSaleCommands junkSale,
+        InspectCommands inspect,
+        Lot30Facades facades,
+        Clock clock) {
 
     static Lot30Commands of(GatewayFacades gateway, WorldGateway worldGateway) {
         return new Lot30Commands(
                 new MailBulkCommands(gateway.contentFacades().socialFacades().mailFacade()),
                 new JunkSaleCommands(gateway.progression().expansion().lot30().junkSale(), Clock.systemUTC()),
+                new InspectCommands(new InspectCommands.Deps(
+                        gateway.characterFacade(),
+                        gateway.inventoryFacade(),
+                        gateway.progression().expansion().lot30().inspectPrivacy())),
                 gateway.progression().expansion().lot30(),
                 Clock.systemUTC());
     }

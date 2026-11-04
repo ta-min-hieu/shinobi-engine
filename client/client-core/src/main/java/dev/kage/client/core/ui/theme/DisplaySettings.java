@@ -23,7 +23,11 @@ public final class DisplaySettings {
         /** Mưa linh khí / bão cát theo vùng (ADR-144). */
         WEATHER("display.weather"),
         /** ADR-156 — tự uống đan hồi máu khi máu thấp; mặc định TẮT (đổi hành vi chơi, không chỉ hiển thị). */
-        AUTO_POTION("display.auto_potion", false);
+        AUTO_POTION("display.auto_potion", false),
+        /**
+         * ADR-171 — cho người khác soi trang bị của mình; công tắc này được gửi lên SERVER (server mới là bên từ chối).
+         */
+        ALLOW_INSPECT("display.allow_inspect");
 
         private final String key;
         private final boolean defaultOn;

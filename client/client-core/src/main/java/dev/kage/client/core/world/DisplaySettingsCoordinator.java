@@ -21,6 +21,11 @@ final class DisplaySettingsCoordinator implements WindowFlow {
 
     private final ReportPanel panel;
     private final DisplaySettings settings;
+
+    /** ADR-171 — công tắc nào cần báo ra ngoài (vd gửi lên server) mỗi lần đổi. */
+    private final java.util.Map<DisplaySettings.Option, java.util.function.Consumer<Boolean>> onChange =
+            new java.util.EnumMap<>(DisplaySettings.Option.class);
+
     private final I18NBundle i18n = KageI18n.load();
 
     DisplaySettingsCoordinator(ReportPanel panel, DisplaySettings settings, ChatCoordinator chat) {
@@ -34,6 +39,12 @@ final class DisplaySettingsCoordinator implements WindowFlow {
 
     DisplaySettings settings() {
         return settings;
+    }
+
+    /** ADR-171 — báo {@code listener} giá trị hiện tại ngay, rồi mỗi lần người chơi đổi công tắc này. */
+    void onChange(DisplaySettings.Option option, java.util.function.Consumer<Boolean> listener) {
+        onChange.put(option, listener);
+        listener.accept(settings.isOn(option));
     }
 
     /** Nối công tắc vào từng lớp vẽ — mỗi lớp tự hỏi công tắc của mình mỗi khung. */
@@ -60,6 +71,10 @@ final class DisplaySettingsCoordinator implements WindowFlow {
             return;
         }
         settings.toggle(options[rowIndex]);
+        java.util.function.Consumer<Boolean> listener = onChange.get(options[rowIndex]);
+        if (listener != null) {
+            listener.accept(settings.isOn(options[rowIndex]));
+        }
         showRows();
     }
 

@@ -572,3 +572,43 @@ message GoldHistoryEntry {
 message GetGoldHistoryResponse {
   repeated GoldHistoryEntry entries = 1;
 }
+
+// Request: Client -> Server (OPCODE_INSPECT_CHARACTER_REQUEST = 249) — ADR-171. Soi một nhân vật theo TÊN.
+message InspectCharacterRequest {
+  string name = 1;
+}
+
+enum InspectCharacterOutcome {
+  INSPECT_CHARACTER_OUTCOME_UNSPECIFIED = 0;
+  INSPECT_CHARACTER_OUTCOME_OK = 1;
+  INSPECT_CHARACTER_OUTCOME_NOT_FOUND = 2;
+  INSPECT_CHARACTER_OUTCOME_HIDDEN = 3;  // người đó tắt cho xem
+}
+
+// Một món đang mặc: ô (giá trị enum EquipmentSlot của inventory.proto), mẫu, cường hoá, ngọc khảm (0 = không).
+message InspectedEquipment {
+  int32 slot = 1;
+  int64 item_template_id = 2;
+  int32 enhance_level = 3;
+  int64 socket_gem_template_id = 4;
+}
+
+// Response: Server -> Client (OPCODE_INSPECT_CHARACTER_RESPONSE = 250).
+message InspectCharacterResponse {
+  InspectCharacterOutcome outcome = 1;
+  string name = 2;
+  int32 level = 3;
+  Faction faction = 4;
+  int64 combat_power = 5;
+  repeated InspectedEquipment equipment = 6;
+}
+
+// Command: Client -> Server (OPCODE_SET_INSPECT_PRIVACY_COMMAND = 251). hidden = true ⇒ người khác không soi được mình.
+message SetInspectPrivacyCommand {
+  bool hidden = 1;
+}
+
+// Response: Server -> Client (OPCODE_SET_INSPECT_PRIVACY_RESPONSE = 252).
+message SetInspectPrivacyResponse {
+  bool hidden = 1;
+}

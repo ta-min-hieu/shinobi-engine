@@ -8,16 +8,21 @@ import dev.kage.protocol.GetGoldHistoryRequest;
 import dev.kage.protocol.GetGoldHistoryResponse;
 import dev.kage.protocol.GetJunkPreviewRequest;
 import dev.kage.protocol.GetJunkPreviewResponse;
+import dev.kage.protocol.InspectCharacterRequest;
+import dev.kage.protocol.InspectCharacterResponse;
 import dev.kage.protocol.JunkLineView;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SellJunkCommand;
 import dev.kage.protocol.SellJunkResponse;
+import dev.kage.protocol.SetInspectPrivacyCommand;
+import dev.kage.protocol.SetInspectPrivacyResponse;
 import dev.kage.protocol.UnsocketGemCommand;
 import dev.kage.protocol.UnsocketGemResponse;
 
 /**
  * Bước lô 30: nhận hết thư (ADR-167) {@code claimAllMail}, tháo ngọc (ADR-168) {@code unsocket:<itemId>}, sổ vàng
- * (ADR-169) {@code goldLog}, bán rác (ADR-170) {@code junkPreview}, {@code sellJunk}.
+ * (ADR-169) {@code goldLog}, bán rác (ADR-170) {@code junkPreview}, {@code sellJunk}, soi trang bị
+ * (ADR-171) {@code inspect:<tên>}, {@code hideGear:<true|false>}.
  */
 final class Lot30Steps {
 
@@ -34,6 +39,8 @@ final class Lot30Steps {
             case "goldLog" -> goldLog();
             case "junkPreview" -> junkPreview();
             case "sellJunk" -> sellJunk();
+            case "inspect" -> inspect(arg);
+            case "hideGear" -> hideGear(Boolean.parseBoolean(arg));
             default -> "bước không hiểu";
         };
     }
@@ -108,5 +115,41 @@ final class Lot30Steps {
                 .append('@')
                 .append(l.getPriceEach()));
         return line.toString().strip();
+    }
+
+    private String inspect(String name) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_INSPECT_CHARACTER_REQUEST_VALUE,
+                InspectCharacterRequest.newBuilder().setName(name).build(),
+                Opcode.OPCODE_INSPECT_CHARACTER_RESPONSE_VALUE,
+                p -> {
+                    InspectCharacterResponse r = InspectCharacterResponse.parseFrom(p);
+                    StringBuilder line = new StringBuilder(r.getOutcome().name())
+                            .append(' ')
+                            .append(r.getName())
+                            .append(" cấp=")
+                            .append(r.getLevel())
+                            .append(" lựcChiến=")
+                            .append(r.getCombatPower());
+                    r.getEquipmentList().forEach(e -> line.append(" ô")
+                            .append(e.getSlot())
+                            .append('=')
+                            .append(e.getItemTemplateId())
+                            .append('+')
+                            .append(e.getEnhanceLevel())
+                            .append(
+                                    e.getSocketGemTemplateId() != 0
+                                            ? "[ngọc " + e.getSocketGemTemplateId() + "]"
+                                            : ""));
+                    return line.toString();
+                });
+    }
+
+    private String hideGear(boolean hidden) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SET_INSPECT_PRIVACY_COMMAND_VALUE,
+                SetInspectPrivacyCommand.newBuilder().setHidden(hidden).build(),
+                Opcode.OPCODE_SET_INSPECT_PRIVACY_RESPONSE_VALUE,
+                p -> "ẩn=" + SetInspectPrivacyResponse.parseFrom(p).getHidden());
     }
 }

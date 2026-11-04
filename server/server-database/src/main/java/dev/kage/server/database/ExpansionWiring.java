@@ -149,6 +149,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.inventory.PostgresJunkSaleAdapter(dataSource));
     }
 
+    /** ADR-171 — công tắc cho người khác soi trang bị. */
+    public dev.kage.character.api.InspectPrivacyFacade wireInspectPrivacyFacade() {
+        return new dev.kage.character.api.InspectPrivacyFacade(
+                new dev.kage.server.database.character.PostgresInspectPrivacyAdapter(dataSource));
+    }
+
     /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
     public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
         return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));

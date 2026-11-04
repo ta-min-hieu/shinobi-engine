@@ -202,6 +202,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-168](ADR-168-Unsocket-Gem.md) | Tháo Linh Ngọc: gỡ ngọc về túi 500 vàng, một transaction, áp lại chỉ số món đang mặc; 540/541; nút Tháo ngọc trong cửa sổ khảm | ✅ Accepted (lô 30) |
 | [ADR-169](ADR-169-Gold-Ledger-History.md) | Sổ vàng cá nhân: bảng `gold_ledger_entry` (V135) ghi trong `GoldLedger` cùng transaction với mọi lần đổi vàng, giữ 30 ngày; 247/248; `/sovang` + 37 nhãn lý do | ✅ Accepted (lô 30) |
 | [ADR-170](ADR-170-Sell-Junk.md) | Bán nhanh đồ rác: cờ `item_template.junk` (V136: kunai, sắt vụn, thẻ bài, bùa Huyết Sa), xem trước rồi mới bán, bỏ qua món khoá/đang mặc/giao dịch; 542–545; nút Bán rác / `/banrac` | ✅ Accepted (lô 30) |
+| [ADR-171](ADR-171-Inspect-Player.md) | Soi trang bị người khác: `/soi <tên>` (cả offline) — cảnh giới, Lực Chiến (công thức ADR-056), món đang mặc; riêng tư lưu server (V137), công tắc trong /caidat; 249–252 | ✅ Accepted (lô 30) |
 ---
 
 ## ADR cần tạo (chưa viết)

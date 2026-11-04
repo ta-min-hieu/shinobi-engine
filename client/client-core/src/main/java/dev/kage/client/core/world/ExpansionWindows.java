@@ -140,6 +140,8 @@ record ExpansionWindows(
         zoneMap.useBanner(hud::setZoneBanner);
         lot27.bossBoard().useBoard(hud::setBossBoard); // ADR-157
         lot29.expBuff().useBanner(hud::setExpBuff); // ADR-164
+        // ADR-171 — đồng bộ công tắc "cho người khác soi" lên server lúc vào game và mỗi lần đổi.
+        displaySettings.onChange(DisplaySettings.Option.ALLOW_INSPECT, lot30.inspect()::setAllowed);
         displaySettings.applyTo(titles, feedback, backdrop, weather.overlay());
     }
 
