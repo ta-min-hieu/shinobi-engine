@@ -6,13 +6,18 @@ import dev.kage.protocol.ClaimAllMailCommand;
 import dev.kage.protocol.ClaimAllMailResponse;
 import dev.kage.protocol.GetGoldHistoryRequest;
 import dev.kage.protocol.GetGoldHistoryResponse;
+import dev.kage.protocol.GetJunkPreviewRequest;
+import dev.kage.protocol.GetJunkPreviewResponse;
+import dev.kage.protocol.JunkLineView;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.SellJunkCommand;
+import dev.kage.protocol.SellJunkResponse;
 import dev.kage.protocol.UnsocketGemCommand;
 import dev.kage.protocol.UnsocketGemResponse;
 
 /**
  * Bước lô 30: nhận hết thư (ADR-167) {@code claimAllMail}, tháo ngọc (ADR-168) {@code unsocket:<itemId>}, sổ vàng
- * (ADR-169) {@code goldLog}.
+ * (ADR-169) {@code goldLog}, bán rác (ADR-170) {@code junkPreview}, {@code sellJunk}.
  */
 final class Lot30Steps {
 
@@ -27,6 +32,8 @@ final class Lot30Steps {
             case "claimAllMail" -> claimAllMail();
             case "unsocket" -> unsocket(Long.parseLong(arg));
             case "goldLog" -> goldLog();
+            case "junkPreview" -> junkPreview();
+            case "sellJunk" -> sellJunk();
             default -> "bước không hiểu";
         };
     }
@@ -71,5 +78,35 @@ final class Lot30Steps {
                             .append(']'));
                     return line.toString().strip();
                 });
+    }
+
+    private String junkPreview() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_JUNK_PREVIEW_REQUEST_VALUE,
+                GetJunkPreviewRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_JUNK_PREVIEW_RESPONSE_VALUE,
+                p -> lines(GetJunkPreviewResponse.parseFrom(p).getLinesList()));
+    }
+
+    private String sellJunk() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SELL_JUNK_COMMAND_VALUE,
+                SellJunkCommand.getDefaultInstance(),
+                Opcode.OPCODE_SELL_JUNK_RESPONSE_VALUE,
+                p -> {
+                    SellJunkResponse r = SellJunkResponse.parseFrom(p);
+                    return "vàng=" + r.getGold() + " đầy=" + r.getGoldFull() + " " + lines(r.getSoldList());
+                });
+    }
+
+    private static String lines(java.util.List<JunkLineView> lines) {
+        StringBuilder line = new StringBuilder();
+        lines.forEach(l -> line.append(' ')
+                .append(l.getItemTemplateId())
+                .append('x')
+                .append(l.getQuantity())
+                .append('@')
+                .append(l.getPriceEach()));
+        return line.toString().strip();
     }
 }

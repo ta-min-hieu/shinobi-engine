@@ -19,6 +19,7 @@ import dev.kage.protocol.EnhanceItemResponse;
 import dev.kage.protocol.EquipItemResponse;
 import dev.kage.protocol.EquipmentSlot;
 import dev.kage.protocol.ErrorResponse;
+import dev.kage.protocol.GetJunkPreviewRequest;
 import dev.kage.protocol.ItemCatalogEntry;
 import dev.kage.protocol.ItemGrantedEvent;
 import dev.kage.protocol.ItemUseEffect;
@@ -154,6 +155,9 @@ final class InventoryCoordinator implements WindowFlow {
         panel.setOnSellSelected(this::onSellSelected);
         // ADR-097 — kết quả về DailyCoordinator (báo chat + làm mới túi).
         panel.setOnLockSelected(this::onLockSelected);
+        // ADR-170 — bán rác: hỏi danh sách sẽ bán; JunkSaleCoordinator mở cửa sổ khi có câu trả lời.
+        panel.setOnJunkSelected(() -> sender.sendReadRequest(
+                Opcode.OPCODE_GET_JUNK_PREVIEW_REQUEST_VALUE, GetJunkPreviewRequest.getDefaultInstance()));
         // ADR-160 — sắp xếp túi; kết quả về BagActionsCoordinator (báo chat + hỏi lại túi).
         panel.setOnSortSelected(() -> sender.sendReadRequest(
                 Opcode.OPCODE_SORT_INVENTORY_COMMAND_VALUE, SortInventoryCommand.getDefaultInstance()));

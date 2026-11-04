@@ -585,3 +585,29 @@ message UnsocketGemResponse {
   int64 fee = 3;
   int32 max_hp = 4;
 }
+
+// ===== ADR-170 — bán nhanh đồ rác: liệt kê trước, bấm mới bán. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_GET_JUNK_PREVIEW_REQUEST = 542).
+message GetJunkPreviewRequest {}
+
+message JunkLineView {
+  int64 item_template_id = 1;
+  int32 quantity = 2;
+  int64 price_each = 3;
+}
+
+// Response: Server -> Client (OPCODE_GET_JUNK_PREVIEW_RESPONSE = 543). Những gì SẼ bán (bỏ qua món khoá/đang mặc/...).
+message GetJunkPreviewResponse {
+  repeated JunkLineView lines = 1;
+}
+
+// Command: Client -> Server (OPCODE_SELL_JUNK_COMMAND = 544). Bán hết rác — server tự tính lại, không tin danh sách nào.
+message SellJunkCommand {}
+
+// Response: Server -> Client (OPCODE_SELL_JUNK_RESPONSE = 545).
+message SellJunkResponse {
+  repeated JunkLineView sold = 1;
+  int64 gold = 2;
+  bool gold_full = 3;  // vàng chạm trần — không bán gì
+}

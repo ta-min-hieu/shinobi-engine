@@ -177,6 +177,7 @@ public final class InventoryPanel implements HudWindow {
         private Runnable onDismantleSelected;
         private Runnable onLockSelected;
         private Runnable onSortSelected;
+        private Runnable onJunkSelected;
         private IntConsumer onUnequip;
         private Runnable onOpened;
 
@@ -327,10 +328,14 @@ public final class InventoryPanel implements HudWindow {
         Label hint = new Label(text("inventory.hint.close"), skin.labelStyle);
         hint.setColor(SECTION_COLOR);
         block.add(hint).left().expandX().row();
-        // ADR-160 — hàng nút riêng dưới chữ gợi ý: 4 × 104 + 3 khe 6 = 434 ≤ 560 (chung một hàng với chữ thì tràn).
+        // ADR-160 — hàng nút riêng dưới chữ gợi ý (chung một hàng với chữ thì tràn).
         Table row = new Table();
         block.add(row).right().padTop(4f);
         row.add(actionButton("inventory.action.sort", () -> fire(listeners.onSortSelected)))
+                .width(ACTION_BUTTON_WIDTH_PX)
+                .padRight(6f);
+        // ADR-170 — mở cửa sổ bán rác (liệt kê trước, bấm mới bán). 5 × 104 + 4 khe 6 = 544 ≤ 560.
+        row.add(actionButton("inventory.action.junk", () -> fire(listeners.onJunkSelected)))
                 .width(ACTION_BUTTON_WIDTH_PX)
                 .padRight(6f);
         // ADR-097 — phân giải món đang chọn; ở hàng này vì hàng hành động đã kín bề rộng khung.
@@ -344,6 +349,11 @@ public final class InventoryPanel implements HudWindow {
         row.add(actionButton("inventory.action.refresh", () -> fire(listeners.onOpened)))
                 .width(ACTION_BUTTON_WIDTH_PX);
         return block;
+    }
+
+    /** ADR-170 — người chơi bấm Bán rác: hỏi server danh sách sẽ bán, cửa sổ bán rác tự mở khi có câu trả lời. */
+    public void setOnJunkSelected(Runnable listener) {
+        listeners.onJunkSelected = listener;
     }
 
     /** ADR-160 — người chơi bấm Sắp xếp: server gom chồng và xếp lại túi. */
