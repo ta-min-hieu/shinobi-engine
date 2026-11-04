@@ -18,6 +18,7 @@ record Lot30Commands(
         JunkSaleCommands junkSale,
         InspectCommands inspect,
         GuildRenameCommands guildRename,
+        FriendNoteCommands friendNotes,
         Lot30Facades facades,
         Clock clock) {
 
@@ -34,6 +35,10 @@ record Lot30Commands(
                         gateway.contentFacades().socialFacades().guildFacade(),
                         worldGateway.registry(),
                         Clock.systemUTC())),
+                new FriendNoteCommands(new FriendNoteCommands.Deps(
+                        gateway.characterFacade(),
+                        gateway.contentFacades().socialFacades().friendFacade(),
+                        gateway.progression().expansion().lot30().friendNotes())),
                 gateway.progression().expansion().lot30(),
                 Clock.systemUTC());
     }

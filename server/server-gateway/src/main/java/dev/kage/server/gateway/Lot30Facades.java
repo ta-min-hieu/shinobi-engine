@@ -2,6 +2,7 @@ package dev.kage.server.gateway;
 
 import dev.kage.character.api.GoldHistoryFacade;
 import dev.kage.character.api.InspectPrivacyFacade;
+import dev.kage.friend.api.FriendNoteFacade;
 import dev.kage.guild.api.GuildRenameFacade;
 import dev.kage.inventory.api.GemRemovalFacade;
 import dev.kage.inventory.api.JunkSaleFacade;
@@ -12,7 +13,8 @@ record Lot30Facades(
         GoldHistoryFacade goldHistory,
         JunkSaleFacade junkSale,
         InspectPrivacyFacade inspectPrivacy,
-        GuildRenameFacade guildRename) {
+        GuildRenameFacade guildRename,
+        FriendNoteFacade friendNotes) {
 
     /** Composition không có các tính năng này (test). */
     static final Lot30Facades DISABLED = new Lot30Facades(
@@ -20,5 +22,6 @@ record Lot30Facades(
             GoldHistoryFacade.DISABLED,
             JunkSaleFacade.DISABLED,
             InspectPrivacyFacade.DISABLED,
-            GuildRenameFacade.DISABLED);
+            GuildRenameFacade.DISABLED,
+            FriendNoteFacade.DISABLED);
 }

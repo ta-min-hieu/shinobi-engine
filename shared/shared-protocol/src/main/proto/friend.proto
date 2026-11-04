@@ -99,6 +99,7 @@ message FriendView {
   bool online = 3;
   int32 intimacy = 4; // ADR-084 — thân mật của cặp bạn (tăng khi tặng quà)
   bool dao_lu = 5;     // ADR-094 — người này là đạo lữ của mình
+  string note = 6;     // ADR-173 — ghi chú RIÊNG của mình về người bạn này ("" = không có)
 }
 
 message ListFriendsResponse {
@@ -365,4 +366,28 @@ message LeaveSwornCommand {}
 // Response: Server -> Client (OPCODE_LEAVE_SWORN_RESPONSE = 1144).
 message LeaveSwornResponse {
   SwornOutcome outcome = 1;
+}
+
+// ===== ADR-173 — ghi chú bạn bè. CHỈ THÊM. Ghi chú riêng của mình, người kia không thấy; trả về trong FriendView.note.
+
+// Command: Client -> Server (OPCODE_SET_FRIEND_NOTE_COMMAND = 1145). Theo TÊN, như RemoveFriendCommand.
+// note rỗng (sau khi bỏ khoảng trắng) = xoá ghi chú. Tối đa 24 ký tự.
+message SetFriendNoteCommand {
+  string target_name = 1;
+  string note = 2;
+}
+
+enum SetFriendNoteOutcome {
+  SET_FRIEND_NOTE_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  SET_FRIEND_NOTE_OUTCOME_OK = 1;
+  SET_FRIEND_NOTE_OUTCOME_TARGET_NOT_FOUND = 2;
+  SET_FRIEND_NOTE_OUTCOME_NOT_FRIENDS = 3;
+  SET_FRIEND_NOTE_OUTCOME_TOO_LONG = 4;
+}
+
+// Response: Server -> Client (OPCODE_SET_FRIEND_NOTE_RESPONSE = 1146).
+message SetFriendNoteResponse {
+  SetFriendNoteOutcome outcome = 1;
+  string target_name = 2; // tên đúng của người bạn (khi tìm thấy)
+  string note = 3;        // ghi chú ĐÃ chuẩn hoá được lưu ("" = đã xoá)
 }

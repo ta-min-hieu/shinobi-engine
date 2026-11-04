@@ -117,13 +117,16 @@ final class FriendController {
         friends.clear();
         for (FriendView view : response.getFriendsList()) {
             friends.add(new Friend(
-                    view.getCharacterId(),
-                    view.getName(),
-                    ChatController.sanitize(view.getName()),
-                    view.getOnline(),
-                    view.getIntimacy()));
+                    view.getCharacterId(), view.getName(), displayNameOf(view), view.getOnline(), view.getIntimacy()));
         }
         friends.sort(Comparator.comparing(Friend::online).reversed().thenComparing(Friend::displayName));
+    }
+
+    /** Tên hiển thị: tên, kèm ghi chú riêng trong ngoặc nếu có (ADR-173). */
+    static String displayNameOf(FriendView view) {
+        String name = ChatController.sanitize(view.getName());
+        String note = ChatController.sanitize(view.getNote());
+        return note.isBlank() ? name : name + " (" + note + ")";
     }
 
     /** Toàn bộ lời mời đang chờ — cùng quy ước "thay thế trọn gói" như {@link #onFriendList}. */

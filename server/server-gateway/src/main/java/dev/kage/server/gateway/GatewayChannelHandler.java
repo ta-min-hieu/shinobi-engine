@@ -931,6 +931,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.RenameGuildCommand.parser(),
                             Opcode.OPCODE_RENAME_GUILD_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot30().guildRename().rename(id, c))),
+            // Lô 30 — ghi chú bạn bè (ADR-173); hiện kèm tên trong danh sách bạn.
+            Map.entry(
+                    Opcode.OPCODE_SET_FRIEND_NOTE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetFriendNoteCommand.parser(),
+                            Opcode.OPCODE_SET_FRIEND_NOTE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot30().friendNotes().setNote(id, c))),
             // Lô 30 — soi trang bị người khác (ADR-171); Lực Chiến theo đúng công thức bảng nhân vật.
             Map.entry(
                     Opcode.OPCODE_INSPECT_CHARACTER_REQUEST_VALUE,
@@ -4049,6 +4056,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ListFriendsResponse.Builder responseBuilder = ListFriendsResponse.newBuilder();
             Map<Long, Integer> intimacy = friendGifts.intimacyOf(characterId);
             long daoLuPartner = relations.daoLu().partnerOf(characterId).orElse(0L);
+            Map<Long, String> notes = expansion.lot30().facades().friendNotes().notesOf(characterId);
             for (long friendId : friendFacade.listFriends(characterId)) {
                 // findByName/findById chạm DB mỗi bạn — chấp nhận N+1 ở quy mô danh sách bạn bè MVP
                 // (vài chục), không phải đường nóng mỗi tick (khác AoI/combat).
@@ -4060,6 +4068,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         .setOnline(worldGateway.registry().isOnline(friendId))
                         .setIntimacy(intimacy.getOrDefault(friendId, 0))
                         .setDaoLu(friendId == daoLuPartner)
+                        .setNote(notes.getOrDefault(friendId, ""))
                         .build());
             }
             send(
