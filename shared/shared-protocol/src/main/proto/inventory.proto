@@ -560,3 +560,28 @@ message OpenLuckyBagResponse {
   LuckyBagRewardView reward = 2;
   GetLuckyBagsResponse bags = 3;
 }
+
+// ===== ADR-168 — tháo Linh Ngọc: gỡ viên ngọc đang khảm trả về túi, tốn phí. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_UNSOCKET_GEM_COMMAND = 540). item_id = trang bị đang khảm (của chính người gửi).
+message UnsocketGemCommand {
+  int64 item_id = 1;
+}
+
+enum UnsocketGemOutcome {
+  UNSOCKET_GEM_OUTCOME_UNSPECIFIED = 0;
+  UNSOCKET_GEM_OUTCOME_OK = 1;
+  UNSOCKET_GEM_OUTCOME_NOT_FOUND = 2;
+  UNSOCKET_GEM_OUTCOME_NOT_SOCKETED = 3;
+  UNSOCKET_GEM_OUTCOME_NOT_ENOUGH_GOLD = 4;
+  UNSOCKET_GEM_OUTCOME_BAG_FULL = 5;
+}
+
+// Response: Server -> Client (OPCODE_UNSOCKET_GEM_RESPONSE = 541). max_hp > 0 khi chỉ số vừa áp lại (món đang mặc) —
+// cùng quy ước SocketGemResponse.max_hp.
+message UnsocketGemResponse {
+  UnsocketGemOutcome outcome = 1;
+  int64 gem_item_template_id = 2;
+  int64 fee = 3;
+  int32 max_hp = 4;
+}

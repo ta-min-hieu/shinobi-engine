@@ -20,6 +20,7 @@ import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SocketGemCommand;
 import dev.kage.protocol.SocketGemOutcome;
 import dev.kage.protocol.SocketGemResponse;
+import dev.kage.protocol.UnsocketGemCommand;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
@@ -45,8 +46,14 @@ final class GemCoordinator implements WindowFlow {
         OUTCOME_KEYS.put(SocketGemOutcome.SOCKET_GEM_OUTCOME_INSUFFICIENT_GOLD, "gem.error.insufficient_gold");
     }
 
-    /** Hành động của một dòng: chọn trang bị, hoặc khảm viên ngọc này vào món đã chọn. */
-    private record Action(boolean pickTarget, long itemId) {}
+    /** Hành động của một dòng: chọn trang bị, khảm viên ngọc này vào món đã chọn, hoặc tháo ngọc (ADR-168). */
+    private enum Kind {
+        PICK,
+        SOCKET,
+        UNSOCKET
+    }
+
+    private record Action(Kind kind, long itemId) {}
 
     private final ReportPanel panel;
     private final WorldCommandSender sender;
@@ -80,9 +87,16 @@ final class GemCoordinator implements WindowFlow {
             return;
         }
         Action action = actions.get(rowIndex);
-        if (action.pickTarget()) {
+        if (action.kind() == Kind.PICK) {
             targetItemId = action.itemId();
             redraw();
+            return;
+        }
+        if (action.kind() == Kind.UNSOCKET) {
+            // ADR-168 — kết quả về GemRemovalCoordinator (dòng hệ thống + hỏi lại túi).
+            sender.sendReadRequest(
+                    Opcode.OPCODE_UNSOCKET_GEM_COMMAND_VALUE,
+                    UnsocketGemCommand.newBuilder().setItemId(action.itemId()).build());
             return;
         }
         pendingSequenceId = sender.sendReadRequest(
@@ -182,8 +196,8 @@ final class GemCoordinator implements WindowFlow {
             if (chosen) {
                 targetName = name(item.getItemTemplateId());
             }
-            rows.add(new ReportPanel.Row(equipmentText(item, chosen), chosen, chosen ? "" : "gem.action.pick"));
-            actions.add(chosen ? null : new Action(true, item.getItemId()));
+            rows.add(new ReportPanel.Row(equipmentText(item, chosen), chosen, actionKeyOf(item, chosen)));
+            actions.add(actionOf(item, chosen));
         }
         rows.add(new ReportPanel.Row(format("gem.section.gems", targetName), true));
         actions.add(null);
@@ -191,9 +205,27 @@ final class GemCoordinator implements WindowFlow {
         for (InventoryItemView gem : gems) {
             String label = name(gem.getItemTemplateId()) + (gem.getQuantity() > 1 ? " x" + gem.getQuantity() : "");
             rows.add(new ReportPanel.Row(label, false, canSocket ? "gem.action.socket" : ""));
-            actions.add(canSocket ? new Action(false, gem.getItemId()) : null);
+            actions.add(canSocket ? new Action(Kind.SOCKET, gem.getItemId()) : null);
         }
         panel.setRows(rows);
+    }
+
+    /**
+     * Dòng trang bị: chưa chọn ⇒ "Chọn"; đang chọn và có ngọc ⇒ "Tháo ngọc" (ADR-168); đang chọn, chưa ngọc ⇒ không
+     * nút.
+     */
+    private static String actionKeyOf(InventoryItemView item, boolean chosen) {
+        if (!chosen) {
+            return "gem.action.pick";
+        }
+        return item.getSocketGemTemplateId() != 0L ? "gem.action.unsocket" : "";
+    }
+
+    private static Action actionOf(InventoryItemView item, boolean chosen) {
+        if (!chosen) {
+            return new Action(Kind.PICK, item.getItemId());
+        }
+        return item.getSocketGemTemplateId() != 0L ? new Action(Kind.UNSOCKET, item.getItemId()) : null;
     }
 
     /** {@code [Đang chọn] Tên +3 — Ngọc: X}; dấu bằng CHỮ, không chỉ bằng màu. */

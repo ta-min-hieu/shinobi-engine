@@ -131,6 +131,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.character.PostgresCostumeAdapter(dataSource));
     }
 
+    /** ADR-168 — tháo Linh Ngọc. */
+    public dev.kage.inventory.api.GemRemovalFacade wireGemRemovalFacade() {
+        return new dev.kage.inventory.api.GemRemovalFacade(
+                new dev.kage.server.database.inventory.PostgresGemRemovalAdapter(dataSource));
+    }
+
     /** Điểm vinh dự đấu trường + cửa hàng (ADR-155). */
     public dev.kage.pvp.api.HonorFacade wireHonorFacade() {
         return new dev.kage.pvp.api.HonorFacade(new dev.kage.server.database.pvp.PostgresHonorAdapter(dataSource));

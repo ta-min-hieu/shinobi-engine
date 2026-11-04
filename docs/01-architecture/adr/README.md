@@ -199,6 +199,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-165](ADR-165-GM-Mass-Compensation.md) | GM thư bồi thường hàng loạt: `/gm compensate <MÃ> <vàng> <đồ|-> <số> <cấp>` (ADMIN), thư hệ thống tới mọi nhân vật cấp ≥ ngưỡng, khoá chống trùng tất định + sổ đợt V133 | ✅ Accepted (lô 29) |
 | [ADR-166](ADR-166-Costume-Appearance-Choice.md) | Huyễn hình trang phục (chủ dự án chọn thay cho huyễn hình trang bị — trang bị không vẽ lên nhân vật): chọn hiển thị bậc trang phục đã mở (V134, 2.000 vàng, về tự động miễn phí), áp ở registry mỗi lần ghi ngoại hình, 307 tới người xung quanh; 245/246; `/huyenhinh` | ✅ Accepted (lô 29) |
 | [ADR-167](ADR-167-Claim-All-Mail.md) | Nhận hết thư: vòng lặp gateway qua đường lĩnh thư sẵn có, dừng khi túi đầy, dọn thư đã xong; 911/912; nút Nhận hết | ✅ Accepted (lô 30) |
+| [ADR-168](ADR-168-Unsocket-Gem.md) | Tháo Linh Ngọc: gỡ ngọc về túi 500 vàng, một transaction, áp lại chỉ số món đang mặc; 540/541; nút Tháo ngọc trong cửa sổ khảm | ✅ Accepted (lô 30) |
 ---
 
 ## ADR cần tạo (chưa viết)

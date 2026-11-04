@@ -224,6 +224,8 @@ enum Opcode {
   OPCODE_GET_LUCKY_BAGS_RESPONSE = 537;
   OPCODE_OPEN_LUCKY_BAG_COMMAND = 538;
   OPCODE_OPEN_LUCKY_BAG_RESPONSE = 539;
+  OPCODE_UNSOCKET_GEM_COMMAND = 540;  // ADR-168 (2026-11-04) — tháo Linh Ngọc
+  OPCODE_UNSOCKET_GEM_RESPONSE = 541;
   // 511 để TRỐNG CÓ CHỦ Ý — dành sẵn cho ITEM_REMOVED_EVENT (ADR-035 Revisit Trigger #3, chỉ
   // thêm khi ĐO thấy việc hỏi lại toàn bộ túi sau mỗi hành động tốn thật). ĐỪNG cấp cho packet khác.
 
