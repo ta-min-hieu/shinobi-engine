@@ -192,7 +192,7 @@ services:
       options: { max-size: "50m", max-file: "5" }
 
   grafana:
-    image: grafana/grafana:13.1.1
+    image: grafana/grafana:13.3.0
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD trong .env.prod}
