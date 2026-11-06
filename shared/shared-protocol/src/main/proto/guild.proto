@@ -157,6 +157,7 @@ message GetMyGuildResponse {
   string guild_name = 3;
   bool is_leader = 4;
   GuildProgressView progress = 5; // ADR-068/069 — chỉ có khi in_guild = true
+  string notice = 6;              // ADR-179 — thông báo bang ("" = chưa có)
 }
 
 // ADR-059 (Accepted 2026-10-18) — "bang của bạn vừa đổi". CHỈ THÊM, protocolVersion không tăng. Client nói
@@ -172,6 +173,7 @@ enum GuildChangeReason {
   GUILD_CHANGE_REASON_LEVEL_UP = 7;                // ADR-068 — bang vừa lên cấp
   GUILD_CHANGE_REASON_WEEKLY_QUEST_COMPLETED = 8;  // ADR-069 — thưởng đã gửi qua thư
   GUILD_CHANGE_REASON_RENAMED = 9;                 // ADR-172 — bang vừa đổi tên
+  GUILD_CHANGE_REASON_NOTICE_CHANGED = 10;         // ADR-179 — bang chủ vừa đổi thông báo bang
 }
 
 // Event: Server -> Client (OPCODE_GUILD_CHANGED_EVENT = 720).
@@ -435,4 +437,26 @@ message RenameGuildResponse {
   string name = 2;
   int64 next_allowed_at_epoch_ms = 3;  // OK / ON_COOLDOWN: lúc được đổi lần sau
   int64 fee = 4;
+}
+
+// ===== ADR-179 — thông báo bang. CHỈ THÊM. Bang chủ ghi một dòng; thành viên thấy trong GetMyGuildResponse.notice.
+
+// Command: Client -> Server (OPCODE_SET_GUILD_NOTICE_COMMAND = 743). notice rỗng = xoá. Tối đa 100 ký tự.
+message SetGuildNoticeCommand {
+  string notice = 1;
+}
+
+enum SetGuildNoticeOutcome {
+  SET_GUILD_NOTICE_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  SET_GUILD_NOTICE_OUTCOME_OK = 1;
+  SET_GUILD_NOTICE_OUTCOME_NOT_IN_GUILD = 2;
+  SET_GUILD_NOTICE_OUTCOME_NOT_LEADER = 3;
+  SET_GUILD_NOTICE_OUTCOME_TOO_LONG = 4;
+  SET_GUILD_NOTICE_OUTCOME_BANNED_WORD = 5; // cùng bộ lọc từ cấm của chat
+}
+
+// Response: Server -> Client (OPCODE_SET_GUILD_NOTICE_RESPONSE = 744).
+message SetGuildNoticeResponse {
+  SetGuildNoticeOutcome outcome = 1;
+  string notice = 2; // thông báo ĐÃ chuẩn hoá vừa lưu (khi OK)
 }

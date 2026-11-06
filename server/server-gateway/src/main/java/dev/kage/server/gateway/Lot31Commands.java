@@ -12,6 +12,7 @@ record Lot31Commands(
         EquipmentPresetCommands equipmentPresets,
         BulkUseCommands bulkUse,
         AwayCommands away,
+        GuildNoticeCommands guildNotice,
         Lot31Facades facades,
         Clock clock) {
 
@@ -24,6 +25,11 @@ record Lot31Commands(
                         gateway.inventoryFacade(),
                         gateway.progression().expansion().lot29().luckyBag()),
                 worldGateway.registry().away, // ADR-178 — chung mọi kết nối, KHÔNG dựng mới mỗi kết nối
+                new GuildNoticeCommands(new GuildNoticeCommands.Deps(
+                        lot31.guildNotice(),
+                        gateway.contentFacades().socialFacades().guildFacade(),
+                        worldGateway.registry(),
+                        Clock.systemUTC())),
                 lot31,
                 Clock.systemUTC());
     }

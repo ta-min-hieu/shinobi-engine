@@ -108,6 +108,8 @@ final class GuildController {
 
     /** ADR-068/069 — cấp bang + nhiệm vụ tuần, theo lời server (mặc định rỗng = chưa biết). */
     private GuildProgressView progress = GuildProgressView.getDefaultInstance();
+    /** ADR-179 — thông báo bang (đã lọc ký tự font không vẽ được); "" = chưa có. */
+    private String notice = "";
 
     /**
      * Bang của mình, theo lời server. Đây là đường DUY NHẤT trạng thái "đang ở trong bang" thay đổi —
@@ -119,6 +121,7 @@ final class GuildController {
     void onMyGuild(GetMyGuildResponse response) {
         inGuild = response.getInGuild();
         progress = response.getProgress();
+        notice = ChatController.sanitize(response.getNotice());
         if (!inGuild) {
             guildId = 0L;
             guildName = "";
@@ -328,6 +331,11 @@ final class GuildController {
 
     static Optional<String> kickMessageKey(KickGuildMemberOutcome outcome) {
         return messageKey(KICK_MESSAGE_KEYS, outcome);
+    }
+
+    /** ADR-179 — thông báo bang mới nhất ("" = chưa có). */
+    String notice() {
+        return notice;
     }
 
     /** Cấp bang + nhiệm vụ tuần mới nhất (ADR-068/069). */

@@ -12,6 +12,8 @@ import dev.kage.protocol.GetEquipmentPresetsRequest;
 import dev.kage.protocol.GetEquipmentPresetsResponse;
 import dev.kage.protocol.GetMarketHistoryRequest;
 import dev.kage.protocol.GetMarketHistoryResponse;
+import dev.kage.protocol.GetMyGuildRequest;
+import dev.kage.protocol.GetMyGuildResponse;
 import dev.kage.protocol.LuckyBagRewardView;
 import dev.kage.protocol.MarketHistoryEntry;
 import dev.kage.protocol.Opcode;
@@ -22,6 +24,8 @@ import dev.kage.protocol.SaveEquipmentPresetResponse;
 import dev.kage.protocol.SendChatMessageCommand;
 import dev.kage.protocol.SetAwayMessageCommand;
 import dev.kage.protocol.SetAwayMessageResponse;
+import dev.kage.protocol.SetGuildNoticeCommand;
+import dev.kage.protocol.SetGuildNoticeResponse;
 import dev.kage.protocol.UseItemsCommand;
 import dev.kage.protocol.UseItemsResponse;
 
@@ -50,8 +54,17 @@ final class Lot31Steps {
             case "useMany" -> useMany(arg);
             case "openBags" -> openBags(arg);
             case "marketHistory" -> marketHistory();
+            default -> socialStep(verb, arg);
+        };
+    }
+
+    /** Nhánh xã hội — tách khỏi {@link #step} vì trần CyclomaticComplexity. */
+    private String socialStep(String verb, String arg) throws IOException {
+        return switch (verb) {
             case "setAway" -> setAway(arg);
             case "whisperAway" -> whisperAway(arg);
+            case "guildNotice" -> guildNotice(arg);
+            case "myGuild" -> myGuild();
             default -> "bước không hiểu";
         };
     }
@@ -196,6 +209,28 @@ final class Lot31Steps {
     private static String describeChat(byte[] payload) throws com.google.protobuf.InvalidProtocolBufferException {
         ChatMessageEvent e = ChatMessageEvent.parseFrom(payload);
         return "tựTrảLời=" + e.getAutoReply() + " từ=" + e.getSenderName() + " nội dung=" + e.getBody();
+    }
+
+    private String guildNotice(String notice) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SET_GUILD_NOTICE_COMMAND_VALUE,
+                SetGuildNoticeCommand.newBuilder().setNotice(notice).build(),
+                Opcode.OPCODE_SET_GUILD_NOTICE_RESPONSE_VALUE,
+                p -> {
+                    SetGuildNoticeResponse r = SetGuildNoticeResponse.parseFrom(p);
+                    return r.getOutcome().name() + " thôngBáo=" + r.getNotice();
+                });
+    }
+
+    private String myGuild() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_MY_GUILD_REQUEST_VALUE,
+                GetMyGuildRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_MY_GUILD_RESPONSE_VALUE,
+                p -> {
+                    GetMyGuildResponse r = GetMyGuildResponse.parseFrom(p);
+                    return "bang=" + r.getGuildName() + " thôngBáo=" + r.getNotice();
+                });
     }
 
     private static String describe(EquipmentPresetView preset) {

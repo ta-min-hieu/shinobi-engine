@@ -302,7 +302,9 @@ final class GuildCoordinator implements WindowFlow {
     private void showGuild(String guildName) {
         boolean leader = controller.isLeader();
         panel.showGuild(guildName + " — " + text(leader ? "guild.label.leader" : "guild.label.member"), leader);
-        panel.setProgress(progressText(controller.progress()));
+        String notice = controller.notice(); // ADR-179 — thông báo bang trên đầu khối tiến độ
+        String progress = progressText(controller.progress());
+        panel.setProgress(notice.isEmpty() ? progress : format("guild.notice_line", notice) + "\n" + progress);
         refreshMembers(leader);
         refreshPendingRequests();
     }

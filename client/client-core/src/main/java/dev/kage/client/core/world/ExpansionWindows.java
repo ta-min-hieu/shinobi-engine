@@ -144,6 +144,7 @@ record ExpansionWindows(
         lot29.expBuff().useBanner(hud::setExpBuff); // ADR-164
         // ADR-171 — đồng bộ công tắc "cho người khác soi" lên server lúc vào game và mỗi lần đổi.
         displaySettings.onChange(DisplaySettings.Option.ALLOW_INSPECT, lot30.inspect()::setAllowed);
+        lot31.guildNotice().requestOnEnter(); // ADR-179 — thấy thông báo bang ngay lúc vào game
         lot30.restReminder().useSwitch(displaySettings.settings().switchFor(DisplaySettings.Option.REST_REMINDER));
         displaySettings.applyTo(titles, feedback, backdrop, weather.overlay());
     }

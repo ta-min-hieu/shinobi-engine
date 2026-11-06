@@ -11,14 +11,16 @@ record Lot31Windows(
         EquipmentPresetCoordinator equipmentPresets,
         BulkUseCoordinator bulkUse,
         MarketHistoryCoordinator marketHistory,
-        AwayCoordinator away) {
+        AwayCoordinator away,
+        GuildNoticeCoordinator guildNotice) {
 
     static Lot31Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot31Windows(
                 new EquipmentPresetCoordinator(sender, feeds),
                 new BulkUseCoordinator(sender, feeds.chat()),
                 MarketHistoryCoordinator.create(skin, sender, feeds),
-                new AwayCoordinator(sender, feeds.chat()));
+                new AwayCoordinator(sender, feeds.chat()),
+                new GuildNoticeCoordinator(sender, feeds.chat()));
     }
 
     /** Đăng ký vào hub. */
@@ -27,5 +29,6 @@ record Lot31Windows(
         panels.register(bulkUse);
         panels.register(marketHistory.panel(), marketHistory);
         panels.register(away);
+        panels.register(guildNotice);
     }
 }

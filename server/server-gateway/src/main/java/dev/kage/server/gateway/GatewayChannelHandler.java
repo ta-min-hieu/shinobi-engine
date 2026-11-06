@@ -981,6 +981,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetAwayMessageCommand.parser(),
                             Opcode.OPCODE_SET_AWAY_MESSAGE_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot31().away().set(id, c))),
+            // Lô 31 — thông báo bang (ADR-179); chỉ bang chủ, báo cả bang.
+            Map.entry(
+                    Opcode.OPCODE_SET_GUILD_NOTICE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetGuildNoticeCommand.parser(),
+                            Opcode.OPCODE_SET_GUILD_NOTICE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot31().guildNotice().set(id, c))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,
@@ -4516,7 +4523,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         myGuild.ifPresent(guild -> responseBuilder
                 .setGuildId(guild.guildId())
                 .setGuildName(guild.guildName())
-                .setIsLeader(guild.isLeader()));
+                .setIsLeader(guild.isLeader())
+                .setNotice(expansion.lot31().guildNotice().noticeOf(characterId))); // ADR-179
         if (myGuild.isPresent()) {
             guildProgression
                     .standingOf(characterId)
