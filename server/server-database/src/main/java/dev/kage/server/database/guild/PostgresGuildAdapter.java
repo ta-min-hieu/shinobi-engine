@@ -74,13 +74,23 @@ public final class PostgresGuildAdapter implements GuildPort {
             DELETE FROM guild WHERE leader_character_id = ?
             """;
 
+    // ADR-180 — xoá thành viên và ghi nhật ký bang trong MỘT câu: số dòng trả về = số người đã rời.
     private static final String LEAVE = """
-            DELETE FROM guild_member WHERE character_id = ? AND role = 'MEMBER'
+            WITH gone AS (
+                DELETE FROM guild_member WHERE character_id = ? AND role = 'MEMBER' RETURNING guild_id, character_id
+            )
+            INSERT INTO guild_log (guild_id, kind, actor_id, subject_id, amount, detail, created_at)
+            SELECT guild_id, 'LEFT', character_id, character_id, 0, '', now() FROM gone
             """;
 
     private static final String KICK = """
-            DELETE FROM guild_member WHERE character_id = ? AND role = 'MEMBER'
-              AND guild_id = (SELECT guild_id FROM guild_member WHERE character_id = ? AND role = 'LEADER')
+            WITH gone AS (
+                DELETE FROM guild_member WHERE character_id = ? AND role = 'MEMBER'
+                  AND guild_id = (SELECT guild_id FROM guild_member WHERE character_id = ? AND role = 'LEADER')
+                RETURNING guild_id, character_id
+            )
+            INSERT INTO guild_log (guild_id, kind, actor_id, subject_id, amount, detail, created_at)
+            SELECT guild_id, 'KICKED', ?, character_id, 0, '', now() FROM gone
             """;
 
     private static final String FIND_PENDING_REQUEST_OF_CHARACTER = """
@@ -162,6 +172,7 @@ public final class PostgresGuildAdapter implements GuildPort {
             Instant now = Instant.now();
             long guildId = insertGuild(connection, name, leaderCharacterId, now);
             insertMember(connection, new NewMember(guildId, leaderCharacterId, GuildRole.LEADER, now));
+            GuildLog.append(connection, GuildLog.Entry.of(guildId, GuildLog.Kind.CREATED, leaderCharacterId), now);
             return new Guild(guildId, name, leaderCharacterId, now);
         });
     }
@@ -209,7 +220,7 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     @Override
     public boolean kickMember(long leaderCharacterId, long targetCharacterId) {
-        return JdbcOperations.update(dataSource, KICK, targetCharacterId, leaderCharacterId) > 0;
+        return JdbcOperations.update(dataSource, KICK, targetCharacterId, leaderCharacterId, leaderCharacterId) > 0;
     }
 
     @Override
@@ -357,6 +368,16 @@ public final class PostgresGuildAdapter implements GuildPort {
             return ApproveResult.TARGET_ALREADY_IN_GUILD;
         }
         deleteJoinRequest(connection, requestId);
+        GuildLog.append(
+                connection,
+                new GuildLog.Entry(
+                        approval.guildId(),
+                        GuildLog.Kind.JOINED,
+                        approval.guildLeaderCharacterId(),
+                        approval.characterId(),
+                        0L,
+                        ""),
+                Instant.now());
         return ApproveResult.OK;
     }
 

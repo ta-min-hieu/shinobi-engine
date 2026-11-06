@@ -63,6 +63,7 @@ public final class PostgresGuildNoticeAdapter implements GuildNoticePort {
                 "GUILD_NOTICE_SET",
                 "{\"guildId\":" + guildId + ",\"length\":" + notice.length() + "}",
                 Timestamp.from(at));
+        GuildLog.append(connection, GuildLog.Entry.of(guildId, GuildLog.Kind.NOTICE_CHANGED, characterId), at);
         return Outcome.OK;
     }
 }

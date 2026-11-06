@@ -988,6 +988,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetGuildNoticeCommand.parser(),
                             Opcode.OPCODE_SET_GUILD_NOTICE_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot31().guildNotice().set(id, c))),
+            // Lô 31 — nhật ký bang (ADR-180); chỉ đọc, mọi thành viên.
+            Map.entry(
+                    Opcode.OPCODE_GET_GUILD_LOG_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetGuildLogRequest.parser(),
+                            Opcode.OPCODE_GET_GUILD_LOG_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot31().guildLog(id))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,

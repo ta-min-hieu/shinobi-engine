@@ -460,3 +460,34 @@ message SetGuildNoticeResponse {
   SetGuildNoticeOutcome outcome = 1;
   string notice = 2; // thông báo ĐÃ chuẩn hoá vừa lưu (khi OK)
 }
+
+// ===== ADR-180 — nhật ký bang. CHỈ THÊM. 50 dòng gần nhất (giữ 90 ngày) của bang người hỏi đang ở; mọi thành viên xem.
+
+// Request: Client -> Server (OPCODE_GET_GUILD_LOG_REQUEST = 745). Người hỏi lấy từ session.
+message GetGuildLogRequest {}
+
+enum GuildLogKind {
+  GUILD_LOG_KIND_UNSPECIFIED = 0;
+  GUILD_LOG_KIND_CREATED = 1;
+  GUILD_LOG_KIND_JOINED = 2;         // actor = bang chủ duyệt, subject = người vào
+  GUILD_LOG_KIND_LEFT = 3;
+  GUILD_LOG_KIND_KICKED = 4;         // actor = bang chủ, subject = người bị đuổi
+  GUILD_LOG_KIND_DONATED = 5;        // amount = vàng góp
+  GUILD_LOG_KIND_LEVEL_UP = 6;       // amount = cấp mới; actor = người góp đẩy lên cấp
+  GUILD_LOG_KIND_RENAMED = 7;        // detail = tên mới
+  GUILD_LOG_KIND_NOTICE_CHANGED = 8;
+}
+
+message GuildLogEntry {
+  GuildLogKind kind = 1;
+  string actor_name = 2;   // "" = không có / nhân vật không còn
+  string subject_name = 3;
+  int64 amount = 4;
+  string detail = 5;
+  int64 at_epoch_seconds = 6;
+}
+
+// Response: Server -> Client (OPCODE_GET_GUILD_LOG_RESPONSE = 746). Mới nhất trước; rỗng nếu không ở bang nào.
+message GetGuildLogResponse {
+  repeated GuildLogEntry entries = 1;
+}

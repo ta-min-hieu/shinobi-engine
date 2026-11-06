@@ -2,9 +2,13 @@ package dev.kage.server.gateway;
 
 import java.time.Clock;
 
+import dev.kage.guild.domain.GuildLogPort;
 import dev.kage.market.domain.MarketHistoryPort;
 import dev.kage.market.domain.MarketPolicy;
+import dev.kage.protocol.GetGuildLogResponse;
 import dev.kage.protocol.GetMarketHistoryResponse;
+import dev.kage.protocol.GuildLogEntry;
+import dev.kage.protocol.GuildLogKind;
 import dev.kage.protocol.MarketHistoryEntry;
 
 /** Lớp lệnh lô 31 (ADR-175…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
@@ -46,6 +50,21 @@ record Lot31Commands(
                     .setGoldDelta(entry.sold() ? MarketPolicy.proceedsOf(entry.price()) : -entry.price())
                     .setCounterpartName(entry.counterpartName())
                     .setAtEpochSeconds(entry.closedAt().getEpochSecond()));
+        }
+        return response.build();
+    }
+
+    /** ADR-180 — Virtual Thread; nhật ký của bang mà {@code characterId} (từ session) đang ở. */
+    GetGuildLogResponse guildLog(long characterId) {
+        GetGuildLogResponse.Builder response = GetGuildLogResponse.newBuilder();
+        for (GuildLogPort.Entry entry : facades.guildLog().recent(characterId)) {
+            response.addEntries(GuildLogEntry.newBuilder()
+                    .setKind(GuildLogKind.valueOf("GUILD_LOG_KIND_" + entry.kind()))
+                    .setActorName(entry.actorName())
+                    .setSubjectName(entry.subjectName())
+                    .setAmount(entry.amount())
+                    .setDetail(entry.detail())
+                    .setAtEpochSeconds(entry.at().getEpochSecond()));
         }
         return response.build();
     }

@@ -152,7 +152,23 @@ public final class PostgresGuildProgressionAdapter implements GuildProgressionPo
                 "GUILD_DONATION",
                 "{\"guildId\":" + id + ",\"amount\":" + amount + "}",
                 Timestamp.from(Instant.now()));
+        logDonation(
+                connection,
+                new GuildLog.Entry(id, GuildLog.Kind.DONATED, characterId, 0L, amount, ""),
+                levelAfter > levelBefore ? levelAfter : 0);
         return new Donation(DonationOutcome.OK, levelAfter > levelBefore, id);
+    }
+
+    /** ADR-180 — dòng góp bang, và dòng "bang lên cấp" nếu lần góp này đẩy cấp lên ({@code newLevel} > 0). */
+    private static void logDonation(Connection connection, GuildLog.Entry donated, int newLevel) {
+        Instant now = Instant.now();
+        GuildLog.append(connection, donated, now);
+        if (newLevel > 0) {
+            GuildLog.append(
+                    connection,
+                    new GuildLog.Entry(donated.guildId(), GuildLog.Kind.LEVEL_UP, donated.actorId(), 0L, newLevel, ""),
+                    now);
+        }
     }
 
     @Override

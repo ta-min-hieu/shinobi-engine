@@ -10,10 +10,13 @@ import dev.kage.protocol.EquipmentPresetSlot;
 import dev.kage.protocol.EquipmentPresetView;
 import dev.kage.protocol.GetEquipmentPresetsRequest;
 import dev.kage.protocol.GetEquipmentPresetsResponse;
+import dev.kage.protocol.GetGuildLogRequest;
+import dev.kage.protocol.GetGuildLogResponse;
 import dev.kage.protocol.GetMarketHistoryRequest;
 import dev.kage.protocol.GetMarketHistoryResponse;
 import dev.kage.protocol.GetMyGuildRequest;
 import dev.kage.protocol.GetMyGuildResponse;
+import dev.kage.protocol.GuildLogEntry;
 import dev.kage.protocol.LuckyBagRewardView;
 import dev.kage.protocol.MarketHistoryEntry;
 import dev.kage.protocol.Opcode;
@@ -65,6 +68,7 @@ final class Lot31Steps {
             case "whisperAway" -> whisperAway(arg);
             case "guildNotice" -> guildNotice(arg);
             case "myGuild" -> myGuild();
+            case "guildLog" -> guildLog();
             default -> "bước không hiểu";
         };
     }
@@ -230,6 +234,29 @@ final class Lot31Steps {
                 p -> {
                     GetMyGuildResponse r = GetMyGuildResponse.parseFrom(p);
                     return "bang=" + r.getGuildName() + " thôngBáo=" + r.getNotice();
+                });
+    }
+
+    private String guildLog() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_GUILD_LOG_REQUEST_VALUE,
+                GetGuildLogRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_GUILD_LOG_RESPONSE_VALUE,
+                p -> {
+                    StringBuilder out = new StringBuilder();
+                    for (GuildLogEntry e : GetGuildLogResponse.parseFrom(p).getEntriesList()) {
+                        out.append(e.getKind().name().replace("GUILD_LOG_KIND_", ""))
+                                .append('(')
+                                .append(e.getActorName())
+                                .append("→")
+                                .append(e.getSubjectName())
+                                .append(' ')
+                                .append(e.getAmount())
+                                .append(' ')
+                                .append(e.getDetail())
+                                .append(") ");
+                    }
+                    return out.toString();
                 });
     }
 

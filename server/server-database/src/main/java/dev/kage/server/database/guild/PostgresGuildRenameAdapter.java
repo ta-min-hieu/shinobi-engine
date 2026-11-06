@@ -74,6 +74,10 @@ public final class PostgresGuildRenameAdapter implements GuildRenamePort {
                 "GUILD_RENAMED",
                 "{\"guildId\":" + guildId + ",\"to\":\"" + request.newName() + "\"}",
                 Timestamp.from(request.at()));
+        GuildLog.append(
+                connection,
+                new GuildLog.Entry(guildId, GuildLog.Kind.RENAMED, request.characterId(), 0L, 0L, request.newName()),
+                request.at()); // ADR-180
         return new Renamed(Outcome.OK, request.newName(), guildId, request.at().plus(COOLDOWN));
     }
 

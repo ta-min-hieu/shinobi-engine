@@ -211,6 +211,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-177](ADR-177-Market-History.md) | Lịch sử phường thị: đọc `market_listing` SOLD (bán + mua) 30 ngày / 50 dòng, chỉ mục V141, 1029/1030; `/lichsupt` | ✅ Accepted (lô 31) |
 | [ADR-178](ADR-178-Away-Auto-Reply.md) | Tự trả lời khi vắng: chỉ bộ nhớ (dùng chung mọi kết nối), ≤ 60 ký tự qua bộ lọc chat, 1 lần/5 phút mỗi người gửi; 812/813 + `ChatMessageEvent.auto_reply`; `/vang` | ✅ Accepted (lô 31) |
 | [ADR-179](ADR-179-Guild-Notice.md) | Thông báo bang: bang chủ ghi ≤ 100 ký tự qua bộ lọc chat (V142), `GetMyGuildResponse.notice`, 743/744, 720 NOTICE_CHANGED; `/thongbaobang` | ✅ Accepted (lô 31) |
+| [ADR-180](ADR-180-Guild-Log.md) | Nhật ký bang: bảng `guild_log` (V143) ghi cùng transaction 8 loại việc, 50 dòng / giữ 90 ngày, 745/746; `/nhatkybang` | ✅ Accepted (lô 31) |
 ---
 
 ## ADR cần tạo (chưa viết)

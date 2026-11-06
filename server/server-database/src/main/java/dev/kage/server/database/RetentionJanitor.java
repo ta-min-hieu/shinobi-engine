@@ -45,6 +45,9 @@ final class RetentionJanitor {
     /** ADR-169 — sổ vàng cá nhân giữ 30 ngày. */
     static final Duration GOLD_LEDGER_RETENTION = Duration.ofDays(30);
 
+    /** ADR-180 — nhật ký bang giữ 90 ngày. */
+    static final Duration GUILD_LOG_RETENTION = Duration.ofDays(90);
+
     private static final Duration FIRST_RUN_DELAY = Duration.ofMinutes(1);
     private static final Duration PERIOD = Duration.ofHours(6);
 
@@ -53,6 +56,8 @@ final class RetentionJanitor {
             """;
 
     private static final String DELETE_GOLD_LEDGER_OLDER_THAN = "DELETE FROM gold_ledger_entry WHERE created_at < ?";
+
+    private static final String DELETE_GUILD_LOG_OLDER_THAN = "DELETE FROM guild_log WHERE created_at < ?";
 
     private static final String DELETE_CHAT_AUDIT_OLDER_THAN = """
             DELETE FROM audit_log WHERE action = 'CHAT_MESSAGE' AND created_at < ?
@@ -94,6 +99,12 @@ final class RetentionJanitor {
                 dataSource, DELETE_GOLD_LEDGER_OLDER_THAN, Timestamp.from(now.minus(GOLD_LEDGER_RETENTION)));
     }
 
+    /** ADR-180 — xoá dòng nhật ký bang cũ hơn {@link #GUILD_LOG_RETENTION}. Package-private để test gọi thẳng. */
+    int purgeGuildLog(Instant now) {
+        return JdbcOperations.update(
+                dataSource, DELETE_GUILD_LOG_OLDER_THAN, Timestamp.from(now.minus(GUILD_LOG_RETENTION)));
+    }
+
     int purgeChatAudit(Instant now) {
         return JdbcOperations.update(
                 dataSource, DELETE_CHAT_AUDIT_OLDER_THAN, Timestamp.from(now.minus(CHAT_AUDIT_RETENTION)));
@@ -128,6 +139,14 @@ final class RetentionJanitor {
             }
         } catch (RuntimeException e) {
             LOG.warn("Dọn sổ vàng thất bại — lượt sau dọn bù", e);
+        }
+        try {
+            int deleted = purgeGuildLog(now);
+            if (deleted > 0) {
+                LOG.info("Đã dọn {} dòng nhật ký bang cũ hơn {} ngày", deleted, GUILD_LOG_RETENTION.toDays());
+            }
+        } catch (RuntimeException e) {
+            LOG.warn("Dọn nhật ký bang thất bại — lượt sau dọn bù", e);
         }
     }
 }
