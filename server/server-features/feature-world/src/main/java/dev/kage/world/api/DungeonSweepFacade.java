@@ -11,6 +11,12 @@ public final class DungeonSweepFacade {
 
     private static final ZoneId VIETNAM = ZoneId.of("Asia/Ho_Chi_Minh");
 
+    /**
+     * Mã Bí Cảnh hợp lệ — mã đến thẳng từ packet; mã lạ (vd chứa {@code U+0000}, Postgres từ chối cả câu SELECT ⇒ 500)
+     * bị trả {@code UNKNOWN_DUNGEON} trước khi chạm DB. Tìm ra bởi {@code GatewayOpcodeFuzzDatabaseTest} 2026-11-06.
+     */
+    private static final java.util.regex.Pattern DUNGEON_CODE = java.util.regex.Pattern.compile("[a-z0-9_]{1,64}");
+
     /** Composition không có quét nhanh (test). */
     public static final DungeonSweepFacade DISABLED = new DungeonSweepFacade(
             (characterId, dungeonCode, day, maxEntries) ->
@@ -28,6 +34,9 @@ public final class DungeonSweepFacade {
 
     /** Quét một lần; lượt ngày cùng trần với lượt vào thật ({@link DungeonQuotaFacade#MAX_DAILY_ENTRIES}). */
     public DungeonSweepPort.Result sweep(long characterId, String dungeonCode) {
+        if (!DUNGEON_CODE.matcher(dungeonCode).matches()) {
+            return DungeonSweepPort.Result.refused(DungeonSweepPort.Outcome.UNKNOWN_DUNGEON, 0);
+        }
         LocalDate today = LocalDate.now(clock.withZone(VIETNAM));
         return port.sweep(characterId, dungeonCode, today, DungeonQuotaFacade.MAX_DAILY_ENTRIES);
     }
