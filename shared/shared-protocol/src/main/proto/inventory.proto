@@ -665,3 +665,33 @@ message GetEquipmentPresetsRequest {}
 message GetEquipmentPresetsResponse {
   repeated EquipmentPresetView presets = 1;
 }
+
+// ===== ADR-176 — dùng nhiều vật phẩm một lần. CHỈ THÊM. Server lặp ĐÚNG đường dùng một món, dừng ở lần đầu bị từ chối.
+
+// Command: Client -> Server (OPCODE_USE_ITEMS_COMMAND = 552). Chỉ món không phải đan hồi máu/tiến hoá linh thú
+// (đan x2 kinh nghiệm, mở rộng túi); count kẹp 1..50 phía server.
+message UseItemsCommand {
+  int64 inventory_item_id = 1;
+  int32 count = 2;
+}
+
+// Response: Server -> Client (OPCODE_USE_ITEMS_RESPONSE = 553).
+message UseItemsResponse {
+  int32 used = 1;               // số lần dùng thành công
+  int32 remaining_quantity = 2; // số cái còn lại trong ô (0 = ô đã biến mất)
+  string stop_error_key = 3;    // lý do dừng sớm (khoá i18n như UseItemResponse.error_key); "" = dùng đủ count
+}
+
+// Command: Client -> Server (OPCODE_OPEN_LUCKY_BAGS_COMMAND = 554). Mở tối đa count túi loại này (kẹp 1..50).
+message OpenLuckyBagsCommand {
+  int64 bag_item_template_id = 1;
+  int32 count = 2;
+}
+
+// Response: Server -> Client (OPCODE_OPEN_LUCKY_BAGS_RESPONSE = 555). rewards = quà đã GỘP theo loại (vàng một dòng).
+message OpenLuckyBagsResponse {
+  int32 opened = 1;
+  repeated LuckyBagRewardView rewards = 2;
+  OpenLuckyBagOutcome stop_outcome = 3; // OK = mở đủ count; khác = lý do dừng sớm (hết túi, đầy túi, đầy vàng...)
+  GetLuckyBagsResponse bags = 4;
+}

@@ -8,13 +8,18 @@ import dev.kage.protocol.EquipmentPresetSlot;
 import dev.kage.protocol.EquipmentPresetView;
 import dev.kage.protocol.GetEquipmentPresetsRequest;
 import dev.kage.protocol.GetEquipmentPresetsResponse;
+import dev.kage.protocol.LuckyBagRewardView;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.OpenLuckyBagsCommand;
+import dev.kage.protocol.OpenLuckyBagsResponse;
 import dev.kage.protocol.SaveEquipmentPresetCommand;
 import dev.kage.protocol.SaveEquipmentPresetResponse;
+import dev.kage.protocol.UseItemsCommand;
+import dev.kage.protocol.UseItemsResponse;
 
 /**
- * Bước lô 31: bộ trang bị (ADR-175) {@code savePreset:<n>}, {@code applyPreset:<n>}, {@code listPresets}. Nối sau
- * {@link Lot30SocialSteps}.
+ * Bước lô 31: bộ trang bị (ADR-175) {@code savePreset:<n>}, {@code applyPreset:<n>}, {@code listPresets}; dùng nhiều
+ * (ADR-176) {@code useMany:<itemId>x<n>}, {@code openBags:<mẫu túi>x<n>}. Nối sau {@link Lot30SocialSteps}.
  */
 final class Lot31Steps {
 
@@ -29,6 +34,8 @@ final class Lot31Steps {
             case "savePreset" -> savePreset(Integer.parseInt(arg));
             case "applyPreset" -> applyPreset(Integer.parseInt(arg));
             case "listPresets" -> listPresets();
+            case "useMany" -> useMany(arg);
+            case "openBags" -> openBags(arg);
             default -> "bước không hiểu";
         };
     }
@@ -68,6 +75,45 @@ final class Lot31Steps {
                         out.append(describe(preset)).append(" | ");
                     }
                     return out.toString();
+                });
+    }
+
+    private String useMany(String arg) throws IOException {
+        String[] parts = arg.split("x", 2);
+        return asker.ask(
+                Opcode.OPCODE_USE_ITEMS_COMMAND_VALUE,
+                UseItemsCommand.newBuilder()
+                        .setInventoryItemId(Long.parseLong(parts[0]))
+                        .setCount(Integer.parseInt(parts[1]))
+                        .build(),
+                Opcode.OPCODE_USE_ITEMS_RESPONSE_VALUE,
+                p -> {
+                    UseItemsResponse r = UseItemsResponse.parseFrom(p);
+                    return "dùng=" + r.getUsed() + " còn=" + r.getRemainingQuantity() + " dừng=" + r.getStopErrorKey();
+                });
+    }
+
+    private String openBags(String arg) throws IOException {
+        String[] parts = arg.split("x", 2);
+        return asker.ask(
+                Opcode.OPCODE_OPEN_LUCKY_BAGS_COMMAND_VALUE,
+                OpenLuckyBagsCommand.newBuilder()
+                        .setBagItemTemplateId(Long.parseLong(parts[0]))
+                        .setCount(Integer.parseInt(parts[1]))
+                        .build(),
+                Opcode.OPCODE_OPEN_LUCKY_BAGS_RESPONSE_VALUE,
+                p -> {
+                    OpenLuckyBagsResponse r = OpenLuckyBagsResponse.parseFrom(p);
+                    StringBuilder out =
+                            new StringBuilder("mở=").append(r.getOpened()).append(" quà=");
+                    for (LuckyBagRewardView reward : r.getRewardsList()) {
+                        out.append(
+                                        reward.getGold() > 0
+                                                ? reward.getGold() + "vàng"
+                                                : reward.getItemTemplateId() + "x" + reward.getQuantity())
+                                .append(' ');
+                    }
+                    return out.append("dừng=").append(r.getStopOutcome().name()).toString();
                 });
     }
 

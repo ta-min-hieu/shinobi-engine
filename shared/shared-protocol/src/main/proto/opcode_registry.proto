@@ -242,6 +242,10 @@ enum Opcode {
   OPCODE_APPLY_EQUIPMENT_PRESET_RESPONSE = 549;
   OPCODE_GET_EQUIPMENT_PRESETS_REQUEST = 550;
   OPCODE_GET_EQUIPMENT_PRESETS_RESPONSE = 551;
+  OPCODE_USE_ITEMS_COMMAND = 552;  // ADR-176 (2026-11-06) — dùng nhiều vật phẩm
+  OPCODE_USE_ITEMS_RESPONSE = 553;
+  OPCODE_OPEN_LUCKY_BAGS_COMMAND = 554;
+  OPCODE_OPEN_LUCKY_BAGS_RESPONSE = 555;
   // 511 để TRỐNG CÓ CHỦ Ý — dành sẵn cho ITEM_REMOVED_EVENT (ADR-035 Revisit Trigger #3, chỉ
   // thêm khi ĐO thấy việc hỏi lại toàn bộ túi sau mỗi hành động tốn thật). ĐỪNG cấp cho packet khác.
 

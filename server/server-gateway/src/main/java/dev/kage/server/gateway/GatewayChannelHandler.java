@@ -946,6 +946,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetEquipmentPresetsRequest.parser(),
                             Opcode.OPCODE_GET_EQUIPMENT_PRESETS_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot31().equipmentPresets().list(id))),
+            // Lô 31 — dùng nhiều vật phẩm (ADR-176); lặp đúng đường dùng một món / mở một túi phúc.
+            Map.entry(
+                    Opcode.OPCODE_USE_ITEMS_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.UseItemsCommand.parser(),
+                            Opcode.OPCODE_USE_ITEMS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot31()
+                                    .bulkUse()
+                                    .useMany(
+                                            id,
+                                            c,
+                                            new BulkUseCommands.Hooks(
+                                                    GatewayChannelHandler::useItemErrorKey,
+                                                    h.expansion.lot29().expBuff()::announce)))),
+            Map.entry(
+                    Opcode.OPCODE_OPEN_LUCKY_BAGS_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.OpenLuckyBagsCommand.parser(),
+                            Opcode.OPCODE_OPEN_LUCKY_BAGS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot31().bulkUse().openMany(id, c))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,

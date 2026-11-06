@@ -19,11 +19,14 @@ import dev.kage.protocol.Opcode;
 import dev.kage.protocol.OpenLuckyBagCommand;
 import dev.kage.protocol.OpenLuckyBagOutcome;
 import dev.kage.protocol.OpenLuckyBagResponse;
+import dev.kage.protocol.OpenLuckyBagsCommand;
+import dev.kage.protocol.OpenLuckyBagsResponse;
 import dev.kage.protocol.wire.PacketCodec;
 
 /**
  * Túi phúc (ADR-163) — cửa sổ mở bằng lệnh chat {@code /tuiphuc} (hoặc {@code /luckybag}). Mỗi loại túi một dòng (đang
- * có bao nhiêu) kèm nút "Mở", rồi bảng quà với tỉ lệ công khai. Server rút và cấp quà; client chỉ bày.
+ * có bao nhiêu) kèm nút "Mở", một dòng "Mở 10" (ADR-176) khi có từ hai túi, rồi bảng quà với tỉ lệ công khai. Server
+ * rút và cấp quà; client chỉ bày.
  */
 final class LuckyBagCoordinator implements WindowFlow {
 
@@ -37,8 +40,13 @@ final class LuckyBagCoordinator implements WindowFlow {
     private final WorldCommandSender sender;
     private final ItemCatalogCoordinator itemCatalog;
     private final I18NBundle i18n = KageI18n.load();
+    /** ADR-176 — số túi một lần bấm "Mở 10". */
+    static final int BULK_OPEN = 10;
+
     /** Túi của từng dòng có nút "Mở"; dòng quà (không nút) giữ 0. */
     private final List<Long> rowBags = new ArrayList<>();
+    /** Số túi mở của từng dòng (1, hoặc {@link #BULK_OPEN} cho dòng "Mở 10"); song song {@link #rowBags}. */
+    private final List<Integer> rowCounts = new ArrayList<>();
 
     LuckyBagCoordinator(ReportPanel panel, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         this.panel = panel;
@@ -75,6 +83,15 @@ final class LuckyBagCoordinator implements WindowFlow {
         if (rowIndex < 0 || rowIndex >= rowBags.size() || rowBags.get(rowIndex) == 0L) {
             return;
         }
+        if (rowCounts.get(rowIndex) > 1) {
+            sender.sendReadRequest(
+                    Opcode.OPCODE_OPEN_LUCKY_BAGS_COMMAND_VALUE,
+                    OpenLuckyBagsCommand.newBuilder()
+                            .setBagItemTemplateId(rowBags.get(rowIndex))
+                            .setCount(rowCounts.get(rowIndex))
+                            .build());
+            return;
+        }
         sender.sendReadRequest(
                 Opcode.OPCODE_OPEN_LUCKY_BAG_COMMAND_VALUE,
                 OpenLuckyBagCommand.newBuilder()
@@ -97,6 +114,15 @@ final class LuckyBagCoordinator implements WindowFlow {
         int opcode = frame.header().opcode();
         if (opcode == Opcode.OPCODE_GET_LUCKY_BAGS_RESPONSE_VALUE) {
             show(GetLuckyBagsResponse.parseFrom(frame.payload()));
+            return true;
+        }
+        if (opcode == Opcode.OPCODE_OPEN_LUCKY_BAGS_RESPONSE_VALUE) {
+            OpenLuckyBagsResponse bulk = OpenLuckyBagsResponse.parseFrom(frame.payload());
+            show(bulk.getBags());
+            panel.setStatus(describeBulk(bulk));
+            if (bulk.getOpened() > 0) {
+                sender.listInventory();
+            }
             return true;
         }
         if (opcode != Opcode.OPCODE_OPEN_LUCKY_BAG_RESPONSE_VALUE) {
@@ -123,8 +149,24 @@ final class LuckyBagCoordinator implements WindowFlow {
         return text("lucky_bag.outcome." + suffix);
     }
 
+    /** ADR-176 — dòng trạng thái sau "Mở 10": số túi đã mở, quà gộp, lý do dừng sớm nếu có. */
+    String describeBulk(OpenLuckyBagsResponse response) {
+        List<String> rewards = new ArrayList<>();
+        response.getRewardsList().forEach(reward -> rewards.add(rewardText(reward)));
+        String opened =
+                KageI18n.formatOrKey(i18n, "lucky_bag.bulk.ok", response.getOpened(), String.join(", ", rewards));
+        OpenLuckyBagOutcome stop = response.getStopOutcome();
+        if (stop == OpenLuckyBagOutcome.OPEN_LUCKY_BAG_OUTCOME_OK) {
+            return response.getOpened() == 0 ? text("lucky_bag.outcome.unspecified") : opened;
+        }
+        String reason =
+                describe(OpenLuckyBagResponse.newBuilder().setOutcome(stop).build());
+        return response.getOpened() == 0 ? reason : opened + " " + reason;
+    }
+
     private void show(GetLuckyBagsResponse bags) {
         rowBags.clear();
+        rowCounts.clear();
         List<ReportPanel.Row> rows = new ArrayList<>();
         for (LuckyBagView bag : bags.getBagsList()) {
             if (rows.size() >= MAX_ROWS) {
@@ -135,6 +177,15 @@ final class LuckyBagCoordinator implements WindowFlow {
                     bag.getOwned() > 0,
                     "lucky_bag.action.open"));
             rowBags.add(bag.getBagItemTemplateId());
+            rowCounts.add(1);
+            if (bag.getOwned() > 1) {
+                rows.add(new ReportPanel.Row(
+                        KageI18n.formatOrKey(i18n, "lucky_bag.bulk.row", Math.min(BULK_OPEN, bag.getOwned())),
+                        true,
+                        "lucky_bag.action.open_many"));
+                rowBags.add(bag.getBagItemTemplateId());
+                rowCounts.add(BULK_OPEN);
+            }
             int total = bag.getRewardsList().stream()
                     .mapToInt(LuckyBagRewardView::getWeight)
                     .sum();
@@ -146,6 +197,7 @@ final class LuckyBagCoordinator implements WindowFlow {
                 rows.add(new ReportPanel.Row(
                         KageI18n.formatOrKey(i18n, "lucky_bag.reward_row", percent, rewardText(reward)), false));
                 rowBags.add(0L);
+                rowCounts.add(1);
             }
         }
         panel.setRows(rows);
@@ -170,6 +222,7 @@ final class LuckyBagCoordinator implements WindowFlow {
     public void reset() {
         panel.close();
         rowBags.clear();
+        rowCounts.clear();
         panel.setRows(List.of());
     }
 }

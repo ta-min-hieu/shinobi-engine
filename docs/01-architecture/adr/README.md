@@ -207,6 +207,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-173](ADR-173-Friend-Notes.md) | Ghi chú bạn bè: ghi chú riêng ≤ 24 ký tự cho người đang là bạn (V139 `friend_note`), `FriendView.note`, 1145/1146; `/ghichu` | ✅ Accepted (lô 30) |
 | [ADR-174](ADR-174-Rest-Reminder.md) | Nhắc nghỉ ngơi: thuần client, dòng hệ thống sau 2 giờ chơi liên tục rồi mỗi giờ; công tắc `/caidat` mặc định bật | ✅ Accepted (lô 30) |
 | [ADR-175](ADR-175-Equipment-Presets.md) | Lưu bộ trang bị: 3 bộ, chụp món cụ thể, mặc lại qua đúng đường mặc đồ thường (V140), 546–551; `/bodo` | ✅ Accepted (lô 31) |
+| [ADR-176](ADR-176-Bulk-Item-Use.md) | Dùng nhiều vật phẩm: lặp đúng đường một món, dừng ở lần từ chối đầu, kẹp 1..50; chỉ đan x2/mở rộng túi/túi phúc (không đan hồi máu); 552–555; `/dungnhieu`, "Mở 10" | ✅ Accepted (lô 31) |
 ---
 
 ## ADR cần tạo (chưa viết)
