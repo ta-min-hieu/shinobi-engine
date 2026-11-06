@@ -149,6 +149,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.inventory.PostgresJunkSaleAdapter(dataSource));
     }
 
+    /** ADR-177 — lịch sử phường thị. */
+    public dev.kage.market.api.MarketHistoryFacade wireMarketHistoryFacade() {
+        return new dev.kage.market.api.MarketHistoryFacade(
+                new dev.kage.server.database.market.PostgresMarketHistoryAdapter(dataSource));
+    }
+
     /** ADR-175 — lưu bộ trang bị. */
     public dev.kage.inventory.api.EquipmentPresetFacade wireEquipmentPresetFacade() {
         return new dev.kage.inventory.api.EquipmentPresetFacade(

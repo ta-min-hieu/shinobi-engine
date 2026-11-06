@@ -967,6 +967,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.OpenLuckyBagsCommand.parser(),
                             Opcode.OPCODE_OPEN_LUCKY_BAGS_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot31().bulkUse().openMany(id, c))),
+            // Lô 31 — lịch sử phường thị (ADR-177); chỉ đọc.
+            Map.entry(
+                    Opcode.OPCODE_GET_MARKET_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetMarketHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_MARKET_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot31().marketHistory(id))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,

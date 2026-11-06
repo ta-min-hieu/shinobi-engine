@@ -223,3 +223,23 @@ message TravelingMerchantArrivedEvent {
   float x = 3;
   int64 ends_at_epoch_ms = 4;
 }
+
+// ===== ADR-177 — lịch sử phường thị. CHỈ THÊM. Món mình đã bán / đã mua (đã chốt), 30 ngày, tối đa 50 dòng.
+
+// Request: Client -> Server (OPCODE_GET_MARKET_HISTORY_REQUEST = 1029). Người hỏi lấy từ session.
+message GetMarketHistoryRequest {}
+
+message MarketHistoryEntry {
+  bool sold = 1;               // true = mình bán; false = mình mua
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int64 price = 4;             // giá tổng cả dòng
+  int64 gold_delta = 5;        // bán: +tiền thực nhận (đã trừ phí 5%); mua: -price
+  string counterpart_name = 6; // người mua (khi mình bán) / người bán (khi mình mua); "" = nhân vật không còn
+  int64 at_epoch_seconds = 7;
+}
+
+// Response: Server -> Client (OPCODE_GET_MARKET_HISTORY_RESPONSE = 1030). Mới nhất trước.
+message GetMarketHistoryResponse {
+  repeated MarketHistoryEntry entries = 1;
+}

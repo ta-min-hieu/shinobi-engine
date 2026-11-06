@@ -8,7 +8,10 @@ import dev.kage.protocol.EquipmentPresetSlot;
 import dev.kage.protocol.EquipmentPresetView;
 import dev.kage.protocol.GetEquipmentPresetsRequest;
 import dev.kage.protocol.GetEquipmentPresetsResponse;
+import dev.kage.protocol.GetMarketHistoryRequest;
+import dev.kage.protocol.GetMarketHistoryResponse;
 import dev.kage.protocol.LuckyBagRewardView;
+import dev.kage.protocol.MarketHistoryEntry;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.OpenLuckyBagsCommand;
 import dev.kage.protocol.OpenLuckyBagsResponse;
@@ -19,7 +22,8 @@ import dev.kage.protocol.UseItemsResponse;
 
 /**
  * Bước lô 31: bộ trang bị (ADR-175) {@code savePreset:<n>}, {@code applyPreset:<n>}, {@code listPresets}; dùng nhiều
- * (ADR-176) {@code useMany:<itemId>x<n>}, {@code openBags:<mẫu túi>x<n>}. Nối sau {@link Lot30SocialSteps}.
+ * (ADR-176) {@code useMany:<itemId>x<n>}, {@code openBags:<mẫu túi>x<n>}; lịch sử phường thị (ADR-177)
+ * {@code marketHistory}. Nối sau {@link Lot30SocialSteps}.
  */
 final class Lot31Steps {
 
@@ -36,6 +40,7 @@ final class Lot31Steps {
             case "listPresets" -> listPresets();
             case "useMany" -> useMany(arg);
             case "openBags" -> openBags(arg);
+            case "marketHistory" -> marketHistory();
             default -> "bước không hiểu";
         };
     }
@@ -114,6 +119,29 @@ final class Lot31Steps {
                                 .append(' ');
                     }
                     return out.append("dừng=").append(r.getStopOutcome().name()).toString();
+                });
+    }
+
+    private String marketHistory() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_MARKET_HISTORY_REQUEST_VALUE,
+                GetMarketHistoryRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_MARKET_HISTORY_RESPONSE_VALUE,
+                p -> {
+                    StringBuilder out = new StringBuilder();
+                    for (MarketHistoryEntry e :
+                            GetMarketHistoryResponse.parseFrom(p).getEntriesList()) {
+                        out.append(e.getSold() ? "BÁN " : "MUA ")
+                                .append(e.getItemTemplateId())
+                                .append('x')
+                                .append(e.getQuantity())
+                                .append(' ')
+                                .append(e.getGoldDelta())
+                                .append(" với ")
+                                .append(e.getCounterpartName())
+                                .append(" | ");
+                    }
+                    return out.toString();
                 });
     }
 
