@@ -19,9 +19,11 @@ import dev.kage.protocol.SetFriendNoteResponse;
 final class Lot30SocialSteps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot31Steps lot31;
 
     Lot30SocialSteps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot31 = new Lot31Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -29,7 +31,7 @@ final class Lot30SocialSteps {
             case "renameGuild" -> renameGuild(arg);
             case "noteFriend" -> noteFriend(arg);
             case "listFriends" -> listFriends();
-            default -> "bước không hiểu";
+            default -> lot31.step(verb, arg);
         };
     }
 

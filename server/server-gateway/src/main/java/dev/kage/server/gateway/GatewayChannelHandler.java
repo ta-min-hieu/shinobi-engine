@@ -924,6 +924,28 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetItemLockCommand.parser(),
                             Opcode.OPCODE_SET_ITEM_LOCK_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot29().itemLock().set(id, c)))),
+            // Lô 31 — lưu bộ trang bị (ADR-175); mặc bộ đi qua đúng đường mặc đồ thường.
+            Map.entry(
+                    Opcode.OPCODE_SAVE_EQUIPMENT_PRESET_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SaveEquipmentPresetCommand.parser(),
+                            Opcode.OPCODE_SAVE_EQUIPMENT_PRESET_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot31().equipmentPresets().save(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_APPLY_EQUIPMENT_PRESET_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ApplyEquipmentPresetCommand.parser(),
+                            Opcode.OPCODE_APPLY_EQUIPMENT_PRESET_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot31()
+                                    .equipmentPresets()
+                                    .apply(id, c, h::applyEquipmentBonusAndComputeMaxHp))),
+            Map.entry(
+                    Opcode.OPCODE_GET_EQUIPMENT_PRESETS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetEquipmentPresetsRequest.parser(),
+                            Opcode.OPCODE_GET_EQUIPMENT_PRESETS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot31().equipmentPresets().list(id))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,

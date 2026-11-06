@@ -611,3 +611,57 @@ message SellJunkResponse {
   int64 gold = 2;
   bool gold_full = 3;  // vàng chạm trần — không bán gì
 }
+
+// ===== ADR-175 — lưu bộ trang bị. CHỈ THÊM. Tối đa 3 bộ; mỗi bộ trỏ tới MÓN cụ thể (item_id), không phải loại món.
+
+// Command: Client -> Server (OPCODE_SAVE_EQUIPMENT_PRESET_COMMAND = 546). Chụp lại MỌI món đang mặc vào bộ preset_no.
+message SaveEquipmentPresetCommand {
+  int32 preset_no = 1; // 1..3
+}
+
+enum EquipmentPresetOutcome {
+  EQUIPMENT_PRESET_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  EQUIPMENT_PRESET_OUTCOME_OK = 1;
+  EQUIPMENT_PRESET_OUTCOME_INVALID_PRESET = 2;   // số bộ ngoài 1..3
+  EQUIPMENT_PRESET_OUTCOME_NOTHING_EQUIPPED = 3; // lưu: đang không mặc gì
+  EQUIPMENT_PRESET_OUTCOME_EMPTY_PRESET = 4;     // mặc: bộ chưa lưu
+}
+
+message EquipmentPresetSlot {
+  EquipmentSlot slot = 1;
+  int64 item_id = 2;
+  int64 item_template_id = 3; // 0 = món không còn trong túi/trên người (đã bán, phân giải...)
+}
+
+message EquipmentPresetView {
+  int32 preset_no = 1;
+  repeated EquipmentPresetSlot slots = 2;
+}
+
+// Response: Server -> Client (OPCODE_SAVE_EQUIPMENT_PRESET_RESPONSE = 547).
+message SaveEquipmentPresetResponse {
+  EquipmentPresetOutcome outcome = 1;
+  EquipmentPresetView preset = 2;
+}
+
+// Command: Client -> Server (OPCODE_APPLY_EQUIPMENT_PRESET_COMMAND = 548). Mặc từng món của bộ qua ĐÚNG đường mặc đồ
+// thường; ô không có trong bộ giữ nguyên. Món không còn / không đủ cấp ⇒ bỏ qua, đếm vào missing.
+message ApplyEquipmentPresetCommand {
+  int32 preset_no = 1;
+}
+
+// Response: Server -> Client (OPCODE_APPLY_EQUIPMENT_PRESET_RESPONSE = 549).
+message ApplyEquipmentPresetResponse {
+  EquipmentPresetOutcome outcome = 1;
+  int32 equipped = 2; // số món vừa mặc lên (món đã mặc sẵn đúng ô không tính)
+  int32 missing = 3;  // số món của bộ không mặc được
+  int32 max_hp = 4;   // máu tối đa mới (như EquipItemResponse.max_hp); 0 nếu không đổi gì
+}
+
+// Request: Client -> Server (OPCODE_GET_EQUIPMENT_PRESETS_REQUEST = 550).
+message GetEquipmentPresetsRequest {}
+
+// Response: Server -> Client (OPCODE_GET_EQUIPMENT_PRESETS_RESPONSE = 551).
+message GetEquipmentPresetsResponse {
+  repeated EquipmentPresetView presets = 1;
+}

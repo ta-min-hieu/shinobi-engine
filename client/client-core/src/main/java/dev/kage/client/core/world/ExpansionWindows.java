@@ -41,7 +41,8 @@ record ExpansionWindows(
         BossTelegraphPresenter telegraphs,
         Lot27Windows lot27,
         Lot29Windows lot29,
-        Lot30Windows lot30) {
+        Lot30Windows lot30,
+        Lot31Windows lot31) {
 
     static ExpansionWindows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         // Cầu mua (ADR-116) — không phím, mở bằng lệnh chat /caumua.
@@ -53,9 +54,8 @@ record ExpansionWindows(
         // Linh điền (ADR-119) — không phím, mở bằng lệnh chat /linhdien.
         ReportPanel fieldPanel =
                 new ReportPanel(skin, "field.title", Input.Keys.UNKNOWN, SpiritFieldCoordinator.TAB_KEYS);
-        // Luyện khí (ADR-120) — không phím, mở bằng lệnh chat /luyenkhi.
+        // Luyện khí (ADR-120, /luyenkhi) + kỳ ngộ (ADR-121, server mở khi gặp) — không phím.
         ReportPanel forgePanel = new ReportPanel(skin, "forge.title", Input.Keys.UNKNOWN, List.of());
-        // Kỳ ngộ (ADR-121) — không phím, server mở khi gặp kỳ ngộ.
         ReportPanel encounterPanel = new ReportPanel(skin, "encounter.title", Input.Keys.UNKNOWN, List.of());
         // Cài đặt hiển thị (ADR-143) — không phím, mở bằng lệnh chat /caidat.
         ReportPanel displaySettingsPanel = new ReportPanel(skin, "settings.title", Input.Keys.UNKNOWN, List.of());
@@ -91,7 +91,8 @@ record ExpansionWindows(
                 new BossTelegraphPresenter(), // ADR-145
                 Lot27Windows.create(skin, sender, feeds), // ADR-147 /tangbaodo, ADR-148 /doiten
                 Lot29Windows.create(skin, sender, feeds), // ADR-159 khoá vật phẩm
-                Lot30Windows.create(skin, sender, feeds)); // ADR-167 nhận hết thư
+                Lot30Windows.create(skin, sender, feeds), // ADR-167 nhận hết thư
+                Lot31Windows.create(skin, sender, feeds)); // ADR-175 bộ trang bị
     }
 
     /** ADR-141 — biển vùng PvP: hỏi bản đồ vùng qua {@code sender}, báo vào/ra qua kênh hệ thống. */
@@ -126,6 +127,7 @@ record ExpansionWindows(
         lot27.registerInto(panels);
         lot29.registerInto(panels);
         lot30.registerInto(panels);
+        lot31.registerInto(panels);
     }
 
     /**

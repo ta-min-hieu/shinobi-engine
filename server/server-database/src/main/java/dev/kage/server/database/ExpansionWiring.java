@@ -149,6 +149,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.inventory.PostgresJunkSaleAdapter(dataSource));
     }
 
+    /** ADR-175 — lưu bộ trang bị. */
+    public dev.kage.inventory.api.EquipmentPresetFacade wireEquipmentPresetFacade() {
+        return new dev.kage.inventory.api.EquipmentPresetFacade(
+                new dev.kage.server.database.inventory.PostgresEquipmentPresetAdapter(dataSource));
+    }
+
     /** ADR-173 — ghi chú bạn bè. */
     public dev.kage.friend.api.FriendNoteFacade wireFriendNoteFacade() {
         return new dev.kage.friend.api.FriendNoteFacade(
