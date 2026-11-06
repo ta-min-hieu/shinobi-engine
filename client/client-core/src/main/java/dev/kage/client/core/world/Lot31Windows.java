@@ -13,7 +13,8 @@ record Lot31Windows(
         MarketHistoryCoordinator marketHistory,
         AwayCoordinator away,
         GuildNoticeCoordinator guildNotice,
-        GuildLogCoordinator guildLog) {
+        GuildLogCoordinator guildLog,
+        FriendBreakthroughCoordinator friendBreakthrough) {
 
     static Lot31Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot31Windows(
@@ -22,7 +23,8 @@ record Lot31Windows(
                 MarketHistoryCoordinator.create(skin, sender, feeds),
                 new AwayCoordinator(sender, feeds.chat()),
                 new GuildNoticeCoordinator(sender, feeds.chat()),
-                GuildLogCoordinator.create(skin, sender, feeds));
+                GuildLogCoordinator.create(skin, sender, feeds),
+                new FriendBreakthroughCoordinator(sender, feeds.chat()));
     }
 
     /** Đăng ký vào hub. */
@@ -33,5 +35,6 @@ record Lot31Windows(
         panels.register(away);
         panels.register(guildNotice);
         panels.register(guildLog.panel(), guildLog);
+        panels.register(friendBreakthrough);
     }
 }

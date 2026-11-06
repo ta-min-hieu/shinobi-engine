@@ -17,6 +17,7 @@ record Lot31Commands(
         BulkUseCommands bulkUse,
         AwayCommands away,
         GuildNoticeCommands guildNotice,
+        FriendBreakthroughCommands friendBreakthrough,
         Lot31Facades facades,
         Clock clock) {
 
@@ -34,8 +35,18 @@ record Lot31Commands(
                         gateway.contentFacades().socialFacades().guildFacade(),
                         worldGateway.registry(),
                         Clock.systemUTC())),
+                friendBreakthrough(gateway, worldGateway.registry()),
                 lot31,
                 Clock.systemUTC());
+    }
+
+    /** ADR-182 — lớp lệnh chúc mừng; trạng thái nằm ở {@code registry.friendBreakthroughs} (dùng chung). */
+    static FriendBreakthroughCommands friendBreakthrough(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
+        return new FriendBreakthroughCommands(new FriendBreakthroughCommands.Deps(
+                gateway.characterFacade(),
+                gateway.contentFacades().socialFacades().friendFacade(),
+                registry,
+                Clock.systemUTC()));
     }
 
     /** ADR-177 — Virtual Thread; lịch sử phường thị của chính {@code characterId} (từ session). */

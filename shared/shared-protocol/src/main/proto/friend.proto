@@ -391,3 +391,41 @@ message SetFriendNoteResponse {
   string target_name = 2; // tên đúng của người bạn (khi tìm thấy)
   string note = 3;        // ghi chú ĐÃ chuẩn hoá được lưu ("" = đã xoá)
 }
+
+// ===== ADR-182 — báo bạn bè đột phá + chúc mừng. CHỈ THÊM. Không ghi DB: nhịp "vừa đột phá" chỉ trong bộ nhớ server.
+
+// Event: Server -> Client (OPCODE_FRIEND_BREAKTHROUGH_EVENT = 1147). Một người bạn vừa mở cảnh giới mới (cấp
+// 19/37/55/73/91) — gửi mọi người bạn đang online của họ. realm = chỉ số cảnh giới (0 = Luyện Khí … 5 = Hoá Thần).
+message FriendBreakthroughEvent {
+  int64 friend_character_id = 1;
+  string friend_name = 2;
+  int32 realm = 3;
+  int32 level = 4;
+}
+
+// Command: Client -> Server (OPCODE_CONGRATULATE_FRIEND_COMMAND = 1148). Theo TÊN. Chỉ được trong 30 phút sau lần đột
+// phá, mỗi người một lần cho mỗi lần đột phá.
+message CongratulateFriendCommand {
+  string friend_name = 1;
+}
+
+enum CongratulateFriendOutcome {
+  CONGRATULATE_FRIEND_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  CONGRATULATE_FRIEND_OUTCOME_OK = 1;
+  CONGRATULATE_FRIEND_OUTCOME_TARGET_NOT_FOUND = 2;
+  CONGRATULATE_FRIEND_OUTCOME_NOT_FRIENDS = 3;
+  CONGRATULATE_FRIEND_OUTCOME_NO_RECENT_BREAKTHROUGH = 4; // chưa đột phá, hoặc đã quá 30 phút
+  CONGRATULATE_FRIEND_OUTCOME_ALREADY_CONGRATULATED = 5;
+}
+
+// Response: Server -> Client (OPCODE_CONGRATULATE_FRIEND_RESPONSE = 1149).
+message CongratulateFriendResponse {
+  CongratulateFriendOutcome outcome = 1;
+  string friend_name = 2;
+}
+
+// Event: Server -> Client (OPCODE_FRIEND_CONGRATULATED_EVENT = 1150) — gửi người vừa đột phá (nếu đang online).
+message FriendCongratulatedEvent {
+  string from_name = 1;
+  int32 realm = 2;
+}

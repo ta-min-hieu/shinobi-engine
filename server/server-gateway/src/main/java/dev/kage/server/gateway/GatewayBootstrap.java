@@ -848,10 +848,13 @@ public final class GatewayBootstrap {
                 facades.characterFacade(), characterRegistry, WorldRouteLookup.of(worldGateway));
         CharacterLevelSync.LevelListener breakthrough = // ADR-136
                 BreakthroughHooks.listener(facades.characterFacade(), characterRegistry);
+        CharacterLevelSync.LevelListener friends = // ADR-182
+                Lot31Commands.friendBreakthrough(facades, characterRegistry).listener();
         return (characterId, level) -> {
             mentorship.onLevelReached(characterId, level);
             costume.onLevelReached(characterId, level);
             breakthrough.onLevelReached(characterId, level);
+            friends.onLevelReached(characterId, level);
         };
     }
 

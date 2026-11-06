@@ -166,6 +166,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** Bụi linh thảo (ADR-098) — trạng thái sẵn/hồi/đang hái, RAM, dùng chung mọi kết nối. */
     final HerbNodes herbNodes = new HerbNodes();
 
+    /** ADR-182 — ai vừa đột phá + ai đã chúc mừng (RAM, dùng chung mọi kết nối). */
+    final FriendBreakthroughs friendBreakthroughs = new FriendBreakthroughs();
+
     /** ADR-178 — lời nhắn vắng: RAM, dùng chung mọi kết nối (người vắng và người nhắn ở hai kết nối khác nhau). */
     final AwayCommands away = new AwayCommands(java.time.Clock.systemUTC());
 

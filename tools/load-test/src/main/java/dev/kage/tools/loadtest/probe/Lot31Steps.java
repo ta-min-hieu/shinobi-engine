@@ -6,6 +6,8 @@ import dev.kage.protocol.ApplyEquipmentPresetCommand;
 import dev.kage.protocol.ApplyEquipmentPresetResponse;
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
+import dev.kage.protocol.CongratulateFriendCommand;
+import dev.kage.protocol.CongratulateFriendResponse;
 import dev.kage.protocol.EquipmentPresetSlot;
 import dev.kage.protocol.EquipmentPresetView;
 import dev.kage.protocol.GetEquipmentPresetsRequest;
@@ -69,6 +71,7 @@ final class Lot31Steps {
             case "guildNotice" -> guildNotice(arg);
             case "myGuild" -> myGuild();
             case "guildLog" -> guildLog();
+            case "congratulate" -> congratulate(arg);
             default -> "bước không hiểu";
         };
     }
@@ -258,6 +261,14 @@ final class Lot31Steps {
                     }
                     return out.toString();
                 });
+    }
+
+    private String congratulate(String name) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_CONGRATULATE_FRIEND_COMMAND_VALUE,
+                CongratulateFriendCommand.newBuilder().setFriendName(name).build(),
+                Opcode.OPCODE_CONGRATULATE_FRIEND_RESPONSE_VALUE,
+                p -> CongratulateFriendResponse.parseFrom(p).getOutcome().name());
     }
 
     private static String describe(EquipmentPresetView preset) {

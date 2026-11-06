@@ -995,6 +995,14 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetGuildLogRequest.parser(),
                             Opcode.OPCODE_GET_GUILD_LOG_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot31().guildLog(id))),
+            // Lô 31 — chúc mừng bạn bè đột phá (ADR-182).
+            Map.entry(
+                    Opcode.OPCODE_CONGRATULATE_FRIEND_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.CongratulateFriendCommand.parser(),
+                            Opcode.OPCODE_CONGRATULATE_FRIEND_RESPONSE_VALUE,
+                            (h, id, c) ->
+                                    h.expansion.lot31().friendBreakthrough().congratulate(id, c))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,
