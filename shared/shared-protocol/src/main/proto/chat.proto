@@ -58,6 +58,8 @@ message ChatMessageEvent {
   string body = 4;
   // ADR-062 — khoá i18n danh hiệu người gửi đang đeo; rỗng = không đeo (và mọi tin hệ thống).
   string sender_title_key = 5;
+  // ADR-178 — tin TỰ TRẢ LỜI khi người kia đang treo "vắng mặt" (server gửi, không qua SendChatMessageCommand).
+  bool auto_reply = 6;
 }
 
 // ===== ADR-092 — biểu cảm. CHỈ THÊM. Phát cho mọi người đang nhìn thấy mình (AoI, gồm cả chính mình); client vẽ
@@ -168,4 +170,25 @@ enum BroadcastMessageOutcome {
 message BroadcastMessageResponse {
   BroadcastMessageOutcome outcome = 1;
   int32 seconds_left = 2;
+}
+
+// ===== ADR-178 — tự trả lời khi vắng. CHỈ THÊM. Trạng thái chỉ nằm trong bộ nhớ gateway (mất khi thoát game).
+
+// Command: Client -> Server (OPCODE_SET_AWAY_MESSAGE_COMMAND = 812). message rỗng (sau khi bỏ khoảng trắng) = tắt.
+message SetAwayMessageCommand {
+  string message = 1;
+}
+
+enum SetAwayMessageOutcome {
+  SET_AWAY_MESSAGE_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  SET_AWAY_MESSAGE_OUTCOME_OK = 1;
+  SET_AWAY_MESSAGE_OUTCOME_TOO_LONG = 2;    // quá 60 ký tự
+  SET_AWAY_MESSAGE_OUTCOME_BANNED_WORD = 3; // cùng bộ lọc từ cấm của chat
+}
+
+// Response: Server -> Client (OPCODE_SET_AWAY_MESSAGE_RESPONSE = 813).
+message SetAwayMessageResponse {
+  SetAwayMessageOutcome outcome = 1;
+  bool away = 2;      // trạng thái SAU lệnh
+  string message = 3; // lời nhắn đã chuẩn hoá đang treo ("" = không vắng)
 }

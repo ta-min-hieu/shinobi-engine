@@ -974,6 +974,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetMarketHistoryRequest.parser(),
                             Opcode.OPCODE_GET_MARKET_HISTORY_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot31().marketHistory(id))),
+            // Lô 31 — tự trả lời khi vắng (ADR-178); chỉ bộ nhớ gateway.
+            Map.entry(
+                    Opcode.OPCODE_SET_AWAY_MESSAGE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetAwayMessageCommand.parser(),
+                            Opcode.OPCODE_SET_AWAY_MESSAGE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot31().away().set(id, c))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,
@@ -5758,7 +5765,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 // ADR-122 — chấm SAU khi tin đã phát: câu trả lời đúng vẫn hiện trên kênh như mọi tin khác.
                 worldGateway.registry().quiz.onWorldChat(ctx.characterId(), ctx.senderName(), ctx.body());
             }
-            case PRIVATE ->
+            case PRIVATE -> {
                 worldGateway
                         .registry()
                         .sendToCharacterIfOnline(
@@ -5766,6 +5773,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                 Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE,
                                 0,
                                 chatEvent(ChatChannel.CHAT_CHANNEL_PRIVATE, ctx).toByteArray());
+                autoReplyIfAway(ctx); // ADR-178
+            }
             // RỖNG nếu người gửi vừa rớt mạng trong lúc tin còn đang qua kiểm duyệt (2026-10-10) — không
             // còn đứng ở đâu để ai "gần đó" nghe thấy; bỏ tin, không ném (xem applyEquipmentBonusAndComputeMaxHp).
             case AREA ->
@@ -5799,6 +5808,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     /** ADR-062 D3 — danh hiệu đang đeo của người gửi, từ bộ nhớ (không DB mỗi tin chat). */
     private String titleKeyOf(long characterId) {
         return worldGateway.registry().achievements.titleKeyOf(characterId);
+    }
+
+    /** ADR-178 — người nhận tin riêng đang treo "vắng" ⇒ gửi lại lời nhắn của họ cho người gửi (có nhịp chặn lặp). */
+    private void autoReplyIfAway(ChatRouteContext ctx) {
+        expansion.lot31().away().replyFor(ctx.target().id(), ctx.characterId()).ifPresent(message -> worldGateway
+                .registry()
+                .sendToCharacterIfOnline(
+                        ctx.characterId(),
+                        Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE,
+                        0,
+                        ChatMessageEvent.newBuilder()
+                                .setChannel(ChatChannel.CHAT_CHANNEL_PRIVATE)
+                                .setSenderId(ctx.target().id())
+                                .setSenderName(ctx.target().name())
+                                .setBody(message)
+                                .setAutoReply(true)
+                                .build()
+                                .toByteArray()));
     }
 
     /** Một tin chat của người chơi, kèm danh hiệu đang đeo (ADR-062 D3). */
@@ -6192,7 +6219,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         // đọc ở đây trên EventLoop, rẻ, không phải I/O, không tra lại sau trên authExecutor
         // vì lúc đó có thể đã bị unregister() xoá mất — xem javadoc CharacterPositionPersister#save).
         PositionSnapshot lastPosition = worldGateway.registry().lastKnownPosition(characterId);
-        worldGateway.registry().achievements.onLeftWorld(characterId);
+        onLeftWorld(characterId);
         // CÓ ĐIỀU KIỆN theo kết nối: nếu nhân vật đã thuộc kết nối khác thì không đụng tới.
         if (!worldGateway.registry().unregister(characterId, ctx)
                 && worldGateway.registry().isOnline(characterId)) {
@@ -6339,6 +6366,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE,
                         0,
                         event.toByteArray());
+    }
+
+    /** Trạng thái chỉ-trong-phiên phải bỏ khi rời world: tiến độ thành tựu đang đếm, lời nhắn vắng (ADR-178). */
+    private void onLeftWorld(long characterId) {
+        worldGateway.registry().achievements.onLeftWorld(characterId);
+        expansion.lot31().away().clear(characterId);
     }
 
     /**

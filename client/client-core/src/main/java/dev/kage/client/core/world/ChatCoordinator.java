@@ -119,7 +119,7 @@ final class ChatCoordinator implements WindowFlow {
             if (event.getSenderId() != 0L && hiddenSender.test(event.getSenderId())) {
                 return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
             }
-            controller.onMessage(withTitle(event));
+            controller.onMessage(withTitle(markAutoReply(event)));
             refreshLines();
             return true;
         }
@@ -128,6 +128,16 @@ final class ChatCoordinator implements WindowFlow {
             return true;
         }
         return false;
+    }
+
+    /** ADR-178 — tin tự trả lời (người kia đang vắng) mang nhãn để không bị đọc nhầm là người thật vừa gõ. */
+    private ChatMessageEvent markAutoReply(ChatMessageEvent event) {
+        if (!event.getAutoReply()) {
+            return event;
+        }
+        return event.toBuilder()
+                .setBody(text("away.auto_reply_prefix") + " " + event.getBody())
+                .build();
     }
 
     /**

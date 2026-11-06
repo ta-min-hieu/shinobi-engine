@@ -9,7 +9,11 @@ import dev.kage.protocol.MarketHistoryEntry;
 
 /** Lớp lệnh lô 31 (ADR-175…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
 record Lot31Commands(
-        EquipmentPresetCommands equipmentPresets, BulkUseCommands bulkUse, Lot31Facades facades, Clock clock) {
+        EquipmentPresetCommands equipmentPresets,
+        BulkUseCommands bulkUse,
+        AwayCommands away,
+        Lot31Facades facades,
+        Clock clock) {
 
     static Lot31Commands of(GatewayFacades gateway, WorldGateway worldGateway) {
         Lot31Facades lot31 = gateway.progression().expansion().lot31();
@@ -19,6 +23,7 @@ record Lot31Commands(
                 new BulkUseCommands(
                         gateway.inventoryFacade(),
                         gateway.progression().expansion().lot29().luckyBag()),
+                worldGateway.registry().away, // ADR-178 — chung mọi kết nối, KHÔNG dựng mới mỗi kết nối
                 lot31,
                 Clock.systemUTC());
     }

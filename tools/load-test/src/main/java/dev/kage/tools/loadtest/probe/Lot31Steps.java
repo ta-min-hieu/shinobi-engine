@@ -4,6 +4,8 @@ import java.io.IOException;
 
 import dev.kage.protocol.ApplyEquipmentPresetCommand;
 import dev.kage.protocol.ApplyEquipmentPresetResponse;
+import dev.kage.protocol.ChatChannel;
+import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.EquipmentPresetSlot;
 import dev.kage.protocol.EquipmentPresetView;
 import dev.kage.protocol.GetEquipmentPresetsRequest;
@@ -17,15 +19,22 @@ import dev.kage.protocol.OpenLuckyBagsCommand;
 import dev.kage.protocol.OpenLuckyBagsResponse;
 import dev.kage.protocol.SaveEquipmentPresetCommand;
 import dev.kage.protocol.SaveEquipmentPresetResponse;
+import dev.kage.protocol.SendChatMessageCommand;
+import dev.kage.protocol.SetAwayMessageCommand;
+import dev.kage.protocol.SetAwayMessageResponse;
 import dev.kage.protocol.UseItemsCommand;
 import dev.kage.protocol.UseItemsResponse;
 
 /**
  * Bước lô 31: bộ trang bị (ADR-175) {@code savePreset:<n>}, {@code applyPreset:<n>}, {@code listPresets}; dùng nhiều
- * (ADR-176) {@code useMany:<itemId>x<n>}, {@code openBags:<mẫu túi>x<n>}; lịch sử phường thị (ADR-177)
- * {@code marketHistory}. Nối sau {@link Lot30SocialSteps}.
+ * (ADR-176) {@code useMany:<itemId>x<n>}, {@code openBags:<mẫu túi>x<n>}; lịch sử phường thị (ADR-177) {@code
+ * marketHistory}; vắng mặt (ADR-178) {@code setAway:<lời nhắn>}, {@code whisperAway:<tên>} (nhắn riêng rồi chờ tin tự
+ * trả lời). Nối sau {@link Lot30SocialSteps}.
  */
 final class Lot31Steps {
+
+    /** Số tin chat tối đa bỏ qua khi chờ tin tự trả lời. */
+    private static final int MAX_CHAT_SKIPS = 5;
 
     private final Lot23Scenario.Asker asker;
 
@@ -41,6 +50,8 @@ final class Lot31Steps {
             case "useMany" -> useMany(arg);
             case "openBags" -> openBags(arg);
             case "marketHistory" -> marketHistory();
+            case "setAway" -> setAway(arg);
+            case "whisperAway" -> whisperAway(arg);
             default -> "bước không hiểu";
         };
     }
@@ -143,6 +154,48 @@ final class Lot31Steps {
                     }
                     return out.toString();
                 });
+    }
+
+    private String setAway(String message) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SET_AWAY_MESSAGE_COMMAND_VALUE,
+                SetAwayMessageCommand.newBuilder().setMessage(message).build(),
+                Opcode.OPCODE_SET_AWAY_MESSAGE_RESPONSE_VALUE,
+                p -> {
+                    SetAwayMessageResponse r = SetAwayMessageResponse.parseFrom(p);
+                    return r.getOutcome().name() + " vắng=" + r.getAway() + " lời=" + r.getMessage();
+                });
+    }
+
+    /** Nhắn riêng rồi đọc các tin chat kế tiếp, bỏ qua tin hệ thống, tới khi gặp tin tự trả lời (tối đa vài tin). */
+    private String whisperAway(String name) throws IOException {
+        String seen = firstChat(name);
+        for (int attempt = 0; attempt < MAX_CHAT_SKIPS && !seen.startsWith("tựTrảLời=true"); attempt++) {
+            // Gói hỏi vô hại chỉ để đọc tiếp luồng — Asker khớp theo opcode trả lời, không theo số thứ tự.
+            seen = asker.ask(
+                    Opcode.OPCODE_GET_MARKET_HISTORY_REQUEST_VALUE,
+                    GetMarketHistoryRequest.getDefaultInstance(),
+                    Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE,
+                    Lot31Steps::describeChat);
+        }
+        return seen;
+    }
+
+    private String firstChat(String name) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE,
+                SendChatMessageCommand.newBuilder()
+                        .setChannel(ChatChannel.CHAT_CHANNEL_PRIVATE)
+                        .setTargetName(name)
+                        .setBody("probe lô 31 vắng")
+                        .build(),
+                Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE,
+                Lot31Steps::describeChat);
+    }
+
+    private static String describeChat(byte[] payload) throws com.google.protobuf.InvalidProtocolBufferException {
+        ChatMessageEvent e = ChatMessageEvent.parseFrom(payload);
+        return "tựTrảLời=" + e.getAutoReply() + " từ=" + e.getSenderName() + " nội dung=" + e.getBody();
     }
 
     private static String describe(EquipmentPresetView preset) {
