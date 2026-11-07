@@ -230,6 +230,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-196](ADR-196-Market-Watch.md) | Theo dõi phường thị: mẫu + giá mỗi cái tối đa (làm tròn lên), `market_watch` (V153) trần 10, báo người đang online lúc có tin khớp, 1031–1035; `/theodoi` | ✅ Accepted (lô 33) |
 | [ADR-197](ADR-197-Account-Storage.md) | Kho chung tài khoản: luật kho tông môn, adapter theo `account_id` (V154), `StorageKind` trên message kho có sẵn; dòng đổi kho trong cửa sổ kho | ✅ Accepted (lô 33) |
 | [ADR-198](ADR-198-Guild-Bank.md) | Kho bang: luật kho tông môn theo bang (V155), thành viên gửi / bang chủ + phó rút, nhật ký bang `BANK_*` cùng transaction; `/khobang` | ✅ Accepted (lô 33) |
+| [ADR-199](ADR-199-Equipment-Comparison.md) | So sánh trang bị: hệ số cường hoá gửi kèm catalog (field 4), client hiện chênh lệch chỉ số hiệu dụng với món đang mặc | ✅ Accepted (lô 34) |
 ---
 
 ## ADR cần tạo (chưa viết)

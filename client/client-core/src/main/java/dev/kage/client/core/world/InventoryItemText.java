@@ -24,9 +24,29 @@ import dev.kage.protocol.ItemCatalogEntry;
  */
 final class InventoryItemText {
 
+    /** ADR-199 — khoá i18n của bốn chỉ số so sánh, cùng thứ tự với {@link #effectiveStats}. */
+    private static final String[] STAT_KEYS = {
+        "compare.stat.atk", "compare.stat.def", "compare.stat.res", "compare.stat.hp"
+    };
+
     private final I18NBundle i18n = KageI18n.load();
     private final LongFunction<ItemCatalogEntry> catalogLookup;
     private final LongFunction<String> nameOrFallback;
+    private Comparison comparison = Comparison.NONE;
+
+    /**
+     * ADR-199 — so với món đang mặc: tra món đang mặc cùng ô và hệ số cường hoá server gửi. {@link #NONE} = không so.
+     *
+     * @param counterpart món đang mặc ở ô mà món đang xem mặc vào; rỗng nếu ô trống hoặc món không mặc được
+     * @param stepPercent phần trăm cường hoá mỗi cấp; 0 = server chưa gửi ⇒ không so (không tự đoán)
+     */
+    record Comparison(
+            java.util.function.Function<InventoryController.Item, java.util.Optional<InventoryController.Item>>
+                    counterpart,
+            java.util.function.IntSupplier stepPercent) {
+
+        static final Comparison NONE = new Comparison(item -> java.util.Optional.empty(), () -> 0);
+    }
 
     /**
      * @param catalogLookup tra {@code item_template_id} ra dòng catalog; {@code null} khi chưa có
@@ -38,6 +58,11 @@ final class InventoryItemText {
         this.nameOrFallback = nameOrFallback;
     }
 
+    /** ADR-199 — bật so sánh với món đang mặc. */
+    void useComparison(Comparison newComparison) {
+        this.comparison = newComparison;
+    }
+
     String describe(InventoryController.Item item) {
         StringBuilder builder = new StringBuilder(nameOrFallback.apply(item.itemTemplateId()));
         if (item.quantity() > 1) {
@@ -47,7 +72,69 @@ final class InventoryItemText {
             builder.append(' ').append(format("inventory.label.enhance", item.enhanceLevel()));
         }
         appendStats(builder, item);
+        appendComparison(builder, item);
         return builder.toString();
+    }
+
+    /**
+     * ADR-199 — "So với đang mặc: Công +3, Thủ -1" (chỉ số HIỆU DỤNG sau cường hoá, theo hệ số server gửi). Món không
+     * mặc được, đang là chính món đang mặc, hoặc chưa biết hệ số ⇒ không thêm gì.
+     */
+    private void appendComparison(StringBuilder builder, InventoryController.Item item) {
+        int step = comparison.stepPercent().getAsInt();
+        ItemCatalogEntry entry = catalogLookup.apply(item.itemTemplateId());
+        if (step <= 0
+                || entry == null
+                || entry.getEquipSlot() == dev.kage.protocol.EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED) {
+            return;
+        }
+        java.util.Optional<InventoryController.Item> worn =
+                comparison.counterpart().apply(item);
+        if (worn.isPresent() && worn.get().itemId() == item.itemId()) {
+            return;
+        }
+        int[] mine = effectiveStats(entry, item.enhanceLevel(), step);
+        int[] theirs = worn.map(w -> effectiveStats(catalogLookup.apply(w.itemTemplateId()), w.enhanceLevel(), step))
+                .orElse(new int[STAT_KEYS.length]);
+        String key = worn.isEmpty() ? "compare.vs_empty" : "compare.vs_worn";
+        builder.append('\n').append(format(key, diffText(mine, theirs)));
+    }
+
+    /** "Công +3, Thủ -1" — chỉ các chỉ số có đổi; "không đổi chỉ số" nếu bằng nhau. */
+    private String diffText(int[] mine, int[] theirs) {
+        StringJoiner diff = new StringJoiner(", ");
+        for (int i = 0; i < STAT_KEYS.length; i++) {
+            int delta = mine[i] - theirs[i];
+            if (delta != 0) {
+                diff.add(format(STAT_KEYS[i], String.format(java.util.Locale.ROOT, "%+d", delta)));
+            }
+        }
+        return diff.length() == 0 ? text("compare.same") : diff.toString();
+    }
+
+    /** Công, thủ, kháng, máu sau cường hoá; catalog chưa có món đó ⇒ toàn 0. */
+    private static int[] effectiveStats(ItemCatalogEntry entry, int level, int step) {
+        if (entry == null) {
+            return new int[STAT_KEYS.length];
+        }
+        return new int[] {
+            effective(entry.getBonusAtk(), level, step),
+            effective(entry.getBonusDef(), level, step),
+            effective(entry.getBonusRes(), level, step),
+            effective(entry.getBonusHp(), level, step)
+        };
+    }
+
+    /**
+     * Chỉ số hiệu dụng — CÙNG công thức số nguyên với {@code EnhancementTable.enhancedBonus} ở server (làm tròn nửa
+     * lên), với hệ số do server gửi. Hiển thị thôi; server vẫn là bên tính chỉ số thật.
+     */
+    static int effective(int base, int level, int stepPercent) {
+        if (base == 0 || level <= 0) {
+            return base;
+        }
+        long scaled = (long) base * (100L + (long) stepPercent * level);
+        return (int) Math.floorDiv(scaled + 50L, 100L);
     }
 
     /**

@@ -3259,8 +3259,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void handleGetItemCatalogBlocking(ChannelHandlerContext ctx, int sequenceId, String knownVersion) {
         ItemCatalog catalog = inventoryFacade.itemCatalog();
         boolean unchanged = catalog.version().equals(knownVersion);
-        ItemCatalogResponse.Builder response =
-                ItemCatalogResponse.newBuilder().setUnchanged(unchanged).setVersion(catalog.version());
+        ItemCatalogResponse.Builder response = ItemCatalogResponse.newBuilder()
+                .setUnchanged(unchanged)
+                .setVersion(catalog.version())
+                .setEnhanceStepPercent(dev.kage.inventory.domain.EnhancementTable.ENHANCE_STEP_PERCENT); // ADR-199
         if (!unchanged) {
             catalog.entries()
                     .forEach(entry -> response.addEntries(dev.kage.protocol.ItemCatalogEntry.newBuilder()

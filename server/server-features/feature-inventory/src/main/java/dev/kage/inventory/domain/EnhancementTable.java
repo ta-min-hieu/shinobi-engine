@@ -38,6 +38,9 @@ public final class EnhancementTable {
     /** {@link #ENHANCE_STEP} quy ra phần trăm nguyên — {@link #enhancedBonus} tính bằng số nguyên. */
     private static final long STEP_PERCENT = Math.round(ENHANCE_STEP * PERCENT);
 
+    /** ADR-199 — {@link #ENHANCE_STEP} dạng phần trăm nguyên, gửi cho client trong catalog vật phẩm. */
+    public static final int ENHANCE_STEP_PERCENT = (int) STEP_PERCENT;
+
     private static final int[] SUCCESS_RATE_PERCENT = {95, 90, 85, 80, 70, 60, 50, 40, 30, 20, 15, 12, 10, 8, 5};
     private static final long[] GOLD_COST = {
         100, 200, 350, 550, 800, 1200, 1700, 2300, 3000, 4000, 5500, 7500, 10000, 14000, 20000

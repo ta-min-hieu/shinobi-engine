@@ -53,6 +53,11 @@ final class ItemCatalogCoordinator implements WindowFlow {
         catalogListeners.add(listener);
     }
 
+    /** ADR-199 — phần trăm cường hoá mỗi cấp do server gửi; 0 = chưa biết. */
+    int enhanceStepPercent() {
+        return catalog.enhanceStepPercent();
+    }
+
     /** Hỏi catalog. Gọi lúc vào thế giới; gọi lại là vô hại (server trả {@code unchanged}). */
     void request() {
         sender.requestItemCatalog(catalog.knownVersion());

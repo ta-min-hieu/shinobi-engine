@@ -143,6 +143,8 @@ final class InventoryCoordinator implements WindowFlow {
         this.itemCatalog = dataSources.itemCatalog();
         this.itemText = new InventoryItemText(
                 itemTemplateId -> itemCatalog.byId(itemTemplateId).orElse(null), this::itemNameOrFallback);
+        itemText.useComparison(
+                new InventoryItemText.Comparison(this::wornCounterpart, itemCatalog::enhanceStepPercent));
         this.gold = dataSources.gold();
         this.notices = dataSources.notices();
         this.autoPotion =
@@ -572,6 +574,16 @@ final class InventoryCoordinator implements WindowFlow {
             return InventoryPanel.PrimaryAction.NONE;
         }
         return InventoryPanel.PrimaryAction.EQUIP;
+    }
+
+    /** ADR-199 — món đang mặc ở ô mà {@code item} mặc vào (rỗng nếu không mặc được hoặc ô trống). */
+    private Optional<InventoryController.Item> wornCounterpart(InventoryController.Item item) {
+        EquipmentSlot slot = itemCatalog.equipSlot(item.itemTemplateId());
+        if (slot == EquipmentSlot.EQUIPMENT_SLOT_UNSPECIFIED) {
+            return Optional.empty();
+        }
+        long wornId = controller.equippedItemId(slot);
+        return wornId == 0L ? Optional.empty() : controller.byId(wornId);
     }
 
     /** Tên đã dịch của vật phẩm; dạng số khi chưa có catalog — client KHÔNG bịa tên (Điều 24). */

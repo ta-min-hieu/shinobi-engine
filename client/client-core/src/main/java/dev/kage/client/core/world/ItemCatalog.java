@@ -34,6 +34,8 @@ final class ItemCatalog {
     private final Map<String, ItemCatalogEntry> byCode = new HashMap<>();
 
     private String version = NO_VERSION;
+    /** ADR-199 — phần trăm cường hoá mỗi cấp do server gửi; 0 = chưa biết. */
+    private int enhanceStepPercent;
 
     /**
      * Nhận một {@code ItemCatalogResponse}.
@@ -42,6 +44,7 @@ final class ItemCatalog {
      *     server trả {@code unchanged}
      */
     boolean adopt(ItemCatalogResponse response) {
+        enhanceStepPercent = response.getEnhanceStepPercent();
         if (response.getUnchanged()) {
             return false;
         }
@@ -54,6 +57,11 @@ final class ItemCatalog {
         }
         version = response.getVersion();
         return true;
+    }
+
+    /** ADR-199 — phần trăm cường hoá mỗi cấp; 0 = server chưa gửi (không được tự đoán). */
+    int enhanceStepPercent() {
+        return enhanceStepPercent;
     }
 
     /** Chuỗi version đang cache — gửi kèm {@code GetItemCatalogRequest} lần hỏi sau. */

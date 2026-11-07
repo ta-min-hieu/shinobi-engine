@@ -248,6 +248,9 @@ message ItemCatalogResponse {
   bool unchanged = 1;
   string version = 2; // hash nội dung catalog; server tính, client chỉ lưu và gửi lại
   repeated ItemCatalogEntry entries = 3;
+  // ADR-199 (2026-11-07) — hệ số cường hoá (phần trăm mỗi cấp, EnhancementTable) để client tính chỉ số HIỆU DỤNG khi so
+  // sánh trang bị. Gửi CẢ khi unchanged=true. 0 = server cũ chưa gửi ⇒ client không so sánh.
+  int32 enhance_step_percent = 4;
 }
 
 // -----------------------------------------------------------------------------------------------

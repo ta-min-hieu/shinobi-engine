@@ -23,9 +23,11 @@ import dev.kage.protocol.TransferPartyLeaderResponse;
 final class Lot33Steps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot34Steps lot34;
 
     Lot33Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot34 = new Lot34Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -111,7 +113,7 @@ final class Lot33Steps {
             case "bank" -> vault(GUILD);
             case "bankDeposit" -> vaultMove(GUILD, arg, true);
             case "bankWithdraw" -> vaultMove(GUILD, arg, false);
-            default -> "bước không hiểu";
+            default -> lot34.step(verb, arg);
         };
     }
 
