@@ -24,6 +24,7 @@ import dev.kage.guild.domain.Guild;
 import dev.kage.guild.domain.GuildJoinRequest;
 import dev.kage.guild.domain.GuildLeadershipPort;
 import dev.kage.guild.domain.GuildLogPort;
+import dev.kage.guild.domain.GuildPort;
 import dev.kage.guild.domain.GuildRole;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
@@ -92,6 +93,46 @@ final class GuildLeadershipIntegrationTest {
         assertThat(guilds.leaveGuild(leader)).isTrue(); // bang chủ cũ giờ rời bang được như thành viên thường
         List<GuildLogPort.Entry> log = new PostgresGuildLogAdapter(dataSource).recent(heir, 50);
         assertThat(log).extracting(GuildLogPort.Entry::kind).contains("LEADER_CHANGED");
+    }
+
+    @Test
+    void viceLeaderApprovesAndPostsButCannotKick_limitTwo() {
+        long leader = createFreshCharacter("VlLeader");
+        long[] members = {createFreshCharacter("VlOne"), createFreshCharacter("VlTwo"), createFreshCharacter("VlThree")
+        };
+        long applicant = createFreshCharacter("VlApplicant");
+        PostgresGuildAdapter guilds = new PostgresGuildAdapter(dataSource);
+        Guild guild = guilds.createGuild("VlBang", leader);
+        for (long member : members) {
+            guilds.approveJoinRequest(guilds.sendJoinRequest(guild.id(), member).id(), leader);
+        }
+        PostgresGuildLeadershipAdapter adapter = new PostgresGuildLeadershipAdapter(dataSource);
+
+        assertThat(adapter.setViceLeader(members[0], members[1], true, NOW))
+                .isEqualTo(GuildLeadershipPort.ViceOutcome.NOT_LEADER);
+        assertThat(adapter.setViceLeader(leader, leader, true, NOW))
+                .isEqualTo(GuildLeadershipPort.ViceOutcome.ALREADY_VICE); // bang chủ không tự hạ mình thành phó
+        assertThat(adapter.setViceLeader(members[0], members[0], true, NOW))
+                .isEqualTo(GuildLeadershipPort.ViceOutcome.NOT_LEADER);
+        assertThat(adapter.setViceLeader(leader, members[0], true, NOW)).isEqualTo(GuildLeadershipPort.ViceOutcome.OK);
+        assertThat(adapter.setViceLeader(leader, members[0], true, NOW))
+                .isEqualTo(GuildLeadershipPort.ViceOutcome.ALREADY_VICE);
+        assertThat(adapter.setViceLeader(leader, members[1], true, NOW)).isEqualTo(GuildLeadershipPort.ViceOutcome.OK);
+        assertThat(adapter.setViceLeader(leader, members[2], true, NOW))
+                .isEqualTo(GuildLeadershipPort.ViceOutcome.VICE_LIMIT_REACHED);
+
+        long vice = members[0];
+        GuildJoinRequest request = guilds.sendJoinRequest(guild.id(), applicant);
+        assertThat(guilds.approveJoinRequest(request.id(), vice)).isEqualTo(GuildPort.ApproveResult.OK);
+        assertThat(new PostgresGuildNoticeAdapter(dataSource).set(vice, "Phó đăng", NOW))
+                .isEqualTo(dev.kage.guild.domain.GuildNoticePort.Outcome.OK);
+        assertThat(guilds.kickMember(vice, applicant)).isFalse(); // phó không đuổi được
+        assertThat(guilds.kickMember(leader, members[1])).isTrue(); // bang chủ đuổi được cả phó
+        assertThat(guilds.leaveGuild(vice)).isTrue(); // phó rời bang được
+        assertThat(adapter.setViceLeader(leader, members[2], true, NOW)).isEqualTo(GuildLeadershipPort.ViceOutcome.OK);
+        assertThat(adapter.setViceLeader(leader, members[2], false, NOW)).isEqualTo(GuildLeadershipPort.ViceOutcome.OK);
+        assertThat(adapter.setViceLeader(leader, members[2], false, NOW))
+                .isEqualTo(GuildLeadershipPort.ViceOutcome.NOT_VICE);
     }
 
     private static long createFreshCharacter(String name) {

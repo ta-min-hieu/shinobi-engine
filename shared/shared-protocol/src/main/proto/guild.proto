@@ -129,6 +129,7 @@ message GuildMemberView {
   bool is_leader = 3;
   bool online = 4;
   int64 contribution = 5; // ADR-068 — điểm cống hiến
+  bool is_vice_leader = 6; // ADR-184 — phó bang chủ
 }
 
 message ListGuildMembersResponse {
@@ -158,6 +159,7 @@ message GetMyGuildResponse {
   bool is_leader = 4;
   GuildProgressView progress = 5; // ADR-068/069 — chỉ có khi in_guild = true
   string notice = 6;              // ADR-179 — thông báo bang ("" = chưa có)
+  bool is_vice_leader = 7;        // ADR-184 — mình là phó bang chủ (duyệt đơn, đăng thông báo)
 }
 
 // ADR-059 (Accepted 2026-10-18) — "bang của bạn vừa đổi". CHỈ THÊM, protocolVersion không tăng. Client nói
@@ -175,6 +177,7 @@ enum GuildChangeReason {
   GUILD_CHANGE_REASON_RENAMED = 9;                 // ADR-172 — bang vừa đổi tên
   GUILD_CHANGE_REASON_NOTICE_CHANGED = 10;         // ADR-179 — bang chủ vừa đổi thông báo bang
   GUILD_CHANGE_REASON_LEADER_CHANGED = 11;         // ADR-183 — bang có bang chủ mới (subject = bang chủ mới)
+  GUILD_CHANGE_REASON_VICE_CHANGED = 12;           // ADR-184 — bổ nhiệm / bãi nhiệm phó bang chủ (subject = người đó)
 }
 
 // Event: Server -> Client (OPCODE_GUILD_CHANGED_EVENT = 720).
@@ -478,6 +481,8 @@ enum GuildLogKind {
   GUILD_LOG_KIND_RENAMED = 7;        // detail = tên mới
   GUILD_LOG_KIND_NOTICE_CHANGED = 8;
   GUILD_LOG_KIND_LEADER_CHANGED = 9; // ADR-183 — actor = bang chủ cũ, subject = bang chủ mới
+  GUILD_LOG_KIND_VICE_APPOINTED = 10; // ADR-184 — actor = bang chủ, subject = phó mới
+  GUILD_LOG_KIND_VICE_DISMISSED = 11;
 }
 
 message GuildLogEntry {
@@ -514,4 +519,30 @@ enum TransferGuildLeaderOutcome {
 message TransferGuildLeaderResponse {
   TransferGuildLeaderOutcome outcome = 1;
   string target_name = 2;
+}
+
+// ===== ADR-184 — phó bang chủ. CHỈ THÊM. Tối đa 2; duyệt/từ chối đơn + đăng thông báo, không đuổi/giải tán/đổi tên.
+
+// Command: Client -> Server (OPCODE_SET_GUILD_VICE_LEADER_COMMAND = 749). Chỉ bang chủ. appoint=false = bãi nhiệm.
+message SetGuildViceLeaderCommand {
+  string target_name = 1;
+  bool appoint = 2;
+}
+
+enum SetGuildViceLeaderOutcome {
+  SET_GUILD_VICE_LEADER_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  SET_GUILD_VICE_LEADER_OUTCOME_OK = 1;
+  SET_GUILD_VICE_LEADER_OUTCOME_NOT_IN_GUILD = 2;
+  SET_GUILD_VICE_LEADER_OUTCOME_NOT_LEADER = 3;
+  SET_GUILD_VICE_LEADER_OUTCOME_TARGET_NOT_IN_GUILD = 4;
+  SET_GUILD_VICE_LEADER_OUTCOME_ALREADY_VICE = 5;
+  SET_GUILD_VICE_LEADER_OUTCOME_NOT_VICE = 6;
+  SET_GUILD_VICE_LEADER_OUTCOME_VICE_LIMIT_REACHED = 7;
+}
+
+// Response: Server -> Client (OPCODE_SET_GUILD_VICE_LEADER_RESPONSE = 750).
+message SetGuildViceLeaderResponse {
+  SetGuildViceLeaderOutcome outcome = 1;
+  string target_name = 2;
+  bool appoint = 3;
 }

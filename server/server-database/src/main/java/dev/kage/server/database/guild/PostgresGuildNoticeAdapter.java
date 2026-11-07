@@ -8,6 +8,7 @@ import java.util.Optional;
 import javax.sql.DataSource;
 
 import dev.kage.guild.domain.GuildNoticePort;
+import dev.kage.guild.domain.GuildRole;
 import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.JdbcTransactionRunner;
 
@@ -51,7 +52,7 @@ public final class PostgresGuildNoticeAdapter implements GuildNoticePort {
         if (membership.isEmpty()) {
             return Outcome.NOT_IN_GUILD;
         }
-        if (!"LEADER".equals(membership.get().role())) {
+        if (!GuildRole.valueOf(membership.get().role()).canManageMembership()) { // ADR-184 — phó bang chủ cũng đăng
             return Outcome.NOT_LEADER;
         }
         long guildId = membership.get().guildId();

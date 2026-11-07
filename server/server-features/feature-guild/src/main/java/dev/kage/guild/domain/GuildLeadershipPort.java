@@ -20,4 +20,23 @@ public interface GuildLeadershipPort {
      * đổi vai hai người + {@code guild.leader_character_id}, ghi nhật ký bang {@code LEADER_CHANGED}.
      */
     Outcome transfer(long leaderId, long targetId, Instant at);
+
+    /** Kết quả bổ nhiệm / bãi nhiệm phó bang chủ (ADR-184). */
+    enum ViceOutcome {
+        OK,
+        NOT_IN_GUILD,
+        NOT_LEADER,
+        TARGET_NOT_IN_GUILD,
+        /** Bổ nhiệm người đã là phó (hoặc chính bang chủ). */
+        ALREADY_VICE,
+        /** Bãi nhiệm người không phải phó. */
+        NOT_VICE,
+        VICE_LIMIT_REACHED
+    }
+
+    /**
+     * ADR-184 — bang chủ bổ nhiệm ({@code appoint}) hoặc bãi nhiệm phó bang chủ; một transaction khoá dòng bang (trần
+     * {@link GuildRole#MAX_VICE_LEADERS} đếm sau khoá), ghi nhật ký bang.
+     */
+    ViceOutcome setViceLeader(long leaderId, long targetId, boolean appoint, Instant at);
 }

@@ -97,7 +97,8 @@ public final class GuildFacade {
     /** Thành viên bang của {@code characterId} — rỗng nếu chưa vào bang nào. */
     public List<MemberView> listMembers(long characterId) {
         return useCases.listGuildMembersUseCase().execute(characterId).stream()
-                .map(m -> new MemberView(m.characterId(), m.role() == GuildRole.LEADER))
+                .map(m -> new MemberView(
+                        m.characterId(), m.role() == GuildRole.LEADER, m.role() == GuildRole.VICE_LEADER))
                 .toList();
     }
 
@@ -112,7 +113,11 @@ public final class GuildFacade {
     public Optional<MyGuildView> findMyGuild(long characterId) {
         return useCases.findMyGuildUseCase()
                 .execute(characterId)
-                .map(r -> new MyGuildView(r.guildId(), r.guildName(), r.myRole() == GuildRole.LEADER));
+                .map(r -> new MyGuildView(
+                        r.guildId(),
+                        r.guildName(),
+                        r.myRole() == GuildRole.LEADER,
+                        r.myRole() == GuildRole.VICE_LEADER));
     }
 
     /** Kết quả lập bang. */
@@ -173,11 +178,11 @@ public final class GuildFacade {
     public record CreateResult(CreateOutcome outcome, Long guildId) {}
 
     /** Một thành viên bang. */
-    public record MemberView(long characterId, boolean isLeader) {}
+    public record MemberView(long characterId, boolean isLeader, boolean isViceLeader) {}
 
     /** Một đơn xin gia nhập đang chờ duyệt. */
     public record PendingJoinRequestView(long requestId, long characterId) {}
 
     /** Bang của người hỏi và vai trò của họ trong đó. */
-    public record MyGuildView(long guildId, String guildName, boolean isLeader) {}
+    public record MyGuildView(long guildId, String guildName, boolean isLeader, boolean isViceLeader) {}
 }

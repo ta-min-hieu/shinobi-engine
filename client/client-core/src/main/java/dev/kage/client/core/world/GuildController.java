@@ -98,6 +98,10 @@ final class GuildController {
     private String guildName = "";
 
     private boolean leader;
+    /** ADR-184 — mình là phó bang chủ (duyệt đơn, đăng thông báo). */
+    private boolean viceLeader;
+    /** ADR-184 — id các phó bang chủ trong danh sách thành viên mới nhất. */
+    private final java.util.Set<Long> viceLeaderIds = new java.util.HashSet<>();
 
     private final List<Member> members = new ArrayList<>();
 
@@ -126,6 +130,7 @@ final class GuildController {
             guildId = 0L;
             guildName = "";
             leader = false;
+            viceLeader = false;
             members.clear();
             pendingRequests.clear();
             return;
@@ -133,14 +138,19 @@ final class GuildController {
         guildId = response.getGuildId();
         guildName = ChatController.sanitize(response.getGuildName());
         leader = response.getIsLeader();
+        viceLeader = response.getIsViceLeader();
     }
 
     /** Danh sách thành viên mới nhất từ server — thay TOÀN BỘ, không trộn với bản cũ. */
     void onMembers(ListGuildMembersResponse response) {
         members.clear();
         contributions.clear();
+        viceLeaderIds.clear();
         for (GuildMemberView view : response.getMembersList()) {
             contributions.put(view.getCharacterId(), view.getContribution());
+            if (view.getIsViceLeader()) {
+                viceLeaderIds.add(view.getCharacterId());
+            }
             members.add(new Member(
                     view.getCharacterId(),
                     ChatController.sanitize(view.getName()),
@@ -184,6 +194,16 @@ final class GuildController {
         return leader;
     }
 
+    /** ADR-184 — mình là phó bang chủ. */
+    boolean isViceLeader() {
+        return viceLeader;
+    }
+
+    /** ADR-184 — thành viên này là phó bang chủ. */
+    boolean isViceLeader(long characterId) {
+        return viceLeaderIds.contains(characterId);
+    }
+
     /** Thành viên, đúng thứ tự server trả về. */
     List<Member> members() {
         return List.copyOf(members);
@@ -219,6 +239,8 @@ final class GuildController {
         guildId = 0L;
         guildName = "";
         leader = false;
+        viceLeader = false;
+        viceLeaderIds.clear();
         members.clear();
         pendingRequests.clear();
         contributions.clear();

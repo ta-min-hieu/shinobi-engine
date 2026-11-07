@@ -77,7 +77,7 @@ public final class PostgresGuildAdapter implements GuildPort {
     // ADR-180 — xoá thành viên và ghi nhật ký bang trong MỘT câu: số dòng trả về = số người đã rời.
     private static final String LEAVE = """
             WITH gone AS (
-                DELETE FROM guild_member WHERE character_id = ? AND role = 'MEMBER' RETURNING guild_id, character_id
+                DELETE FROM guild_member WHERE character_id = ? AND role <> 'LEADER' RETURNING guild_id, character_id
             )
             INSERT INTO guild_log (guild_id, kind, actor_id, subject_id, amount, detail, created_at)
             SELECT guild_id, 'LEFT', character_id, character_id, 0, '', now() FROM gone
@@ -85,7 +85,7 @@ public final class PostgresGuildAdapter implements GuildPort {
 
     private static final String KICK = """
             WITH gone AS (
-                DELETE FROM guild_member WHERE character_id = ? AND role = 'MEMBER'
+                DELETE FROM guild_member WHERE character_id = ? AND role <> 'LEADER'
                   AND guild_id = (SELECT guild_id FROM guild_member WHERE character_id = ? AND role = 'LEADER')
                 RETURNING guild_id, character_id
             )
@@ -125,13 +125,17 @@ public final class PostgresGuildAdapter implements GuildPort {
              FOR UPDATE OF gjr
             """;
 
+    private static final String APPROVER_ROLE = "SELECT role FROM guild_member WHERE guild_id = ? AND character_id = ?";
+
     private static final String DELETE_JOIN_REQUEST = """
             DELETE FROM guild_join_request WHERE id = ?
             """;
 
     private static final String REJECT_JOIN_REQUEST = """
-            DELETE FROM guild_join_request gjr USING guild g
-             WHERE gjr.id = ? AND gjr.guild_id = g.id AND g.leader_character_id = ?
+            DELETE FROM guild_join_request gjr
+             WHERE gjr.id = ?
+               AND EXISTS (SELECT 1 FROM guild_member m WHERE m.guild_id = gjr.guild_id AND m.character_id = ?
+                              AND m.role IN ('LEADER', 'VICE_LEADER'))
             """;
 
     private final DataSource dataSource;
@@ -288,11 +292,12 @@ public final class PostgresGuildAdapter implements GuildPort {
                     return ApproveResult.NOT_FOUND;
                 }
                 Optional<PendingApproval> approval = selectForApproval(connection, requestId);
-                if (approval.isEmpty() || approval.get().guildLeaderCharacterId() != leaderCharacterId) {
+                if (approval.isEmpty() || !canApprove(connection, approval.get().guildId(), leaderCharacterId)) {
                     connection.rollback();
                     return ApproveResult.NOT_FOUND;
                 }
-                ApproveResult result = tryInsertMemberOrDropStaleRequest(connection, requestId, approval.get());
+                ApproveResult result =
+                        tryInsertMemberOrDropStaleRequest(connection, requestId, approval.get(), leaderCharacterId);
                 connection.commit();
                 return result;
             } catch (SQLException e) {
@@ -343,8 +348,15 @@ public final class PostgresGuildAdapter implements GuildPort {
     // Raw JDBC CỐ Ý ở đây (không JdbcOperations.update dùng chung với insertMember): cần bắt
     // SQLException CHECKED ngay tại chỗ để rollback(savepoint) rồi TIẾP TỤC transaction (dọn rác +
     // trả TARGET_ALREADY_IN_GUILD) — JdbcOperations bọc thành unchecked sẽ mất đúng điểm bắt này.
+    /** ADR-184 — bang chủ HOẶC phó bang chủ của đúng bang có đơn mới duyệt được. */
+    private static boolean canApprove(Connection connection, long guildId, long approverId) {
+        return JdbcOperations.queryOne(connection, APPROVER_ROLE, rs -> rs.getString(1), guildId, approverId)
+                .map(role -> GuildRole.valueOf(role).canManageMembership())
+                .orElse(false);
+    }
+
     private static ApproveResult tryInsertMemberOrDropStaleRequest(
-            Connection connection, long requestId, PendingApproval approval) throws SQLException {
+            Connection connection, long requestId, PendingApproval approval, long approverId) throws SQLException {
         // SAVEPOINT bắt buộc: sau lỗi unique_violation, Postgres đánh dấu CẢ transaction là
         // "aborted" — DELETE dọn rác ngay sau đó (cùng transaction) sẽ bị Postgres từ chối với
         // "current transaction is aborted" nếu không rollback về savepoint trước (phát hiện thật
@@ -371,12 +383,7 @@ public final class PostgresGuildAdapter implements GuildPort {
         GuildLog.append(
                 connection,
                 new GuildLog.Entry(
-                        approval.guildId(),
-                        GuildLog.Kind.JOINED,
-                        approval.guildLeaderCharacterId(),
-                        approval.characterId(),
-                        0L,
-                        ""),
+                        approval.guildId(), GuildLog.Kind.JOINED, approverId, approval.characterId(), 0L, ""),
                 Instant.now());
         return ApproveResult.OK;
     }

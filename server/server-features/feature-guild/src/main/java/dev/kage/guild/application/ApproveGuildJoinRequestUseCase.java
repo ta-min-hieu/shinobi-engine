@@ -5,7 +5,6 @@ import java.util.Optional;
 import dev.kage.guild.domain.GuildLevelTable;
 import dev.kage.guild.domain.GuildMember;
 import dev.kage.guild.domain.GuildPort;
-import dev.kage.guild.domain.GuildRole;
 
 /** Leader duyệt đơn xin gia nhập — thêm thành viên MỚI + xoá đơn, nguyên tử ở {@link GuildPort}. */
 public final class ApproveGuildJoinRequestUseCase {
@@ -27,7 +26,7 @@ public final class ApproveGuildJoinRequestUseCase {
     public Result execute(long requestId, long leaderCharacterId) {
         Optional<GuildMember> leader = port.findMembershipOf(leaderCharacterId);
         if (leader.isPresent()
-                && leader.get().role() == GuildRole.LEADER
+                && leader.get().role().canManageMembership() // ADR-184 — phó bang chủ cũng duyệt
                 && port.listMembers(leader.get().guildId()).size()
                         >= GuildLevelTable.maxMembers(port.levelOf(leader.get().guildId()))) {
             return Result.GUILD_FULL;

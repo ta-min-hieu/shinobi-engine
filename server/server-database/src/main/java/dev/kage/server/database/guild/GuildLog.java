@@ -24,7 +24,10 @@ final class GuildLog {
         RENAMED,
         NOTICE_CHANGED,
         /** ADR-183 — actor = bang chủ cũ, subject = bang chủ mới. */
-        LEADER_CHANGED
+        LEADER_CHANGED,
+        /** ADR-184 — actor = bang chủ, subject = người được bổ nhiệm / bãi nhiệm. */
+        VICE_APPOINTED,
+        VICE_DISMISSED
     }
 
     /**

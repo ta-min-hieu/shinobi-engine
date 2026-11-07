@@ -513,6 +513,11 @@ public final class GuildPanel implements HudWindow {
         disbandButton.setVisible(leader);
     }
 
+    /** ADR-184 — phó bang chủ cũng thấy (và duyệt) đơn xin vào; gọi SAU {@link #showGuild}. */
+    public void setPendingVisible(boolean visible) {
+        pendingSection.setVisible(visible);
+    }
+
     /**
      * Vẽ lại danh sách thành viên. Dựng lại toàn bộ dòng mỗi lần gọi — danh sách chỉ đổi khi server
      * vừa trả lời (vài lần một phiên chơi), không phải mỗi khung, nên đây không nằm trong đường cấm

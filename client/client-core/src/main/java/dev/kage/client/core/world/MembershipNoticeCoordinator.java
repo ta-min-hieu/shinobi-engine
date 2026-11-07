@@ -40,7 +40,8 @@ final class MembershipNoticeCoordinator implements WindowFlow {
                     "guild.notice.weekly_quest_completed"),
             Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_RENAMED, "guild.notice.renamed"), // ADR-172
             Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_NOTICE_CHANGED, "guild.notice.notice_changed"), // ADR-179
-            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_LEADER_CHANGED, "guild.notice.leader_changed")); // ADR-183
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_LEADER_CHANGED, "guild.notice.leader_changed"), // ADR-183
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_VICE_CHANGED, "guild.notice.vice_changed")); // ADR-184
 
     private final ChatCoordinator chat;
     private final PartyCoordinator party;

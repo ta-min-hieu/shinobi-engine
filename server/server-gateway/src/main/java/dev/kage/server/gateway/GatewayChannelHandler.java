@@ -1010,6 +1010,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.TransferGuildLeaderCommand.parser(),
                             Opcode.OPCODE_TRANSFER_GUILD_LEADER_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot32().guildLeadership().transfer(id, c))),
+            // Lô 32 — phó bang chủ (ADR-184).
+            Map.entry(
+                    Opcode.OPCODE_SET_GUILD_VICE_LEADER_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetGuildViceLeaderCommand.parser(),
+                            Opcode.OPCODE_SET_GUILD_VICE_LEADER_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot32().guildLeadership().setVice(id, c))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,
@@ -4481,6 +4488,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setCharacterId(member.characterId())
                     .setName(name)
                     .setIsLeader(member.isLeader())
+                    .setIsViceLeader(member.isViceLeader()) // ADR-184
                     .setOnline(worldGateway.registry().isOnline(member.characterId()))
                     .setContribution(contributions.getOrDefault(member.characterId(), 0L))
                     .build());
@@ -4548,6 +4556,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .setGuildId(guild.guildId())
                 .setGuildName(guild.guildName())
                 .setIsLeader(guild.isLeader())
+                .setIsViceLeader(guild.isViceLeader()) // ADR-184
                 .setNotice(expansion.lot31().guildNotice().noticeOf(characterId))); // ADR-179
         if (myGuild.isPresent()) {
             guildProgression

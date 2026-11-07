@@ -301,7 +301,9 @@ final class GuildCoordinator implements WindowFlow {
 
     private void showGuild(String guildName) {
         boolean leader = controller.isLeader();
-        panel.showGuild(guildName + " — " + text(leader ? "guild.label.leader" : "guild.label.member"), leader);
+        boolean vice = controller.isViceLeader(); // ADR-184 — phó bang chủ thấy đơn xin vào, không thấy nút giải tán
+        panel.showGuild(guildName + " — " + text(roleKey(leader, vice)), leader);
+        panel.setPendingVisible(leader || vice);
         String notice = controller.notice(); // ADR-179 — thông báo bang trên đầu khối tiến độ
         String progress = progressText(controller.progress());
         panel.setProgress(notice.isEmpty() ? progress : format("guild.notice_line", notice) + "\n" + progress);
@@ -336,9 +338,16 @@ final class GuildCoordinator implements WindowFlow {
         panel.setPendingRequests(requestRows, overflowNotice(all.size() - shown));
     }
 
+    private static String roleKey(boolean leader, boolean vice) {
+        if (leader) {
+            return "guild.label.leader";
+        }
+        return vice ? "guild.label.vice_leader" : "guild.label.member";
+    }
+
     /** Ghép một dòng thành viên: {@code Tên — Vai trò · Trạng thái · Cống hiến}. */
     private String memberText(GuildController.Member member) {
-        String role = text(member.leader() ? "guild.label.leader" : "guild.label.member");
+        String role = text(roleKey(member.leader(), controller.isViceLeader(member.characterId())));
         String presence = text(member.online() ? "guild.label.online" : "guild.label.offline");
         return member.name() + " — " + role + " · " + presence + " · "
                 + format("guild.label.contribution", controller.contributionOf(member.characterId()));
