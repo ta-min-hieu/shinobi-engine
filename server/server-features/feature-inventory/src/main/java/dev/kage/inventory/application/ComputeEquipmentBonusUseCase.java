@@ -20,6 +20,7 @@ import dev.kage.inventory.domain.ItemSets;
 import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
+import dev.kage.inventory.domain.MountPolicy;
 import dev.kage.inventory.domain.PetPolicy;
 
 /**
@@ -93,7 +94,8 @@ public final class ComputeEquipmentBonusUseCase {
         return inventoryPort
                 .findByCharacter(characterId)
                 .flatMap(inventory -> inventory.findItem(mountItemId))
-                .map(item -> companionPort.moveSpeedPercentOf(item.itemTemplateId()))
+                .map(item -> MountPolicy.speed( // ADR-203 — cấp phi kiếm nằm ở enhance_level
+                        companionPort.moveSpeedPercentOf(item.itemTemplateId()), item.enhanceLevel()))
                 .orElse(0);
     }
 

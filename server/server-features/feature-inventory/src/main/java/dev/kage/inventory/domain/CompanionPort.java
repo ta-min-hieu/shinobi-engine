@@ -47,6 +47,11 @@ public interface CompanionPort {
         public Optional<PetProgress> grantPetExp(Transaction tx, long characterId, long amount) {
             return Optional.empty();
         }
+
+        @Override
+        public Optional<Long> wornMountItemId(Transaction tx, long characterId) {
+            return Optional.empty();
+        }
     };
 
     /** {@code item_template.move_speed_percent} của một mẫu (0 nếu không phải phi kiếm). */
@@ -74,6 +79,9 @@ public interface CompanionPort {
      * ADR-201 — cộng EXP cho linh thú đang mặc TRONG transaction của người gọi (sau khoá túi đồ); rỗng nếu không mặc.
      */
     Optional<PetProgress> grantPetExp(Transaction tx, long characterId, long amount);
+
+    /** ADR-203 — dòng túi đồ của phi kiếm đang mặc (đọc trong transaction, sau khoá túi đồ); rỗng nếu không mặc. */
+    Optional<Long> wornMountItemId(Transaction tx, long characterId);
 
     /** Ghi bậc tiến hoá — chỉ sau {@link #lockEquippedPet} trong cùng transaction. */
     void setPetStage(Transaction tx, long inventoryItemId, int stage);

@@ -102,6 +102,16 @@ public final class PostgresCompanionAdapter implements CompanionPort {
         return grantIn(((JdbcTransaction) tx).connection(), characterId, amount);
     }
 
+    private static final String WORN_MOUNT =
+            "SELECT inventory_item_id FROM equipment_slot WHERE character_id = ? AND slot_type = 'MOUNT'"
+                    + " AND inventory_item_id IS NOT NULL";
+
+    @Override
+    public Optional<Long> wornMountItemId(Transaction tx, long characterId) {
+        return JdbcOperations.queryOne(
+                ((JdbcTransaction) tx).connection(), WORN_MOUNT, rs -> rs.getLong(1), characterId);
+    }
+
     private static Optional<PetProgress> grantIn(Connection connection, long characterId, long amount) {
         List<EquippedPet> pets = JdbcOperations.query(
                 connection, EQUIPPED_PET, rs -> new EquippedPet(rs.getLong(1), rs.getLong(2)), characterId);

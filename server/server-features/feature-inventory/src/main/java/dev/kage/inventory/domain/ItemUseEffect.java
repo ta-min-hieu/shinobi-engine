@@ -21,5 +21,7 @@ public enum ItemUseEffect {
     /** EXP đánh quái nhân đôi thêm {@link ItemTemplate#useValue()} phút, cộng dồn tới trần (ADR-164). */
     DOUBLE_EXP,
     /** Cộng {@link ItemTemplate#useValue()} EXP cho linh thú ĐANG MẶC (ADR-201), qua cấp như EXP đánh quái. */
-    FEED_PET
+    FEED_PET,
+    /** Nâng phi kiếm ĐANG MẶC lên một cấp (ADR-203), tới {@link MountPolicy#MAX_LEVEL}. */
+    UPGRADE_MOUNT
 }

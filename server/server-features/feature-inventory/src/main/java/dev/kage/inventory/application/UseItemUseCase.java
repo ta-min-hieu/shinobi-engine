@@ -11,6 +11,7 @@ import dev.kage.inventory.domain.ItemStack;
 import dev.kage.inventory.domain.ItemTemplate;
 import dev.kage.inventory.domain.ItemTemplatePort;
 import dev.kage.inventory.domain.ItemUseEffect;
+import dev.kage.inventory.domain.MountPolicy;
 import dev.kage.inventory.domain.PetPolicy;
 import dev.kage.inventory.domain.PetProgress;
 import dev.kage.inventory.domain.TradeOfferPort;
@@ -66,7 +67,11 @@ public final class UseItemUseCase {
         /** Đan x2 EXP (ADR-164) nhưng thời gian còn lại đã chạm trần. Không trừ viên đan. */
         EXP_BUFF_AT_MAX,
         /** Thức ăn linh thú (ADR-201) nhưng linh thú đang mặc đã ở cấp tối đa. Không trừ món. */
-        PET_AT_MAX_LEVEL
+        PET_AT_MAX_LEVEL,
+        /** Tinh thạch phi kiếm (ADR-203) nhưng không mặc phi kiếm. Không trừ món. */
+        NO_MOUNT_EQUIPPED,
+        /** Phi kiếm đang mặc đã ở cấp tối đa. Không trừ món. */
+        MOUNT_AT_MAX_LEVEL
     }
 
     /**
@@ -132,7 +137,7 @@ public final class UseItemUseCase {
         if (item.quantity() - tradeOfferPort.offeredQuantity(t, characterId, inventoryItemId) < 1) {
             return UseItemResult.failed(Outcome.ITEM_IN_TRADE);
         }
-        Optional<Outcome> refused = applyEffect(t, characterId, template.get());
+        Optional<Outcome> refused = applyEffect(t, characterId, template.get(), inventory);
         if (refused.isPresent()) {
             return UseItemResult.failed(refused.get());
         }
@@ -157,7 +162,7 @@ public final class UseItemUseCase {
      * Hiệu ứng phải ghi TRONG giao dịch dùng (trước khi trừ món) — từ chối thì chưa ghi gì, món chưa bị trừ. Tách khỏi
      * {@link #useInTransaction} vì trần CyclomaticComplexity.
      */
-    private Optional<Outcome> applyEffect(Transaction t, long characterId, ItemTemplate template) {
+    private Optional<Outcome> applyEffect(Transaction t, long characterId, ItemTemplate template, Inventory inventory) {
         return switch (template.useEffect()) {
             case EXPAND_BAG ->
                 inventoryPort.expandCapacity(t, characterId, template.useValue())
@@ -169,6 +174,7 @@ public final class UseItemUseCase {
                         : Optional.of(Outcome.EXP_BUFF_AT_MAX);
             case EVOLVE_PET -> evolveEquippedPet(t, characterId);
             case FEED_PET -> feedEquippedPet(t, characterId, template.useValue());
+            case UPGRADE_MOUNT -> upgradeWornMount(t, characterId, inventory);
             case HEAL_HP -> Optional.empty();
         };
     }
@@ -208,6 +214,25 @@ public final class UseItemUseCase {
         return companionPort.grantPetExp(t, characterId, expAmount).isPresent()
                 ? Optional.empty()
                 : Optional.of(Outcome.NO_PET_EQUIPPED);
+    }
+
+    /**
+     * ADR-203 — nâng phi kiếm đang mặc một cấp trên CHÍNH aggregate túi đồ đang khoá (lưu cùng lúc với việc trừ tinh
+     * thạch ⇒ không ghi đè nhau). Từ chối thì chưa đổi gì.
+     */
+    private Optional<Outcome> upgradeWornMount(Transaction t, long characterId, Inventory inventory) {
+        Optional<ItemStack> mount =
+                companionPort.wornMountItemId(t, characterId).flatMap(inventory::findItem);
+        if (mount.isEmpty()) {
+            return Optional.of(Outcome.NO_MOUNT_EQUIPPED);
+        }
+        ItemStack current = mount.get();
+        if (current.enhanceLevel() >= MountPolicy.MAX_LEVEL) {
+            return Optional.of(Outcome.MOUNT_AT_MAX_LEVEL);
+        }
+        inventory.replaceItem(
+                new ItemStack(current.id(), current.itemTemplateId(), current.quantity(), current.enhanceLevel() + 1));
+        return Optional.empty();
     }
 
     private static String detailJson(long inventoryItemId, long itemTemplateId) {

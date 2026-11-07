@@ -26,9 +26,11 @@ import dev.kage.inventory.application.ComputeEquipmentBonusUseCase;
 import dev.kage.inventory.application.EquipItemUseCase;
 import dev.kage.inventory.application.StorageUseCase;
 import dev.kage.inventory.domain.EquipmentSlotType;
+import dev.kage.inventory.domain.MountPolicy;
 import dev.kage.inventory.domain.PetProgress;
 import dev.kage.server.database.DatabaseConfig;
 import dev.kage.server.database.FlywayMigrator;
+import dev.kage.server.database.JdbcOperations;
 import dev.kage.server.database.PostgresDataSourceFactory;
 import dev.kage.server.database.account.JdbcAccountTransactionRunner;
 import dev.kage.server.database.account.PostgresAccountAdapter;
@@ -108,6 +110,37 @@ class CompanionIntegrationTest {
         assertThat(storage().deposit(characterId, fox, 1).outcome())
                 .as("linh thú đã có cấp không vào kho (sẽ mất cấp)")
                 .isIn(StorageUseCase.Outcome.SOCKETED, StorageUseCase.Outcome.EQUIPPED);
+    }
+
+    /** ADR-203 — Phi Kiếm Tinh Thạch nâng phi kiếm đang mặc, +5% tốc độ mỗi cấp, dừng ở cấp tối đa không trừ món. */
+    @Test
+    void essenceShouldUpgradeTheWornSword_upToTheCap() {
+        long characterId = createFreshCharacter("MountUp");
+        long sword = query(INSERT_ITEM, characterId, query(TEMPLATE_ID, "wooden_flying_sword"));
+        long essence = query(INSERT_ITEM, characterId, query(TEMPLATE_ID, "flying_sword_essence"));
+        dev.kage.inventory.application.UseItemUseCase use = new dev.kage.inventory.application.UseItemUseCase(
+                new dev.kage.inventory.application.UseItemUseCase.Ports(
+                        new PostgresInventoryAdapter(dataSource),
+                        new PostgresItemTemplateAdapter(dataSource),
+                        new PostgresAuditAdapter(),
+                        new PostgresInventoryTradeOfferAdapter(),
+                        new PostgresCompanionAdapter(dataSource)),
+                new JdbcInventoryTransactionRunner(dataSource));
+
+        assertThat(use.execute(characterId, essence).outcome())
+                .as("chưa cưỡi phi kiếm")
+                .isEqualTo(dev.kage.inventory.application.UseItemUseCase.Outcome.NO_MOUNT_EQUIPPED);
+        equip(characterId, sword, EquipmentSlotType.MOUNT);
+        int base = bonuses().moveSpeedPercent(characterId);
+        assertThat(use.execute(characterId, essence).outcome())
+                .isEqualTo(dev.kage.inventory.application.UseItemUseCase.Outcome.OK);
+        assertThat(bonuses().moveSpeedPercent(characterId)).isEqualTo(base + MountPolicy.SPEED_PER_LEVEL);
+        JdbcOperations.update(
+                dataSource, "UPDATE inventory_item SET enhance_level = ? WHERE id = ?", MountPolicy.MAX_LEVEL, sword);
+        long more = query(INSERT_ITEM, characterId, query(TEMPLATE_ID, "flying_sword_essence"));
+        assertThat(use.execute(characterId, more).outcome())
+                .isEqualTo(dev.kage.inventory.application.UseItemUseCase.Outcome.MOUNT_AT_MAX_LEVEL);
+        assertThat(bonuses().moveSpeedPercent(characterId)).isEqualTo(MountPolicy.speed(base, MountPolicy.MAX_LEVEL));
     }
 
     /** ADR-193 — tên riêng theo linh thú đang mặc; chưa mặc thì không ghi; rỗng thì xoá. */

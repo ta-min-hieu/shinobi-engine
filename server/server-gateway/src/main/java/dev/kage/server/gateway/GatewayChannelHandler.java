@@ -2624,7 +2624,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             expansion.lot29().expBuff().announce(characterId); // ADR-164 — đọc lại hạn + báo HUD
         }
         if (result.outcome() == UseItemUseCase.Outcome.OK
-                && (result.effect() == ItemUseEffect.EVOLVE_PET || result.effect() == ItemUseEffect.FEED_PET)) {
+                && (result.effect() == ItemUseEffect.EVOLVE_PET
+                        || result.effect() == ItemUseEffect.FEED_PET
+                        || result.effect() == ItemUseEffect.UPGRADE_MOUNT)) { // ADR-203 — gửi lại tốc độ mới
             // ADR-078 — chỉ số linh thú vừa nhân bậc 2: tính lại như sau khi mặc đồ.
             applyEquipmentBonusAndComputeMaxHp(characterId);
         }
@@ -2646,6 +2648,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case EXPAND_BAG -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_EXPAND_BAG;
             case DOUBLE_EXP -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_DOUBLE_EXP;
             case FEED_PET -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_FEED_PET;
+            case UPGRADE_MOUNT -> dev.kage.protocol.ItemUseEffect.ITEM_USE_EFFECT_UPGRADE_MOUNT;
         };
     }
 
@@ -2661,6 +2664,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case BAG_AT_MAX -> "error.bag_at_max";
             case EXP_BUFF_AT_MAX -> "error.exp_buff_at_max";
             case PET_AT_MAX_LEVEL -> "error.pet_at_max_level"; // ADR-201
+            case NO_MOUNT_EQUIPPED -> "error.no_mount_equipped"; // ADR-203
+            case MOUNT_AT_MAX_LEVEL -> "error.mount_at_max_level";
         };
     }
 

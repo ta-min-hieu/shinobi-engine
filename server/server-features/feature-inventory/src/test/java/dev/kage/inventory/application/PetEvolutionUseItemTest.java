@@ -95,6 +95,11 @@ class PetEvolutionUseItemTest {
             expGranted = amount;
             return pet;
         }
+
+        @Override
+        public Optional<Long> wornMountItemId(Transaction tx, long characterId) {
+            return Optional.empty();
+        }
     }
 
     private static ItemTemplatePort catalog() {
