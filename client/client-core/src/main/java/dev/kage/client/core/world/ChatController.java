@@ -242,7 +242,13 @@ final class ChatController {
             Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_DELIVERED_LATER, "chat.notice.delivered_later"),
             Map.entry(
                     SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RECIPIENT_INBOX_FULL,
-                    "chat.error.recipient_inbox_full"));
+                    "chat.error.recipient_inbox_full"),
+            Map.entry( // ADR-188
+                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_FOUND,
+                    "chat.error.linked_item_not_found"),
+            Map.entry(
+                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_ON_AREA,
+                    "chat.error.linked_item_not_on_area"));
 
     /**
      * Câu giải thích một kết quả gửi, hoặc rỗng khi không có gì để nói.

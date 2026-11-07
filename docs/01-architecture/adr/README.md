@@ -219,6 +219,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-185](ADR-185-Guild-Recruitment-Board.md) | Bảng chiêu mộ bang: một dòng / bang (V146), bang chủ hoặc phó, ≤ 80 ký tự qua bộ lọc chat, cấp tối thiểu kiểm ở đơn xin vào (`LEVEL_TOO_LOW`), 751–754; `/chieumo` | ✅ Accepted (lô 32) |
 | [ADR-186](ADR-186-Guild-Check-In.md) | Điểm danh bang: một lần / nhân vật / ngày (V147), +100 cống hiến, +100 kinh nghiệm bang qua đúng hàm cộng của góp bang, 755/756; `/diemdanhbang` | ✅ Accepted (lô 32) |
 | [ADR-187](ADR-187-Offline-Whispers.md) | Nhắn riêng khi offline: qua đủ kiểm duyệt + audit rồi giữ (V148), 20 tin / 7 ngày, giao lúc vào game kèm giờ gửi; outcome `DELIVERED_LATER`/`RECIPIENT_INBOX_FULL`, `ChatMessageEvent.sent_at_epoch_seconds` | ✅ Accepted (lô 32) |
+| [ADR-188](ADR-188-Chat-Item-Link.md) | Khoe vật phẩm vào chat: server đọc món thật + chỉ số hiệu dụng, gắn `LinkedItemView` vào tin (không ở kênh Khu vực); 2 outcome + 2 field; `/khoe`, `/xemmon` | ✅ Accepted (lô 32) |
 ---
 
 ## ADR cần tạo (chưa viết)

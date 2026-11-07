@@ -11,14 +11,16 @@ record Lot32Windows(
         GuildLeadershipCoordinator guildLeadership,
         GuildViceCoordinator guildVice,
         GuildRecruitmentCoordinator guildRecruitment,
-        GuildCheckInCoordinator guildCheckIn) {
+        GuildCheckInCoordinator guildCheckIn,
+        ItemLinkCoordinator itemLink) {
 
     static Lot32Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot32Windows(
                 new GuildLeadershipCoordinator(sender, feeds.chat()),
                 new GuildViceCoordinator(sender, feeds.chat()),
                 GuildRecruitmentCoordinator.create(skin, sender, feeds),
-                new GuildCheckInCoordinator(sender, feeds.chat()));
+                new GuildCheckInCoordinator(sender, feeds.chat()),
+                new ItemLinkCoordinator(sender, feeds));
     }
 
     /** Đăng ký vào hub. */
@@ -27,5 +29,6 @@ record Lot32Windows(
         panels.register(guildVice);
         panels.register(guildRecruitment.panel(), guildRecruitment);
         panels.register(guildCheckIn);
+        panels.register(itemLink);
     }
 }

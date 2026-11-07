@@ -11,6 +11,7 @@ record Lot32Commands(
         GuildLeadershipCommands guildLeadership,
         GuildRecruitmentCommands guildRecruitment,
         OfflineWhisperCommands offlineWhispers,
+        ItemLinkCommands itemLinks,
         Lot32Facades facades,
         ConnectedCharacterRegistry registry) {
 
@@ -29,6 +30,7 @@ record Lot32Commands(
                         gateway.progression().relationships().blocks(),
                         worldGateway.registry(),
                         Clock.systemUTC())),
+                new ItemLinkCommands(gateway.inventoryFacade()),
                 lot32,
                 worldGateway.registry());
     }

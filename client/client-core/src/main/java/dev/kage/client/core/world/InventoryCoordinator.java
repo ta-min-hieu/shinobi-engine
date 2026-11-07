@@ -179,6 +179,11 @@ final class InventoryCoordinator implements WindowFlow {
         refreshView();
     }
 
+    /** ADR-188 — món đang chọn trong túi (rỗng nếu chưa chọn); lệnh {@code /khoe} khoe món này. */
+    Optional<InventoryController.Item> selectedItem() {
+        return controller.selected();
+    }
+
     /** ADR-176 — id món đang chọn trong túi (rỗng nếu chưa chọn); lệnh {@code /dungnhieu} dùng món này. */
     Optional<Long> selectedItemId() {
         return controller.selected().map(InventoryController.Item::itemId);

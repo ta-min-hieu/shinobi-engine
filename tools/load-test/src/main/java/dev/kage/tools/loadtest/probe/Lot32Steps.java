@@ -2,6 +2,8 @@ package dev.kage.tools.loadtest.probe;
 
 import java.io.IOException;
 
+import dev.kage.protocol.ChatChannel;
+import dev.kage.protocol.ChatMessageEvent;
 import dev.kage.protocol.GuildCheckInCommand;
 import dev.kage.protocol.GuildCheckInResponse;
 import dev.kage.protocol.GuildRecruitmentView;
@@ -10,6 +12,8 @@ import dev.kage.protocol.ListGuildRecruitmentResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.PostGuildRecruitmentCommand;
 import dev.kage.protocol.PostGuildRecruitmentResponse;
+import dev.kage.protocol.SendChatMessageCommand;
+import dev.kage.protocol.SendChatMessageResponse;
 import dev.kage.protocol.SendGuildJoinRequestCommand;
 import dev.kage.protocol.SendGuildJoinRequestResponse;
 import dev.kage.protocol.SetGuildViceLeaderCommand;
@@ -20,7 +24,8 @@ import dev.kage.protocol.TransferGuildLeaderResponse;
 /**
  * Bước lô 32: nhường chức bang chủ (ADR-183) {@code transferLeader:<tên>}; phó bang chủ (ADR-184) {@code vice:<tên>},
  * {@code unvice:<tên>}; chiêu mộ (ADR-185) {@code recruit:<cấp>=<lời>} ({@code recruit:off} gỡ), {@code recruitBoard},
- * {@code applyGuild:<tên bang>}; điểm danh bang (ADR-186) {@code guildCheckIn}. Nối sau {@link Lot31Steps}.
+ * {@code applyGuild:<tên bang>}; điểm danh bang (ADR-186) {@code guildCheckIn}; khoe vật phẩm (ADR-188) {@code
+ * showItem:<id món>} (kênh Thế giới, chờ tin dội về), {@code showItemArea:<id>}. Nối sau {@link Lot31Steps}.
  */
 final class Lot32Steps {
 
@@ -38,7 +43,17 @@ final class Lot32Steps {
             case "recruit" -> recruit(arg);
             case "recruitBoard" -> recruitBoard();
             case "applyGuild" -> applyGuild(arg);
+            default -> moreStep(verb, arg);
+        };
+    }
+
+    /** Nhánh thứ hai — tách khỏi {@link #step} vì trần CyclomaticComplexity. */
+    private String moreStep(String verb, String arg) throws IOException {
+        return switch (verb) {
             case "guildCheckIn" -> guildCheckIn();
+            case "showItem" -> showItem(Long.parseLong(arg), ChatChannel.CHAT_CHANNEL_WORLD);
+            case "showItemArea" -> showItem(Long.parseLong(arg), ChatChannel.CHAT_CHANNEL_AREA);
+            case "showItemResult" -> showItemResult(Long.parseLong(arg));
             default -> "bước không hiểu";
         };
     }
@@ -122,5 +137,43 @@ final class Lot32Steps {
                     return r.getOutcome().name() + " cốngHiến+" + r.getContribution() + " expBang+" + r.getGuildExp()
                             + " hômNay=" + r.getTodayCount();
                 });
+    }
+
+    /**
+     * Khoe một món; kênh Thế giới thì chờ tin dội về (thấy LinkedItemView server gắn), kênh Khu vực thì chờ outcome.
+     */
+    private String showItem(long itemId, ChatChannel channel) throws IOException {
+        SendChatMessageCommand command = SendChatMessageCommand.newBuilder()
+                .setChannel(channel)
+                .setBody("probe khoe")
+                .setLinkedItemId(itemId)
+                .build();
+        if (channel == ChatChannel.CHAT_CHANNEL_AREA) {
+            return asker.ask(
+                    Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE,
+                    command,
+                    Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE,
+                    p -> SendChatMessageResponse.parseFrom(p).getOutcome().name());
+        }
+        return asker.ask(
+                Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE, command, Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, p -> {
+                    ChatMessageEvent e = ChatMessageEvent.parseFrom(p);
+                    return "món=" + e.getLinkedItem().getItemTemplateId() + " +"
+                            + e.getLinkedItem().getEnhanceLevel() + " công="
+                            + e.getLinkedItem().getBonusAtk() + " body=" + e.getBody();
+                });
+    }
+
+    /** Khoe ở kênh Thế giới nhưng đọc OUTCOME (vd món không phải của mình ⇒ LINKED_ITEM_NOT_FOUND). */
+    private String showItemResult(long itemId) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE,
+                SendChatMessageCommand.newBuilder()
+                        .setChannel(ChatChannel.CHAT_CHANNEL_WORLD)
+                        .setBody("probe khoe")
+                        .setLinkedItemId(itemId)
+                        .build(),
+                Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE,
+                p -> SendChatMessageResponse.parseFrom(p).getOutcome().name());
     }
 }

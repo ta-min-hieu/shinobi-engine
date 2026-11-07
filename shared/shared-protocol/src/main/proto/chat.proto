@@ -27,6 +27,22 @@ message SendChatMessageCommand {
   ChatChannel channel = 1;
   string target_name = 2;
   string body = 3;
+  // ADR-188 — khoe vật phẩm: id một món TRONG TÚI người gửi (0 = không khoe). Server tự đọc món thật và gắn
+  // LinkedItemView vào tin; client không khai chỉ số. Không dùng được ở kênh Khu vực.
+  int64 linked_item_id = 4;
+}
+
+// ADR-188 — món được khoe, do SERVER đọc từ túi người gửi lúc gửi (ảnh chụp, không cập nhật về sau).
+message LinkedItemView {
+  int64 item_template_id = 1;
+  int32 enhance_level = 2;
+  int64 socket_gem_template_id = 3; // 0 = không khảm
+  int32 quantity = 4;
+  // Chỉ số HIỆU DỤNG (đã nhân cường hoá) do server tính — client không tự suy ra.
+  int32 bonus_atk = 5;
+  int32 bonus_def = 6;
+  int32 bonus_res = 7;
+  int32 bonus_hp = 8;
 }
 
 enum SendChatMessageOutcome {
@@ -46,6 +62,8 @@ enum SendChatMessageOutcome {
   // Thay cho TARGET_OFFLINE ở server mới (TARGET_OFFLINE vẫn giữ trong enum cho client cũ / tương thích).
   SEND_CHAT_MESSAGE_OUTCOME_DELIVERED_LATER = 12;
   SEND_CHAT_MESSAGE_OUTCOME_RECIPIENT_INBOX_FULL = 13; // người nhận đã có 20 tin chờ
+  SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_FOUND = 14; // ADR-188 — món khoe không có trong túi người gửi
+  SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_ON_AREA = 15; // ADR-188 — kênh Khu vực không mang món khoe
 }
 
 // Response: Server -> Client (OPCODE_SEND_CHAT_MESSAGE_RESPONSE).
@@ -66,6 +84,7 @@ message ChatMessageEvent {
   bool auto_reply = 6;
   // ADR-187 — tin nhắn riêng gửi lúc mình offline, giao lúc vào game: thời điểm GỬI. 0 = tin thời gian thực.
   int64 sent_at_epoch_seconds = 7;
+  LinkedItemView linked_item = 8; // ADR-188 — có khi người gửi khoe một món
 }
 
 // ===== ADR-092 — biểu cảm. CHỈ THÊM. Phát cho mọi người đang nhìn thấy mình (AoI, gồm cả chính mình); client vẽ

@@ -234,6 +234,7 @@ import dev.kage.protocol.LeavePartyCommand;
 import dev.kage.protocol.LeavePartyOutcome;
 import dev.kage.protocol.LeavePartyResponse;
 import dev.kage.protocol.LeaveSwornCommand;
+import dev.kage.protocol.LinkedItemView;
 import dev.kage.protocol.ListAchievementsRequest;
 import dev.kage.protocol.ListCharactersRequest;
 import dev.kage.protocol.ListCharactersResponse;
@@ -5776,6 +5777,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         String body = dev.kage.chat.domain.ChatMessage.singleLine(command.getBody());
         java.util.OptionalLong recipientId =
                 target == null ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(target.id());
+        Optional<LinkedItemView> linked = linkedItemOf(ctx, sequenceId, characterId, command, domainChannel);
+        if (linked.isEmpty()) {
+            return;
+        }
         Long accountId = boundAccountId;
         if (accountId != null && chatFacade.isMuted(accountId, java.time.Instant.now())) {
             // ADR-052 D4/D7 — khoá chat của GM; outcome MUTED (chỉ thêm, protocolVersion không tăng).
@@ -5796,7 +5801,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         String senderName =
                 characterFacade.findById(characterId).map(Character::name).orElse("");
-        routeChatMessage(domainChannel, new ChatRouteContext(characterId, senderName, target, body));
+        routeChatMessage(domainChannel, new ChatRouteContext(characterId, senderName, target, body, linked.get()));
     }
 
     /**
@@ -5842,8 +5847,36 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return true;
     }
 
-    /** Gói tham số cho {@link #routeChatMessage} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}. */
-    private record ChatRouteContext(long characterId, String senderName, Character target, String body) {}
+    /**
+     * Gói tham số cho {@link #routeChatMessage} — tránh vượt 4 tham số Checkstyle {@code ParameterNumber}.
+     * {@code linkedItem} = món khoe (ADR-188), {@code LinkedItemView.getDefaultInstance()} khi không khoe.
+     */
+    private record ChatRouteContext(
+            long characterId, String senderName, Character target, String body, LinkedItemView linkedItem) {}
+
+    /**
+     * ADR-188 — món khoe của tin: {@code Optional.of(mặc định)} khi không khoe; rỗng (và đã báo người gửi) khi món
+     * không có trong túi hoặc khoe ở kênh Khu vực (tin Khu vực đi qua world tick, không mang món).
+     */
+    private Optional<LinkedItemView> linkedItemOf(
+            ChannelHandlerContext ctx,
+            int sequenceId,
+            long characterId,
+            SendChatMessageCommand command,
+            dev.kage.chat.domain.ChatChannel channel) {
+        if (command.getLinkedItemId() == 0L) {
+            return Optional.of(LinkedItemView.getDefaultInstance());
+        }
+        if (channel == dev.kage.chat.domain.ChatChannel.AREA) {
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_ON_AREA);
+            return Optional.empty();
+        }
+        Optional<LinkedItemView> linked = expansion.lot32().itemLinks().resolve(characterId, command.getLinkedItemId());
+        if (linked.isEmpty()) {
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_FOUND);
+        }
+        return linked;
+    }
 
     /** Định tuyến người nhận SAU KHI {@code ChatFacade.sendMessage} đã trả OK — tách khỏi
      * {@code handleSendChatMessageBlocking} để giữ method đó dưới giới hạn Checkstyle MethodLength. */
@@ -5923,13 +5956,16 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     /** Một tin chat của người chơi, kèm danh hiệu đang đeo (ADR-062 D3). */
     private ChatMessageEvent chatEvent(ChatChannel protoChannel, ChatRouteContext ctx) {
-        return ChatMessageEvent.newBuilder()
+        ChatMessageEvent.Builder event = ChatMessageEvent.newBuilder()
                 .setChannel(protoChannel)
                 .setSenderId(ctx.characterId())
                 .setSenderName(ctx.senderName())
                 .setSenderTitleKey(titleKeyOf(ctx.characterId()))
-                .setBody(ctx.body())
-                .build();
+                .setBody(ctx.body());
+        if (ctx.linkedItem().getItemTemplateId() != 0L) {
+            event.setLinkedItem(ctx.linkedItem()); // ADR-188 — chỉ gắn khi thật sự khoe (tin thường không thêm byte)
+        }
+        return event.build();
     }
 
     private void broadcastToGroup(ChatChannel protoChannel, ChatRouteContext ctx, List<Long> memberCharacterIds) {

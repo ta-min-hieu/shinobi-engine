@@ -123,7 +123,7 @@ final class ChatCoordinator implements WindowFlow {
             if (event.getSenderId() != 0L && hiddenSender.test(event.getSenderId())) {
                 return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
             }
-            controller.onMessage(withTitle(markOffline(markAutoReply(event))));
+            controller.onMessage(withTitle(markLinked(markOffline(markAutoReply(event)))));
             refreshLines();
             return true;
         }
@@ -132,6 +132,33 @@ final class ChatCoordinator implements WindowFlow {
             return true;
         }
         return false;
+    }
+
+    /** ADR-188 — nhãn món khoe do luồng khoe vật phẩm cung cấp (cần catalog vật phẩm, lớp này không có). */
+    private java.util.function.Function<dev.kage.protocol.LinkedItemView, String> linkLabel =
+            item -> "[#" + item.getItemTemplateId() + " +" + item.getEnhanceLevel() + "]";
+
+    /** ADR-188 — nối cách ghi nhãn món khoe. */
+    void useLinkLabel(java.util.function.Function<dev.kage.protocol.LinkedItemView, String> label) {
+        this.linkLabel = label;
+    }
+
+    /** ADR-188 — kênh đang chọn (cho {@code /khoe}). */
+    ChatChannel currentChannel() {
+        return controller.channel();
+    }
+
+    /**
+     * ADR-188 — tin có món khoe: nhãn món ghi TRƯỚC nội dung, dựng từ dữ liệu SERVER đọc trong túi người gửi — chữ
+     * người gửi gõ không thể giả nhãn này.
+     */
+    private ChatMessageEvent markLinked(ChatMessageEvent event) {
+        if (!event.hasLinkedItem()) {
+            return event;
+        }
+        return event.toBuilder()
+                .setBody(linkLabel.apply(event.getLinkedItem()) + " " + event.getBody())
+                .build();
     }
 
     /** ADR-187 — tin riêng gửi lúc mình offline: ghi lúc gửi để không đọc nhầm là vừa nhắn. */
