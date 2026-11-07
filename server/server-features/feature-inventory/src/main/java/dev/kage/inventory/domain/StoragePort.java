@@ -16,4 +16,12 @@ public interface StoragePort {
     void updateQuantity(Transaction tx, long storedItemId, int quantity);
 
     void delete(Transaction tx, long storedItemId);
+
+    /**
+     * Tiền tố hành động audit ({@code <scope>_DEPOSIT} / {@code <scope>_WITHDRAW}) — kho chung tài khoản (ADR-197) ghi
+     * khác kho tông môn để audit phân biệt được.
+     */
+    default String auditScope() {
+        return "STORAGE";
+    }
 }

@@ -137,7 +137,11 @@ public final class StorageUseCase {
             storagePort.insert(
                     t, characterId, new StoredItem(0L, item.itemTemplateId(), quantity, item.enhanceLevel()));
         }
-        auditPort.log(t, characterId, "STORAGE_DEPOSIT", detail(item.itemTemplateId(), quantity, item.enhanceLevel()));
+        auditPort.log(
+                t,
+                characterId,
+                storagePort.auditScope() + "_DEPOSIT",
+                detail(item.itemTemplateId(), quantity, item.enhanceLevel()));
         return Outcome.OK;
     }
 
@@ -183,7 +187,11 @@ public final class StorageUseCase {
         } else {
             storagePort.updateQuantity(t, storedItemId, row.quantity() - quantity);
         }
-        auditPort.log(t, characterId, "STORAGE_WITHDRAW", detail(row.itemTemplateId(), quantity, row.enhanceLevel()));
+        auditPort.log(
+                t,
+                characterId,
+                storagePort.auditScope() + "_WITHDRAW",
+                detail(row.itemTemplateId(), quantity, row.enhanceLevel()));
         return Outcome.OK;
     }
 

@@ -20,6 +20,7 @@ import dev.kage.protocol.ListInventoryResponse;
 import dev.kage.protocol.ListStorageRequest;
 import dev.kage.protocol.ListStorageResponse;
 import dev.kage.protocol.Opcode;
+import dev.kage.protocol.StorageKind;
 import dev.kage.protocol.StorageOutcome;
 import dev.kage.protocol.StoredItemView;
 import dev.kage.protocol.WithdrawItemCommand;
@@ -55,8 +56,13 @@ final class StorageCoordinator implements WindowFlow {
         OUTCOME_KEYS.put(StorageOutcome.STORAGE_OUTCOME_LOCKED, "storage.error.locked");
     }
 
-    /** Một dòng có nút: rút một dòng kho, hoặc gửi một dòng túi. */
-    private record Action(boolean withdraw, long id, int quantity) {}
+    /** Một dòng có nút: rút một dòng kho, gửi một dòng túi, hoặc ({@code toggle}) đổi sang kho kia (ADR-197). */
+    private record Action(boolean withdraw, long id, int quantity, boolean toggle) {
+
+        Action(boolean withdraw, long id, int quantity) {
+            this(withdraw, id, quantity, false);
+        }
+    }
 
     private final ReportPanel panel;
     private final WorldCommandSender sender;
@@ -66,6 +72,8 @@ final class StorageCoordinator implements WindowFlow {
     private final List<StoredItemView> stored = new ArrayList<>();
     private final List<InventoryItemView> bag = new ArrayList<>();
     private int storageCapacity;
+    /** ADR-197 — đang xem kho chung tài khoản (theo cờ server trả về), không phải kho tông môn. */
+    private boolean accountMode;
 
     /** Hành động của từng dòng panel, cùng chỉ số với {@link ReportPanel#setRows}; dòng tiêu đề = rỗng. */
     private final List<Action> actions = new ArrayList<>();
@@ -81,8 +89,18 @@ final class StorageCoordinator implements WindowFlow {
     }
 
     private void request() {
-        sender.sendReadRequest(Opcode.OPCODE_LIST_STORAGE_REQUEST_VALUE, ListStorageRequest.getDefaultInstance());
+        requestStorage(accountMode);
         sender.listInventory();
+    }
+
+    private static StorageKind kindOf(boolean account) {
+        return account ? StorageKind.STORAGE_KIND_ACCOUNT : StorageKind.STORAGE_KIND_SECT;
+    }
+
+    private void requestStorage(boolean account) {
+        sender.sendReadRequest(
+                Opcode.OPCODE_LIST_STORAGE_REQUEST_VALUE,
+                ListStorageRequest.newBuilder().setStorageKind(kindOf(account)).build());
     }
 
     private void onRowAction(int rowIndex) {
@@ -90,12 +108,17 @@ final class StorageCoordinator implements WindowFlow {
             return;
         }
         Action action = actions.get(rowIndex);
+        if (action.toggle()) {
+            requestStorage(!accountMode);
+            return;
+        }
         if (action.withdraw()) {
             sender.sendReadRequest(
                     Opcode.OPCODE_WITHDRAW_ITEM_COMMAND_VALUE,
                     WithdrawItemCommand.newBuilder()
                             .setStoredItemId(action.id())
                             .setQuantity(action.quantity())
+                            .setStorageKind(kindOf(accountMode))
                             .build());
         } else {
             sender.sendReadRequest(
@@ -103,6 +126,7 @@ final class StorageCoordinator implements WindowFlow {
                     DepositItemCommand.newBuilder()
                             .setInventoryItemId(action.id())
                             .setQuantity(action.quantity())
+                            .setStorageKind(kindOf(accountMode))
                             .build());
         }
     }
@@ -122,6 +146,7 @@ final class StorageCoordinator implements WindowFlow {
         int opcode = frame.header().opcode();
         if (opcode == Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE) {
             ListStorageResponse response = ListStorageResponse.parseFrom(frame.payload());
+            accountMode = response.getStorageKind() == StorageKind.STORAGE_KIND_ACCOUNT;
             replaceStorage(response.getItemsList(), response.getCapacity());
             panel.setStatus(text("storage.hint.open"));
             if (!panel.isOpen()) {
@@ -188,7 +213,15 @@ final class StorageCoordinator implements WindowFlow {
         List<ReportPanel.Row> rows = new ArrayList<>();
         actions.clear();
         rows.add(new ReportPanel.Row(
-                KageI18n.formatOrKey(i18n, "storage.section.stored", stored.size(), storageCapacity), true));
+                text(accountMode ? "storage.row.to_sect" : "storage.row.to_account"), false, "storage.action.switch"));
+        actions.add(new Action(false, 0L, 0, true));
+        rows.add(new ReportPanel.Row(
+                KageI18n.formatOrKey(
+                        i18n,
+                        accountMode ? "storage.section.account_stored" : "storage.section.stored",
+                        stored.size(),
+                        storageCapacity),
+                true));
         actions.add(null);
         for (StoredItemView item : stored) {
             rows.add(new ReportPanel.Row(
@@ -227,6 +260,7 @@ final class StorageCoordinator implements WindowFlow {
         stored.clear();
         bag.clear();
         actions.clear();
+        accountMode = false;
         panel.setRows(List.of());
         panel.setStatus(text("storage.hint.open"));
     }

@@ -1473,7 +1473,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 worldGateway.mainWorldChannels().worldContent().npcs(),
                 this::mainWorldPositionOf,
                 worldGateway.mainWorldChannels()::dynamicNpcs);
-        this.storage = new SectStorageCommands(inventoryFacade, npcProximity);
+        this.storage = SectStorageCommands.of(inventoryFacade, npcProximity, facades);
         this.market = MarketCommands.of(facades, worldGateway);
         this.crafting = new CraftingCommands(facades.progression().crafting(), characterFacade, npcProximity);
         this.guildShop = new GuildShopCommands(facades.progression().guildShop());
@@ -2665,8 +2665,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     /** ADR-061 — liệt kê kho đồ. Mở bằng phím không có; client hỏi lại sau khi đã mở qua hội thoại. */
     private void handleListStorageRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
             throws InvalidProtocolBufferException {
-        ListStorageRequest.parser().parseFrom(payload);
-        runStorage(ctx, header.sequenceId(), Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE, storage::list);
+        ListStorageRequest request = ListStorageRequest.parseFrom(payload);
+        runStorage(
+                ctx,
+                header.sequenceId(),
+                Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE,
+                characterId -> storage.list(characterId, request));
     }
 
     private void handleDepositItemCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)

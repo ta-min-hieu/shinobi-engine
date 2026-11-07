@@ -155,6 +155,21 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.trade.PostgresTradeHistoryAdapter(dataSource));
     }
 
+    /** ADR-197 — kho chung tài khoản: luật kho tông môn, adapter theo tài khoản. */
+    public dev.kage.inventory.api.AccountStorageFacade wireAccountStorageFacade() {
+        dev.kage.server.database.inventory.PostgresInventoryAdapter inventory =
+                new dev.kage.server.database.inventory.PostgresInventoryAdapter(dataSource);
+        return new dev.kage.inventory.api.AccountStorageFacade(new dev.kage.inventory.application.StorageUseCase(
+                new dev.kage.inventory.application.StorageUseCase.Ports(
+                        inventory,
+                        new dev.kage.server.database.inventory.PostgresEquipmentAdapter(dataSource),
+                        new dev.kage.server.database.inventory.PostgresItemTemplateAdapter(dataSource),
+                        new dev.kage.server.database.inventory.PostgresInventoryTradeOfferAdapter()),
+                new dev.kage.server.database.inventory.PostgresAccountStorageAdapter(dataSource),
+                new dev.kage.server.database.inventory.PostgresAuditAdapter(),
+                new dev.kage.server.database.inventory.JdbcInventoryTransactionRunner(dataSource)));
+    }
+
     /** ADR-196 — theo dõi phường thị. */
     public dev.kage.market.api.MarketWatchFacade wireMarketWatchFacade() {
         return new dev.kage.market.api.MarketWatchFacade(

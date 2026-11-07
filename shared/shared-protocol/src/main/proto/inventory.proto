@@ -289,15 +289,23 @@ message StoredItemView {
   int32 enhance_level = 4;
 }
 
+// ADR-197 — một bộ lệnh kho cho nhiều kho. 0 = kho tông môn của nhân vật (client cũ không gửi field ⇒ như trước).
+enum StorageKind {
+  STORAGE_KIND_SECT = 0;
+  STORAGE_KIND_ACCOUNT = 1; // kho chung mọi nhân vật cùng tài khoản
+}
+
 // Command: Client -> Server (OPCODE_LIST_STORAGE_REQUEST = 514). Không field — characterId từ session.
 // Server cũng tự gửi ListStorageResponse khi lựa chọn hội thoại có action "open_storage".
 message ListStorageRequest {
+  StorageKind storage_kind = 1; // ADR-197 — kho nào (mặc định kho tông môn)
 }
 
 // Response: Server -> Client (OPCODE_LIST_STORAGE_RESPONSE = 515).
 message ListStorageResponse {
   repeated StoredItemView items = 1;
   int32 capacity = 2; // hằng số StoragePolicy.CAPACITY, gửi kèm để client không đoán
+  StorageKind storage_kind = 3; // ADR-197 — trả lời cho kho nào
 }
 
 enum StorageOutcome {
@@ -318,6 +326,7 @@ enum StorageOutcome {
 message DepositItemCommand {
   int64 inventory_item_id = 1;
   int32 quantity = 2;
+  StorageKind storage_kind = 3; // ADR-197
 }
 
 // Response: Server -> Client (OPCODE_DEPOSIT_ITEM_RESPONSE = 517). Mang kho SAU lệnh; túi đồ client tự hỏi lại.
@@ -325,12 +334,14 @@ message DepositItemResponse {
   StorageOutcome outcome = 1;
   repeated StoredItemView items = 2;
   int32 capacity = 3;
+  StorageKind storage_kind = 4; // ADR-197
 }
 
 // Command: Client -> Server (OPCODE_WITHDRAW_ITEM_COMMAND = 518).
 message WithdrawItemCommand {
   int64 stored_item_id = 1;
   int32 quantity = 2;
+  StorageKind storage_kind = 3; // ADR-197
 }
 
 // Response: Server -> Client (OPCODE_WITHDRAW_ITEM_RESPONSE = 519).
@@ -338,6 +349,7 @@ message WithdrawItemResponse {
   StorageOutcome outcome = 1;
   repeated StoredItemView items = 2;
   int32 capacity = 3;
+  StorageKind storage_kind = 4; // ADR-197
 }
 
 // ===== ADR-064 — khảm Linh Ngọc =====

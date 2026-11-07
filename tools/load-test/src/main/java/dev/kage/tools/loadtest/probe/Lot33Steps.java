@@ -16,7 +16,8 @@ import dev.kage.protocol.TransferPartyLeaderResponse;
 /**
  * Bước lô 33: nhường trưởng nhóm (ADR-191) {@code partyLeader:<tên>}; đặt tên linh thú (ADR-193) {@code petName:<tên>}
  * ({@code petName:} trống = xoá); cừu nhân (ADR-194) {@code enemies}, {@code unenemy:<tên>}; theo dõi phường thị
- * (ADR-196) {@code watch:<id mẫu>=<giá mỗi cái>} (giá 0 = bỏ). Nối sau {@link Lot32Steps}.
+ * (ADR-196) {@code watch:<id mẫu>=<giá mỗi cái>} (giá 0 = bỏ); kho chung tài khoản (ADR-197) {@code vault},
+ * {@code vaultDeposit:<id>:<sl>}, {@code vaultWithdraw:<id>:<sl>}. Nối sau {@link Lot32Steps}.
  */
 final class Lot33Steps {
 
@@ -33,7 +34,7 @@ final class Lot33Steps {
             case "enemies" -> enemies();
             case "unenemy" -> unenemy(arg);
             case "watch" -> watch(arg);
-            default -> "bước không hiểu";
+            default -> vaultStep(verb, arg);
         };
     }
 
@@ -98,5 +99,73 @@ final class Lot33Steps {
                 p -> dev.kage.protocol.SetMarketWatchResponse.parseFrom(p)
                         .getOutcome()
                         .name());
+    }
+
+    /** Kho chung tài khoản (ADR-197) — tách vì trần CyclomaticComplexity của {@link #step}. */
+    private String vaultStep(String verb, String arg) throws IOException {
+        return switch (verb) {
+            case "vault" -> vault();
+            case "vaultDeposit" -> vaultMove(arg, true);
+            case "vaultWithdraw" -> vaultMove(arg, false);
+            default -> "bước không hiểu";
+        };
+    }
+
+    private String vault() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_LIST_STORAGE_REQUEST_VALUE,
+                dev.kage.protocol.ListStorageRequest.newBuilder()
+                        .setStorageKind(dev.kage.protocol.StorageKind.STORAGE_KIND_ACCOUNT)
+                        .build(),
+                Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE,
+                p -> describeVault(
+                        dev.kage.protocol.ListStorageResponse.parseFrom(p).getItemsList()));
+    }
+
+    /** {@code <id>:<số lượng>} — id món trong túi (gửi) hoặc id dòng kho (rút). */
+    private String vaultMove(String arg, boolean deposit) throws IOException {
+        String[] parts = arg.split(":", 2);
+        long id = Long.parseLong(parts[0]);
+        int quantity = Integer.parseInt(parts[1]);
+        if (deposit) {
+            return asker.ask(
+                    Opcode.OPCODE_DEPOSIT_ITEM_COMMAND_VALUE,
+                    dev.kage.protocol.DepositItemCommand.newBuilder()
+                            .setInventoryItemId(id)
+                            .setQuantity(quantity)
+                            .setStorageKind(dev.kage.protocol.StorageKind.STORAGE_KIND_ACCOUNT)
+                            .build(),
+                    Opcode.OPCODE_DEPOSIT_ITEM_RESPONSE_VALUE,
+                    p -> {
+                        dev.kage.protocol.DepositItemResponse r = dev.kage.protocol.DepositItemResponse.parseFrom(p);
+                        return r.getOutcome().name() + " kho=" + describeVault(r.getItemsList());
+                    });
+        }
+        return asker.ask(
+                Opcode.OPCODE_WITHDRAW_ITEM_COMMAND_VALUE,
+                dev.kage.protocol.WithdrawItemCommand.newBuilder()
+                        .setStoredItemId(id)
+                        .setQuantity(quantity)
+                        .setStorageKind(dev.kage.protocol.StorageKind.STORAGE_KIND_ACCOUNT)
+                        .build(),
+                Opcode.OPCODE_WITHDRAW_ITEM_RESPONSE_VALUE,
+                p -> {
+                    dev.kage.protocol.WithdrawItemResponse r = dev.kage.protocol.WithdrawItemResponse.parseFrom(p);
+                    return r.getOutcome().name() + " kho=" + describeVault(r.getItemsList());
+                });
+    }
+
+    private static String describeVault(java.util.List<dev.kage.protocol.StoredItemView> items) {
+        StringBuilder out = new StringBuilder();
+        for (dev.kage.protocol.StoredItemView item : items) {
+            out.append('#')
+                    .append(item.getStoredItemId())
+                    .append(" tpl")
+                    .append(item.getItemTemplateId())
+                    .append('x')
+                    .append(item.getQuantity())
+                    .append(' ');
+        }
+        return out.toString();
     }
 }

@@ -10,7 +10,9 @@ import dev.kage.inventory.domain.StoragePolicy;
 import dev.kage.inventory.domain.StoredItem;
 import dev.kage.protocol.DepositItemCommand;
 import dev.kage.protocol.DepositItemResponse;
+import dev.kage.protocol.ListStorageRequest;
 import dev.kage.protocol.ListStorageResponse;
+import dev.kage.protocol.StorageKind;
 import dev.kage.protocol.StorageOutcome;
 import dev.kage.protocol.StoredItemView;
 import dev.kage.protocol.WithdrawItemCommand;
@@ -39,47 +41,82 @@ final class SectStorageCommands {
 
     private final InventoryFacade inventory;
     private final NpcProximity proximity;
+    private final dev.kage.inventory.api.AccountStorageFacade accountStorage;
 
-    SectStorageCommands(InventoryFacade inventory, NpcProximity proximity) {
+    SectStorageCommands(
+            InventoryFacade inventory,
+            NpcProximity proximity,
+            dev.kage.inventory.api.AccountStorageFacade accountStorage) {
         this.inventory = inventory;
         this.proximity = proximity;
+        this.accountStorage = accountStorage;
     }
 
+    /** Dựng từ composition — một dòng trong constructor handler (trần {@code MethodLength}). */
+    static SectStorageCommands of(InventoryFacade inventory, NpcProximity proximity, GatewayFacades facades) {
+        return new SectStorageCommands(
+                inventory, proximity, facades.progression().expansion().lot33().accountStorage());
+    }
+
+    /** Kho tông môn (lối cũ: hội thoại tự mở, phím làm mới). */
     ListStorageResponse list(long characterId) {
+        return list(characterId, ListStorageRequest.getDefaultInstance());
+    }
+
+    /** ADR-197 — {@code storage_kind} chọn kho. Xem không cần đứng gần người giữ kho. */
+    ListStorageResponse list(long characterId, ListStorageRequest request) {
+        StorageKind kind = known(request.getStorageKind());
+        boolean shared = kind == StorageKind.STORAGE_KIND_ACCOUNT;
         return ListStorageResponse.newBuilder()
-                .addAllItems(views(inventory.listStorage(characterId)))
+                .addAllItems(views(shared ? accountStorage.list(characterId) : inventory.listStorage(characterId)))
                 .setCapacity(StoragePolicy.CAPACITY)
+                .setStorageKind(kind)
                 .build();
     }
 
     DepositItemResponse deposit(long characterId, DepositItemCommand command) {
+        StorageKind kind = known(command.getStorageKind());
+        boolean shared = kind == StorageKind.STORAGE_KIND_ACCOUNT;
         if (!nearKeeper(characterId)) {
             return DepositItemResponse.newBuilder()
                     .setOutcome(StorageOutcome.STORAGE_OUTCOME_TOO_FAR)
+                    .setStorageKind(kind)
                     .build();
         }
-        StorageUseCase.Result result =
-                inventory.depositToStorage(characterId, command.getInventoryItemId(), command.getQuantity());
+        StorageUseCase.Result result = shared
+                ? accountStorage.deposit(characterId, command.getInventoryItemId(), command.getQuantity())
+                : inventory.depositToStorage(characterId, command.getInventoryItemId(), command.getQuantity());
         return DepositItemResponse.newBuilder()
                 .setOutcome(OUTCOMES.get(result.outcome()))
                 .addAllItems(views(result.storage()))
                 .setCapacity(StoragePolicy.CAPACITY)
+                .setStorageKind(kind)
                 .build();
     }
 
     WithdrawItemResponse withdraw(long characterId, WithdrawItemCommand command) {
+        StorageKind kind = known(command.getStorageKind());
+        boolean shared = kind == StorageKind.STORAGE_KIND_ACCOUNT;
         if (!nearKeeper(characterId)) {
             return WithdrawItemResponse.newBuilder()
                     .setOutcome(StorageOutcome.STORAGE_OUTCOME_TOO_FAR)
+                    .setStorageKind(kind)
                     .build();
         }
-        StorageUseCase.Result result =
-                inventory.withdrawFromStorage(characterId, command.getStoredItemId(), command.getQuantity());
+        StorageUseCase.Result result = shared
+                ? accountStorage.withdraw(characterId, command.getStoredItemId(), command.getQuantity())
+                : inventory.withdrawFromStorage(characterId, command.getStoredItemId(), command.getQuantity());
         return WithdrawItemResponse.newBuilder()
                 .setOutcome(OUTCOMES.get(result.outcome()))
                 .addAllItems(views(result.storage()))
                 .setCapacity(StoragePolicy.CAPACITY)
+                .setStorageKind(kind)
                 .build();
+    }
+
+    /** Giá trị lạ (client mới hơn / gói hỏng) ⇒ kho tông môn — không bao giờ đặt UNRECOGNIZED vào response. */
+    private static StorageKind known(StorageKind kind) {
+        return kind == StorageKind.STORAGE_KIND_ACCOUNT ? kind : StorageKind.STORAGE_KIND_SECT;
     }
 
     private boolean nearKeeper(long characterId) {
