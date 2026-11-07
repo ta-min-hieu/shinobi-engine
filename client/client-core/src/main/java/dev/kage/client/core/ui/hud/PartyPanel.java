@@ -21,6 +21,7 @@ import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
+import dev.kage.client.core.input.KeyBindings;
 import dev.kage.client.core.render.FontFactory;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.client.core.ui.theme.KageSkin;
@@ -184,12 +185,12 @@ public final class PartyPanel implements HudWindow {
             @Override
             public boolean keyUp(InputEvent event, int keycode) {
                 if (isOpen()) {
-                    if (keycode == TOGGLE_KEY) {
+                    if (keycode == KeyBindings.shared().resolve(TOGGLE_KEY)) {
                         close();
                     }
                     return true; // nuốt: không để phím rơi xuống panel khác đang chờ phím mở của nó
                 }
-                if (keycode != TOGGLE_KEY || !canOpen.getAsBoolean()) {
+                if (keycode != KeyBindings.shared().resolve(TOGGLE_KEY) || !canOpen.getAsBoolean()) {
                     return false;
                 }
                 open();

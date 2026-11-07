@@ -22,7 +22,7 @@ public final class GdxPreferencesLanguageStore implements LanguageStore {
     private static final Logger LOG = LoggerFactory.getLogger(GdxPreferencesLanguageStore.class);
 
     /** Tên bộ cấu hình của client — các cài đặt người chơi khác sau này dùng chung bộ này. */
-    static final String PREFERENCES_NAME = "kage-client";
+    public static final String PREFERENCES_NAME = "kage-client";
 
     static final String LANGUAGE_KEY = "language";
 

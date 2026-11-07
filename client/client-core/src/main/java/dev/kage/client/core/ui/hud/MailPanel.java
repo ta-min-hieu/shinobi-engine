@@ -21,6 +21,7 @@ import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
+import dev.kage.client.core.input.KeyBindings;
 import dev.kage.client.core.render.FontFactory;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.client.core.ui.theme.KageSkin;
@@ -385,7 +386,7 @@ public final class MailPanel implements HudWindow {
                 if (isOpen()) {
                     return true; // xem javadoc: chặn phím rơi xuống panel khác trong lúc đang gõ
                 }
-                if (keycode != OPEN_KEY || !canOpen.getAsBoolean()) {
+                if (keycode != KeyBindings.shared().resolve(OPEN_KEY) || !canOpen.getAsBoolean()) {
                     return false;
                 }
                 open();

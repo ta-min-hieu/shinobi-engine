@@ -27,6 +27,7 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import dev.kage.client.core.input.KeyBindings;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.client.core.ui.theme.KageSkin;
 
@@ -410,7 +411,7 @@ public final class InventoryPanel implements HudWindow {
                 if (isOpen()) {
                     return true;
                 }
-                if (keycode != OPEN_KEY || !listeners.canOpen.getAsBoolean()) {
+                if (keycode != KeyBindings.shared().resolve(OPEN_KEY) || !listeners.canOpen.getAsBoolean()) {
                     return false;
                 }
                 open();

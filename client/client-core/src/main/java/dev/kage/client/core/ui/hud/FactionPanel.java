@@ -19,6 +19,7 @@ import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.I18NBundle;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
+import dev.kage.client.core.input.KeyBindings;
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.client.core.ui.theme.KageSkin;
 
@@ -124,12 +125,12 @@ public final class FactionPanel implements HudWindow {
             @Override
             public boolean keyUp(InputEvent event, int keycode) {
                 if (isOpen()) {
-                    if (keycode == OPEN_KEY) {
+                    if (keycode == KeyBindings.shared().resolve(OPEN_KEY)) {
                         close();
                     }
                     return true; // xem javadoc: không để phím rơi xuống panel khác đang chờ phím mở
                 }
-                if (keycode != OPEN_KEY || !canOpen.getAsBoolean()) {
+                if (keycode != KeyBindings.shared().resolve(OPEN_KEY) || !canOpen.getAsBoolean()) {
                     return false;
                 }
                 open();

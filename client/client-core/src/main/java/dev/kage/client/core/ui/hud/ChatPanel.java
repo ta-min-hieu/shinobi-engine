@@ -21,6 +21,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
+import dev.kage.client.core.input.KeyBindings;
 import dev.kage.client.core.render.FontFactory;
 import dev.kage.client.core.ui.theme.KageSkin;
 
@@ -195,7 +196,7 @@ public final class ChatPanel implements HudWindow {
         stage.addListener(new InputListener() {
             @Override
             public boolean keyUp(InputEvent event, int keycode) {
-                if (keycode != OPEN_KEY || isComposing() || !canOpen.getAsBoolean()) {
+                if (keycode != KeyBindings.shared().resolve(OPEN_KEY) || isComposing() || !canOpen.getAsBoolean()) {
                     return false;
                 }
                 openComposer();
