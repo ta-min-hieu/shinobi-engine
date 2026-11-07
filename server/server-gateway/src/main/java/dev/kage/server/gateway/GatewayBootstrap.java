@@ -707,9 +707,7 @@ public final class GatewayBootstrap {
                 lot31Facades(databaseBootstrap),
                 lot32Facades(databaseBootstrap),
                 lot33Facades(databaseBootstrap),
-                new Lot34Facades(
-                        databaseBootstrap.expansion().wireBuybackFacade(),
-                        databaseBootstrap.expansion().wireAutoSellJunkFacade()));
+                lot34Facades(databaseBootstrap));
     }
 
     /** Facade lô 31 (ADR-175…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
@@ -729,6 +727,14 @@ public final class GatewayBootstrap {
                 databaseBootstrap.expansion().wireGuildCheckInFacade(),
                 databaseBootstrap.expansion().wireOfflineWhisperFacade(),
                 databaseBootstrap.expansion().wireTradeHistoryFacade());
+    }
+
+    /** Facade lô 34 (ADR-199…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
+    private static Lot34Facades lot34Facades(ServerDatabaseBootstrap databaseBootstrap) {
+        return new Lot34Facades(
+                databaseBootstrap.expansion().wireBuybackFacade(),
+                databaseBootstrap.expansion().wireAutoSellJunkFacade(),
+                databaseBootstrap.expansion().wireCharacterDeletionFacade());
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

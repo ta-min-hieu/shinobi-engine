@@ -11,10 +11,12 @@ import dev.kage.shop.api.BuybackFacade;
 import dev.kage.shop.domain.BuybackPort;
 
 /** Lớp lệnh lô 34 (ADR-199…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
-record Lot34Commands(Lot34Facades facades) {
+record Lot34Commands(Lot34Facades facades, dev.kage.guild.api.GuildFacade guilds) {
 
     static Lot34Commands of(GatewayFacades gateway) {
-        return new Lot34Commands(gateway.progression().expansion().lot34());
+        return new Lot34Commands(
+                gateway.progression().expansion().lot34(),
+                gateway.contentFacades().socialFacades().guildFacade());
     }
 
     /** ADR-202 — Virtual Thread; món còn mua lại được của {@code characterId}. */
@@ -56,6 +58,31 @@ record Lot34Commands(Lot34Facades facades) {
         }
         return dev.kage.protocol.SetAutoSellJunkResponse.newBuilder()
                 .setEnabled(facades.autoSell().enabled(characterId))
+                .build();
+    }
+
+    /**
+     * ADR-205 — Virtual Thread; yêu cầu xoá {@code characterId} của {@code accountId}. Không xoá nhân vật đang chơi
+     * ({@code playing}) và bang chủ (phải nhường chức trước — bang không được mất chủ).
+     */
+    dev.kage.protocol.DeleteCharacterResponse deleteCharacter(long accountId, Long playing, long characterId) {
+        dev.kage.protocol.DeleteCharacterResponse.Builder response =
+                dev.kage.protocol.DeleteCharacterResponse.newBuilder();
+        if (playing != null && playing == characterId) {
+            return response.setOutcome(dev.kage.protocol.DeleteCharacterOutcome.DELETE_CHARACTER_OUTCOME_IN_WORLD)
+                    .build();
+        }
+        if (guilds.findMyGuild(characterId)
+                .map(dev.kage.guild.api.GuildFacade.MyGuildView::isLeader)
+                .orElse(false)) {
+            return response.setOutcome(dev.kage.protocol.DeleteCharacterOutcome.DELETE_CHARACTER_OUTCOME_GUILD_LEADER)
+                    .build();
+        }
+        boolean marked = facades.deletion().request(accountId, characterId, Instant.now());
+        return response.setOutcome(
+                        marked
+                                ? dev.kage.protocol.DeleteCharacterOutcome.DELETE_CHARACTER_OUTCOME_OK
+                                : dev.kage.protocol.DeleteCharacterOutcome.DELETE_CHARACTER_OUTCOME_NOT_FOUND)
                 .build();
     }
 }

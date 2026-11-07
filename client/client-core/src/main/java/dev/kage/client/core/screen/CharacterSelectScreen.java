@@ -57,6 +57,7 @@ public final class CharacterSelectScreen implements GameScreen {
         LISTING,
         AWAITING_CREATE_RESPONSE,
         AWAITING_SELECT_RESPONSE,
+        AWAITING_DELETE_RESPONSE, // ADR-205
         FAILED
     }
 
@@ -84,6 +85,9 @@ public final class CharacterSelectScreen implements GameScreen {
     /** Khung chứa rộng hơn dòng đúng 20px — giữ nguyên tỉ lệ lề của bố cục cũ (360 so với 340). */
     private static final float CHARACTER_LIST_WIDTH_PX = 660f;
 
+    /** ADR-205 — nút "Xoá" cạnh mỗi dòng nhân vật (dòng nhân vật hẹp lại đúng chừng đó). */
+    private static final float DELETE_BUTTON_WIDTH_PX = 96f;
+
     /** Nút "Tạo nhân vật mới" — rộng cố định, nhãn đo ở cả hai ngôn ngữ bằng {@code ScreenButtonLabelFitTest}. */
     static final float CREATE_BUTTON_WIDTH_PX = 200f;
 
@@ -101,6 +105,8 @@ public final class CharacterSelectScreen implements GameScreen {
     private State state = State.LISTING;
     private float stateElapsed;
     private CharacterSummary pendingSelection;
+    /** ADR-205 — nhân vật vừa bấm "Xoá" lần đầu (lần hai mới gửi); 0 = chưa. */
+    private long deleteArmedId;
 
     /**
      * {@code sequence_id} của yêu cầu đang chờ — chỉ câu trả lời mang đúng số này mới được nhận, câu
@@ -177,6 +183,11 @@ public final class CharacterSelectScreen implements GameScreen {
                     character.getName(),
                     factionLabel(character.getFaction()),
                     realmLabel(character.getLevel()));
+            if (character.getDeletionEpochSeconds() > 0L) { // ADR-205 — đang chờ xoá
+                rowText = rowText + " "
+                        + CharacterDeletionText.pending(
+                                i18n, character.getDeletionEpochSeconds(), System.currentTimeMillis() / 1000L);
+            }
             TextButton row = new TextButton(rowText, skin.buttonStyle);
             row.addListener(new ClickListener() {
                 @Override
@@ -184,9 +195,21 @@ public final class CharacterSelectScreen implements GameScreen {
                     onCharacterRowClicked(character);
                 }
             });
+            TextButton delete = new TextButton(i18n.get("charselect.button.delete"), skin.buttonStyle);
+            delete.addListener(new ClickListener() {
+                @Override
+                public void clicked(InputEvent event, float x, float y) {
+                    onDeleteClicked(character);
+                }
+            });
             characterListTable
                     .add(row)
-                    .size(CHARACTER_ROW_WIDTH_PX, 44f)
+                    .size(CHARACTER_ROW_WIDTH_PX - DELETE_BUTTON_WIDTH_PX - 8f, 44f)
+                    .padBottom(8f)
+                    .padRight(8f);
+            characterListTable
+                    .add(delete)
+                    .size(DELETE_BUTTON_WIDTH_PX, 44f)
                     .padBottom(8f)
                     .row();
         }
@@ -245,6 +268,60 @@ public final class CharacterSelectScreen implements GameScreen {
         selectCharacter(character);
     }
 
+    /**
+     * ADR-205 — bấm lần đầu chỉ hỏi lại; bấm lần hai (cùng nhân vật) mới gửi. Server chờ 3 ngày; chọn lại nhân vật
+     * trong khoảng đó là khôi phục.
+     */
+    private void onDeleteClicked(CharacterSummary character) {
+        if (state != State.LISTING && state != State.FAILED) {
+            return;
+        }
+        if (deleteArmedId != character.getId()) {
+            deleteArmedId = character.getId();
+            statusLabel.setText(i18n.format("charselect.delete.confirm", character.getName()));
+            return;
+        }
+        deleteArmedId = 0L;
+        try {
+            pendingSequenceId = connection.nextSequenceId();
+            connection.send(
+                    Opcode.OPCODE_DELETE_CHARACTER_REQUEST_VALUE,
+                    pendingSequenceId,
+                    dev.kage.protocol.DeleteCharacterRequest.newBuilder()
+                            .setCharacterId(character.getId())
+                            .build()
+                            .toByteArray());
+            setFormEnabled(false);
+            transitionTo(State.AWAITING_DELETE_RESPONSE);
+        } catch (IOException e) {
+            LOG.debug("Gửi DeleteCharacterRequest thất bại (mất kết nối tạm thời)", e);
+            failWithGenericError();
+        }
+    }
+
+    private void pollDeleteResponse() {
+        Optional<PacketCodec.Frame> reply =
+                PendingReply.poll(inbound, pendingSequenceId, Opcode.OPCODE_DELETE_CHARACTER_RESPONSE_VALUE);
+        if (reply.isPresent()) {
+            try {
+                dev.kage.protocol.DeleteCharacterResponse response =
+                        dev.kage.protocol.DeleteCharacterResponse.parseFrom(
+                                reply.get().payload());
+                rebuildCharacterRows(response.getCharactersList());
+                setFormEnabled(true);
+                statusLabel.setText(i18n.get(CharacterDeletionText.outcomeKey(response.getOutcome())));
+                transitionTo(State.LISTING);
+            } catch (InvalidProtocolBufferException e) {
+                LOG.warn("DeleteCharacterResponse không hợp lệ", e);
+                failWithGenericError();
+            }
+            return;
+        }
+        if (stateElapsed > STEP_TIMEOUT_SECONDS) {
+            failWithGenericError();
+        }
+    }
+
     private void onCreateClicked() {
         if (state != State.LISTING && state != State.FAILED) {
             return;
@@ -298,6 +375,7 @@ public final class CharacterSelectScreen implements GameScreen {
         switch (state) {
             case AWAITING_CREATE_RESPONSE -> pollCreateResponse();
             case AWAITING_SELECT_RESPONSE -> pollSelectResponse();
+            case AWAITING_DELETE_RESPONSE -> pollDeleteResponse();
             // LISTING/FAILED — chờ người chơi chọn/tạo nhân vật, không có gì để làm mỗi tick.
             // `default` thay vì liệt kê 2 case (MissingSwitchDefault, xem LoginScreen#fixedUpdate).
             default -> {}

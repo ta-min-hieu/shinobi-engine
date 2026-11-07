@@ -62,14 +62,16 @@ public final class PostgresCharacterAdapter implements CharacterPort {
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """;
 
+    // ADR-205 — nhân vật đã quá hạn xoá (CharacterDeletionFacade.GRACE = 3 ngày) biến khỏi danh sách và không chiếm chỗ
+    // trong trần nhân vật; đang chờ xoá thì vẫn hiện (vào lại là khôi phục).
+    private static final String NOT_DELETED =
+            " AND (deletion_requested_at IS NULL OR deletion_requested_at >= now() - interval '3 days')";
+
     private static final String LIST_BY_ACCOUNT = """
             SELECT id, account_id, realm_id, name, faction, level, exp, rebirth_count, created_at
-              FROM character WHERE account_id = ? ORDER BY id
-            """;
+              FROM character WHERE account_id = ?""" + NOT_DELETED + " ORDER BY id";
 
-    private static final String COUNT_BY_ACCOUNT = """
-            SELECT COUNT(*) FROM character WHERE account_id = ?
-            """;
+    private static final String COUNT_BY_ACCOUNT = "SELECT COUNT(*) FROM character WHERE account_id = ?" + NOT_DELETED;
 
     // FOR NO KEY UPDATE (không phải FOR UPDATE): tự xung đột với chính nó nên vẫn xếp hàng các lượt
     // tạo nhân vật trên cùng account, nhưng KHÔNG xung đột với khoá FOR KEY SHARE mà Postgres tự lấy

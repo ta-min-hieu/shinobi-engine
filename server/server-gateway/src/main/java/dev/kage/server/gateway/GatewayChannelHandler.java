@@ -565,6 +565,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map.entry(Opcode.OPCODE_PING_VALUE, this::handlePing),
             Map.entry(Opcode.OPCODE_CONNECT_REQUEST_VALUE, this::handleConnect),
             Map.entry(Opcode.OPCODE_LIST_CHARACTERS_REQUEST_VALUE, this::handleListCharacters),
+            Map.entry(Opcode.OPCODE_DELETE_CHARACTER_REQUEST_VALUE, this::handleDeleteCharacter), // ADR-205
             Map.entry(Opcode.OPCODE_CREATE_CHARACTER_REQUEST_VALUE, this::handleCreateCharacter),
             Map.entry(Opcode.OPCODE_SELECT_CHARACTER_REQUEST_VALUE, this::handleSelectCharacter),
             Map.entry(Opcode.OPCODE_SELECT_FACTION_REQUEST_VALUE, this::handleSelectFactionRequest),
@@ -1700,17 +1701,38 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
     private void handleListCharactersBlocking(ChannelHandlerContext ctx, int sequenceId, long accountId) {
         try {
-            List<Character> characters = characterFacade.listCharacters(accountId);
             ListCharactersResponse response = ListCharactersResponse.newBuilder()
-                    .addAllCharacters(characters.stream()
-                            .map(GatewayChannelHandler::toProto)
-                            .toList())
+                    .addAllCharacters(characterSummaries(accountId))
                     .build();
             send(ctx, Opcode.OPCODE_LIST_CHARACTERS_RESPONSE_VALUE, sequenceId, response.toByteArray());
         } catch (RuntimeException e) {
             LOG.error("Liệt kê nhân vật thất bại", e);
             sendError(ctx, sequenceId, 500, "error.list_characters_failed");
         }
+    }
+
+    /** ADR-205 — yêu cầu xoá nhân vật (màn chọn nhân vật). accountId từ session; không xoá nhân vật đang chơi. */
+    private void handleDeleteCharacter(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
+            throws InvalidProtocolBufferException {
+        dev.kage.protocol.DeleteCharacterRequest request = dev.kage.protocol.DeleteCharacterRequest.parseFrom(payload);
+        int sequenceId = header.sequenceId();
+        Long accountId = boundAccountId;
+        if (accountId == null) {
+            sendError(ctx, sequenceId, 401, "error.not_authenticated");
+            return;
+        }
+        Long playing = boundCharacterId;
+        executeBlocking(
+                ctx,
+                sequenceId,
+                () -> send(
+                        ctx,
+                        Opcode.OPCODE_DELETE_CHARACTER_RESPONSE_VALUE,
+                        sequenceId,
+                        expansion.lot34().deleteCharacter(accountId, playing, request.getCharacterId()).toBuilder()
+                                .addAllCharacters(characterSummaries(accountId))
+                                .build()
+                                .toByteArray()));
     }
 
     private void handleCreateCharacter(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)
@@ -1788,6 +1810,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             ChannelHandlerContext ctx, int sequenceId, long accountId, long characterId) {
         try {
             Character character = characterFacade.selectCharacter(accountId, characterId);
+            // ADR-205 — đang chờ xoá ⇒ vào lại là khôi phục; quá hạn ⇒ như không tồn tại.
+            if (expansion.lot34().facades().deletion().restoreOnSelect(accountId, characterId, java.time.Instant.now())
+                    == dev.kage.character.domain.CharacterDeletionPort.State.EXPIRED) {
+                throw new CharacterNotFoundException(characterId);
+            }
             // Kiểm quyền sở hữu XONG mới rời nhân vật cũ — chọn nhầm id thì vẫn giữ nhân vật đang chơi.
             releasePreviousCharacterIfSwitching(ctx, characterId);
             if (!enterWorldAsOnlySession(ctx, sequenceId, character)) {
@@ -6186,6 +6213,22 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      */
     Long boundCharacterId() {
         return boundCharacterId;
+    }
+
+    /** Danh sách nhân vật kèm mốc xoá hẳn của nhân vật đang chờ xoá (ADR-205). Chạm DB. */
+    List<CharacterSummary> characterSummaries(long accountId) {
+        Map<Long, java.time.Instant> deletions =
+                expansion.lot34().facades().deletion().deletionTimes(accountId, java.time.Instant.now());
+        return characterFacade.listCharacters(accountId).stream()
+                .map(character -> {
+                    java.time.Instant at = deletions.get(character.id());
+                    return at == null
+                            ? toProto(character)
+                            : toProto(character).toBuilder()
+                                    .setDeletionEpochSeconds(at.getEpochSecond())
+                                    .build();
+                })
+                .toList();
     }
 
     private static CharacterSummary toProto(Character character) {

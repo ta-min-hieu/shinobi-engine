@@ -35,6 +35,7 @@ message CharacterSummary {
   string name = 2;
   Faction faction = 3;
   int32 level = 4;
+  int64 deletion_epoch_seconds = 5; // ADR-205 — đang chờ xoá: lúc sẽ xoá hẳn; 0 = không chờ xoá
 }
 
 // Command: Client -> Server (OPCODE_LIST_CHARACTERS_REQUEST). Không field — accountId từ session.
@@ -647,4 +648,26 @@ message GetResetTimersResponse {
   int64 server_now_epoch_seconds = 1;
   int64 next_daily_epoch_seconds = 2;  // 00:00 giờ VN: nhiệm vụ ngày, điểm danh, quẻ bói, lượt hầm ngục, …
   int64 next_weekly_epoch_seconds = 3; // 00:00 thứ Hai giờ VN: nhiệm vụ tuần, cửa hàng vinh dự
+}
+
+// ===== ADR-205 (Accepted 2026-11-07, chủ dự án chọn) — xoá nhân vật có chờ 3 ngày. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_DELETE_CHARACTER_REQUEST = 257). accountId từ session. Chọn lại nhân vật đang chờ xoá
+// (SelectCharacterRequest) là khôi phục.
+message DeleteCharacterRequest {
+  int64 character_id = 1;
+}
+
+enum DeleteCharacterOutcome {
+  DELETE_CHARACTER_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  DELETE_CHARACTER_OUTCOME_OK = 1;
+  DELETE_CHARACTER_OUTCOME_NOT_FOUND = 2;    // không thuộc tài khoản (hoặc đã quá hạn)
+  DELETE_CHARACTER_OUTCOME_IN_WORLD = 3;     // đang chơi chính nhân vật đó
+  DELETE_CHARACTER_OUTCOME_GUILD_LEADER = 4; // phải nhường chức bang chủ trước
+}
+
+// Response: Server -> Client (OPCODE_DELETE_CHARACTER_RESPONSE = 258). characters = danh sách SAU lệnh.
+message DeleteCharacterResponse {
+  DeleteCharacterOutcome outcome = 1;
+  repeated CharacterSummary characters = 2;
 }

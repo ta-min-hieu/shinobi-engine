@@ -155,6 +155,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.trade.PostgresTradeHistoryAdapter(dataSource));
     }
 
+    /** ADR-205 — xoá nhân vật có chờ. */
+    public dev.kage.character.api.CharacterDeletionFacade wireCharacterDeletionFacade() {
+        return new dev.kage.character.api.CharacterDeletionFacade(
+                new dev.kage.server.database.character.PostgresCharacterDeletionAdapter(dataSource));
+    }
+
     /** ADR-204 — lọc nhặt đồ (tự bán đồ rác rơi ra). */
     public dev.kage.inventory.api.AutoSellJunkFacade wireAutoSellJunkFacade() {
         return new dev.kage.inventory.api.AutoSellJunkFacade(

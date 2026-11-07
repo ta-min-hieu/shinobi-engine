@@ -8,6 +8,9 @@ import dev.kage.pvp.domain.EnemyListPort;
 /** Danh sách cừu nhân (ADR-194) — ai đã hạ mình trong dải PvP. Chạm DB — Virtual Thread. */
 public final class EnemyListFacade {
 
+    /** Dài hơn mức này thì chắc chắn không phải tên nhân vật — không cần hỏi DB. */
+    public static final int MAX_NAME_LENGTH = 64;
+
     /** Số cừu nhân giữ lại mỗi nhân vật (người cũ nhất rơi ra). */
     public static final int MAX_ENTRIES = 20;
 
@@ -48,8 +51,15 @@ public final class EnemyListFacade {
         return port.list(characterId);
     }
 
-    /** Xoá một cừu nhân theo tên. */
+    /**
+     * Xoá một cừu nhân theo tên. Tên không thể là tên nhân vật (rỗng, quá dài, có ký tự điều khiển — kể cả NUL mà
+     * Postgres từ chối) ⇒ {@code false} ngay, không chạm DB (test fuzz gateway bắt được 500 ở đây).
+     */
     public boolean remove(long characterId, String enemyName) {
-        return port.remove(characterId, enemyName.strip());
+        String name = enemyName.strip();
+        if (name.isEmpty() || name.length() > MAX_NAME_LENGTH || name.chars().anyMatch(Character::isISOControl)) {
+            return false;
+        }
+        return port.remove(characterId, name);
     }
 }
