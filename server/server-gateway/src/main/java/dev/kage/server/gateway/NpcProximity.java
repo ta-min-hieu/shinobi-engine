@@ -68,6 +68,19 @@ final class NpcProximity {
         return anyClose(npcs.placements(), npcCode, x, y) || anyClose(dynamicNpcs.get(), npcCode, x, y);
     }
 
+    /**
+     * ADR-206 — mọi chỗ đứng NPC ở world chính (tĩnh rồi tới động), cho tự tìm đường; rỗng nếu nhân vật hiện không
+     * đứng ở world chính. Chạy trên luồng blocking: vị trí có thể phải đọc từ DB.
+     */
+    Optional<List<NpcCatalogSnapshot.NpcPlacementDefinition>> placementsVisibleTo(long characterId) {
+        if (mainWorldPositionOf.apply(characterId).isEmpty()) {
+            return Optional.empty();
+        }
+        List<NpcCatalogSnapshot.NpcPlacementDefinition> all = new java.util.ArrayList<>(npcs.placements());
+        all.addAll(dynamicNpcs.get());
+        return Optional.of(all);
+    }
+
     private static boolean anyClose(
             List<NpcCatalogSnapshot.NpcPlacementDefinition> placements, String npcCode, float x, float y) {
         for (NpcCatalogSnapshot.NpcPlacementDefinition placement : placements) {

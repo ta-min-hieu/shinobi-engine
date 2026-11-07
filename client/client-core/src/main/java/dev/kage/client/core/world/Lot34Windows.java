@@ -3,18 +3,23 @@ package dev.kage.client.core.world;
 import dev.kage.client.core.ui.theme.KageSkin;
 
 /**
- * Luồng lô 34 (ADR-199…) — đếm ngược làm mới (ADR-200), mua lại đồ đã bán (ADR-202), lọc nhặt đồ (ADR-204)… Là MỘT
- * thành phần của {@link Lot33Windows} (chuỗi lồng nhau vì {@code ExpansionWindows.create} đã chạm trần {@code
- * MethodLength}).
+ * Luồng lô 34 (ADR-199…) — đếm ngược làm mới (ADR-200), mua lại đồ đã bán (ADR-202), lọc nhặt đồ (ADR-204), tự tìm
+ * đường (ADR-206)… Là MỘT thành phần của {@link Lot33Windows} (chuỗi lồng nhau vì {@code ExpansionWindows.create} đã
+ * chạm trần {@code MethodLength}).
  */
-record Lot34Windows(ResetTimersCoordinator resetTimers, BuybackCoordinator buyback, AutoSellCoordinator autoSell) {
+record Lot34Windows(
+        ResetTimersCoordinator resetTimers,
+        BuybackCoordinator buyback,
+        AutoSellCoordinator autoSell,
+        AutoWalkCoordinator autoWalk) {
 
     @SuppressWarnings("unused") // skin dành cho các cửa sổ lô 34 tiếp theo
     static Lot34Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot34Windows(
                 new ResetTimersCoordinator(sender, feeds.chat()),
                 new BuybackCoordinator(sender, feeds.chat(), feeds.itemCatalog()),
-                new AutoSellCoordinator(sender, feeds.chat()));
+                new AutoSellCoordinator(sender, feeds.chat()),
+                new AutoWalkCoordinator(sender, feeds.chat()));
     }
 
     /** Đăng ký vào hub. */
@@ -22,5 +27,6 @@ record Lot34Windows(ResetTimersCoordinator resetTimers, BuybackCoordinator buyba
         panels.register(resetTimers);
         panels.register(buyback);
         panels.register(autoSell);
+        panels.register(autoWalk);
     }
 }

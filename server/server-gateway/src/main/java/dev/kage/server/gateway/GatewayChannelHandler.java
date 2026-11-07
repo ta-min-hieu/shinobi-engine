@@ -1113,6 +1113,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetAutoSellJunkCommand.parser(),
                             Opcode.OPCODE_SET_AUTO_SELL_JUNK_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot34().setAutoSellJunk(id, c))),
+            // Lô 34 — tự tìm đường tới NPC (ADR-206).
+            Map.entry(
+                    Opcode.OPCODE_LIST_NPC_LOCATIONS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListNpcLocationsRequest.parser(),
+                            Opcode.OPCODE_LIST_NPC_LOCATIONS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot34().listNpcLocations(id))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,

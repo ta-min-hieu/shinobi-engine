@@ -9,7 +9,7 @@ import dev.kage.protocol.Opcode;
 /**
  * Bước lô 34: hệ số cường hoá trong catalog (ADR-199) {@code catalogStep}; mốc làm mới (ADR-200) {@code resetTimers};
  * mua lại (ADR-202) {@code buybackList}, {@code buyback:<entry id>}; lọc nhặt đồ (ADR-204) {@code autoSell:on|off|?};
- * xoá nhân vật (ADR-205) {@code deleteChar:<id>}.
+ * xoá nhân vật (ADR-205) {@code deleteChar:<id>}; chỗ đứng NPC cho tự tìm đường (ADR-206) {@code npcLocations}.
  * Nối sau {@link Lot33Steps}.
  */
 final class Lot34Steps {
@@ -28,6 +28,7 @@ final class Lot34Steps {
             case "buyback" -> buyback(Long.parseLong(arg));
             case "autoSell" -> autoSell(arg);
             case "deleteChar" -> deleteChar(Long.parseLong(arg));
+            case "npcLocations" -> npcLocations();
             default -> "bước không hiểu";
         };
     }
@@ -114,14 +115,34 @@ final class Lot34Steps {
     private String deleteChar(long characterId) throws IOException {
         return asker.ask(
                 Opcode.OPCODE_DELETE_CHARACTER_REQUEST_VALUE,
-                dev.kage.protocol.DeleteCharacterRequest.newBuilder().setCharacterId(characterId).build(),
+                dev.kage.protocol.DeleteCharacterRequest.newBuilder()
+                        .setCharacterId(characterId)
+                        .build(),
                 Opcode.OPCODE_DELETE_CHARACTER_RESPONSE_VALUE,
                 p -> {
-                    dev.kage.protocol.DeleteCharacterResponse r = dev.kage.protocol.DeleteCharacterResponse.parseFrom(p);
+                    dev.kage.protocol.DeleteCharacterResponse r =
+                            dev.kage.protocol.DeleteCharacterResponse.parseFrom(p);
                     StringBuilder out = new StringBuilder(r.getOutcome().name()).append(" danh sách=");
                     r.getCharactersList().forEach(c -> out.append(c.getName())
                             .append(c.getDeletionEpochSeconds() > 0 ? "(chờ xoá)" : "")
                             .append(' '));
+                    return out.toString();
+                });
+    }
+
+    private String npcLocations() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_LIST_NPC_LOCATIONS_REQUEST_VALUE,
+                dev.kage.protocol.ListNpcLocationsRequest.getDefaultInstance(),
+                Opcode.OPCODE_LIST_NPC_LOCATIONS_RESPONSE_VALUE,
+                p -> {
+                    dev.kage.protocol.ListNpcLocationsResponse r =
+                            dev.kage.protocol.ListNpcLocationsResponse.parseFrom(p);
+                    StringBuilder out = new StringBuilder("worldChính=").append(r.getInMainWorld());
+                    r.getLocationsList().forEach(l -> out.append(' ')
+                            .append(l.getNpcCode())
+                            .append('@')
+                            .append(Math.round(l.getX())));
                     return out.toString();
                 });
     }

@@ -149,10 +149,14 @@ record ExpansionWindows(
         displaySettings.applyTo(titles, feedback, backdrop, weather.overlay());
     }
 
-    /** Lệnh chat dùng MÓN ĐANG CHỌN trong túi: dùng nhiều (ADR-176), khoe vật phẩm (ADR-188). */
-    void useInventorySelection(InventoryCoordinator inventory) {
+    /**
+     * Lệnh chat dùng MÓN ĐANG CHỌN trong túi: dùng nhiều (ADR-176), khoe vật phẩm (ADR-188); và tự tìm đường (ADR-206)
+     * lái nhân vật qua {@link LocalIntentSender}.
+     */
+    void useLocalInput(InventoryCoordinator inventory, LocalIntentSender intents) {
         lot31.bulkUse().useSelection(inventory::selectedItemId);
         lot31.lot32().itemLink().useSelection(inventory::selectedItem);
+        intents.useAutoWalk(lot31.lot32().lot33().lot34().autoWalk().target());
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

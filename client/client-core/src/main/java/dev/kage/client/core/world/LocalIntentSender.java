@@ -63,6 +63,14 @@ final class LocalIntentSender {
 
     private Runnable onArtifact = () -> {};
 
+    /** ADR-206 — đích tự đi; mặc định một đích không bao giờ được đặt. */
+    private AutoWalkTarget autoWalk = new AutoWalkTarget();
+
+    /** ADR-206 — vị trí X ở lần kiểm tiến độ gần nhất, và số tick đã tự đi mà không nhích được. */
+    private float autoWalkCheckX;
+
+    private int autoWalkStalledTicks;
+
     LocalIntentSender(LocalIntentContext context) {
         this.context = context;
         this.attackInput = new AttackInputController(context.localCharacterId());
@@ -90,6 +98,7 @@ final class LocalIntentSender {
      */
     void onWorldChanged() {
         lastSentDirX = 0f;
+        autoWalk.stop(); // ADR-206 — đích là toạ độ world chính, World mới không còn nghĩa
         // ADR-073 D4: entity mới không mang hiệu ứng nào, và server chỉ báo khi ĐỔI so với mặc định của entity đó —
         // choáng dở ở World cũ sẽ không bao giờ được báo "hết".
         onMovementModifier(1f, false);
@@ -128,6 +137,11 @@ final class LocalIntentSender {
         return action;
     }
 
+    /** ADR-206 — nối đích tự đi (một lần, lúc dựng màn hình). */
+    void useAutoWalk(AutoWalkTarget target) {
+        this.autoWalk = target;
+    }
+
     private void updateArtifact() {
         boolean freshPress = artifactKey.update(
                 context.inputMapper().isPressed(GameAction.USE_ARTIFACT),
@@ -155,6 +169,7 @@ final class LocalIntentSender {
         if (isPressed(GameAction.MOVE_RIGHT)) {
             dirX += 1f;
         }
+        dirX = autoWalkDirection(dirX);
         // Quay mặt theo chiều đi; dirX == 0 (đứng yên) GIỮ NGUYÊN hướng cũ, không quay về mặc định.
         if (dirX != 0f) {
             context.models().setFacingRight(WorldConstants.LOCAL_CHARACTER_ID, dirX > 0f);
@@ -168,6 +183,37 @@ final class LocalIntentSender {
             lastSentDirX = dirX;
             context.sender().moveDirection(dirX);
         }
+    }
+
+    /**
+     * ADR-206 — người chơi tự bấm phím đi thì huỷ tự đi và theo phím; không thì lái về phía đích, dừng khi tới nơi hoặc
+     * khi {@link WorldConstants#AUTO_WALK_STALL_TICKS} tick liền không nhích được (vướng địa hình) — đứng im vì choáng
+     * không tính.
+     */
+    private float autoWalkDirection(float keyDirX) {
+        float x = POSITION.get(context.localPlayer()).x;
+        autoWalk.trackPosition(x);
+        if (!autoWalk.isActive()) {
+            return keyDirX;
+        }
+        if (keyDirX != 0f) {
+            autoWalk.stop();
+            return keyDirX;
+        }
+        float dx = autoWalk.targetX() - x;
+        if (Math.abs(dx) <= AutoWalkTarget.ARRIVE_DISTANCE_METERS) {
+            autoWalk.arrive();
+            return 0f;
+        }
+        if (immobilized || Math.abs(x - autoWalkCheckX) > WorldConstants.AUTO_WALK_PROGRESS_METERS) {
+            autoWalkCheckX = x;
+            autoWalkStalledTicks = 0;
+        } else if (++autoWalkStalledTicks >= WorldConstants.AUTO_WALK_STALL_TICKS) {
+            autoWalkStalledTicks = 0;
+            autoWalk.stop();
+            return 0f;
+        }
+        return Math.signum(dx);
     }
 
     private void updateJump(float fixedDeltaTime) {

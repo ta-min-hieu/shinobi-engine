@@ -82,6 +82,21 @@ class NpcProximityTest {
         assertThat(proximity.isWithinReach(CHARACTER_ID, "traveling_merchant")).isFalse();
     }
 
+    /** ADR-206 — tự tìm đường thấy cả NPC tĩnh lẫn động, nhưng không thấy gì khi đang ở ngoài world chính. */
+    @Test
+    void shouldListEveryPlacement_onlyWhileInTheMainWorld() {
+        NpcProximity proximity = new NpcProximity(
+                NPCS,
+                characterId -> Optional.of(new PositionSnapshot(0f, 0f)),
+                () -> List.of(new NpcCatalogSnapshot.NpcPlacementDefinition("traveling_merchant", 40f, 0f)));
+
+        assertThat(proximity.placementsVisibleTo(CHARACTER_ID).orElseThrow())
+                .extracting(NpcCatalogSnapshot.NpcPlacementDefinition::npcCode)
+                .containsExactly(ELDER, ATTENDANT, ATTENDANT, "traveling_merchant");
+        assertThat(new NpcProximity(NPCS, characterId -> Optional.empty()).placementsVisibleTo(CHARACTER_ID))
+                .isEmpty();
+    }
+
     private static NpcProximity standingAt(float x) {
         return new NpcProximity(NPCS, characterId -> Optional.of(new PositionSnapshot(x, 0f)));
     }

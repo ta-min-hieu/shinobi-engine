@@ -18,6 +18,12 @@ final class WorldConstants {
 
     static final float MOVE_SPEED_MPS = 5f;
 
+    /** ADR-206 — tự đi coi là "còn nhích" khi đi được hơn chừng này mét giữa hai lần kiểm. */
+    static final float AUTO_WALK_PROGRESS_METERS = 0.1f;
+
+    /** ADR-206 — tự đi bao nhiêu tick liền không nhích được thì bỏ (2 giây ở 60 Hz — vướng địa hình). */
+    static final int AUTO_WALK_STALL_TICKS = 120;
+
     /**
      * ADR-033 — PHẢI khớp {@code server-world.WorldConstants.GRAVITY_MPS2}/{@code
      * JUMP_VELOCITY_MPS}, cùng lý do {@code MOVE_SPEED_MPS}: chỉ dùng để dự đoán cục bộ, lệch chỉ

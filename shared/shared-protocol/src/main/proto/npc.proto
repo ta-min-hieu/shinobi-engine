@@ -22,3 +22,20 @@ message NpcSpawnedEvent {
 message NpcDespawnedEvent {
   int64 npc_id = 1;
 }
+
+// ADR-206 (2026-11-07) — tự tìm đường. Request: Client -> Server (OPCODE_LIST_NPC_LOCATIONS_REQUEST).
+message ListNpcLocationsRequest {}
+
+// Một chỗ đứng của NPC ở world chính (cùng mã có thể đứng nhiều chỗ — tiếp dẫn sứ mỗi trạm).
+message NpcLocation {
+  string npc_code = 1;
+  float x = 2;
+  float y = 3;
+}
+
+// Response: Server -> Client (OPCODE_LIST_NPC_LOCATIONS_RESPONSE). Đang không ở world chính (hầm ngục, đấu trường)
+// thì in_main_world=false và danh sách rỗng — NPC chỉ đứng ở world chính.
+message ListNpcLocationsResponse {
+  bool in_main_world = 1;
+  repeated NpcLocation locations = 2;
+}

@@ -11,12 +11,30 @@ import dev.kage.shop.api.BuybackFacade;
 import dev.kage.shop.domain.BuybackPort;
 
 /** Lớp lệnh lô 34 (ADR-199…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
-record Lot34Commands(Lot34Facades facades, dev.kage.guild.api.GuildFacade guilds) {
+record Lot34Commands(Lot34Facades facades, dev.kage.guild.api.GuildFacade guilds, NpcProximity proximity) {
 
-    static Lot34Commands of(GatewayFacades gateway) {
+    static Lot34Commands of(GatewayFacades gateway, NpcProximity proximity) {
         return new Lot34Commands(
                 gateway.progression().expansion().lot34(),
-                gateway.contentFacades().socialFacades().guildFacade());
+                gateway.contentFacades().socialFacades().guildFacade(),
+                proximity);
+    }
+
+    /**
+     * ADR-206 — Virtual Thread; chỗ đứng NPC ở world chính cho tự tìm đường. Chỉ là thông tin hiển thị: đi tới
+     * nơi vẫn là di chuyển bình thường, nói chuyện vẫn qua {@link NpcProximity#isWithinReach}.
+     */
+    dev.kage.protocol.ListNpcLocationsResponse listNpcLocations(long characterId) {
+        dev.kage.protocol.ListNpcLocationsResponse.Builder response =
+                dev.kage.protocol.ListNpcLocationsResponse.newBuilder();
+        proximity.placementsVisibleTo(characterId).ifPresent(placements -> {
+            response.setInMainWorld(true);
+            placements.forEach(p -> response.addLocations(dev.kage.protocol.NpcLocation.newBuilder()
+                    .setNpcCode(p.npcCode())
+                    .setX(p.posX())
+                    .setY(p.posY())));
+        });
+        return response.build();
     }
 
     /** ADR-202 — Virtual Thread; món còn mua lại được của {@code characterId}. */
