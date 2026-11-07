@@ -155,6 +155,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.trade.PostgresTradeHistoryAdapter(dataSource));
     }
 
+    /** ADR-193 — tên riêng linh thú. */
+    public dev.kage.inventory.api.PetNameFacade wirePetNameFacade() {
+        return new dev.kage.inventory.api.PetNameFacade(
+                new dev.kage.server.database.inventory.PostgresPetNameAdapter(dataSource));
+    }
+
     /** ADR-192 — lần cuối online. */
     public dev.kage.character.api.LastOnlineFacade wireLastOnlineFacade() {
         return new dev.kage.character.api.LastOnlineFacade(

@@ -4,8 +4,13 @@ import java.util.Optional;
 
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.domain.Character;
+import dev.kage.chat.domain.ProfanityFilter;
+import dev.kage.inventory.api.PetNameFacade;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.party.application.HandOverPartyLeadershipUseCase;
+import dev.kage.protocol.RenamePetCommand;
+import dev.kage.protocol.RenamePetOutcome;
+import dev.kage.protocol.RenamePetResponse;
 import dev.kage.protocol.TransferPartyLeaderCommand;
 import dev.kage.protocol.TransferPartyLeaderOutcome;
 import dev.kage.protocol.TransferPartyLeaderResponse;
@@ -41,6 +46,19 @@ record Lot33Commands(
         }
         return response.setOutcome(TransferPartyLeaderOutcome.valueOf("TRANSFER_PARTY_LEADER_OUTCOME_" + result.name()))
                 .setTargetName(target.get().name())
+                .build();
+    }
+
+    /** ADR-193 — Virtual Thread; đặt (hoặc xoá, khi rỗng) tên linh thú đang mặc của {@code characterId}. */
+    RenamePetResponse renamePet(long characterId, RenamePetCommand command) {
+        String name = command.getName().strip();
+        RenamePetResponse.Builder response = RenamePetResponse.newBuilder().setName(name);
+        if (ProfanityFilter.containsBannedWord(name)) {
+            return response.setOutcome(RenamePetOutcome.RENAME_PET_OUTCOME_BANNED_WORD)
+                    .build();
+        }
+        PetNameFacade.Outcome outcome = facades.petName().rename(characterId, name);
+        return response.setOutcome(RenamePetOutcome.valueOf("RENAME_PET_OUTCOME_" + outcome.name()))
                 .build();
     }
 }

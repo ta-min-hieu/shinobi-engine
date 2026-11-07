@@ -110,6 +110,27 @@ class CompanionIntegrationTest {
                 .isIn(StorageUseCase.Outcome.SOCKETED, StorageUseCase.Outcome.EQUIPPED);
     }
 
+    /** ADR-193 — tên riêng theo linh thú đang mặc; chưa mặc thì không ghi; rỗng thì xoá. */
+    @Test
+    void petNameShouldFollowTheWornPet() {
+        long characterId = createFreshCharacter("PetName");
+        long turtle = query(INSERT_ITEM, characterId, query(TEMPLATE_ID, "spirit_turtle"));
+        PostgresPetNameAdapter names = new PostgresPetNameAdapter(dataSource);
+
+        assertThat(names.renameEquipped(characterId, "Tiểu Quy")).as("chưa mặc").isFalse();
+        equip(characterId, turtle, EquipmentSlotType.PET);
+        assertThat(names.renameEquipped(characterId, "Tiểu Quy")).isTrue();
+        assertThat(names.equippedName(characterId)).contains("Tiểu Quy");
+        assertThat(new PostgresCompanionAdapter(dataSource)
+                        .equippedPet(characterId)
+                        .orElseThrow()
+                        .level())
+                .as("đặt tên tạo dòng pet_state cấp 1 — không đổi cấp")
+                .isEqualTo(1);
+        assertThat(names.renameEquipped(characterId, "")).isTrue();
+        assertThat(names.equippedName(characterId)).isEmpty();
+    }
+
     /** Gói adapter cho dễ đọc. */
     private static final class CompanionPortUnderTest {
         final PostgresCompanionAdapter adapter = new PostgresCompanionAdapter(dataSource);

@@ -188,6 +188,7 @@ message PetView {
   int64 exp_into_level = 3;
   int64 exp_to_next = 4;      // 0 = cấp tối đa
   int32 stage = 5;            // ADR-078 — bậc tiến hoá 1..2 (0 ở server cũ = bậc 1)
+  string custom_name = 6;     // ADR-193 — tên riêng người chơi đặt ("" = dùng tên loài)
 }
 
 // ADR-065 — một bộ pháp khí trên bảng nhân vật. Chỉ số thưởng ĐÃ nằm trong các tổng ở trên.
@@ -611,4 +612,26 @@ message SetInspectPrivacyCommand {
 // Response: Server -> Client (OPCODE_SET_INSPECT_PRIVACY_RESPONSE = 252).
 message SetInspectPrivacyResponse {
   bool hidden = 1;
+}
+
+// ===== ADR-193 (Accepted 2026-11-07, chủ dự án chọn) — đặt tên riêng cho linh thú đang mặc. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_RENAME_PET_COMMAND = 253). name rỗng = xoá tên riêng. Miễn phí.
+message RenamePetCommand {
+  string name = 1;
+}
+
+enum RenamePetOutcome {
+  RENAME_PET_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  RENAME_PET_OUTCOME_OK = 1;
+  RENAME_PET_OUTCOME_CLEARED = 2;
+  RENAME_PET_OUTCOME_NO_PET = 3;       // không mặc linh thú nào
+  RENAME_PET_OUTCOME_INVALID_NAME = 4; // 2..12 ký tự, chỉ chữ / số / khoảng trắng đơn
+  RENAME_PET_OUTCOME_BANNED_WORD = 5;
+}
+
+// Response: Server -> Client (OPCODE_RENAME_PET_RESPONSE = 254). name = tên đã strip mà server xét.
+message RenamePetResponse {
+  RenamePetOutcome outcome = 1;
+  string name = 2;
 }

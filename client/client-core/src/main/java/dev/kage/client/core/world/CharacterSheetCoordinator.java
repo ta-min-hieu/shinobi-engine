@@ -151,6 +151,9 @@ final class CharacterSheetCoordinator implements WindowFlow {
                 .nameKey(pet.getItemTemplateId())
                 .map(this::text)
                 .orElseGet(() -> "#" + pet.getItemTemplateId());
+        if (!pet.getCustomName().isBlank()) { // ADR-193 — tên riêng trước, tên loài trong ngoặc
+            name = ChatController.sanitize(pet.getCustomName()) + " (" + name + ")";
+        }
         String line = pet.getExpToNext() == 0
                 ? format("charsheet.row.pet_max", name, pet.getLevel())
                 : format("charsheet.row.pet", name, pet.getLevel(), pet.getExpIntoLevel(), pet.getExpToNext());

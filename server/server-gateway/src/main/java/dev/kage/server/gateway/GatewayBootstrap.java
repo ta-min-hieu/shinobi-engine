@@ -725,7 +725,9 @@ public final class GatewayBootstrap {
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
     private static Lot33Facades lot33Facades(ServerDatabaseBootstrap databaseBootstrap) {
-        return new Lot33Facades(databaseBootstrap.expansion().wireLastOnlineFacade());
+        return new Lot33Facades(
+                databaseBootstrap.expansion().wireLastOnlineFacade(),
+                databaseBootstrap.expansion().wirePetNameFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */

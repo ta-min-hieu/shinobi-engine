@@ -1052,6 +1052,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.TransferPartyLeaderCommand.parser(),
                             Opcode.OPCODE_TRANSFER_PARTY_LEADER_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot33().transferPartyLeader(id, c))),
+            // Lô 33 — đổi tên linh thú (ADR-193).
+            Map.entry(
+                    Opcode.OPCODE_RENAME_PET_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.RenamePetCommand.parser(),
+                            Opcode.OPCODE_RENAME_PET_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot33().renamePet(id, c))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,
@@ -3311,20 +3318,30 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .addAllItemSets(itemSetViews(characterId))
                     .setMoveSpeedPercent(inventoryFacade.moveSpeedPercent(characterId))
                     .setRebirthCount(rebirth.rebirthCountOf(characterId));
-            inventoryFacade
-                    .equippedPet(characterId)
-                    .ifPresent(pet -> response.setPet(PetView.newBuilder()
-                            .setItemTemplateId(pet.itemTemplateId())
-                            .setLevel(pet.level())
-                            .setExpIntoLevel(pet.expIntoLevel())
-                            .setExpToNext(pet.expToNext())
-                            .setStage(pet.stage())));
+            inventoryFacade.equippedPet(characterId).ifPresent(pet -> response.setPet(petView(characterId, pet)));
             send(
                     ctx,
                     Opcode.OPCODE_GET_CHARACTER_STATS_RESPONSE_VALUE,
                     sequenceId,
                     response.build().toByteArray());
         });
+    }
+
+    /** ADR-072/078/193 — linh thú đang mặc kèm tên riêng. Tên chạm DB — gọi trên Virtual Thread. */
+    private PetView petView(long characterId, dev.kage.inventory.domain.PetProgress pet) {
+        return PetView.newBuilder()
+                .setItemTemplateId(pet.itemTemplateId())
+                .setLevel(pet.level())
+                .setExpIntoLevel(pet.expIntoLevel())
+                .setExpToNext(pet.expToNext())
+                .setStage(pet.stage())
+                .setCustomName(expansion
+                        .lot33()
+                        .facades()
+                        .petName()
+                        .equippedName(characterId)
+                        .orElse(""))
+                .build();
     }
 
     /** ADR-065 — bộ pháp khí đang mặc; thưởng đã nằm trong các tổng của bảng. Chạm DB. */
