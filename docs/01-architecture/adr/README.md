@@ -242,6 +242,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-208](ADR-208-Guild-War-History.md) | Lịch sử bang chiến: 20 trận đã chốt của bang mình (thắng/thua/hoà, tỷ số), đọc `guild_war` sẵn có, 759/760; `/lichsuchien` | ✅ Accepted (lô 35) |
 | [ADR-209](ADR-209-Achievement-Leaderboard.md) | Xếp hạng thành tựu: `LEADERBOARD_KIND_ACHIEVEMENT = 8` trong Bia Anh Danh, giá trị = số thành tựu đã mở; tab mới | ✅ Accepted (lô 35) |
 | [ADR-210](ADR-210-Title-Stat-Bonus.md) | Danh hiệu cộng chỉ số: cột chỉ số trên `achievement` (V162), chỉ danh hiệu đang đeo, cộng phẳng chung đường chỉ số trang bị; `AchievementView` field 7–10 | ✅ Accepted (lô 35) |
+| [ADR-211](ADR-211-Friend-Suggestions.md) | Gợi ý kết bạn: tối đa 10 người online, chênh ≤ 10 cấp, chưa bạn / chưa mời / không chặn, 1151/1152; `/goiyban`, `/ketban <tên>` | ✅ Accepted (lô 35) |
+| [ADR-212](ADR-212-Stranger-Mail-Block.md) | Chặn thư người lạ: `block_stranger_mail` (V163), thư người chơi không phải bạn ⇒ `SEND_MAIL_OUTCOME_STRANGER_MAIL_BLOCKED`, 913/914; `/chanthu` | ✅ Accepted (lô 35) |
 ---
 
 ## ADR cần tạo (chưa viết)

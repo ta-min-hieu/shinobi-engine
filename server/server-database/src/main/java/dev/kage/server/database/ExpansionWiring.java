@@ -228,6 +228,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.chat.PostgresOfflineWhisperAdapter(dataSource));
     }
 
+    /** ADR-212 — chặn thư người lạ. */
+    public dev.kage.mail.api.StrangerMailFacade wireStrangerMailFacade() {
+        return new dev.kage.mail.api.StrangerMailFacade(
+                new dev.kage.server.database.mail.PostgresStrangerMailAdapter(dataSource));
+    }
+
     /** ADR-210 — chỉ số cộng của danh hiệu. */
     public dev.kage.achievement.api.TitleBonusFacade wireTitleBonusFacade() {
         return new dev.kage.achievement.api.TitleBonusFacade(

@@ -294,9 +294,12 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         return contextsByCharacterId.containsKey(characterId);
     }
 
-    /** Tổng số nhân vật đang kết nối (OBSERVABILITY.md §3.1 {@code kage.players.online}). */
-    int onlineCount() {
-        return contextsByCharacterId.size();
+    /**
+     * Id mọi nhân vật đang kết nối, tăng dần (bản chụp) — gợi ý kết bạn (ADR-211); {@code size()} là số người online
+     * (OBSERVABILITY.md §3.1 {@code kage.players.online}).
+     */
+    java.util.List<Long> onlineCharacterIds() {
+        return contextsByCharacterId.keySet().stream().sorted().toList();
     }
 
     /**

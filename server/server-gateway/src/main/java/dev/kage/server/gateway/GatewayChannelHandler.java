@@ -1127,6 +1127,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetGuildWarHistoryRequest.parser(),
                             Opcode.OPCODE_GET_GUILD_WAR_HISTORY_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot35().warHistory(id))),
+            // Lô 35 — gợi ý kết bạn (ADR-211), chặn thư người lạ (ADR-212).
+            Map.entry(
+                    Opcode.OPCODE_SUGGEST_FRIENDS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SuggestFriendsRequest.parser(),
+                            Opcode.OPCODE_SUGGEST_FRIENDS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot35().suggestFriends(id))),
+            Map.entry(
+                    Opcode.OPCODE_SET_STRANGER_MAIL_BLOCK_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetStrangerMailBlockCommand.parser(),
+                            Opcode.OPCODE_SET_STRANGER_MAIL_BLOCK_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot35().setStrangerMailBlock(id, c))),
             // Lô 34 — tự tìm đường tới NPC (ADR-206).
             Map.entry(
                     Opcode.OPCODE_LIST_NPC_LOCATIONS_REQUEST_VALUE,
@@ -5710,6 +5723,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
+        if (refusesStrangerMail(ctx, sequenceId, characterId, recipient.get().id())) {
+            return;
+        }
         List<MailFacade.AttachmentRequest> attachments = command.getAttachmentsList().stream()
                 .map(a -> new MailFacade.AttachmentRequest(a.getItemTemplateId(), a.getQuantity(), a.getEnhanceLevel()))
                 .toList();
@@ -5743,6 +5759,29 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .registry()
                 .sendToCharacterIfOnline(
                         recipient.get().id(), Opcode.OPCODE_NEW_MAIL_EVENT_VALUE, 0, event.toByteArray());
+    }
+
+    /**
+     * ADR-212 — người nhận chặn thư người lạ mà người gửi không phải bạn họ: trả {@code STRANGER_MAIL_BLOCKED}, không
+     * tạo thư, không ký quỹ gì.
+     *
+     * @return {@code true} nếu đã từ chối (caller dừng lại)
+     */
+    private boolean refusesStrangerMail(ChannelHandlerContext ctx, int sequenceId, long senderId, long recipientId) {
+        if (!expansion.lot35().facades().strangerMail().refuses(recipientId, senderId, sender -> friendFacade
+                .listFriends(recipientId)
+                .contains(sender))) {
+            return false;
+        }
+        send(
+                ctx,
+                Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE,
+                sequenceId,
+                SendMailResponse.newBuilder()
+                        .setOutcome(SendMailOutcome.SEND_MAIL_OUTCOME_STRANGER_MAIL_BLOCKED)
+                        .build()
+                        .toByteArray());
+        return true;
     }
 
     /**

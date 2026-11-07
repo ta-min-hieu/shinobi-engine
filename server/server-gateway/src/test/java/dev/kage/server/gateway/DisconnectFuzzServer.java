@@ -246,7 +246,10 @@ final class DisconnectFuzzServer implements AutoCloseable {
         List<String> residue = new ArrayList<>();
         addIfNonZero(
                 residue, "thực thể ECS thừa trong world chính (bóng ma)", mainWorldEntityCount - emptyWorldEntityCount);
-        addIfNonZero(residue, "nhân vật còn đăng ký online", characterRegistry.onlineCount());
+        addIfNonZero(
+                residue,
+                "nhân vật còn đăng ký online",
+                characterRegistry.onlineCharacterIds().size());
         addIfNonZero(residue, "thực thể còn ở world chính", mainWorldChannels.playerCount());
         addIfNonZero(
                 residue, "World hầm ngục còn chạy", instanceRegistries.dungeon().instanceCount());

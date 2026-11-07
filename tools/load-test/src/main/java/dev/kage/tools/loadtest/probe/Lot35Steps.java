@@ -6,7 +6,8 @@ import dev.kage.protocol.Opcode;
 
 /**
  * Bước lô 35: góp vật phẩm cho bang (ADR-207) {@code donateItem:<inventory item id>/<số lượng>}; lịch sử bang chiến
- * (ADR-208) {@code warHistory}. Nối sau {@link Lot34Steps}.
+ * (ADR-208) {@code warHistory}; gợi ý kết bạn (ADR-211) {@code suggestFriends}; chặn thư người lạ (ADR-212)
+ * {@code strangerMail:on|off|?}. Nối sau {@link Lot34Steps}.
  */
 final class Lot35Steps {
 
@@ -20,6 +21,8 @@ final class Lot35Steps {
         return switch (verb) {
             case "donateItem" -> donateItem(arg);
             case "warHistory" -> warHistory();
+            case "suggestFriends" -> suggestFriends();
+            case "strangerMail" -> strangerMail(arg);
             default -> "bước không hiểu";
         };
     }
@@ -60,5 +63,39 @@ final class Lot35Steps {
                                     .append(e.getTheirKills()));
                     return out.toString();
                 });
+    }
+
+    private String suggestFriends() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SUGGEST_FRIENDS_REQUEST_VALUE,
+                dev.kage.protocol.SuggestFriendsRequest.getDefaultInstance(),
+                Opcode.OPCODE_SUGGEST_FRIENDS_RESPONSE_VALUE,
+                p -> {
+                    StringBuilder out = new StringBuilder("gợiÝ=");
+                    dev.kage.protocol.SuggestFriendsResponse.parseFrom(p)
+                            .getSuggestionsList()
+                            .forEach(s -> out.append(' ')
+                                    .append(s.getName())
+                                    .append("/Lv")
+                                    .append(s.getLevel()));
+                    return out.toString();
+                });
+    }
+
+    private String strangerMail(String arg) throws IOException {
+        dev.kage.protocol.SetStrangerMailBlockCommand.Builder command =
+                dev.kage.protocol.SetStrangerMailBlockCommand.newBuilder();
+        if ("?".equals(arg)) {
+            command.setQueryOnly(true);
+        } else {
+            command.setEnabled("on".equals(arg));
+        }
+        return asker.ask(
+                Opcode.OPCODE_SET_STRANGER_MAIL_BLOCK_COMMAND_VALUE,
+                command.build(),
+                Opcode.OPCODE_SET_STRANGER_MAIL_BLOCK_RESPONSE_VALUE,
+                p -> "chặnThưNgườiLạ="
+                        + dev.kage.protocol.SetStrangerMailBlockResponse.parseFrom(p)
+                                .getEnabled());
     }
 }

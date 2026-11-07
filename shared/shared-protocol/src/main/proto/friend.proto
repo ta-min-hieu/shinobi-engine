@@ -430,3 +430,17 @@ message FriendCongratulatedEvent {
   string from_name = 1;
   int32 realm = 2;
 }
+
+// ADR-211 (2026-11-07) — gợi ý kết bạn. Request: Client -> Server (OPCODE_SUGGEST_FRIENDS_REQUEST).
+message SuggestFriendsRequest {}
+
+message FriendSuggestion {
+  string name = 1;
+  int32 level = 2;
+}
+
+// Response: Server -> Client (OPCODE_SUGGEST_FRIENDS_RESPONSE). Tối đa 10 người đang online, cảnh giới gần mình, chưa là
+// bạn, không chặn nhau, chưa gửi lời mời cho mình.
+message SuggestFriendsResponse {
+  repeated FriendSuggestion suggestions = 1;
+}

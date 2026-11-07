@@ -544,7 +544,8 @@ public final class GatewayBootstrap {
         // state hiện có lúc scrape (weak reference qua Gauge.builder, không polling thủ công,
         // không allocation mỗi tick). kage.gold.total chạm DB mỗi lần scrape — chấp nhận được
         // (query SUM 1 bảng, không phải hot path tick/EventLoop, server/CLAUDE.md chỉ cấm 2 chỗ đó).
-        Gauge.builder("kage.players.online", characterRegistry, ConnectedCharacterRegistry::onlineCount)
+        Gauge.builder("kage.players.online", characterRegistry, r -> r.onlineCharacterIds()
+                        .size())
                 .description("Tổng số nhân vật đang kết nối")
                 .register(meterRegistry);
         Gauge.builder("kage.gold.total", databaseBootstrap, ServerDatabaseBootstrap::totalGold)
@@ -738,7 +739,8 @@ public final class GatewayBootstrap {
                 new Lot35Facades(
                         databaseBootstrap.expansion().wireGuildItemDonationFacade(),
                         databaseBootstrap.expansion().wireGuildWarHistoryFacade(),
-                        databaseBootstrap.expansion().wireTitleBonusFacade()));
+                        databaseBootstrap.expansion().wireTitleBonusFacade(),
+                        databaseBootstrap.expansion().wireStrangerMailFacade()));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

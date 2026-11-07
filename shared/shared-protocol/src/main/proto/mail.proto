@@ -46,6 +46,8 @@ enum SendMailOutcome {
   SEND_MAIL_OUTCOME_BODY_TOO_LONG = 8;         // vượt VARCHAR(1024) của cột mail.body (V13)
   // ADR-058 (2026-10-18, chỉ thêm): idempotency_key đã dùng — lá thư đó ĐÃ được gửi, không gửi lần hai.
   SEND_MAIL_OUTCOME_DUPLICATE_REQUEST = 9;
+  // ADR-212 (2026-11-07, chỉ thêm): người nhận chặn thư người lạ và người gửi không phải bạn bè của họ.
+  SEND_MAIL_OUTCOME_STRANGER_MAIL_BLOCKED = 10;
 }
 
 // Response: Server -> Client (OPCODE_SEND_MAIL_RESPONSE).
@@ -155,4 +157,15 @@ message ClaimAllMailResponse {
   int32 items = 3;     // tổng số món vừa lĩnh
   int32 deleted = 4;   // số thư đã xoá
   bool bag_full = 5;   // dừng giữa chừng vì túi đầy — còn thư chưa lĩnh
+}
+
+// ADR-212 (2026-11-07) — chặn thư người lạ. Command: Client -> Server (OPCODE_SET_STRANGER_MAIL_BLOCK_COMMAND).
+message SetStrangerMailBlockCommand {
+  bool enabled = 1;
+  bool query_only = 2;  // true = chỉ hỏi trạng thái, không đổi
+}
+
+// Response: Server -> Client (OPCODE_SET_STRANGER_MAIL_BLOCK_RESPONSE).
+message SetStrangerMailBlockResponse {
+  bool enabled = 1;
 }
