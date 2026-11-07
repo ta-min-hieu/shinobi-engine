@@ -3229,16 +3229,18 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 ctx,
                 header.sequenceId(),
                 Opcode.OPCODE_LIST_ACHIEVEMENTS_RESPONSE_VALUE,
-                characterId -> AchievementViews.sheet(worldGateway
-                        .registry()
-                        .achievements
-                        .facade()
-                        .sheet(
-                                characterId,
-                                characterFacade
-                                        .findById(characterId)
-                                        .map(Character::level)
-                                        .orElse(1))));
+                characterId -> AchievementViews.sheet(
+                        worldGateway
+                                .registry()
+                                .achievements
+                                .facade()
+                                .sheet(
+                                        characterId,
+                                        characterFacade
+                                                .findById(characterId)
+                                                .map(Character::level)
+                                                .orElse(1)),
+                        expansion.lot35().facades().titleBonus()));
     }
 
     /** ADR-062 D2 — đeo/bỏ danh hiệu; chỉ đeo được cái đã mở (server kiểm trong câu SQL). */
@@ -3250,8 +3252,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 header.sequenceId(),
                 Opcode.OPCODE_SET_ACTIVE_TITLE_RESPONSE_VALUE,
                 characterId -> AchievementViews.titleResponse(
-                        worldGateway.registry().achievements.wearTitle(characterId, command.getAchievementCode()),
+                        wearTitle(characterId, command.getAchievementCode()),
                         worldGateway.registry().achievements.facade().activeTitleCode(characterId)));
+    }
+
+    /** Đeo/bỏ danh hiệu; đổi được thì áp lại chỉ số ngay — danh hiệu cộng chỉ số (ADR-210). */
+    private boolean wearTitle(long characterId, String achievementCode) {
+        boolean worn = worldGateway.registry().achievements.wearTitle(characterId, achievementCode);
+        if (worn) {
+            applyEquipmentBonusAndComputeMaxHp(characterId);
+        }
+        return worn;
     }
 
     /**

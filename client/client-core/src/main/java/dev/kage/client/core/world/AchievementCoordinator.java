@@ -127,15 +127,35 @@ final class AchievementCoordinator implements WindowFlow {
         panel.setRows(rows);
     }
 
-    /** {@code [Đã mở] Tên (12/100) — Danh hiệu: X}; dấu bằng CHỮ để không dựa vào màu (client/CLAUDE.md). */
+    /**
+     * {@code [Đã mở] Tên (12/100) — Danh hiệu: X (Công +2)}; dấu bằng CHỮ để không dựa vào màu (client/CLAUDE.md). Chỉ
+     * số cộng khi đeo (ADR-210) nối sau, chỉ những chỉ số khác 0.
+     */
     private String rowText(AchievementView view) {
         long shown = Math.min(view.getProgress(), view.getTarget());
         return format(
-                view.getUnlocked() ? "achievement.row.unlocked" : "achievement.row.locked",
-                text(view.getNameKey()),
-                shown,
-                view.getTarget(),
-                text(view.getTitleKey()));
+                        view.getUnlocked() ? "achievement.row.unlocked" : "achievement.row.locked",
+                        text(view.getNameKey()),
+                        shown,
+                        view.getTarget(),
+                        text(view.getTitleKey()))
+                + bonusSuffix(i18n, view);
+    }
+
+    /** ADR-210 — {@code " (Công +2, Máu +30)"}, hoặc chuỗi rỗng nếu danh hiệu không cộng gì. Tĩnh để test. */
+    static String bonusSuffix(I18NBundle i18n, AchievementView view) {
+        List<String> parts = new ArrayList<>();
+        addStat(parts, i18n, "inventory.stat.atk", view.getBonusAtk());
+        addStat(parts, i18n, "inventory.stat.def", view.getBonusDef());
+        addStat(parts, i18n, "inventory.stat.res", view.getBonusRes());
+        addStat(parts, i18n, "inventory.stat.hp", view.getBonusHp());
+        return parts.isEmpty() ? "" : " (" + String.join(", ", parts) + ")";
+    }
+
+    private static void addStat(List<String> parts, I18NBundle i18n, String key, int value) {
+        if (value != 0) {
+            parts.add(KageI18n.formatOrKey(i18n, key, value));
+        }
     }
 
     private String text(String key) {

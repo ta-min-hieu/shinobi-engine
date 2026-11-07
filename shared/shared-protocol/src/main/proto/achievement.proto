@@ -16,6 +16,11 @@ message AchievementView {
   int64 progress = 4; // bộ đếm (hoặc cấp hiện tại với mốc cấp)
   int64 target = 5;
   bool unlocked = 6;
+  // ADR-210 — chỉ số cộng khi ĐEO danh hiệu này (0 = không cộng).
+  int32 bonus_atk = 7;
+  int32 bonus_def = 8;
+  int32 bonus_res = 9;
+  int32 bonus_hp = 10;
 }
 
 // Request: Client -> Server (OPCODE_LIST_ACHIEVEMENTS_REQUEST = 1700). Không field.

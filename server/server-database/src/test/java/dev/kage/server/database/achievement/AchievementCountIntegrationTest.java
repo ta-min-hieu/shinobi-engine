@@ -26,7 +26,10 @@ import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 
-/** ADR-209 — số thành tựu đã mở theo nhân vật (bảng xếp hạng Thành tựu) trên Postgres thật. */
+/**
+ * ADR-209 — số thành tựu đã mở theo nhân vật (bảng xếp hạng Thành tựu); ADR-210 — chỉ số cộng của danh hiệu, trên
+ * Postgres thật.
+ */
 @Testcontainers
 final class AchievementCountIntegrationTest {
 
@@ -70,6 +73,19 @@ final class AchievementCountIntegrationTest {
                 .containsEntry(two, 2)
                 .containsEntry(one, 1)
                 .doesNotContainKey(none);
+    }
+
+    @Test
+    void loadsTheTitleBonusesSeededByV162() {
+        java.util.Map<String, dev.kage.achievement.domain.TitleBonusPort.TitleBonus> bonuses =
+                new PostgresTitleBonusAdapter(dataSource).bonusesByCode();
+
+        assertThat(bonuses.get("slayer_10"))
+                .isEqualTo(new dev.kage.achievement.domain.TitleBonusPort.TitleBonus(2, 0, 0, 0));
+        assertThat(bonuses.get("duel_10"))
+                .isEqualTo(new dev.kage.achievement.domain.TitleBonusPort.TitleBonus(4, 0, 4, 0));
+        assertThat(bonuses.get("level_30"))
+                .isEqualTo(new dev.kage.achievement.domain.TitleBonusPort.TitleBonus(0, 0, 0, 80));
     }
 
     private static long createFreshCharacter(String name) {

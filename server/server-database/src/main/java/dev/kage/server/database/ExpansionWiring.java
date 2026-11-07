@@ -228,6 +228,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.chat.PostgresOfflineWhisperAdapter(dataSource));
     }
 
+    /** ADR-210 — chỉ số cộng của danh hiệu. */
+    public dev.kage.achievement.api.TitleBonusFacade wireTitleBonusFacade() {
+        return new dev.kage.achievement.api.TitleBonusFacade(
+                new dev.kage.server.database.achievement.PostgresTitleBonusAdapter(dataSource));
+    }
+
     /** ADR-208 — lịch sử bang chiến. */
     public dev.kage.guild.api.GuildWarHistoryFacade wireGuildWarHistoryFacade() {
         return new dev.kage.guild.api.GuildWarHistoryFacade(

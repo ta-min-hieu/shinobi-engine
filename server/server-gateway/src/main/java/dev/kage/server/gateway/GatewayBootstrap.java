@@ -737,7 +737,8 @@ public final class GatewayBootstrap {
                 databaseBootstrap.expansion().wireCharacterDeletionFacade(),
                 new Lot35Facades(
                         databaseBootstrap.expansion().wireGuildItemDonationFacade(),
-                        databaseBootstrap.expansion().wireGuildWarHistoryFacade()));
+                        databaseBootstrap.expansion().wireGuildWarHistoryFacade(),
+                        databaseBootstrap.expansion().wireTitleBonusFacade()));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
@@ -914,20 +915,40 @@ public final class GatewayBootstrap {
                         .map(character -> FactionMapping.toElement(character.faction()))
                         .orElse(Element.NONE));
         characterRegistry.skillRanks.bindGuildBonus(characterId -> characterRegistry.formation.plus( // ADR-128
-                TribulationEffects.plus( // ADR-126
-                        RefinementEffects.plus(
-                                BestiaryEffects.plus(
-                                        RebirthEffects.plus(
-                                                GuildSkillEffects.bonusOf(
-                                                        facades.progression().guildSkills(), characterId),
-                                                facades.progression().rebirth().rebirthCountOf(characterId)),
+                TitleEffects.plus( // ADR-210
+                        TribulationEffects.plus( // ADR-126
+                                RefinementEffects.plus(
+                                        BestiaryEffects.plus(
+                                                RebirthEffects.plus(
+                                                        GuildSkillEffects.bonusOf(
+                                                                facades.progression()
+                                                                        .guildSkills(),
+                                                                characterId),
+                                                        facades.progression()
+                                                                .rebirth()
+                                                                .rebirthCountOf(characterId)),
+                                                facades.progression()
+                                                        .collections()
+                                                        .bestiary()
+                                                        .bonusOf(characterId)),
                                         facades.progression()
                                                 .collections()
-                                                .bestiary()
-                                                .bonusOf(characterId)),
-                                facades.progression().collections().refinement().wornBonusOf(characterId)),
-                        facades.progression().expansion().tribulation().passed(characterId)),
+                                                .refinement()
+                                                .wornBonusOf(characterId)),
+                                facades.progression().expansion().tribulation().passed(characterId)),
+                        titleBonusOf(facades, characterRegistry, characterId)),
                 characterId));
+    }
+
+    /** ADR-210 — chỉ số của danh hiệu {@code characterId} đang đeo (đọc danh hiệu từ DB: Virtual Thread). */
+    private static dev.kage.achievement.domain.TitleBonusPort.TitleBonus titleBonusOf(
+            GatewayFacades facades, ConnectedCharacterRegistry characterRegistry, long characterId) {
+        return facades.progression()
+                .expansion()
+                .lot34()
+                .lot35()
+                .titleBonus()
+                .bonusOf(characterRegistry.achievements.facade().activeTitleCode(characterId));
     }
 
     private static java.util.List<Long> partyMembers(PartyFacade partyFacade, long characterId) {
