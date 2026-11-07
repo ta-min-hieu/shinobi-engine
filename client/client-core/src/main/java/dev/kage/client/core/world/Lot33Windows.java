@@ -13,9 +13,9 @@ record Lot33Windows(
         EnemyListCoordinator enemies,
         DeathRecapCoordinator deathRecap,
         MarketWatchCoordinator marketWatch,
-        GuildBankCoordinator guildBank) {
+        GuildBankCoordinator guildBank,
+        Lot34Windows lot34) {
 
-    @SuppressWarnings("unused") // skin/feeds dành cho các cửa sổ lô 33 tiếp theo
     static Lot33Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot33Windows(
                 new PartyLeaderCoordinator(sender, feeds.chat()),
@@ -23,7 +23,8 @@ record Lot33Windows(
                 new EnemyListCoordinator(sender, feeds.chat()),
                 new DeathRecapCoordinator(feeds.chat()),
                 new MarketWatchCoordinator(sender, feeds.chat(), feeds.itemCatalog()),
-                new GuildBankCoordinator(sender, feeds.chat()));
+                new GuildBankCoordinator(sender, feeds.chat()),
+                Lot34Windows.create(skin, sender, feeds)); // lô 34 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -34,5 +35,6 @@ record Lot33Windows(
         panels.register(deathRecap);
         panels.register(marketWatch);
         panels.register(guildBank);
+        lot34.registerInto(panels);
     }
 }

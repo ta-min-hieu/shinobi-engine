@@ -114,4 +114,14 @@ record Lot33Commands(
         }
         return response.build();
     }
+
+    /** ADR-200 — mốc làm mới ngày / tuần tính từ giờ server. Không chạm DB. */
+    dev.kage.protocol.GetResetTimersResponse resetTimers() {
+        java.time.Instant now = java.time.Instant.now();
+        return dev.kage.protocol.GetResetTimersResponse.newBuilder()
+                .setServerNowEpochSeconds(now.getEpochSecond())
+                .setNextDailyEpochSeconds(ResetSchedule.nextDaily(now).getEpochSecond())
+                .setNextWeeklyEpochSeconds(ResetSchedule.nextWeekly(now).getEpochSecond())
+                .build();
+    }
 }

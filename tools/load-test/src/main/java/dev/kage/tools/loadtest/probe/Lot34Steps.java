@@ -6,7 +6,10 @@ import dev.kage.protocol.GetItemCatalogRequest;
 import dev.kage.protocol.ItemCatalogResponse;
 import dev.kage.protocol.Opcode;
 
-/** Bước lô 34: hệ số cường hoá trong catalog (ADR-199) {@code catalogStep}. Nối sau {@link Lot33Steps}. */
+/**
+ * Bước lô 34: hệ số cường hoá trong catalog (ADR-199) {@code catalogStep}; mốc làm mới (ADR-200) {@code resetTimers}.
+ * Nối sau {@link Lot33Steps}.
+ */
 final class Lot34Steps {
 
     private final Lot23Scenario.Asker asker;
@@ -18,6 +21,7 @@ final class Lot34Steps {
     String step(String verb, String arg) throws IOException {
         return switch (verb) {
             case "catalogStep" -> catalogStep();
+            case "resetTimers" -> resetTimers();
             default -> "bước không hiểu";
         };
     }
@@ -30,6 +34,19 @@ final class Lot34Steps {
                 p -> {
                     ItemCatalogResponse r = ItemCatalogResponse.parseFrom(p);
                     return "enhanceStepPercent=" + r.getEnhanceStepPercent() + " món=" + r.getEntriesCount();
+                });
+    }
+
+    private String resetTimers() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_RESET_TIMERS_REQUEST_VALUE,
+                dev.kage.protocol.GetResetTimersRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_RESET_TIMERS_RESPONSE_VALUE,
+                p -> {
+                    dev.kage.protocol.GetResetTimersResponse r = dev.kage.protocol.GetResetTimersResponse.parseFrom(p);
+                    return "now=" + java.time.Instant.ofEpochSecond(r.getServerNowEpochSeconds()) + " ngày="
+                            + java.time.Instant.ofEpochSecond(r.getNextDailyEpochSeconds()) + " tuần="
+                            + java.time.Instant.ofEpochSecond(r.getNextWeeklyEpochSeconds());
                 });
     }
 }
