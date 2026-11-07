@@ -243,3 +243,53 @@ message MarketHistoryEntry {
 message GetMarketHistoryResponse {
   repeated MarketHistoryEntry entries = 1;
 }
+
+// ===== ADR-196 (Accepted 2026-11-07, chủ dự án chọn) — theo dõi phường thị. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_SET_MARKET_WATCH_COMMAND = 1031). max_unit_price = giá MỖI CÁI tối đa;
+// 0 = bỏ theo dõi loại này.
+message SetMarketWatchCommand {
+  int64 item_template_id = 1;
+  int64 max_unit_price = 2;
+}
+
+enum SetMarketWatchOutcome {
+  SET_MARKET_WATCH_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  SET_MARKET_WATCH_OUTCOME_OK = 1;           // đặt mới hoặc sửa mức giá
+  SET_MARKET_WATCH_OUTCOME_REMOVED = 2;
+  SET_MARKET_WATCH_OUTCOME_NOT_WATCHING = 3; // bỏ một loại đang không theo dõi
+  SET_MARKET_WATCH_OUTCOME_TOO_MANY = 4;     // đã theo dõi đủ max_watches loại
+  SET_MARKET_WATCH_OUTCOME_INVALID = 5;
+}
+
+// Response: Server -> Client (OPCODE_SET_MARKET_WATCH_RESPONSE = 1032).
+message SetMarketWatchResponse {
+  SetMarketWatchOutcome outcome = 1;
+  int64 item_template_id = 2;
+  int64 max_unit_price = 3;
+}
+
+// Request: Client -> Server (OPCODE_LIST_MARKET_WATCH_REQUEST = 1033).
+message ListMarketWatchRequest {}
+
+message MarketWatchView {
+  int64 item_template_id = 1;
+  int64 max_unit_price = 2;
+}
+
+// Response: Server -> Client (OPCODE_LIST_MARKET_WATCH_RESPONSE = 1034).
+message ListMarketWatchResponse {
+  repeated MarketWatchView watches = 1;
+  int32 max_watches = 2;
+}
+
+// Event: Server -> Client (OPCODE_MARKET_WATCH_ALERT_EVENT = 1035) — ai đó vừa bày món mình theo dõi với giá mỗi cái
+// (làm tròn lên) không quá mức mình đặt. Chỉ gửi người đang online; người bán không nhận báo về món của mình.
+message MarketWatchAlertEvent {
+  int64 listing_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int64 price = 4;
+  int64 unit_price = 5;
+  string seller_name = 6;
+}

@@ -1072,6 +1072,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.RemoveEnemyCommand.parser(),
                             Opcode.OPCODE_REMOVE_ENEMY_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot33().removeEnemy(id, c))),
+            // Lô 33 — theo dõi phường thị (ADR-196).
+            Map.entry(
+                    Opcode.OPCODE_SET_MARKET_WATCH_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetMarketWatchCommand.parser(),
+                            Opcode.OPCODE_SET_MARKET_WATCH_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot33().setMarketWatch(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_LIST_MARKET_WATCH_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListMarketWatchRequest.parser(),
+                            Opcode.OPCODE_LIST_MARKET_WATCH_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot33().listMarketWatch(id))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,
@@ -1461,7 +1474,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 this::mainWorldPositionOf,
                 worldGateway.mainWorldChannels()::dynamicNpcs);
         this.storage = new SectStorageCommands(inventoryFacade, npcProximity);
-        this.market = new MarketCommands(facades.progression().marketFacade(), worldGateway.registry());
+        this.market = MarketCommands.of(facades, worldGateway);
         this.crafting = new CraftingCommands(facades.progression().crafting(), characterFacade, npcProximity);
         this.guildShop = new GuildShopCommands(facades.progression().guildShop());
         this.guildSkills = new GuildSkillCommands(facades.progression().guildSkills());

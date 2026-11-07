@@ -39,10 +39,21 @@ final class MarketCommands {
 
     private final MarketFacade market;
     private final ConnectedCharacterRegistry registry;
+    private final dev.kage.market.api.MarketWatchFacade watch;
 
-    MarketCommands(MarketFacade market, ConnectedCharacterRegistry registry) {
+    MarketCommands(
+            MarketFacade market, ConnectedCharacterRegistry registry, dev.kage.market.api.MarketWatchFacade watch) {
         this.market = market;
         this.registry = registry;
+        this.watch = watch;
+    }
+
+    /** Dựng từ composition — tách khỏi constructor handler vì trần {@code MethodLength}. */
+    static MarketCommands of(GatewayFacades facades, WorldGateway worldGateway) {
+        return new MarketCommands(
+                facades.progression().marketFacade(),
+                worldGateway.registry(),
+                facades.progression().expansion().lot33().marketWatch());
     }
 
     ListMarketResponse list(long characterId, ListMarketRequest request) {
@@ -69,6 +80,9 @@ final class MarketCommands {
                 command.getQuantity(),
                 command.getPrice(),
                 command.getIdempotencyKey()));
+        if (outcome == MarketOutcome.OK) {
+            alertWatchers(characterId);
+        }
         return CreateListingResponse.newBuilder()
                 .setOutcome(RESULTS.get(outcome))
                 .build();
@@ -86,6 +100,34 @@ final class MarketCommands {
         return CancelListingResponse.newBuilder()
                 .setOutcome(RESULTS.get(market.cancel(characterId, command.getListingId())))
                 .build();
+    }
+
+    /**
+     * ADR-196 — món vừa bày (dòng mới nhất của người bán) khớp ai đang theo dõi thì báo người đó nếu đang online. Người
+     * bán không tự nhận báo về món của mình.
+     */
+    private void alertWatchers(long sellerId) {
+        market.mine(sellerId).stream()
+                .max(java.util.Comparator.comparingLong(MarketListing::id))
+                .ifPresent(listing -> {
+                    byte[] payload = dev.kage.protocol.MarketWatchAlertEvent.newBuilder()
+                            .setListingId(listing.id())
+                            .setItemTemplateId(listing.itemTemplateId())
+                            .setQuantity(listing.quantity())
+                            .setPrice(listing.price())
+                            .setUnitPrice(dev.kage.market.api.MarketWatchFacade.unitPrice(
+                                    listing.price(), listing.quantity()))
+                            .setSellerName(listing.sellerName())
+                            .build()
+                            .toByteArray();
+                    for (long watcher :
+                            watch.watchersFor(listing.itemTemplateId(), listing.price(), listing.quantity())) {
+                        if (watcher != sellerId) {
+                            registry.sendToCharacterIfOnline(
+                                    watcher, Opcode.OPCODE_MARKET_WATCH_ALERT_EVENT_VALUE, 0, payload);
+                        }
+                    }
+                });
     }
 
     /** Người bán đang online thì biết ngay; vàng mới tới riêng bằng GoldChangedEvent. */

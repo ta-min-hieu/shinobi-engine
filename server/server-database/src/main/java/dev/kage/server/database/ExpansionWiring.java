@@ -155,6 +155,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.trade.PostgresTradeHistoryAdapter(dataSource));
     }
 
+    /** ADR-196 — theo dõi phường thị. */
+    public dev.kage.market.api.MarketWatchFacade wireMarketWatchFacade() {
+        return new dev.kage.market.api.MarketWatchFacade(
+                new dev.kage.server.database.market.PostgresMarketWatchAdapter(dataSource));
+    }
+
     /** ADR-194 — danh sách cừu nhân. */
     public dev.kage.pvp.api.EnemyListFacade wireEnemyListFacade() {
         return new dev.kage.pvp.api.EnemyListFacade(

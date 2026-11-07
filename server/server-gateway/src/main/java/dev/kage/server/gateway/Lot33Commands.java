@@ -87,4 +87,31 @@ record Lot33Commands(
                 .setName(command.getName().strip())
                 .build();
     }
+
+    /** ADR-196 — Virtual Thread; đặt / sửa / bỏ ({@code max_unit_price = 0}) một dòng theo dõi phường thị. */
+    dev.kage.protocol.SetMarketWatchResponse setMarketWatch(
+            long characterId, dev.kage.protocol.SetMarketWatchCommand command) {
+        dev.kage.market.api.MarketWatchFacade.Outcome outcome = facades.marketWatch()
+                .set(characterId, command.getItemTemplateId(), command.getMaxUnitPrice(), java.time.Instant.now());
+        return dev.kage.protocol.SetMarketWatchResponse.newBuilder()
+                .setOutcome(
+                        dev.kage.protocol.SetMarketWatchOutcome.valueOf("SET_MARKET_WATCH_OUTCOME_" + outcome.name()))
+                .setItemTemplateId(command.getItemTemplateId())
+                .setMaxUnitPrice(command.getMaxUnitPrice())
+                .build();
+    }
+
+    /** ADR-196 — Virtual Thread; các dòng theo dõi phường thị của {@code characterId}. */
+    dev.kage.protocol.ListMarketWatchResponse listMarketWatch(long characterId) {
+        dev.kage.protocol.ListMarketWatchResponse.Builder response =
+                dev.kage.protocol.ListMarketWatchResponse.newBuilder()
+                        .setMaxWatches(dev.kage.market.api.MarketWatchFacade.MAX_WATCHES);
+        for (dev.kage.market.domain.MarketWatchPort.Watch watch :
+                facades.marketWatch().list(characterId)) {
+            response.addWatches(dev.kage.protocol.MarketWatchView.newBuilder()
+                    .setItemTemplateId(watch.itemTemplateId())
+                    .setMaxUnitPrice(watch.maxUnitPrice()));
+        }
+        return response.build();
+    }
 }

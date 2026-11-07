@@ -731,7 +731,8 @@ public final class GatewayBootstrap {
         return new Lot33Facades(
                 databaseBootstrap.expansion().wireLastOnlineFacade(),
                 databaseBootstrap.expansion().wirePetNameFacade(),
-                databaseBootstrap.expansion().wireEnemyListFacade());
+                databaseBootstrap.expansion().wireEnemyListFacade(),
+                databaseBootstrap.expansion().wireMarketWatchFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */

@@ -227,6 +227,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-193](ADR-193-Pet-Rename.md) | Đặt tên linh thú đang mặc: `pet_state.custom_name` (V151), 253/254, `PetView.custom_name`; `/tenlinhthu` (tên hiện trên bảng nhân vật — linh thú chưa có hình trong world) | ✅ Accepted (lô 33) |
 | [ADR-194](ADR-194-Enemy-List.md) | Danh sách cừu nhân: ai hạ mình trong dải PvP, `pvp_enemy` (V152) trần 20, 1619–1622; `/cuunhan` | ✅ Accepted (lô 33) |
 | [ADR-195](ADR-195-Death-Recap.md) | Tóm tắt khi chết: gateway giữ đòn trúng trong RAM (64/nhân vật), lúc bị hạ gửi 415 tổng 10 giây cuối theo kẻ ra đòn; client in vào chat | ✅ Accepted (lô 33) |
+| [ADR-196](ADR-196-Market-Watch.md) | Theo dõi phường thị: mẫu + giá mỗi cái tối đa (làm tròn lên), `market_watch` (V153) trần 10, báo người đang online lúc có tin khớp, 1031–1035; `/theodoi` | ✅ Accepted (lô 33) |
 ---
 
 ## ADR cần tạo (chưa viết)

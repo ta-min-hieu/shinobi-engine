@@ -15,8 +15,8 @@ import dev.kage.protocol.TransferPartyLeaderResponse;
 
 /**
  * Bước lô 33: nhường trưởng nhóm (ADR-191) {@code partyLeader:<tên>}; đặt tên linh thú (ADR-193) {@code petName:<tên>}
- * ({@code petName:} trống = xoá); cừu nhân (ADR-194) {@code enemies}, {@code unenemy:<tên>}. Nối sau {@link
- * Lot32Steps}.
+ * ({@code petName:} trống = xoá); cừu nhân (ADR-194) {@code enemies}, {@code unenemy:<tên>}; theo dõi phường thị
+ * (ADR-196) {@code watch:<id mẫu>=<giá mỗi cái>} (giá 0 = bỏ). Nối sau {@link Lot32Steps}.
  */
 final class Lot33Steps {
 
@@ -32,6 +32,7 @@ final class Lot33Steps {
             case "petName" -> petName(arg);
             case "enemies" -> enemies();
             case "unenemy" -> unenemy(arg);
+            case "watch" -> watch(arg);
             default -> "bước không hiểu";
         };
     }
@@ -83,5 +84,19 @@ final class Lot33Steps {
                 RemoveEnemyCommand.newBuilder().setName(name).build(),
                 Opcode.OPCODE_REMOVE_ENEMY_RESPONSE_VALUE,
                 p -> "removed=" + RemoveEnemyResponse.parseFrom(p).getRemoved());
+    }
+
+    private String watch(String arg) throws IOException {
+        String[] parts = arg.split("=", 2);
+        return asker.ask(
+                Opcode.OPCODE_SET_MARKET_WATCH_COMMAND_VALUE,
+                dev.kage.protocol.SetMarketWatchCommand.newBuilder()
+                        .setItemTemplateId(Long.parseLong(parts[0]))
+                        .setMaxUnitPrice(Long.parseLong(parts[1]))
+                        .build(),
+                Opcode.OPCODE_SET_MARKET_WATCH_RESPONSE_VALUE,
+                p -> dev.kage.protocol.SetMarketWatchResponse.parseFrom(p)
+                        .getOutcome()
+                        .name());
     }
 }
