@@ -3,19 +3,26 @@ package dev.kage.client.core.world;
 import dev.kage.client.core.ui.theme.KageSkin;
 
 /**
- * Luồng lô 32 — nhường chức bang chủ (ADR-183), phó bang chủ (ADR-184). Là MỘT thành phần của {@link Lot31Windows}
- * (không phải của {@link ExpansionWindows}: {@code ExpansionWindows.create} đã chạm trần {@code MethodLength}).
+ * Luồng lô 32 — nhường chức bang chủ (ADR-183), phó bang chủ (ADR-184), bảng chiêu mộ bang (ADR-185). Là MỘT thành phần
+ * của {@link Lot31Windows} (không phải của {@link ExpansionWindows}: {@code ExpansionWindows.create} đã chạm trần
+ * {@code MethodLength}).
  */
-record Lot32Windows(GuildLeadershipCoordinator guildLeadership, GuildViceCoordinator guildVice) {
+record Lot32Windows(
+        GuildLeadershipCoordinator guildLeadership,
+        GuildViceCoordinator guildVice,
+        GuildRecruitmentCoordinator guildRecruitment) {
 
     static Lot32Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot32Windows(
-                new GuildLeadershipCoordinator(sender, feeds.chat()), new GuildViceCoordinator(sender, feeds.chat()));
+                new GuildLeadershipCoordinator(sender, feeds.chat()),
+                new GuildViceCoordinator(sender, feeds.chat()),
+                GuildRecruitmentCoordinator.create(skin, sender, feeds));
     }
 
     /** Đăng ký vào hub. */
     void registerInto(PanelHub panels) {
         panels.register(guildLeadership);
         panels.register(guildVice);
+        panels.register(guildRecruitment.panel(), guildRecruitment);
     }
 }

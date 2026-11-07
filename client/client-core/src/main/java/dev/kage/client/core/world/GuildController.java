@@ -276,7 +276,9 @@ final class GuildController {
             SendGuildJoinRequestOutcome.SEND_GUILD_JOIN_REQUEST_OUTCOME_GUILD_NOT_FOUND,
             "guild.error.guild_not_found",
             SendGuildJoinRequestOutcome.SEND_GUILD_JOIN_REQUEST_OUTCOME_REQUEST_ALREADY_PENDING,
-            "guild.error.request_already_pending");
+            "guild.error.request_already_pending",
+            SendGuildJoinRequestOutcome.SEND_GUILD_JOIN_REQUEST_OUTCOME_LEVEL_TOO_LOW, // ADR-185
+            "guild.error.level_too_low");
 
     private static final Map<ApproveGuildJoinRequestOutcome, String> APPROVE_MESSAGE_KEYS = Map.of(
             ApproveGuildJoinRequestOutcome.APPROVE_GUILD_JOIN_REQUEST_OUTCOME_OK,

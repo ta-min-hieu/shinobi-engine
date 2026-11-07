@@ -699,12 +699,24 @@ public final class GatewayBootstrap {
                         databaseBootstrap.expansion().wireInspectPrivacyFacade(),
                         databaseBootstrap.expansion().wireGuildRenameFacade(),
                         databaseBootstrap.expansion().wireFriendNoteFacade()),
-                new Lot31Facades(
-                        databaseBootstrap.expansion().wireEquipmentPresetFacade(),
-                        databaseBootstrap.expansion().wireMarketHistoryFacade(),
-                        databaseBootstrap.expansion().wireGuildNoticeFacade(),
-                        databaseBootstrap.expansion().wireGuildLogFacade()),
-                new Lot32Facades(databaseBootstrap.expansion().wireGuildLeadershipFacade()));
+                lot31Facades(databaseBootstrap),
+                lot32Facades(databaseBootstrap));
+    }
+
+    /** Facade lô 31 (ADR-175…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
+    private static Lot31Facades lot31Facades(ServerDatabaseBootstrap databaseBootstrap) {
+        return new Lot31Facades(
+                databaseBootstrap.expansion().wireEquipmentPresetFacade(),
+                databaseBootstrap.expansion().wireMarketHistoryFacade(),
+                databaseBootstrap.expansion().wireGuildNoticeFacade(),
+                databaseBootstrap.expansion().wireGuildLogFacade());
+    }
+
+    /** Facade lô 32 (ADR-183…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
+    private static Lot32Facades lot32Facades(ServerDatabaseBootstrap databaseBootstrap) {
+        return new Lot32Facades(
+                databaseBootstrap.expansion().wireGuildLeadershipFacade(),
+                databaseBootstrap.expansion().wireGuildRecruitmentFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */

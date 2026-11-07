@@ -1017,6 +1017,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetGuildViceLeaderCommand.parser(),
                             Opcode.OPCODE_SET_GUILD_VICE_LEADER_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot32().guildLeadership().setVice(id, c))),
+            // Lô 32 — bảng chiêu mộ bang (ADR-185).
+            Map.entry(
+                    Opcode.OPCODE_POST_GUILD_RECRUITMENT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.PostGuildRecruitmentCommand.parser(),
+                            Opcode.OPCODE_POST_GUILD_RECRUITMENT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot32().guildRecruitment().post(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_LIST_GUILD_RECRUITMENT_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListGuildRecruitmentRequest.parser(),
+                            Opcode.OPCODE_LIST_GUILD_RECRUITMENT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot32().guildRecruitment().list())),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,
@@ -4273,6 +4286,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleSendGuildJoinRequestBlocking(
             ChannelHandlerContext ctx, int sequenceId, long characterId, SendGuildJoinRequestCommand command) {
+        // ADR-185 — bang đang chiêu mộ với cấp tối thiểu: kiểm Ở SERVER, không chỉ hiển thị trên bảng.
+        java.util.OptionalInt minLevel = expansion.lot32().guildRecruitment().minLevelOf(command.getGuildName());
+        if (minLevel.isPresent()
+                && characterFacade.findById(characterId).map(Character::level).orElse(0) < minLevel.getAsInt()) {
+            send(
+                    ctx,
+                    Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_RESPONSE_VALUE,
+                    sequenceId,
+                    SendGuildJoinRequestResponse.newBuilder()
+                            .setOutcome(SendGuildJoinRequestOutcome.SEND_GUILD_JOIN_REQUEST_OUTCOME_LEVEL_TOO_LOW)
+                            .build()
+                            .toByteArray());
+            return;
+        }
         GuildFacade.SendJoinRequestResult result = guildFacade.sendJoinRequest(characterId, command.getGuildName());
         SendGuildJoinRequestResponse response = SendGuildJoinRequestResponse.newBuilder()
                 .setOutcome(toProtoOutcome(result))

@@ -216,6 +216,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-182](ADR-182-Friend-Breakthrough-Notice.md) | Báo bạn bè đột phá: mốc ADR-136 báo riêng bạn bè đang online, chúc mừng 1 lần / 30 phút, chỉ bộ nhớ; 1147–1150; `/chucmung` | ✅ Accepted (lô 31) |
 | [ADR-183](ADR-183-Guild-Leader-Transfer.md) | Nhường chức bang chủ: cho thành viên cùng bang, một transaction đọc-lại-sau-khoá, nhật ký `LEADER_CHANGED` (V144), 747/748, 720 LEADER_CHANGED; `/nhuongbang` | ✅ Accepted (lô 32) |
 | [ADR-184](ADR-184-Guild-Vice-Leader.md) | Phó bang chủ: vai `VICE_LEADER` ≤ 2 — duyệt đơn + đăng thông báo, rời / bị đuổi được (sửa SQL rời/đuổi/duyệt/từ chối), V145, 749/750; `/phobang` | ✅ Accepted (lô 32) |
+| [ADR-185](ADR-185-Guild-Recruitment-Board.md) | Bảng chiêu mộ bang: một dòng / bang (V146), bang chủ hoặc phó, ≤ 80 ký tự qua bộ lọc chat, cấp tối thiểu kiểm ở đơn xin vào (`LEVEL_TOO_LOW`), 751–754; `/chieumo` | ✅ Accepted (lô 32) |
 ---
 
 ## ADR cần tạo (chưa viết)

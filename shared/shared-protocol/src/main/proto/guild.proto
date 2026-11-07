@@ -39,6 +39,7 @@ enum SendGuildJoinRequestOutcome {
   SEND_GUILD_JOIN_REQUEST_OUTCOME_ALREADY_IN_GUILD = 2;
   SEND_GUILD_JOIN_REQUEST_OUTCOME_GUILD_NOT_FOUND = 3;
   SEND_GUILD_JOIN_REQUEST_OUTCOME_REQUEST_ALREADY_PENDING = 4;
+  SEND_GUILD_JOIN_REQUEST_OUTCOME_LEVEL_TOO_LOW = 5; // ADR-185 — bang đang chiêu mộ với cấp tối thiểu cao hơn cấp mình
 }
 
 message SendGuildJoinRequestResponse {
@@ -545,4 +546,46 @@ message SetGuildViceLeaderResponse {
   SetGuildViceLeaderOutcome outcome = 1;
   string target_name = 2;
   bool appoint = 3;
+}
+
+// ===== ADR-185 — bảng chiêu mộ bang. CHỈ THÊM. Bang chủ / phó treo lời chiêu mộ; người chưa có bang xem và gửi đơn
+// bằng SendGuildJoinRequestCommand như cũ (server kiểm cấp tối thiểu ⇒ LEVEL_TOO_LOW).
+
+// Command: Client -> Server (OPCODE_POST_GUILD_RECRUITMENT_COMMAND = 751). open=false = gỡ chiêu mộ.
+message PostGuildRecruitmentCommand {
+  bool open = 1;
+  int32 min_level = 2; // kẹp 1..100
+  string message = 3;  // tối đa 80 ký tự, một dòng, qua bộ lọc từ cấm của chat
+}
+
+enum PostGuildRecruitmentOutcome {
+  POST_GUILD_RECRUITMENT_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  POST_GUILD_RECRUITMENT_OUTCOME_OK = 1;
+  POST_GUILD_RECRUITMENT_OUTCOME_NOT_IN_GUILD = 2;
+  POST_GUILD_RECRUITMENT_OUTCOME_NOT_ALLOWED = 3; // không phải bang chủ / phó bang chủ
+  POST_GUILD_RECRUITMENT_OUTCOME_TOO_LONG = 4;
+  POST_GUILD_RECRUITMENT_OUTCOME_BANNED_WORD = 5;
+}
+
+// Response: Server -> Client (OPCODE_POST_GUILD_RECRUITMENT_RESPONSE = 752).
+message PostGuildRecruitmentResponse {
+  PostGuildRecruitmentOutcome outcome = 1;
+  bool open = 2;
+}
+
+// Request: Client -> Server (OPCODE_LIST_GUILD_RECRUITMENT_REQUEST = 753).
+message ListGuildRecruitmentRequest {}
+
+message GuildRecruitmentView {
+  string guild_name = 1;
+  int32 guild_level = 2;
+  int32 members = 3;
+  int32 max_members = 4;
+  int32 min_level = 5;
+  string message = 6;
+}
+
+// Response: Server -> Client (OPCODE_LIST_GUILD_RECRUITMENT_RESPONSE = 754). Cấp bang giảm dần, tối đa 50 dòng.
+message ListGuildRecruitmentResponse {
+  repeated GuildRecruitmentView entries = 1;
 }
