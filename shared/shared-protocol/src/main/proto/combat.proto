@@ -216,3 +216,23 @@ message WorldBossBoardEvent {
   int32 participants = 5;
   bool ended = 6;
 }
+
+// ===== ADR-195 (Accepted 2026-11-07, chủ dự án chọn) — tóm tắt khi chết. CHỈ THÊM. =====
+
+// Một kẻ ra đòn trong cửa sổ. attacker_name chỉ có với người chơi (id dương); quái (id âm) client tự đặt tên theo
+// gói spawn. top_skill_code rỗng = đòn đánh thường gây nhiều sát thương nhất.
+message DeathRecapEntry {
+  int64 attacker_entity_id = 1;
+  string attacker_name = 2;
+  int32 damage = 3;
+  int32 hits = 4;
+  string top_skill_code = 5;
+}
+
+// Event: Server -> Client (OPCODE_DEATH_RECAP_EVENT = 415) — chỉ gửi người vừa bị hạ, khi có ít nhất một đòn trúng
+// trong window_seconds giây cuối. Nhiều sát thương nhất trước. Sát thương theo thời gian (độc, bỏng) không có ở đây.
+message DeathRecapEvent {
+  int64 killer_entity_id = 1;
+  repeated DeathRecapEntry entries = 2;
+  int32 window_seconds = 3;
+}

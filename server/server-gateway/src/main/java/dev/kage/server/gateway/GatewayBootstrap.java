@@ -395,6 +395,7 @@ public final class GatewayBootstrap {
                 java.time.Clock.systemUTC()));
         characterRegistry.enemies.bind(new EnemyHooks.Deps(
                 facades.progression().expansion().lot33().enemies(), java.time.Clock.systemUTC())); // ADR-194
+        characterRegistry.deathRecap.bind(facades.characterFacade()); // ADR-195
         return List.of(
                 characterRegistry.killingIntent.job(),
                 WeatherJob.job(

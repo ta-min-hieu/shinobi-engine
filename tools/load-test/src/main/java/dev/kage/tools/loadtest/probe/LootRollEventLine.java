@@ -7,7 +7,8 @@ import com.google.protobuf.InvalidProtocolBufferException;
 import dev.kage.protocol.Opcode;
 
 /**
- * Dòng log probe cho gói tung xúc xắc chia đồ nhóm (ADR-150) — tách khỏi {@link ProbeEventLine} vì lớp đó đã chạm trần
+ * Dòng log probe cho gói tung xúc xắc chia đồ nhóm (ADR-150) và tóm tắt khi chết (ADR-195) — tách khỏi {@link
+ * ProbeEventLine} vì lớp đó đã chạm trần
  * CyclomaticComplexity cả lớp.
  */
 final class LootRollEventLine {
@@ -27,6 +28,14 @@ final class LootRollEventLine {
                         + r.getByMail() + " entries="
                         + r.getEntriesList().stream()
                                 .map(e -> e.getName() + ":" + e.getChoice() + ":" + e.getRoll())
+                                .toList());
+            }
+            case Opcode.OPCODE_DEATH_RECAP_EVENT_VALUE -> { // ADR-195
+                dev.kage.protocol.DeathRecapEvent r = dev.kage.protocol.DeathRecapEvent.parseFrom(payload);
+                yield Optional.of("killer=" + r.getKillerEntityId() + " window=" + r.getWindowSeconds() + "s entries="
+                        + r.getEntriesList().stream()
+                                .map(e -> e.getAttackerEntityId() + "/" + e.getAttackerName() + ":" + e.getDamage()
+                                        + "dmg/" + e.getHits() + "hits/" + e.getTopSkillCode())
                                 .toList());
             }
             default -> Optional.empty();

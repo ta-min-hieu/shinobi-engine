@@ -183,6 +183,7 @@ enum Opcode {
   OPCODE_UPGRADE_SKILL_RESPONSE = 412;
   OPCODE_BOSS_TELEGRAPH_EVENT = 413; // ADR-145 (2026-11-01) — boss gồng dậm đất, vẽ vòng báo trước
   OPCODE_WORLD_BOSS_BOARD_EVENT = 414; // ADR-157 (2026-11-02) — bảng sát thương boss thế giới trực tiếp
+  OPCODE_DEATH_RECAP_EVENT = 415; // ADR-195 (2026-11-07) — tóm tắt sát thương 10 giây cuối khi bị hạ
 
   // --- Inventory / Equipment (500-599) ---
   OPCODE_ITEM_GRANTED_EVENT = 500;

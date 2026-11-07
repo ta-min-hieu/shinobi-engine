@@ -6569,6 +6569,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void onLeftWorld(long characterId) {
         worldGateway.registry().achievements.onLeftWorld(characterId);
         expansion.lot31().away().clear(characterId);
+        worldGateway.registry().deathRecap.forget(characterId); // ADR-195
     }
 
     /**

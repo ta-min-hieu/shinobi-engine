@@ -128,6 +128,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     final KillingIntentHooks killingIntent = new KillingIntentHooks();
 
     final EnemyHooks enemies = new EnemyHooks(); // ADR-194
+    final DeathRecapHooks deathRecap = new DeathRecapHooks(System::currentTimeMillis); // ADR-195
 
     /** ADR-112 — mở lô đấu giá khi boss Bí Cảnh chết + nhịp chốt/gửi thư; nối sau khi DB đã dựng. */
     final GuildAuctionHooks guildAuctions = new GuildAuctionHooks();
@@ -517,6 +518,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onAttackResult(long targetCharacterId, WorldOutboundSink.AttackOutcome outcome) {
+        deathRecap.onAttackObserved(targetCharacterId, outcome); // ADR-195
         ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
@@ -552,6 +554,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onSkillResult(long targetCharacterId, WorldOutboundSink.SkillOutcome outcome) {
+        deathRecap.onSkillObserved(targetCharacterId, outcome); // ADR-195
         ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
@@ -660,6 +663,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         Optional<PositionSnapshot> victimAt = Optional.ofNullable(lastKnownPosition.get(defeatedCharacterId));
         killingIntent.onCharacterDefeated(defeatedCharacterId, killerEntityId, victimAt, guildWars.roster); // ADR-142
         enemies.onCharacterDefeated(defeatedCharacterId, killerEntityId, killingIntent.inPvpZone(victimAt)); // ADR-194
+        deathRecap.onDefeated(defeatedCharacterId, killerEntityId, this); // ADR-195
     }
 
     @Override
