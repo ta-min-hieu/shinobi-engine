@@ -33,9 +33,11 @@ import dev.kage.protocol.TransferGuildLeaderResponse;
 final class Lot32Steps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot33Steps lot33;
 
     Lot32Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot33 = new Lot33Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -58,7 +60,7 @@ final class Lot32Steps {
             case "showItemArea" -> showItem(Long.parseLong(arg), ChatChannel.CHAT_CHANNEL_AREA);
             case "showItemResult" -> showItemResult(Long.parseLong(arg));
             case "tradeHistory" -> tradeHistory();
-            default -> "bước không hiểu";
+            default -> lot33.step(verb, arg);
         };
     }
 

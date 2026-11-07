@@ -222,6 +222,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-188](ADR-188-Chat-Item-Link.md) | Khoe vật phẩm vào chat: server đọc món thật + chỉ số hiệu dụng, gắn `LinkedItemView` vào tin (không ở kênh Khu vực); 2 outcome + 2 field; `/khoe`, `/xemmon` | ✅ Accepted (lô 32) |
 | [ADR-189](ADR-189-Trade-History.md) | Lịch sử giao dịch: đọc audit `TRADE_EXECUTED` sẵn có (chỉ mục V149), 30 lần / 30 ngày, 1415/1416; `/lichsugd` | ✅ Accepted (lô 32) |
 | [ADR-190](ADR-190-Key-Rebinding.md) | Đổi phím tắt phía client: 27 phím mở bảng/hành động, lưu Preferences, chặn trùng + phím dành riêng; `/phimtat` (không đổi protocol/DB) | ✅ Accepted (lô 32) |
+| [ADR-191](ADR-191-Party-Leader-Transfer.md) | Nhường trưởng nhóm khi vẫn ở lại nhóm: dùng lại `PartyPort.transferLeadership`, 1332/1333, báo 1318 LEADER_CHANGED; `/nhuongnhom` | ✅ Accepted (lô 33) |
 ---
 
 ## ADR cần tạo (chưa viết)

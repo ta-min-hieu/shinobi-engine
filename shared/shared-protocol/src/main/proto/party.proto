@@ -294,3 +294,26 @@ message LootRollResultEvent {
   repeated LootRollEntry entries = 6;
   bool by_mail = 7;
 }
+
+// ===== ADR-191 (Accepted 2026-11-07, chủ dự án chọn) — nhường trưởng nhóm khi vẫn ở trong nhóm. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_TRANSFER_PARTY_LEADER_COMMAND = 1332). target_name (không phải ID) — cùng lý do
+// InvitePartyMemberCommand.
+message TransferPartyLeaderCommand {
+  string target_name = 1;
+}
+
+enum TransferPartyLeaderOutcome {
+  TRANSFER_PARTY_LEADER_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  TRANSFER_PARTY_LEADER_OUTCOME_OK = 1;
+  TRANSFER_PARTY_LEADER_OUTCOME_NOT_LEADER = 2; // chưa vào nhóm, hoặc không phải trưởng nhóm
+  TRANSFER_PARTY_LEADER_OUTCOME_TARGET_NOT_IN_PARTY = 3; // tên không tồn tại, hoặc không cùng nhóm
+  TRANSFER_PARTY_LEADER_OUTCOME_CANNOT_TRANSFER_TO_SELF = 4;
+}
+
+// Response: Server -> Client (OPCODE_TRANSFER_PARTY_LEADER_RESPONSE = 1333). Thành công ⇒ cả nhóm (đang online) nhận
+// PartyChangedEvent LEADER_CHANGED.
+message TransferPartyLeaderResponse {
+  TransferPartyLeaderOutcome outcome = 1;
+  string target_name = 2;
+}

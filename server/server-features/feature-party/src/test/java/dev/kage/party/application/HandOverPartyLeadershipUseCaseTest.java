@@ -59,6 +59,31 @@ class HandOverPartyLeadershipUseCaseTest {
         assertThat(port.findMembershipOf(LEADER).orElseThrow().role()).isEqualTo(PartyRole.LEADER);
     }
 
+    /** ADR-191 — trưởng nhóm tự nhường cho một thành viên cùng nhóm, vẫn ở lại nhóm. */
+    @Test
+    void transferTo_shouldPassLeadershipToTheChosenMember() {
+        Party party = partyOfThree();
+
+        assertThat(useCase.transferTo(LEADER, SECOND_MEMBER)).isEqualTo(HandOverPartyLeadershipUseCase.Transfer.OK);
+        assertThat(port.findMembershipOf(SECOND_MEMBER).orElseThrow().role()).isEqualTo(PartyRole.LEADER);
+        assertThat(port.findMembershipOf(LEADER).orElseThrow().role()).isEqualTo(PartyRole.MEMBER);
+        assertThat(port.listMembers(party.id())).hasSize(3);
+    }
+
+    /** ADR-191 — thành viên thường, tự nhường cho mình, người ngoài nhóm: không đổi gì. */
+    @Test
+    void transferTo_shouldRefuseNonLeadersSelfAndOutsiders() {
+        partyOfThree();
+
+        assertThat(useCase.transferTo(FIRST_MEMBER, SECOND_MEMBER))
+                .isEqualTo(HandOverPartyLeadershipUseCase.Transfer.NOT_LEADER);
+        assertThat(useCase.transferTo(LEADER, LEADER))
+                .isEqualTo(HandOverPartyLeadershipUseCase.Transfer.CANNOT_TRANSFER_TO_SELF);
+        assertThat(useCase.transferTo(LEADER, 999L))
+                .isEqualTo(HandOverPartyLeadershipUseCase.Transfer.TARGET_NOT_IN_PARTY);
+        assertThat(port.findMembershipOf(LEADER).orElseThrow().role()).isEqualTo(PartyRole.LEADER);
+    }
+
     /** Thành viên thường rớt mạng không làm đổi trưởng nhóm; người không ở nhóm nào cũng vậy. */
     @Test
     void shouldChangeNothing_whenTheDisconnectedCharacterIsNotALeader() {

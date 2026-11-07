@@ -104,6 +104,15 @@ public final class PartyFacade {
         return useCases.handOverPartyLeadershipUseCase().execute(leaderCharacterId, isOnline);
     }
 
+    /**
+     * ADR-191 — trưởng nhóm nhường quyền cho {@code targetCharacterId} cùng nhóm, vẫn ở lại làm thành viên. Chạm DB
+     * (blocking).
+     */
+    public dev.kage.party.application.HandOverPartyLeadershipUseCase.Transfer transferLeadership(
+            long leaderCharacterId, long targetCharacterId) {
+        return useCases.handOverPartyLeadershipUseCase().transferTo(leaderCharacterId, targetCharacterId);
+    }
+
     /** Nhóm của {@code characterId} — rỗng nếu chưa vào nhóm nào. */
     public Optional<MyPartyView> findMyParty(long characterId) {
         return useCases.findMyPartyUseCase()

@@ -15,7 +15,8 @@ record Lot32Windows(
         GuildCheckInCoordinator guildCheckIn,
         ItemLinkCoordinator itemLink,
         TradeHistoryCoordinator tradeHistory,
-        KeyBindingsCoordinator keyBindings) {
+        KeyBindingsCoordinator keyBindings,
+        Lot33Windows lot33) {
 
     static Lot32Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot32Windows(
@@ -25,7 +26,8 @@ record Lot32Windows(
                 new GuildCheckInCoordinator(sender, feeds.chat()),
                 new ItemLinkCoordinator(sender, feeds),
                 TradeHistoryCoordinator.create(skin, sender, feeds),
-                keyBindings(feeds));
+                keyBindings(feeds),
+                Lot33Windows.create(skin, sender, feeds)); // lô 33 lồng ở đây
     }
 
     /** ADR-190 — lắp phím đã lưu trên máy rồi dựng lệnh {@code /phimtat}. */
@@ -44,5 +46,6 @@ record Lot32Windows(
         panels.register(itemLink);
         panels.register(tradeHistory.panel(), tradeHistory);
         panels.register(keyBindings);
+        lot33.registerInto(panels);
     }
 }

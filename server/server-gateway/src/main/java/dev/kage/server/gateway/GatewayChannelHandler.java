@@ -1045,6 +1045,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetTradeHistoryRequest.parser(),
                             Opcode.OPCODE_GET_TRADE_HISTORY_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot32().tradeHistory(id))),
+            // Lô 33 — nhường trưởng nhóm (ADR-191).
+            Map.entry(
+                    Opcode.OPCODE_TRANSFER_PARTY_LEADER_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.TransferPartyLeaderCommand.parser(),
+                            Opcode.OPCODE_TRANSFER_PARTY_LEADER_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot33().transferPartyLeader(id, c))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,
@@ -5784,7 +5791,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         String body = dev.kage.chat.domain.ChatMessage.singleLine(command.getBody());
         java.util.OptionalLong recipientId =
                 target == null ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(target.id());
-        Optional<LinkedItemView> linked = linkedItemOf(ctx, sequenceId, characterId, command, domainChannel);
+        Optional<LinkedItemView> linked = linkedItemOf(ctx, sequenceId, characterId, command);
         if (linked.isEmpty()) {
             return;
         }
@@ -5866,15 +5873,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * không có trong túi hoặc khoe ở kênh Khu vực (tin Khu vực đi qua world tick, không mang món).
      */
     private Optional<LinkedItemView> linkedItemOf(
-            ChannelHandlerContext ctx,
-            int sequenceId,
-            long characterId,
-            SendChatMessageCommand command,
-            dev.kage.chat.domain.ChatChannel channel) {
+            ChannelHandlerContext ctx, int sequenceId, long characterId, SendChatMessageCommand command) {
         if (command.getLinkedItemId() == 0L) {
             return Optional.of(LinkedItemView.getDefaultInstance());
         }
-        if (channel == dev.kage.chat.domain.ChatChannel.AREA) {
+        if (command.getChannel() == ChatChannel.CHAT_CHANNEL_AREA) {
             sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_ON_AREA);
             return Optional.empty();
         }
