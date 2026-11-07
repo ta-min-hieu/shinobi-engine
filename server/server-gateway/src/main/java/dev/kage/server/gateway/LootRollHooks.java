@@ -143,13 +143,20 @@ final class LootRollHooks {
      *
      * @return biên lai phần đã vào túi người ra đòn cuối
      */
-    List<ItemStack> grantLoot(InventoryFacade inventory, long killerId, String dropTableCode) {
+    List<ItemStack> grantLoot(InventoryFacade inventory, long killerId, String dropTableCode, AutoSellHooks autoSell) {
         List<Long> rollers = rollersFor(killerId);
-        if (rollers.isEmpty()) {
-            return inventory.grantLoot(killerId, dropTableCode);
+        java.util.function.Predicate<ItemStack> junk = autoSell.divertFor(killerId); // ADR-204
+        java.util.function.Predicate<ItemStack> rare = rollers.isEmpty() ? stack -> false : this::isRare;
+        GrantLootUseCase.Loot loot = inventory.grantLoot(killerId, dropTableCode, junk.or(rare));
+        List<ItemStack> toSell = new java.util.ArrayList<>();
+        for (ItemStack stack : loot.diverted()) {
+            if (junk.test(stack)) {
+                toSell.add(stack);
+            } else {
+                start(new Opening(killerId, dropTableCode, stack, rollers));
+            }
         }
-        GrantLootUseCase.Loot loot = inventory.grantLoot(killerId, dropTableCode, this::isRare);
-        loot.diverted().forEach(stack -> start(new Opening(killerId, dropTableCode, stack, rollers)));
+        autoSell.sell(inventory, killerId, dropTableCode, toSell);
         return loot.granted();
     }
 

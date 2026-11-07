@@ -129,6 +129,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     final EnemyHooks enemies = new EnemyHooks(); // ADR-194
     final DeathRecapHooks deathRecap = new DeathRecapHooks(System::currentTimeMillis); // ADR-195
+    final AutoSellHooks autoSell = new AutoSellHooks(); // ADR-204
 
     /** ADR-112 — mở lô đấu giá khi boss Bí Cảnh chết + nhịp chốt/gửi thư; nối sau khi DB đã dựng. */
     final GuildAuctionHooks guildAuctions = new GuildAuctionHooks();
@@ -834,7 +835,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     private void grantLootBlocking(long killerCharacterId, String monsterCode) {
         // ADR-150 — có đồng đội online cùng World thì trang bị rơi ra đi vào lượt tung xúc xắc, không vào túi ai ngay.
-        List<ItemStack> granted = lootRolls.grantLoot(inventoryFacade, killerCharacterId, monsterCode);
+        List<ItemStack> granted = lootRolls.grantLoot(inventoryFacade, killerCharacterId, monsterCode, autoSell);
         ChannelHandlerContext ctx = contextsByCharacterId.get(killerCharacterId);
         if (ctx == null) {
             return; // đã ngắt kết nối giữa lúc roll loot — item đã lưu DB thật, chỉ mất thông báo.

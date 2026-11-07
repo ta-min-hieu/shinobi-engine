@@ -155,6 +155,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.trade.PostgresTradeHistoryAdapter(dataSource));
     }
 
+    /** ADR-204 — lọc nhặt đồ (tự bán đồ rác rơi ra). */
+    public dev.kage.inventory.api.AutoSellJunkFacade wireAutoSellJunkFacade() {
+        return new dev.kage.inventory.api.AutoSellJunkFacade(
+                new dev.kage.server.database.inventory.PostgresAutoSellJunkAdapter(dataSource));
+    }
+
     /** ADR-202 — mua lại đồ đã bán. */
     public dev.kage.shop.api.BuybackFacade wireBuybackFacade() {
         return new dev.kage.shop.api.BuybackFacade(

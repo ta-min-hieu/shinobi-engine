@@ -235,6 +235,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-201](ADR-201-Spirit-Beast-Food.md) | Cho linh thú ăn: hiệu ứng dùng `FEED_PET`, EXP cùng transaction với trừ món, V156 Linh Thú Thực (200 EXP / 600 linh thạch) | ✅ Accepted (lô 34) |
 | [ADR-202](ADR-202-Shop-Buyback.md) | Mua lại đồ đã bán: ghi cùng transaction bán (giữ cấp cường hoá), 10 món / 1 giờ, đúng giá đã nhận, V157, 1036–1039; `/mualai` | ✅ Accepted (lô 34) |
 | [ADR-203](ADR-203-Flying-Sword-Upgrade.md) | Nâng cấp phi kiếm: cấp = `enhance_level` của phi kiếm, +5%/cấp tới 5, Phi Kiếm Tinh Thạch (V158, `UPGRADE_MOUNT`) | ✅ Accepted (lô 34) |
+| [ADR-204](ADR-204-Loot-Filter.md) | Lọc nhặt đồ: công tắc `auto_sell_junk` (V159), đồ rác có giá thu rơi ra tự bán qua `GoldLedger`, 556/557; `/tubanrac` | ✅ Accepted (lô 34) |
 ---
 
 ## ADR cần tạo (chưa viết)

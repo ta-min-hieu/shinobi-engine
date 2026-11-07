@@ -396,6 +396,8 @@ public final class GatewayBootstrap {
         characterRegistry.enemies.bind(new EnemyHooks.Deps(
                 facades.progression().expansion().lot33().enemies(), java.time.Clock.systemUTC())); // ADR-194
         characterRegistry.deathRecap.bind(facades.characterFacade()); // ADR-195
+        characterRegistry.autoSell.bind(new AutoSellHooks.Deps(
+                facades.progression().expansion().lot34().autoSell(), characterRegistry)); // ADR-204
         return List.of(
                 characterRegistry.killingIntent.job(),
                 WeatherJob.job(
@@ -705,7 +707,9 @@ public final class GatewayBootstrap {
                 lot31Facades(databaseBootstrap),
                 lot32Facades(databaseBootstrap),
                 lot33Facades(databaseBootstrap),
-                new Lot34Facades(databaseBootstrap.expansion().wireBuybackFacade()));
+                new Lot34Facades(
+                        databaseBootstrap.expansion().wireBuybackFacade(),
+                        databaseBootstrap.expansion().wireAutoSellJunkFacade()));
     }
 
     /** Facade lô 31 (ADR-175…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

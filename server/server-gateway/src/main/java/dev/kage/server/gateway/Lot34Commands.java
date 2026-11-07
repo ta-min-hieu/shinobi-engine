@@ -47,4 +47,15 @@ record Lot34Commands(Lot34Facades facades) {
                         .build())
                 .toList();
     }
+
+    /** ADR-204 — Virtual Thread; bật / tắt (hoặc chỉ hỏi) công tắc tự bán đồ rác khi nhặt. */
+    dev.kage.protocol.SetAutoSellJunkResponse setAutoSellJunk(
+            long characterId, dev.kage.protocol.SetAutoSellJunkCommand command) {
+        if (!command.getQueryOnly()) {
+            facades.autoSell().setEnabled(characterId, command.getEnabled());
+        }
+        return dev.kage.protocol.SetAutoSellJunkResponse.newBuilder()
+                .setEnabled(facades.autoSell().enabled(characterId))
+                .build();
+    }
 }

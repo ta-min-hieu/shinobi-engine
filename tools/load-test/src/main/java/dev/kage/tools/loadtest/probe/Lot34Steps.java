@@ -8,7 +8,8 @@ import dev.kage.protocol.Opcode;
 
 /**
  * Bước lô 34: hệ số cường hoá trong catalog (ADR-199) {@code catalogStep}; mốc làm mới (ADR-200) {@code resetTimers};
- * mua lại (ADR-202) {@code buybackList}, {@code buyback:<entry id>}. Nối sau {@link Lot33Steps}.
+ * mua lại (ADR-202) {@code buybackList}, {@code buyback:<entry id>}; lọc nhặt đồ (ADR-204) {@code autoSell:on|off|?}.
+ * Nối sau {@link Lot33Steps}.
  */
 final class Lot34Steps {
 
@@ -24,6 +25,7 @@ final class Lot34Steps {
             case "resetTimers" -> resetTimers();
             case "buybackList" -> buybackList();
             case "buyback" -> buyback(Long.parseLong(arg));
+            case "autoSell" -> autoSell(arg);
             default -> "bước không hiểu";
         };
     }
@@ -89,5 +91,21 @@ final class Lot34Steps {
                     .append("; ");
         }
         return out.toString();
+    }
+
+    private String autoSell(String arg) throws IOException {
+        dev.kage.protocol.SetAutoSellJunkCommand.Builder command =
+                dev.kage.protocol.SetAutoSellJunkCommand.newBuilder();
+        if ("?".equals(arg)) {
+            command.setQueryOnly(true);
+        } else {
+            command.setEnabled("on".equals(arg));
+        }
+        return asker.ask(
+                Opcode.OPCODE_SET_AUTO_SELL_JUNK_COMMAND_VALUE,
+                command.build(),
+                Opcode.OPCODE_SET_AUTO_SELL_JUNK_RESPONSE_VALUE,
+                p -> "enabled="
+                        + dev.kage.protocol.SetAutoSellJunkResponse.parseFrom(p).getEnabled());
     }
 }

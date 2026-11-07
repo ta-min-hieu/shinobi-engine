@@ -715,3 +715,16 @@ message OpenLuckyBagsResponse {
   OpenLuckyBagOutcome stop_outcome = 3; // OK = mở đủ count; khác = lý do dừng sớm (hết túi, đầy túi, đầy vàng...)
   GetLuckyBagsResponse bags = 4;
 }
+
+// ===== ADR-204 (Accepted 2026-11-07, chủ dự án chọn) — lọc nhặt đồ: đồ rác rơi ra tự bán thay vì vào túi. CHỈ THÊM. =====
+
+// Command: Client -> Server (OPCODE_SET_AUTO_SELL_JUNK_COMMAND = 556). query_only = chỉ hỏi trạng thái, không đổi.
+message SetAutoSellJunkCommand {
+  bool enabled = 1;
+  bool query_only = 2;
+}
+
+// Response: Server -> Client (OPCODE_SET_AUTO_SELL_JUNK_RESPONSE = 557). Trạng thái SAU lệnh.
+message SetAutoSellJunkResponse {
+  bool enabled = 1;
+}
