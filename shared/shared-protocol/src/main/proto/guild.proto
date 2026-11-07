@@ -174,6 +174,7 @@ enum GuildChangeReason {
   GUILD_CHANGE_REASON_WEEKLY_QUEST_COMPLETED = 8;  // ADR-069 — thưởng đã gửi qua thư
   GUILD_CHANGE_REASON_RENAMED = 9;                 // ADR-172 — bang vừa đổi tên
   GUILD_CHANGE_REASON_NOTICE_CHANGED = 10;         // ADR-179 — bang chủ vừa đổi thông báo bang
+  GUILD_CHANGE_REASON_LEADER_CHANGED = 11;         // ADR-183 — bang có bang chủ mới (subject = bang chủ mới)
 }
 
 // Event: Server -> Client (OPCODE_GUILD_CHANGED_EVENT = 720).
@@ -476,6 +477,7 @@ enum GuildLogKind {
   GUILD_LOG_KIND_LEVEL_UP = 6;       // amount = cấp mới; actor = người góp đẩy lên cấp
   GUILD_LOG_KIND_RENAMED = 7;        // detail = tên mới
   GUILD_LOG_KIND_NOTICE_CHANGED = 8;
+  GUILD_LOG_KIND_LEADER_CHANGED = 9; // ADR-183 — actor = bang chủ cũ, subject = bang chủ mới
 }
 
 message GuildLogEntry {
@@ -490,4 +492,26 @@ message GuildLogEntry {
 // Response: Server -> Client (OPCODE_GET_GUILD_LOG_RESPONSE = 746). Mới nhất trước; rỗng nếu không ở bang nào.
 message GetGuildLogResponse {
   repeated GuildLogEntry entries = 1;
+}
+
+// ===== ADR-183 — nhường chức bang chủ. CHỈ THÊM. Bang chủ cũ thành thành viên thường; cả bang nhận 720 LEADER_CHANGED.
+
+// Command: Client -> Server (OPCODE_TRANSFER_GUILD_LEADER_COMMAND = 747). Theo TÊN người nhận.
+message TransferGuildLeaderCommand {
+  string target_name = 1;
+}
+
+enum TransferGuildLeaderOutcome {
+  TRANSFER_GUILD_LEADER_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  TRANSFER_GUILD_LEADER_OUTCOME_OK = 1;
+  TRANSFER_GUILD_LEADER_OUTCOME_NOT_IN_GUILD = 2;
+  TRANSFER_GUILD_LEADER_OUTCOME_NOT_LEADER = 3;
+  TRANSFER_GUILD_LEADER_OUTCOME_TARGET_NOT_IN_GUILD = 4; // không tìm thấy, hoặc không cùng bang
+  TRANSFER_GUILD_LEADER_OUTCOME_CANNOT_TRANSFER_TO_SELF = 5;
+}
+
+// Response: Server -> Client (OPCODE_TRANSFER_GUILD_LEADER_RESPONSE = 748).
+message TransferGuildLeaderResponse {
+  TransferGuildLeaderOutcome outcome = 1;
+  string target_name = 2;
 }

@@ -214,6 +214,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-180](ADR-180-Guild-Log.md) | Nhật ký bang: bảng `guild_log` (V143) ghi cùng transaction 8 loại việc, 50 dòng / giữ 90 ngày, 745/746; `/nhatkybang` | ✅ Accepted (lô 31) |
 | [ADR-181](ADR-181-Guild-Leaderboard-Columns.md) | Bảng xếp hạng bang: bảng đã có từ ADR-068 ⇒ (chủ dự án chọn) thêm số thành viên + tổng cống hiến thành viên hiện tại, `LeaderboardEntry` 7/8 | ✅ Accepted (lô 31) |
 | [ADR-182](ADR-182-Friend-Breakthrough-Notice.md) | Báo bạn bè đột phá: mốc ADR-136 báo riêng bạn bè đang online, chúc mừng 1 lần / 30 phút, chỉ bộ nhớ; 1147–1150; `/chucmung` | ✅ Accepted (lô 31) |
+| [ADR-183](ADR-183-Guild-Leader-Transfer.md) | Nhường chức bang chủ: cho thành viên cùng bang, một transaction đọc-lại-sau-khoá, nhật ký `LEADER_CHANGED` (V144), 747/748, 720 LEADER_CHANGED; `/nhuongbang` | ✅ Accepted (lô 32) |
 ---
 
 ## ADR cần tạo (chưa viết)

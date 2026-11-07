@@ -26,17 +26,21 @@ final class MembershipNoticeCoordinator implements WindowFlow {
             PartyChangeReason.PARTY_CHANGE_REASON_YOU_WERE_KICKED, "party.notice.you_were_kicked",
             PartyChangeReason.PARTY_CHANGE_REASON_LEADER_CHANGED, "party.notice.leader_changed");
 
-    private static final Map<GuildChangeReason, String> GUILD_KEYS = Map.of(
-            GuildChangeReason.GUILD_CHANGE_REASON_MEMBER_JOINED, "guild.notice.member_joined",
-            GuildChangeReason.GUILD_CHANGE_REASON_MEMBER_LEFT, "guild.notice.member_left",
-            GuildChangeReason.GUILD_CHANGE_REASON_MEMBER_KICKED, "guild.notice.member_kicked",
-            GuildChangeReason.GUILD_CHANGE_REASON_YOU_WERE_KICKED, "guild.notice.you_were_kicked",
-            GuildChangeReason.GUILD_CHANGE_REASON_DISBANDED, "guild.notice.your_guild_disbanded",
-            GuildChangeReason.GUILD_CHANGE_REASON_YOU_WERE_ACCEPTED, "guild.notice.you_were_accepted",
-            GuildChangeReason.GUILD_CHANGE_REASON_LEVEL_UP, "guild.notice.level_up",
-            GuildChangeReason.GUILD_CHANGE_REASON_WEEKLY_QUEST_COMPLETED, "guild.notice.weekly_quest_completed",
-            GuildChangeReason.GUILD_CHANGE_REASON_RENAMED, "guild.notice.renamed", // ADR-172
-            GuildChangeReason.GUILD_CHANGE_REASON_NOTICE_CHANGED, "guild.notice.notice_changed"); // ADR-179
+    // Map.ofEntries: quá 10 cặp (Map.of chỉ tới 10) từ ADR-183.
+    private static final Map<GuildChangeReason, String> GUILD_KEYS = Map.ofEntries(
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_MEMBER_JOINED, "guild.notice.member_joined"),
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_MEMBER_LEFT, "guild.notice.member_left"),
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_MEMBER_KICKED, "guild.notice.member_kicked"),
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_YOU_WERE_KICKED, "guild.notice.you_were_kicked"),
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_DISBANDED, "guild.notice.your_guild_disbanded"),
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_YOU_WERE_ACCEPTED, "guild.notice.you_were_accepted"),
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_LEVEL_UP, "guild.notice.level_up"),
+            Map.entry(
+                    GuildChangeReason.GUILD_CHANGE_REASON_WEEKLY_QUEST_COMPLETED,
+                    "guild.notice.weekly_quest_completed"),
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_RENAMED, "guild.notice.renamed"), // ADR-172
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_NOTICE_CHANGED, "guild.notice.notice_changed"), // ADR-179
+            Map.entry(GuildChangeReason.GUILD_CHANGE_REASON_LEADER_CHANGED, "guild.notice.leader_changed")); // ADR-183
 
     private final ChatCoordinator chat;
     private final PartyCoordinator party;

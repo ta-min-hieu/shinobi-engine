@@ -14,7 +14,8 @@ record Lot31Windows(
         AwayCoordinator away,
         GuildNoticeCoordinator guildNotice,
         GuildLogCoordinator guildLog,
-        FriendBreakthroughCoordinator friendBreakthrough) {
+        FriendBreakthroughCoordinator friendBreakthrough,
+        Lot32Windows lot32) {
 
     static Lot31Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot31Windows(
@@ -24,7 +25,8 @@ record Lot31Windows(
                 new AwayCoordinator(sender, feeds.chat()),
                 new GuildNoticeCoordinator(sender, feeds.chat()),
                 GuildLogCoordinator.create(skin, sender, feeds),
-                new FriendBreakthroughCoordinator(sender, feeds.chat()));
+                new FriendBreakthroughCoordinator(sender, feeds.chat()),
+                Lot32Windows.create(skin, sender, feeds)); // lô 32 lồng ở đây — ExpansionWindows.create đã kín
     }
 
     /** Đăng ký vào hub. */
@@ -36,5 +38,6 @@ record Lot31Windows(
         panels.register(guildNotice);
         panels.register(guildLog.panel(), guildLog);
         panels.register(friendBreakthrough);
+        lot32.registerInto(panels);
     }
 }

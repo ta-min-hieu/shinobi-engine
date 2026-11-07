@@ -46,9 +46,11 @@ final class Lot31Steps {
     private static final int MAX_CHAT_SKIPS = 5;
 
     private final Lot23Scenario.Asker asker;
+    private final Lot32Steps lot32;
 
     Lot31Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot32 = new Lot32Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -72,7 +74,7 @@ final class Lot31Steps {
             case "myGuild" -> myGuild();
             case "guildLog" -> guildLog();
             case "congratulate" -> congratulate(arg);
-            default -> "bước không hiểu";
+            default -> lot32.step(verb, arg);
         };
     }
 

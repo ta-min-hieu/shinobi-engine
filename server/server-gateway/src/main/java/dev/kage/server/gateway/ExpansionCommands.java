@@ -24,7 +24,8 @@ record ExpansionCommands(
         HonorCommands honor,
         Lot29Commands lot29,
         Lot30Commands lot30,
-        Lot31Commands lot31) {
+        Lot31Commands lot31,
+        Lot32Commands lot32) {
 
     static ExpansionCommands of(GatewayFacades facades, WorldGateway worldGateway, NpcProximity proximity) {
         ExpansionFacades expansion = facades.progression().expansion();
@@ -68,6 +69,7 @@ record ExpansionCommands(
                 new HonorCommands(expansion.honor(), clock),
                 Lot29Commands.of(facades, worldGateway),
                 Lot30Commands.of(facades, worldGateway),
-                Lot31Commands.of(facades, worldGateway));
+                Lot31Commands.of(facades, worldGateway),
+                Lot32Commands.of(facades, worldGateway));
     }
 }

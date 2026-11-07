@@ -22,7 +22,9 @@ final class GuildLog {
         DONATED,
         LEVEL_UP,
         RENAMED,
-        NOTICE_CHANGED
+        NOTICE_CHANGED,
+        /** ADR-183 — actor = bang chủ cũ, subject = bang chủ mới. */
+        LEADER_CHANGED
     }
 
     /**
