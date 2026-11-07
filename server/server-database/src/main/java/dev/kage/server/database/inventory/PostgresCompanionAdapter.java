@@ -97,6 +97,11 @@ public final class PostgresCompanionAdapter implements CompanionPort {
         return JdbcTransactionRunner.call(dataSource, connection -> grantIn(connection, characterId, amount));
     }
 
+    @Override
+    public Optional<PetProgress> grantPetExp(Transaction tx, long characterId, long amount) {
+        return grantIn(((JdbcTransaction) tx).connection(), characterId, amount);
+    }
+
     private static Optional<PetProgress> grantIn(Connection connection, long characterId, long amount) {
         List<EquippedPet> pets = JdbcOperations.query(
                 connection, EQUIPPED_PET, rs -> new EquippedPet(rs.getLong(1), rs.getLong(2)), characterId);

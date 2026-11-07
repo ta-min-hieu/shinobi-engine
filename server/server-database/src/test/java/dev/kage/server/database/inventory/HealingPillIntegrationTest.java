@@ -104,7 +104,9 @@ class HealingPillIntegrationTest {
                         && !"spirit_beast_pill".equals(entry.code())
                         && !"bag_expansion_pouch".equals(entry.code())
                         // ADR-164 — Đan x2 kinh nghiệm, hiệu ứng riêng DOUBLE_EXP.
-                        && !"double_exp_pill".equals(entry.code()))
+                        && !"double_exp_pill".equals(entry.code())
+                        // ADR-201 — Linh Thú Thực, hiệu ứng riêng FEED_PET.
+                        && !"spirit_beast_food".equals(entry.code()))
                 .isNotEmpty()
                 .allSatisfy(entry -> assertThat(entry.useEffect()).isNull());
     }

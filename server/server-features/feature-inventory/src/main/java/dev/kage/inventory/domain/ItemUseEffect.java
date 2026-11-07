@@ -19,5 +19,7 @@ public enum ItemUseEffect {
     /** Mở rộng túi đồ thêm {@link ItemTemplate#useValue()} ô (ADR-088), tới trần. */
     EXPAND_BAG,
     /** EXP đánh quái nhân đôi thêm {@link ItemTemplate#useValue()} phút, cộng dồn tới trần (ADR-164). */
-    DOUBLE_EXP
+    DOUBLE_EXP,
+    /** Cộng {@link ItemTemplate#useValue()} EXP cho linh thú ĐANG MẶC (ADR-201), qua cấp như EXP đánh quái. */
+    FEED_PET
 }
