@@ -240,6 +240,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-206](ADR-206-Auto-Walk-To-Npc.md) | Tự tìm đường: 626/627 liệt kê chỗ đứng NPC world chính (tĩnh + động); client lái hướng −1/0/1 tới chỗ gần nhất, dừng khi tới / bấm phím / vướng; `/den`, `/walkto` | ✅ Accepted (lô 34) |
 | [ADR-207](ADR-207-Guild-Item-Donation.md) | Góp vật phẩm cho bang: món biến mất, giá thu × số lượng ⇒ kinh nghiệm bang + cống hiến; nhật ký `ITEM_DONATED` (V161), 757/758; `/gopdo` | ✅ Accepted (lô 35) |
 | [ADR-208](ADR-208-Guild-War-History.md) | Lịch sử bang chiến: 20 trận đã chốt của bang mình (thắng/thua/hoà, tỷ số), đọc `guild_war` sẵn có, 759/760; `/lichsuchien` | ✅ Accepted (lô 35) |
+| [ADR-209](ADR-209-Achievement-Leaderboard.md) | Xếp hạng thành tựu: `LEADERBOARD_KIND_ACHIEVEMENT = 8` trong Bia Anh Danh, giá trị = số thành tựu đã mở; tab mới | ✅ Accepted (lô 35) |
 ---
 
 ## ADR cần tạo (chưa viết)

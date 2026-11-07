@@ -32,7 +32,8 @@ final class LeaderboardCoordinator implements WindowFlow {
             "leaderboard.tab.guild",
             "leaderboard.tab.boss_damage",
             "leaderboard.tab.cave",
-            "leaderboard.tab.tribulation");
+            "leaderboard.tab.tribulation",
+            "leaderboard.tab.achievement");
 
     private static final List<LeaderboardKind> TAB_KINDS = List.of(
             LeaderboardKind.LEADERBOARD_KIND_REALM,
@@ -41,7 +42,8 @@ final class LeaderboardCoordinator implements WindowFlow {
             LeaderboardKind.LEADERBOARD_KIND_GUILD,
             LeaderboardKind.LEADERBOARD_KIND_BOSS_DAMAGE,
             LeaderboardKind.LEADERBOARD_KIND_CAVE,
-            LeaderboardKind.LEADERBOARD_KIND_TRIBULATION);
+            LeaderboardKind.LEADERBOARD_KIND_TRIBULATION,
+            LeaderboardKind.LEADERBOARD_KIND_ACHIEVEMENT);
 
     private static final String FACTION_PREFIX = "FACTION_";
 
@@ -136,6 +138,7 @@ final class LeaderboardCoordinator implements WindowFlow {
             case LEADERBOARD_KIND_BOSS_DAMAGE -> format("leaderboard.value.boss_damage", value);
             case LEADERBOARD_KIND_CAVE -> format("leaderboard.value.cave", value);
             case LEADERBOARD_KIND_TRIBULATION -> format("leaderboard.value.tribulation", value);
+            case LEADERBOARD_KIND_ACHIEVEMENT -> format("leaderboard.value.achievement", value);
             default -> format("leaderboard.value.realm", value);
         };
     }

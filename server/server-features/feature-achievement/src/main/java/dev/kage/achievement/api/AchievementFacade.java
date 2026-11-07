@@ -54,6 +54,11 @@ public final class AchievementFacade {
         return useCases.activeTitleCode(characterId);
     }
 
+    /** ADR-209 — số thành tựu đã mở của mọi nhân vật (bảng xếp hạng Thành tựu). */
+    public Map<Long, Integer> unlockedCounts() {
+        return useCases.unlockedCounts();
+    }
+
     /** Khoá i18n danh hiệu đang đeo, rỗng nếu không đeo gì. */
     public Optional<String> activeTitleKey(long characterId) {
         return useCases.activeTitleKey(characterId);
@@ -79,6 +84,11 @@ public final class AchievementFacade {
         @Override
         public boolean unlock(long characterId, String achievementCode) {
             return false;
+        }
+
+        @Override
+        public Map<Long, Integer> unlockedCounts() {
+            return Map.of();
         }
 
         @Override

@@ -26,6 +26,9 @@ public interface AchievementPort {
 
     Set<String> unlocked(long characterId);
 
+    /** ADR-209 — số thành tựu đã mở của mọi nhân vật có ít nhất một: {@code characterId → số}. */
+    Map<Long, Integer> unlockedCounts();
+
     /** Thành tựu có danh hiệu đang đeo, rỗng nếu không đeo gì. */
     Optional<String> activeTitle(long characterId);
 

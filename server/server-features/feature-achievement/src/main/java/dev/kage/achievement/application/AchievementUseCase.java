@@ -87,6 +87,11 @@ public final class AchievementUseCase {
         return opened;
     }
 
+    /** ADR-209 — số thành tựu đã mở của mọi nhân vật có ít nhất một. */
+    public Map<Long, Integer> unlockedCounts() {
+        return port.unlockedCounts();
+    }
+
     public Sheet sheet(long characterId, int level) {
         Map<AchievementKind, Long> counters = port.counters(characterId);
         Set<String> unlocked = port.unlocked(characterId);

@@ -3,6 +3,7 @@ package dev.kage.server.database.achievement;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +42,9 @@ public final class PostgresAchievementAdapter implements AchievementPort {
             """;
 
     private static final String UNLOCKED = "SELECT achievement_code FROM character_achievement WHERE character_id = ?";
+
+    private static final String UNLOCKED_COUNTS =
+            "SELECT character_id, COUNT(*) AS n FROM character_achievement GROUP BY character_id";
 
     private static final String ACTIVE_TITLE = "SELECT achievement_code FROM character_title WHERE character_id = ?";
 
@@ -109,6 +113,16 @@ public final class PostgresAchievementAdapter implements AchievementPort {
     public Set<String> unlocked(long characterId) {
         return new HashSet<>(
                 JdbcOperations.query(dataSource, UNLOCKED, rs -> rs.getString("achievement_code"), characterId));
+    }
+
+    @Override
+    public Map<Long, Integer> unlockedCounts() {
+        Map<Long, Integer> counts = new HashMap<>();
+        for (Map.Entry<Long, Integer> row : JdbcOperations.query(
+                dataSource, UNLOCKED_COUNTS, rs -> Map.entry(rs.getLong("character_id"), rs.getInt("n")))) {
+            counts.put(row.getKey(), row.getValue());
+        }
+        return counts;
     }
 
     @Override

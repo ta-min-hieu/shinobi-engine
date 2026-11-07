@@ -105,6 +105,11 @@ class AchievementUseCaseTest {
         }
 
         @Override
+        public Map<Long, Integer> unlockedCounts() {
+            return Map.of(1L, unlocked.size());
+        }
+
+        @Override
         public Optional<String> activeTitle(long characterId) {
             return active;
         }

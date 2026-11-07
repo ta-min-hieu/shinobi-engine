@@ -55,7 +55,9 @@ final class LeaderboardCache {
         /** ADR-134 — cấp linh mạch động phủ. */
         CAVE,
         /** ADR-134 — số kiếp Thiên Kiếp đã qua. */
-        TRIBULATION
+        TRIBULATION,
+        /** ADR-209 — số thành tựu đã mở. */
+        ACHIEVEMENT
     }
 
     /** ADR-181 — phần thêm của dòng bảng bang: số thành viên, tổng cống hiến thành viên hiện tại. */
@@ -77,6 +79,7 @@ final class LeaderboardCache {
     private final Supplier<List<WorldBossPort.DamageRank>> bossDamage;
     private final Supplier<Map<Long, Integer>> caveLevels;
     private final Supplier<Map<Long, Integer>> tribulations;
+    private final Supplier<Map<Long, Integer>> achievements;
     private final Clock clock;
     private final Map<Kind, Board> boards = new EnumMap<>(Kind.class);
     private final Map<Kind, Object> locks = new EnumMap<>(Kind.class);
@@ -89,7 +92,8 @@ final class LeaderboardCache {
             Supplier<List<GuildRank>> guildRanks,
             Supplier<List<WorldBossPort.DamageRank>> bossDamage,
             Supplier<Map<Long, Integer>> caveLevels,
-            Supplier<Map<Long, Integer>> tribulations) {}
+            Supplier<Map<Long, Integer>> tribulations,
+            Supplier<Map<Long, Integer>> achievements) {}
 
     LeaderboardCache(Sources sources, Clock clock) {
         this.characterFacade = sources.characterFacade();
@@ -99,6 +103,7 @@ final class LeaderboardCache {
         this.bossDamage = sources.bossDamage();
         this.caveLevels = sources.caveLevels();
         this.tribulations = sources.tribulations();
+        this.achievements = sources.achievements();
         this.clock = clock;
         for (Kind kind : Kind.values()) {
             locks.put(kind, new Object());
@@ -148,6 +153,7 @@ final class LeaderboardCache {
             case BOSS_DAMAGE -> rankByBossDamage(characters);
             case CAVE -> rankByScore(characters, caveLevels.get());
             case TRIBULATION -> rankByScore(characters, tribulations.get());
+            case ACHIEVEMENT -> rankByScore(characters, achievements.get());
         };
     }
 

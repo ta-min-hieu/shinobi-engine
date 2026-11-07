@@ -3491,7 +3491,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 guildProgression::rankGuilds,
                 () -> worldBoss.topDamage(LeaderboardCache.TOP_SIZE),
                 expansion.cave()::veinLevels, // ADR-134
-                worldGateway.registry().tribulation::passedByCharacter);
+                worldGateway.registry().tribulation::passedByCharacter,
+                worldGateway.registry().achievements.facade()::unlockedCounts); // ADR-209
     }
 
     private static LeaderboardCache.Kind toCacheKind(LeaderboardKind kind) {
@@ -3502,6 +3503,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case LEADERBOARD_KIND_BOSS_DAMAGE -> LeaderboardCache.Kind.BOSS_DAMAGE;
             case LEADERBOARD_KIND_CAVE -> LeaderboardCache.Kind.CAVE;
             case LEADERBOARD_KIND_TRIBULATION -> LeaderboardCache.Kind.TRIBULATION;
+            case LEADERBOARD_KIND_ACHIEVEMENT -> LeaderboardCache.Kind.ACHIEVEMENT;
             // UNSPECIFIED/lạ (client mới hơn server) ⇒ bảng cảnh giới, không lỗi.
             default -> LeaderboardCache.Kind.REALM;
         };
@@ -3558,6 +3560,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case BOSS_DAMAGE -> LeaderboardKind.LEADERBOARD_KIND_BOSS_DAMAGE;
             case CAVE -> LeaderboardKind.LEADERBOARD_KIND_CAVE;
             case TRIBULATION -> LeaderboardKind.LEADERBOARD_KIND_TRIBULATION;
+            case ACHIEVEMENT -> LeaderboardKind.LEADERBOARD_KIND_ACHIEVEMENT;
         };
     }
 
