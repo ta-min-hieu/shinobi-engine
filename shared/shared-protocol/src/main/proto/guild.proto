@@ -589,3 +589,24 @@ message GuildRecruitmentView {
 message ListGuildRecruitmentResponse {
   repeated GuildRecruitmentView entries = 1;
 }
+
+// ===== ADR-186 — điểm danh bang. CHỈ THÊM. Một lần mỗi nhân vật mỗi ngày (giờ Việt Nam): +100 cống hiến cho mình,
+// +100 kinh nghiệm cho bang (bang lên cấp ⇒ cả bang nhận 720 LEVEL_UP như góp bang).
+
+// Command: Client -> Server (OPCODE_GUILD_CHECK_IN_COMMAND = 755).
+message GuildCheckInCommand {}
+
+enum GuildCheckInOutcome {
+  GUILD_CHECK_IN_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  GUILD_CHECK_IN_OUTCOME_OK = 1;
+  GUILD_CHECK_IN_OUTCOME_NOT_IN_GUILD = 2;
+  GUILD_CHECK_IN_OUTCOME_ALREADY_CHECKED_IN = 3;
+}
+
+// Response: Server -> Client (OPCODE_GUILD_CHECK_IN_RESPONSE = 756).
+message GuildCheckInResponse {
+  GuildCheckInOutcome outcome = 1;
+  int64 contribution = 2; // cống hiến vừa cộng (0 nếu không OK)
+  int64 guild_exp = 3;    // kinh nghiệm bang vừa cộng
+  int32 today_count = 4;  // số người của bang đã điểm danh hôm nay (kể cả mình)
+}

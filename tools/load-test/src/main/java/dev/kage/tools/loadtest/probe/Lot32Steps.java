@@ -2,6 +2,8 @@ package dev.kage.tools.loadtest.probe;
 
 import java.io.IOException;
 
+import dev.kage.protocol.GuildCheckInCommand;
+import dev.kage.protocol.GuildCheckInResponse;
 import dev.kage.protocol.GuildRecruitmentView;
 import dev.kage.protocol.ListGuildRecruitmentRequest;
 import dev.kage.protocol.ListGuildRecruitmentResponse;
@@ -18,7 +20,7 @@ import dev.kage.protocol.TransferGuildLeaderResponse;
 /**
  * Bước lô 32: nhường chức bang chủ (ADR-183) {@code transferLeader:<tên>}; phó bang chủ (ADR-184) {@code vice:<tên>},
  * {@code unvice:<tên>}; chiêu mộ (ADR-185) {@code recruit:<cấp>=<lời>} ({@code recruit:off} gỡ), {@code recruitBoard},
- * {@code applyGuild:<tên bang>}. Nối sau {@link Lot31Steps}.
+ * {@code applyGuild:<tên bang>}; điểm danh bang (ADR-186) {@code guildCheckIn}. Nối sau {@link Lot31Steps}.
  */
 final class Lot32Steps {
 
@@ -36,6 +38,7 @@ final class Lot32Steps {
             case "recruit" -> recruit(arg);
             case "recruitBoard" -> recruitBoard();
             case "applyGuild" -> applyGuild(arg);
+            case "guildCheckIn" -> guildCheckIn();
             default -> "bước không hiểu";
         };
     }
@@ -107,5 +110,17 @@ final class Lot32Steps {
                 SendGuildJoinRequestCommand.newBuilder().setGuildName(guildName).build(),
                 Opcode.OPCODE_SEND_GUILD_JOIN_REQUEST_RESPONSE_VALUE,
                 p -> SendGuildJoinRequestResponse.parseFrom(p).getOutcome().name());
+    }
+
+    private String guildCheckIn() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GUILD_CHECK_IN_COMMAND_VALUE,
+                GuildCheckInCommand.getDefaultInstance(),
+                Opcode.OPCODE_GUILD_CHECK_IN_RESPONSE_VALUE,
+                p -> {
+                    GuildCheckInResponse r = GuildCheckInResponse.parseFrom(p);
+                    return r.getOutcome().name() + " cốngHiến+" + r.getContribution() + " expBang+" + r.getGuildExp()
+                            + " hômNay=" + r.getTodayCount();
+                });
     }
 }

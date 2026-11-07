@@ -149,6 +149,13 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.inventory.PostgresJunkSaleAdapter(dataSource));
     }
 
+    /** ADR-186 — điểm danh bang. */
+    public dev.kage.guild.api.GuildCheckInFacade wireGuildCheckInFacade() {
+        return new dev.kage.guild.api.GuildCheckInFacade(
+                new dev.kage.server.database.guild.PostgresGuildCheckInAdapter(dataSource),
+                java.time.Clock.systemUTC());
+    }
+
     /** ADR-185 — bảng chiêu mộ bang. */
     public dev.kage.guild.api.GuildRecruitmentFacade wireGuildRecruitmentFacade() {
         return new dev.kage.guild.api.GuildRecruitmentFacade(

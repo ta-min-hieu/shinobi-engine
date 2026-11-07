@@ -237,8 +237,11 @@ public final class PostgresGuildProgressionAdapter implements GuildProgressionPo
                 .orElseThrow(() -> new DatabaseAccessException("Bang " + guildId + " biến mất giữa giao dịch", null));
     }
 
-    /** Cộng kinh nghiệm (dòng đã khoá), tính lại cấp; trả cấp mới. */
-    private static int addGuildExp(Connection connection, long guildId, long amount) {
+    /**
+     * Cộng kinh nghiệm (khoá dòng bang), tính lại cấp; trả cấp mới. Package-private: điểm danh bang (ADR-186) dùng
+     * chung.
+     */
+    static int addGuildExp(Connection connection, long guildId, long amount) {
         long exp = JdbcOperations.queryOne(connection, LOCK_GUILD_EXP, rs -> rs.getLong("exp"), guildId)
                 .orElse(0L);
         long newExp = exp + amount;
