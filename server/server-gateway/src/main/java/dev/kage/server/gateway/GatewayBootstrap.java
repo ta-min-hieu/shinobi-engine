@@ -393,6 +393,8 @@ public final class GatewayBootstrap {
                 characterRegistry,
                 WorldRouteLookup.of(worldGateway),
                 java.time.Clock.systemUTC()));
+        characterRegistry.enemies.bind(new EnemyHooks.Deps(
+                facades.progression().expansion().lot33().enemies(), java.time.Clock.systemUTC())); // ADR-194
         return List.of(
                 characterRegistry.killingIntent.job(),
                 WeatherJob.job(
@@ -727,7 +729,8 @@ public final class GatewayBootstrap {
     private static Lot33Facades lot33Facades(ServerDatabaseBootstrap databaseBootstrap) {
         return new Lot33Facades(
                 databaseBootstrap.expansion().wireLastOnlineFacade(),
-                databaseBootstrap.expansion().wirePetNameFacade());
+                databaseBootstrap.expansion().wirePetNameFacade(),
+                databaseBootstrap.expansion().wireEnemyListFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */

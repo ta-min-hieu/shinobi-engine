@@ -8,6 +8,10 @@ import dev.kage.chat.domain.ProfanityFilter;
 import dev.kage.inventory.api.PetNameFacade;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.party.application.HandOverPartyLeadershipUseCase;
+import dev.kage.protocol.EnemyView;
+import dev.kage.protocol.ListEnemiesResponse;
+import dev.kage.protocol.RemoveEnemyCommand;
+import dev.kage.protocol.RemoveEnemyResponse;
 import dev.kage.protocol.RenamePetCommand;
 import dev.kage.protocol.RenamePetOutcome;
 import dev.kage.protocol.RenamePetResponse;
@@ -59,6 +63,28 @@ record Lot33Commands(
         }
         PetNameFacade.Outcome outcome = facades.petName().rename(characterId, name);
         return response.setOutcome(RenamePetOutcome.valueOf("RENAME_PET_OUTCOME_" + outcome.name()))
+                .build();
+    }
+
+    /** ADR-194 — Virtual Thread; cừu nhân của {@code characterId}, kèm ai đang online. */
+    ListEnemiesResponse listEnemies(long characterId) {
+        ListEnemiesResponse.Builder response = ListEnemiesResponse.newBuilder();
+        for (dev.kage.pvp.domain.EnemyListPort.Enemy enemy : facades.enemies().list(characterId)) {
+            response.addEnemies(EnemyView.newBuilder()
+                    .setName(enemy.name())
+                    .setKillCount(enemy.killCount())
+                    .setLastKilledEpochSeconds(enemy.lastKilledAt().getEpochSecond())
+                    .setOnline(registry.isOnline(enemy.characterId())));
+        }
+        return response.build();
+    }
+
+    /** ADR-194 — Virtual Thread; xoá một cừu nhân theo tên. */
+    RemoveEnemyResponse removeEnemy(long characterId, RemoveEnemyCommand command) {
+        boolean removed = facades.enemies().remove(characterId, command.getName());
+        return RemoveEnemyResponse.newBuilder()
+                .setRemoved(removed)
+                .setName(command.getName().strip())
                 .build();
     }
 }

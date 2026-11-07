@@ -38,10 +38,13 @@ public final class HonorFacade {
     /**
      * Một trận đấu trường vừa chốt: người thắng +{@value HonorRules#WIN_POINTS}, người thua
      * +{@value HonorRules#LOSS_POINTS}.
+     *
+     * @return tổng điểm thực cộng cho cả hai (sau trần ngày)
      */
-    public void onDuelSettled(long winnerId, long loserId, Instant now) {
-        port.award(winnerId, HonorRules.WIN_POINTS, HonorRules.day(now));
-        port.award(loserId, HonorRules.LOSS_POINTS, HonorRules.day(now));
+    public int onDuelSettled(long winnerId, long loserId, Instant now) {
+        int winner = port.award(winnerId, HonorRules.WIN_POINTS, HonorRules.day(now));
+        int loser = port.award(loserId, HonorRules.LOSS_POINTS, HonorRules.day(now));
+        return winner + loser;
     }
 
     /** Cửa hàng tuần này. */

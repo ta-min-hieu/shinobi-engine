@@ -119,6 +119,11 @@ final class KillingIntentHooks {
         }
     }
 
+    /** ADR-194 — vị trí (nếu có) nằm trong dải PvP tự do; đọc RAM, gọi được trên tick thread. */
+    boolean inPvpZone(Optional<PositionSnapshot> at) {
+        return at.isPresent() && inPvpRange(at.get().x());
+    }
+
     private boolean inPvpRange(float x) {
         float[] ranges = pvpRanges;
         for (int i = 0; i < ranges.length; i += 2) {

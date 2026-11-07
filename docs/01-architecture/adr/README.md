@@ -225,6 +225,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-191](ADR-191-Party-Leader-Transfer.md) | Nhường trưởng nhóm khi vẫn ở lại nhóm: dùng lại `PartyPort.transferLeadership`, 1332/1333, báo 1318 LEADER_CHANGED; `/nhuongnhom` | ✅ Accepted (lô 33) |
 | [ADR-192](ADR-192-Last-Online.md) | Lần cuối online: cột `character.last_online_at` (V150) ghi khi rời world, field 7 ở `FriendView`/`GuildMemberView`; "3 ngày trước" | ✅ Accepted (lô 33) |
 | [ADR-193](ADR-193-Pet-Rename.md) | Đặt tên linh thú đang mặc: `pet_state.custom_name` (V151), 253/254, `PetView.custom_name`; `/tenlinhthu` (tên hiện trên bảng nhân vật — linh thú chưa có hình trong world) | ✅ Accepted (lô 33) |
+| [ADR-194](ADR-194-Enemy-List.md) | Danh sách cừu nhân: ai hạ mình trong dải PvP, `pvp_enemy` (V152) trần 20, 1619–1622; `/cuunhan` | ✅ Accepted (lô 33) |
 ---
 
 ## ADR cần tạo (chưa viết)

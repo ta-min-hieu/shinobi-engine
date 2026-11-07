@@ -186,3 +186,32 @@ message BuyHonorItemResponse {
   BuyHonorItemOutcome outcome = 1;
   GetHonorShopResponse shop = 2;
 }
+
+// ===== ADR-194 (Accepted 2026-11-07, chủ dự án chọn) — danh sách cừu nhân: ai đã hạ mình trong dải PvP. CHỈ THÊM. =====
+
+// Request: Client -> Server (OPCODE_LIST_ENEMIES_REQUEST = 1619).
+message ListEnemiesRequest {}
+
+// Một cừu nhân — online tra ở gateway lúc trả lời.
+message EnemyView {
+  string name = 1;
+  int32 kill_count = 2;
+  int64 last_killed_epoch_seconds = 3;
+  bool online = 4;
+}
+
+// Response: Server -> Client (OPCODE_LIST_ENEMIES_RESPONSE = 1620). Mới nhất trước, tối đa 20.
+message ListEnemiesResponse {
+  repeated EnemyView enemies = 1;
+}
+
+// Command: Client -> Server (OPCODE_REMOVE_ENEMY_COMMAND = 1621).
+message RemoveEnemyCommand {
+  string name = 1;
+}
+
+// Response: Server -> Client (OPCODE_REMOVE_ENEMY_RESPONSE = 1622). removed = false khi không có dòng đó.
+message RemoveEnemyResponse {
+  bool removed = 1;
+  string name = 2;
+}

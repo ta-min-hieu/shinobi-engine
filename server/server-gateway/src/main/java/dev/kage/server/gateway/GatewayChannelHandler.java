@@ -1059,6 +1059,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.RenamePetCommand.parser(),
                             Opcode.OPCODE_RENAME_PET_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot33().renamePet(id, c))),
+            // Lô 33 — danh sách cừu nhân (ADR-194).
+            Map.entry(
+                    Opcode.OPCODE_LIST_ENEMIES_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListEnemiesRequest.parser(),
+                            Opcode.OPCODE_LIST_ENEMIES_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot33().listEnemies(id))),
+            Map.entry(
+                    Opcode.OPCODE_REMOVE_ENEMY_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.RemoveEnemyCommand.parser(),
+                            Opcode.OPCODE_REMOVE_ENEMY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot33().removeEnemy(id, c))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,
