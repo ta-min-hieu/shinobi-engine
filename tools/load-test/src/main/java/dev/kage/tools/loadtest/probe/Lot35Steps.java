@@ -7,7 +7,8 @@ import dev.kage.protocol.Opcode;
 /**
  * Bước lô 35: góp vật phẩm cho bang (ADR-207) {@code donateItem:<inventory item id>/<số lượng>}; lịch sử bang chiến
  * (ADR-208) {@code warHistory}; gợi ý kết bạn (ADR-211) {@code suggestFriends}; chặn thư người lạ (ADR-212)
- * {@code strangerMail:on|off|?}. Nối sau {@link Lot34Steps}.
+ * {@code strangerMail:on|off|?}; đánh dấu mục tiêu nhóm (ADR-213) {@code markTarget:<entity id>}. Nối sau {@link
+ * Lot34Steps}.
  */
 final class Lot35Steps {
 
@@ -23,6 +24,7 @@ final class Lot35Steps {
             case "warHistory" -> warHistory();
             case "suggestFriends" -> suggestFriends();
             case "strangerMail" -> strangerMail(arg);
+            case "markTarget" -> markTarget(Long.parseLong(arg));
             default -> "bước không hiểu";
         };
     }
@@ -97,5 +99,17 @@ final class Lot35Steps {
                 p -> "chặnThưNgườiLạ="
                         + dev.kage.protocol.SetStrangerMailBlockResponse.parseFrom(p)
                                 .getEnabled());
+    }
+
+    private String markTarget(long targetEntityId) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_MARK_PARTY_TARGET_COMMAND_VALUE,
+                dev.kage.protocol.MarkPartyTargetCommand.newBuilder()
+                        .setTargetEntityId(targetEntityId)
+                        .build(),
+                Opcode.OPCODE_MARK_PARTY_TARGET_RESPONSE_VALUE,
+                p -> dev.kage.protocol.MarkPartyTargetResponse.parseFrom(p)
+                        .getOutcome()
+                        .name());
     }
 }

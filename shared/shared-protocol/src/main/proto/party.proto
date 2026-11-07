@@ -317,3 +317,28 @@ message TransferPartyLeaderResponse {
   TransferPartyLeaderOutcome outcome = 1;
   string target_name = 2;
 }
+
+// ADR-213 (2026-11-07) — đánh dấu mục tiêu nhóm. Command: Client -> Server (OPCODE_MARK_PARTY_TARGET_COMMAND).
+// Chỉ trưởng nhóm; target_entity_id = 0 là bỏ đánh dấu. Server không kiểm entity tồn tại: dấu chỉ là gợi ý cho đồng
+// đội, mỗi client tự nhắm (và server vẫn kiểm mọi đòn đánh như thường).
+message MarkPartyTargetCommand {
+  int64 target_entity_id = 1;
+}
+
+enum MarkPartyTargetOutcome {
+  MARK_PARTY_TARGET_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  MARK_PARTY_TARGET_OUTCOME_OK = 1;
+  MARK_PARTY_TARGET_OUTCOME_NOT_LEADER = 2;     // chưa vào nhóm, hoặc không phải trưởng nhóm
+  MARK_PARTY_TARGET_OUTCOME_INVALID_TARGET = 3; // id âm
+}
+
+// Response: Server -> Client (OPCODE_MARK_PARTY_TARGET_RESPONSE).
+message MarkPartyTargetResponse {
+  MarkPartyTargetOutcome outcome = 1;
+}
+
+// Event: Server -> Client (OPCODE_PARTY_TARGET_MARKED_EVENT) — tới mọi thành viên đang online, kể cả trưởng nhóm.
+message PartyTargetMarkedEvent {
+  int64 target_entity_id = 1; // 0 = bỏ đánh dấu
+  string leader_name = 2;
+}

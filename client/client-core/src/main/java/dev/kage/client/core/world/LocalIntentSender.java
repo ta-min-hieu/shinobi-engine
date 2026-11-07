@@ -137,6 +137,23 @@ final class LocalIntentSender {
         return action;
     }
 
+    /** ADR-213 — mục tiêu đang nhắm (0 = không có). */
+    long currentTargetId() {
+        return context.combat().currentTargetId();
+    }
+
+    /**
+     * ADR-213 — nhắm {@code targetId} (quái đang theo dõi) như khi click vào nó; đổi được thì gửi lệnh chọn mục tiêu.
+     *
+     * @return {@code true} nếu giờ đang nhắm đúng {@code targetId}
+     */
+    boolean focusTarget(long targetId) {
+        if (context.combat().selectTarget(targetId)) {
+            context.sender().setTarget(targetId);
+        }
+        return context.combat().currentTargetId() == targetId;
+    }
+
     /** ADR-206 — nối đích tự đi (một lần, lúc dựng màn hình). */
     void useAutoWalk(AutoWalkTarget target) {
         this.autoWalk = target;

@@ -159,6 +159,7 @@ record ExpansionWindows(
         Lot34Windows lot34 = lot31.lot32().lot33().lot34();
         intents.useAutoWalk(lot34.autoWalk().target());
         lot34.lot35().guildItemDonation().useSelection(inventory::selectedItemId); // ADR-207 /gopdo
+        lot34.lot35().partyMark().useTargeting(intents); // ADR-213 /danhdau, /theodau
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

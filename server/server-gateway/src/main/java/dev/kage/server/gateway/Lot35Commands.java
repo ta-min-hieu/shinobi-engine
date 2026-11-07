@@ -12,7 +12,8 @@ record Lot35Commands(Lot35Facades facades, ConnectedCharacterRegistry registry, 
     record Social(
             dev.kage.character.api.CharacterFacade characters,
             dev.kage.friend.api.FriendFacade friends,
-            dev.kage.friend.api.BlockFacade blocks) {}
+            dev.kage.friend.api.BlockFacade blocks,
+            dev.kage.party.api.PartyFacade party) {}
 
     static Lot35Commands of(GatewayFacades gateway, WorldGateway worldGateway) {
         return new Lot35Commands(
@@ -21,7 +22,8 @@ record Lot35Commands(Lot35Facades facades, ConnectedCharacterRegistry registry, 
                 new Social(
                         gateway.characterFacade(),
                         gateway.contentFacades().socialFacades().friendFacade(),
-                        gateway.progression().relationships().blocks()));
+                        gateway.progression().relationships().blocks(),
+                        gateway.contentFacades().socialFacades().partyFacade()));
     }
 
     /** ADR-211 — Virtual Thread; tối đa 10 người online nên kết bạn với {@code characterId}. */
@@ -49,6 +51,39 @@ record Lot35Commands(Lot35Facades facades, ConnectedCharacterRegistry registry, 
                     .setLevel(c.level()));
         }
         return response.build();
+    }
+
+    /** ADR-213 — Virtual Thread; trưởng nhóm đánh dấu (0 = bỏ) một mục tiêu, báo cả nhóm đang online. */
+    dev.kage.protocol.MarkPartyTargetResponse markPartyTarget(
+            long characterId, dev.kage.protocol.MarkPartyTargetCommand command) {
+        dev.kage.protocol.MarkPartyTargetResponse.Builder response =
+                dev.kage.protocol.MarkPartyTargetResponse.newBuilder();
+        if (command.getTargetEntityId() < 0) {
+            return response.setOutcome(
+                            dev.kage.protocol.MarkPartyTargetOutcome.MARK_PARTY_TARGET_OUTCOME_INVALID_TARGET)
+                    .build();
+        }
+        if (!social.party()
+                .findMyParty(characterId)
+                .map(dev.kage.party.api.PartyFacade.MyPartyView::isLeader)
+                .orElse(false)) {
+            return response.setOutcome(dev.kage.protocol.MarkPartyTargetOutcome.MARK_PARTY_TARGET_OUTCOME_NOT_LEADER)
+                    .build();
+        }
+        byte[] event = dev.kage.protocol.PartyTargetMarkedEvent.newBuilder()
+                .setTargetEntityId(command.getTargetEntityId())
+                .setLeaderName(social.characters()
+                        .findById(characterId)
+                        .map(dev.kage.character.domain.Character::name)
+                        .orElse(""))
+                .build()
+                .toByteArray();
+        for (dev.kage.party.api.PartyFacade.MemberView member : social.party().listMembers(characterId)) {
+            registry.sendToCharacterIfOnline(
+                    member.characterId(), dev.kage.protocol.Opcode.OPCODE_PARTY_TARGET_MARKED_EVENT_VALUE, 0, event);
+        }
+        return response.setOutcome(dev.kage.protocol.MarkPartyTargetOutcome.MARK_PARTY_TARGET_OUTCOME_OK)
+                .build();
     }
 
     /** ADR-212 — Virtual Thread; bật / tắt (hoặc chỉ hỏi) chặn thư người lạ. */

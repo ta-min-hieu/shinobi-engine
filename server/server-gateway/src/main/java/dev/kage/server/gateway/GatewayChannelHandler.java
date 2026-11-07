@@ -480,6 +480,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private final WorldGateway worldGateway;
     private final WorldRouteLookup worldRoutes;
     private final NpcProximity npcProximity;
+
+    /** ADR-214 — tự ngắt khi treo máy, mỗi kết nối một bản. */
+    private final IdleKick idleKick = new IdleKick();
+
     private final SectStorageCommands storage;
     private final MarketCommands market;
     private final CraftingCommands crafting;
@@ -1140,6 +1144,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetStrangerMailBlockCommand.parser(),
                             Opcode.OPCODE_SET_STRANGER_MAIL_BLOCK_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot35().setStrangerMailBlock(id, c))),
+            // Lô 35 — đánh dấu mục tiêu nhóm (ADR-213).
+            Map.entry(
+                    Opcode.OPCODE_MARK_PARTY_TARGET_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.MarkPartyTargetCommand.parser(),
+                            Opcode.OPCODE_MARK_PARTY_TARGET_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot35().markPartyTarget(id, c))),
             // Lô 34 — tự tìm đường tới NPC (ADR-206).
             Map.entry(
                     Opcode.OPCODE_LIST_NPC_LOCATIONS_REQUEST_VALUE,
@@ -1565,6 +1576,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
         networkMetrics.connectionOpened();
+        idleKick.start(ctx, () -> boundCharacterId != null); // ADR-214
     }
 
     // javac [try] + PMD UnusedLocalVariable: `scope` không đọc trong thân try — ĐÚNG Ý,
@@ -1575,6 +1587,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     protected void channelRead0(ChannelHandlerContext ctx, PacketCodec.Frame frame) {
         PacketHeader header = frame.header();
         networkMetrics.recordPacketReceived(header.opcode(), frame.payload().length);
+        idleKick.touch(header.opcode());
         PacketHandler handler = handlers.get(header.opcode());
         // OBSERVABILITY.md §6 — span "gateway.command" bao decode+validate+dispatch, 1 chỗ trung
         // tâm áp dụng cho MỌI opcode (không retrofit sâu hơn từng handler — xem javadoc GatewayTracing).
@@ -6452,6 +6465,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         networkMetrics.connectionClosed();
+        idleKick.stop();
         // Mất kết nối (đóng chủ động, timeout, hay lỗi — exceptionCaught cũng dẫn tới sự kiện
         // này) — dọn entity ECS + AoI của nhân vật này (SERVER.md §9: 1 kết nối chết không được
         // để bia đỡ đạn đứng lại trong world).

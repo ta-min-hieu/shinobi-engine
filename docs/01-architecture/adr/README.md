@@ -244,6 +244,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-210](ADR-210-Title-Stat-Bonus.md) | Danh hiệu cộng chỉ số: cột chỉ số trên `achievement` (V162), chỉ danh hiệu đang đeo, cộng phẳng chung đường chỉ số trang bị; `AchievementView` field 7–10 | ✅ Accepted (lô 35) |
 | [ADR-211](ADR-211-Friend-Suggestions.md) | Gợi ý kết bạn: tối đa 10 người online, chênh ≤ 10 cấp, chưa bạn / chưa mời / không chặn, 1151/1152; `/goiyban`, `/ketban <tên>` | ✅ Accepted (lô 35) |
 | [ADR-212](ADR-212-Stranger-Mail-Block.md) | Chặn thư người lạ: `block_stranger_mail` (V163), thư người chơi không phải bạn ⇒ `SEND_MAIL_OUTCOME_STRANGER_MAIL_BLOCKED`, 913/914; `/chanthu` | ✅ Accepted (lô 35) |
+| [ADR-213](ADR-213-Party-Target-Marker.md) | Đánh dấu mục tiêu nhóm: trưởng nhóm gửi id entity, server phát event 1336 cho nhóm (không lưu), 1334/1335; `/danhdau`, `/theodau` | ✅ Accepted (lô 35) |
+| [ADR-214](ADR-214-Idle-Disconnect.md) | Tự ngắt khi treo máy: im (trừ PING) quá `KAGE_IDLE_KICK_MINUTES` (30, 0 = tắt) trong world ⇒ báo một dòng chat rồi đóng kết nối | ✅ Accepted (lô 35) |
 ---
 
 ## ADR cần tạo (chưa viết)
