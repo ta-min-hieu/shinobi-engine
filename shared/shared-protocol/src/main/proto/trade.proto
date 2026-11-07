@@ -163,3 +163,28 @@ message TradeClosedEvent {
   int64 session_id = 1;
   TradeCloseReason reason = 2;
 }
+
+// ===== ADR-189 — lịch sử giao dịch. CHỈ THÊM. Đọc dòng audit TRADE_EXECUTED của chính người hỏi (30 ngày, 30 lần).
+
+// Request: Client -> Server (OPCODE_GET_TRADE_HISTORY_REQUEST = 1415). Người hỏi lấy từ session.
+message GetTradeHistoryRequest {}
+
+message TradeHistoryItem {
+  int64 item_template_id = 1; // 0 = món không đọc được lúc giao dịch (dòng nguồn đã biến mất)
+  int32 quantity = 2;
+  int32 enhance_level = 3;
+}
+
+message TradeHistoryEntry {
+  string counterpart_name = 1; // "" = nhân vật không còn
+  int64 gold_given = 2;
+  int64 gold_received = 3;
+  repeated TradeHistoryItem given = 4;
+  repeated TradeHistoryItem received = 5;
+  int64 at_epoch_seconds = 6;
+}
+
+// Response: Server -> Client (OPCODE_GET_TRADE_HISTORY_RESPONSE = 1416). Mới nhất trước.
+message GetTradeHistoryResponse {
+  repeated TradeHistoryEntry entries = 1;
+}

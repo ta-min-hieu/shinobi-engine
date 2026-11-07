@@ -149,6 +149,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.inventory.PostgresJunkSaleAdapter(dataSource));
     }
 
+    /** ADR-189 — lịch sử giao dịch. */
+    public dev.kage.trade.api.TradeHistoryFacade wireTradeHistoryFacade() {
+        return new dev.kage.trade.api.TradeHistoryFacade(
+                new dev.kage.server.database.trade.PostgresTradeHistoryAdapter(dataSource));
+    }
+
     /** ADR-187 — nhắn riêng khi offline. */
     public dev.kage.chat.api.OfflineWhisperFacade wireOfflineWhisperFacade() {
         return new dev.kage.chat.api.OfflineWhisperFacade(

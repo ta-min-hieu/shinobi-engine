@@ -3,8 +3,12 @@ package dev.kage.server.gateway;
 import java.time.Clock;
 
 import dev.kage.guild.domain.GuildCheckInPort;
+import dev.kage.protocol.GetTradeHistoryResponse;
 import dev.kage.protocol.GuildCheckInOutcome;
 import dev.kage.protocol.GuildCheckInResponse;
+import dev.kage.protocol.TradeHistoryEntry;
+import dev.kage.protocol.TradeHistoryItem;
+import dev.kage.trade.domain.TradeHistoryPort;
 
 /** Lớp lệnh lô 32 (ADR-183…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
 record Lot32Commands(
@@ -49,5 +53,29 @@ record Lot32Commands(
             registry.guildProgress.announceLevelUp(checkIn.guildId());
         }
         return response.build();
+    }
+
+    /** ADR-189 — Virtual Thread; lịch sử giao dịch của chính {@code characterId} (từ session). */
+    GetTradeHistoryResponse tradeHistory(long characterId) {
+        GetTradeHistoryResponse.Builder response = GetTradeHistoryResponse.newBuilder();
+        for (TradeHistoryPort.Entry entry : facades.tradeHistory().recent(characterId, java.time.Instant.now())) {
+            TradeHistoryEntry.Builder view = TradeHistoryEntry.newBuilder()
+                    .setCounterpartName(entry.counterpartName())
+                    .setGoldGiven(entry.goldGiven())
+                    .setGoldReceived(entry.goldReceived())
+                    .setAtEpochSeconds(entry.at().getEpochSecond());
+            entry.given().forEach(item -> view.addGiven(wire(item)));
+            entry.received().forEach(item -> view.addReceived(wire(item)));
+            response.addEntries(view);
+        }
+        return response.build();
+    }
+
+    private static TradeHistoryItem wire(TradeHistoryPort.Item item) {
+        return TradeHistoryItem.newBuilder()
+                .setItemTemplateId(item.itemTemplateId())
+                .setQuantity(item.quantity())
+                .setEnhanceLevel(item.enhanceLevel())
+                .build();
     }
 }

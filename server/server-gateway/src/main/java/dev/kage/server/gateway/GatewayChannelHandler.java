@@ -1038,6 +1038,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GuildCheckInCommand.parser(),
                             Opcode.OPCODE_GUILD_CHECK_IN_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot32().guildCheckIn(id))),
+            // Lô 32 — lịch sử giao dịch (ADR-189); chỉ đọc.
+            Map.entry(
+                    Opcode.OPCODE_GET_TRADE_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetTradeHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_TRADE_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot32().tradeHistory(id))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,

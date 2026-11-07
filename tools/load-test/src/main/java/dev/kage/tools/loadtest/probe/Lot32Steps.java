@@ -4,6 +4,8 @@ import java.io.IOException;
 
 import dev.kage.protocol.ChatChannel;
 import dev.kage.protocol.ChatMessageEvent;
+import dev.kage.protocol.GetTradeHistoryRequest;
+import dev.kage.protocol.GetTradeHistoryResponse;
 import dev.kage.protocol.GuildCheckInCommand;
 import dev.kage.protocol.GuildCheckInResponse;
 import dev.kage.protocol.GuildRecruitmentView;
@@ -18,6 +20,7 @@ import dev.kage.protocol.SendGuildJoinRequestCommand;
 import dev.kage.protocol.SendGuildJoinRequestResponse;
 import dev.kage.protocol.SetGuildViceLeaderCommand;
 import dev.kage.protocol.SetGuildViceLeaderResponse;
+import dev.kage.protocol.TradeHistoryEntry;
 import dev.kage.protocol.TransferGuildLeaderCommand;
 import dev.kage.protocol.TransferGuildLeaderResponse;
 
@@ -54,6 +57,7 @@ final class Lot32Steps {
             case "showItem" -> showItem(Long.parseLong(arg), ChatChannel.CHAT_CHANNEL_WORLD);
             case "showItemArea" -> showItem(Long.parseLong(arg), ChatChannel.CHAT_CHANNEL_AREA);
             case "showItemResult" -> showItemResult(Long.parseLong(arg));
+            case "tradeHistory" -> tradeHistory();
             default -> "bước không hiểu";
         };
     }
@@ -175,5 +179,30 @@ final class Lot32Steps {
                         .build(),
                 Opcode.OPCODE_SEND_CHAT_MESSAGE_RESPONSE_VALUE,
                 p -> SendChatMessageResponse.parseFrom(p).getOutcome().name());
+    }
+
+    private String tradeHistory() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_TRADE_HISTORY_REQUEST_VALUE,
+                GetTradeHistoryRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_TRADE_HISTORY_RESPONSE_VALUE,
+                p -> {
+                    StringBuilder out = new StringBuilder();
+                    for (TradeHistoryEntry e :
+                            GetTradeHistoryResponse.parseFrom(p).getEntriesList()) {
+                        out.append("với ")
+                                .append(e.getCounterpartName())
+                                .append(" đưa ")
+                                .append(e.getGivenCount())
+                                .append(" món+")
+                                .append(e.getGoldGiven())
+                                .append(" nhận ")
+                                .append(e.getReceivedCount())
+                                .append(" món+")
+                                .append(e.getGoldReceived())
+                                .append(" | ");
+                    }
+                    return out.toString();
+                });
     }
 }
