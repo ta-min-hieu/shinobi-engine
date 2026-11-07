@@ -228,6 +228,18 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.chat.PostgresOfflineWhisperAdapter(dataSource));
     }
 
+    /** ADR-208 — lịch sử bang chiến. */
+    public dev.kage.guild.api.GuildWarHistoryFacade wireGuildWarHistoryFacade() {
+        return new dev.kage.guild.api.GuildWarHistoryFacade(
+                new dev.kage.server.database.guild.PostgresGuildWarHistoryAdapter(dataSource));
+    }
+
+    /** ADR-207 — góp vật phẩm cho bang. */
+    public dev.kage.guild.api.GuildItemDonationFacade wireGuildItemDonationFacade() {
+        return new dev.kage.guild.api.GuildItemDonationFacade(
+                new dev.kage.server.database.guild.PostgresGuildItemDonationAdapter(dataSource));
+    }
+
     /** ADR-186 — điểm danh bang. */
     public dev.kage.guild.api.GuildCheckInFacade wireGuildCheckInFacade() {
         return new dev.kage.guild.api.GuildCheckInFacade(

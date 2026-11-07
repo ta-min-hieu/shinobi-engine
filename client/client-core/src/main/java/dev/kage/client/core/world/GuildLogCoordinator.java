@@ -98,10 +98,14 @@ final class GuildLogCoordinator implements WindowFlow {
         return true;
     }
 
-    /** ADR-198 — dòng kho bang mang mã vật phẩm ở {@code detail}; đổi sang tên hiển thị nếu catalog biết mã đó. */
+    /**
+     * ADR-198/207 — dòng kho bang / góp vật phẩm mang mã vật phẩm ở {@code detail}; đổi sang tên hiển thị nếu catalog
+     * biết mã đó.
+     */
     private GuildLogEntry withItemName(GuildLogEntry entry) {
         if (entry.getKind() != GuildLogKind.GUILD_LOG_KIND_BANK_DEPOSIT
-                && entry.getKind() != GuildLogKind.GUILD_LOG_KIND_BANK_WITHDRAW) {
+                && entry.getKind() != GuildLogKind.GUILD_LOG_KIND_BANK_WITHDRAW
+                && entry.getKind() != GuildLogKind.GUILD_LOG_KIND_ITEM_DONATED) {
             return entry;
         }
         return itemCatalog

@@ -734,7 +734,10 @@ public final class GatewayBootstrap {
         return new Lot34Facades(
                 databaseBootstrap.expansion().wireBuybackFacade(),
                 databaseBootstrap.expansion().wireAutoSellJunkFacade(),
-                databaseBootstrap.expansion().wireCharacterDeletionFacade());
+                databaseBootstrap.expansion().wireCharacterDeletionFacade(),
+                new Lot35Facades(
+                        databaseBootstrap.expansion().wireGuildItemDonationFacade(),
+                        databaseBootstrap.expansion().wireGuildWarHistoryFacade()));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

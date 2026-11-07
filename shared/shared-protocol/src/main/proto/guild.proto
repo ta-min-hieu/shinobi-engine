@@ -487,6 +487,7 @@ enum GuildLogKind {
   GUILD_LOG_KIND_VICE_DISMISSED = 11;
   GUILD_LOG_KIND_BANK_DEPOSIT = 12;   // ADR-198 — actor gửi kho bang; amount = số lượng, detail = mã vật phẩm
   GUILD_LOG_KIND_BANK_WITHDRAW = 13;  // ADR-198 — actor rút kho bang
+  GUILD_LOG_KIND_ITEM_DONATED = 14;   // ADR-207 — actor góp vật phẩm; amount = số lượng, detail = mã vật phẩm
 }
 
 message GuildLogEntry {
@@ -612,4 +613,54 @@ message GuildCheckInResponse {
   int64 contribution = 2; // cống hiến vừa cộng (0 nếu không OK)
   int64 guild_exp = 3;    // kinh nghiệm bang vừa cộng
   int32 today_count = 4;  // số người của bang đã điểm danh hôm nay (kể cả mình)
+}
+
+// ADR-207 (2026-11-07) — góp vật phẩm cho bang. Command: Client -> Server (OPCODE_DONATE_ITEM_TO_GUILD_COMMAND).
+// Món biến mất; bang nhận kinh nghiệm và người góp nhận cống hiến bằng giá thu của Tàng Bảo Các × số lượng.
+message DonateItemToGuildCommand {
+  int64 inventory_item_id = 1;
+  int32 quantity = 2;
+}
+
+enum DonateItemToGuildOutcome {
+  DONATE_ITEM_TO_GUILD_OUTCOME_UNSPECIFIED = 0;
+  DONATE_ITEM_TO_GUILD_OUTCOME_OK = 1;
+  DONATE_ITEM_TO_GUILD_OUTCOME_NOT_IN_GUILD = 2;
+  // Không có trong túi, đang mặc/khoá/cường hoá/khảm/đang chào giao dịch, hoặc Tàng Bảo Các không thu.
+  DONATE_ITEM_TO_GUILD_OUTCOME_NOT_DONATABLE = 3;
+  DONATE_ITEM_TO_GUILD_OUTCOME_INSUFFICIENT_QUANTITY = 4;
+  DONATE_ITEM_TO_GUILD_OUTCOME_INVALID_QUANTITY = 5;
+}
+
+// Response: Server -> Client (OPCODE_DONATE_ITEM_TO_GUILD_RESPONSE).
+message DonateItemToGuildResponse {
+  DonateItemToGuildOutcome outcome = 1;
+  int64 contribution = 2;     // cống hiến nhận được (= kinh nghiệm bang nhận được); 0 nếu không OK
+  bool guild_leveled_up = 3;
+}
+
+// ADR-208 (2026-11-07) — lịch sử bang chiến. Request: Client -> Server (OPCODE_GET_GUILD_WAR_HISTORY_REQUEST).
+message GetGuildWarHistoryRequest {}
+
+enum GuildWarResult {
+  GUILD_WAR_RESULT_UNSPECIFIED = 0;
+  GUILD_WAR_RESULT_WIN = 1;
+  GUILD_WAR_RESULT_LOSS = 2;
+  GUILD_WAR_RESULT_DRAW = 3;
+}
+
+// Một trận đã chốt, nhìn từ phía bang người hỏi.
+message GuildWarHistoryEntry {
+  string opponent_guild_name = 1;
+  bool declared_by_us = 2;
+  int32 our_kills = 3;
+  int32 their_kills = 4;
+  GuildWarResult result = 5;
+  int64 ended_epoch_seconds = 6;
+}
+
+// Response: Server -> Client (OPCODE_GET_GUILD_WAR_HISTORY_RESPONSE). Tối đa 20 trận gần nhất, mới nhất trước; rỗng nếu
+// không ở bang nào hoặc bang chưa đánh trận nào.
+message GetGuildWarHistoryResponse {
+  repeated GuildWarHistoryEntry entries = 1;
 }

@@ -11,7 +11,8 @@ record Lot34Windows(
         ResetTimersCoordinator resetTimers,
         BuybackCoordinator buyback,
         AutoSellCoordinator autoSell,
-        AutoWalkCoordinator autoWalk) {
+        AutoWalkCoordinator autoWalk,
+        Lot35Windows lot35) {
 
     @SuppressWarnings("unused") // skin dành cho các cửa sổ lô 34 tiếp theo
     static Lot34Windows create(KageSkin skin, WorldCommandSender sender, ReportWindows.Feeds feeds) {
@@ -19,7 +20,8 @@ record Lot34Windows(
                 new ResetTimersCoordinator(sender, feeds.chat()),
                 new BuybackCoordinator(sender, feeds.chat(), feeds.itemCatalog()),
                 new AutoSellCoordinator(sender, feeds.chat()),
-                new AutoWalkCoordinator(sender, feeds.chat()));
+                new AutoWalkCoordinator(sender, feeds.chat()),
+                Lot35Windows.create(sender, feeds)); // lô 35 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -28,5 +30,6 @@ record Lot34Windows(
         panels.register(buyback);
         panels.register(autoSell);
         panels.register(autoWalk);
+        lot35.registerInto(panels);
     }
 }

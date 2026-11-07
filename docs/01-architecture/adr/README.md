@@ -238,6 +238,8 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-204](ADR-204-Loot-Filter.md) | Lọc nhặt đồ: công tắc `auto_sell_junk` (V159), đồ rác có giá thu rơi ra tự bán qua `GoldLedger`, 556/557; `/tubanrac` | ✅ Accepted (lô 34) |
 | [ADR-205](ADR-205-Character-Deletion.md) | Xoá nhân vật: hẹn xoá 3 ngày (`deletion_requested_at`, V160), chọn lại nhân vật = huỷ xoá; 257/258; cấm khi đang chơi/đang là bang chủ; tên vẫn giữ | ✅ Accepted (lô 34) |
 | [ADR-206](ADR-206-Auto-Walk-To-Npc.md) | Tự tìm đường: 626/627 liệt kê chỗ đứng NPC world chính (tĩnh + động); client lái hướng −1/0/1 tới chỗ gần nhất, dừng khi tới / bấm phím / vướng; `/den`, `/walkto` | ✅ Accepted (lô 34) |
+| [ADR-207](ADR-207-Guild-Item-Donation.md) | Góp vật phẩm cho bang: món biến mất, giá thu × số lượng ⇒ kinh nghiệm bang + cống hiến; nhật ký `ITEM_DONATED` (V161), 757/758; `/gopdo` | ✅ Accepted (lô 35) |
+| [ADR-208](ADR-208-Guild-War-History.md) | Lịch sử bang chiến: 20 trận đã chốt của bang mình (thắng/thua/hoà, tỷ số), đọc `guild_war` sẵn có, 759/760; `/lichsuchien` | ✅ Accepted (lô 35) |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -9,15 +9,17 @@ import dev.kage.protocol.Opcode;
 /**
  * Bước lô 34: hệ số cường hoá trong catalog (ADR-199) {@code catalogStep}; mốc làm mới (ADR-200) {@code resetTimers};
  * mua lại (ADR-202) {@code buybackList}, {@code buyback:<entry id>}; lọc nhặt đồ (ADR-204) {@code autoSell:on|off|?};
- * xoá nhân vật (ADR-205) {@code deleteChar:<id>}; chỗ đứng NPC cho tự tìm đường (ADR-206) {@code npcLocations}.
- * Nối sau {@link Lot33Steps}.
+ * xoá nhân vật (ADR-205) {@code deleteChar:<id>}; chỗ đứng NPC cho tự tìm đường (ADR-206) {@code npcLocations}. Nối
+ * sau {@link Lot33Steps}; bước lạ chuyển tiếp cho {@link Lot35Steps}.
  */
 final class Lot34Steps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot35Steps lot35;
 
     Lot34Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot35 = new Lot35Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -29,7 +31,7 @@ final class Lot34Steps {
             case "autoSell" -> autoSell(arg);
             case "deleteChar" -> deleteChar(Long.parseLong(arg));
             case "npcLocations" -> npcLocations();
-            default -> "bước không hiểu";
+            default -> lot35.step(verb, arg);
         };
     }
 

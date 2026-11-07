@@ -30,7 +30,9 @@ final class GuildLog {
         VICE_DISMISSED,
         /** ADR-198 — ghi thẳng bằng SQL trong transaction kho bang ({@code PostgresGuildStorageAdapter}). */
         BANK_DEPOSIT,
-        BANK_WITHDRAW
+        BANK_WITHDRAW,
+        /** ADR-207 — amount = số lượng, detail = mã vật phẩm. */
+        ITEM_DONATED
     }
 
     /**
