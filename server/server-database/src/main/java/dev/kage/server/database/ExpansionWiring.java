@@ -155,6 +155,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.trade.PostgresTradeHistoryAdapter(dataSource));
     }
 
+    /** ADR-202 — mua lại đồ đã bán. */
+    public dev.kage.shop.api.BuybackFacade wireBuybackFacade() {
+        return new dev.kage.shop.api.BuybackFacade(
+                new dev.kage.server.database.shop.PostgresBuybackAdapter(dataSource));
+    }
+
     /** ADR-198 — kho bang: luật kho tông môn, adapter theo bang. */
     public dev.kage.inventory.api.GuildBankFacade wireGuildBankFacade() {
         return new dev.kage.inventory.api.GuildBankFacade(

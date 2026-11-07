@@ -48,6 +48,21 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
             UPDATE inventory_item SET quantity = quantity - ? WHERE id = ?
             """;
 
+    private static final String ENHANCE_OF =
+            "SELECT enhance_level FROM inventory_item WHERE id = ? AND character_id = ?";
+
+    // ADR-202 — món vừa bán; giữ 10 dòng gần nhất (BuybackFacade.MAX_ENTRIES) — cắt ngay trong transaction bán.
+    private static final String RECORD_SALE = """
+            INSERT INTO shop_buyback (character_id, item_template_id, quantity, enhance_level, price, sold_at)
+            VALUES (?, ?, ?, ?, ?, now())
+            """;
+
+    private static final String TRIM_SALES = """
+            DELETE FROM shop_buyback
+             WHERE character_id = ?
+               AND id NOT IN (SELECT id FROM shop_buyback WHERE character_id = ? ORDER BY id DESC LIMIT ?)
+            """;
+
     private final DataSource dataSource;
 
     public PostgresShopInventoryGatewayAdapter(DataSource dataSource) {
@@ -115,4 +130,30 @@ public final class PostgresShopInventoryGatewayAdapter implements InventoryGatew
 
     /** Dòng {@code inventory_item} đã khoá — các cột cần để quyết có bớt được không. */
     private record LockedRow(int quantity, boolean equipped, int offered) {}
+
+    @Override
+    public int enhanceLevelOf(Transaction tx, long characterId, long itemId) {
+        return JdbcOperations.queryOne(
+                        ((JdbcTransaction) tx).connection(), ENHANCE_OF, rs -> rs.getInt(1), itemId, characterId)
+                .orElse(0);
+    }
+
+    @Override
+    public void recordSale(Transaction tx, dev.kage.shop.domain.SoldItem sale) {
+        Connection connection = ((JdbcTransaction) tx).connection();
+        JdbcOperations.update(
+                connection,
+                RECORD_SALE,
+                sale.characterId(),
+                sale.itemTemplateId(),
+                sale.quantity(),
+                sale.enhanceLevel(),
+                sale.goldEarned());
+        JdbcOperations.update(
+                connection,
+                TRIM_SALES,
+                sale.characterId(),
+                sale.characterId(),
+                dev.kage.shop.api.BuybackFacade.MAX_ENTRIES);
+    }
 }

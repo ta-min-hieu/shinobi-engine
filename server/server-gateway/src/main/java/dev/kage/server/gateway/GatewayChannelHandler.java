@@ -1092,6 +1092,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetResetTimersRequest.parser(),
                             Opcode.OPCODE_GET_RESET_TIMERS_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot33().resetTimers())),
+            // Lô 34 — mua lại đồ đã bán (ADR-202).
+            Map.entry(
+                    Opcode.OPCODE_LIST_BUYBACK_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListBuybackRequest.parser(),
+                            Opcode.OPCODE_LIST_BUYBACK_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot34().listBuyback(id))),
+            Map.entry(
+                    Opcode.OPCODE_BUYBACK_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.BuybackCommand.parser(),
+                            Opcode.OPCODE_BUYBACK_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot34().buyBack(id, c))),
             // Lô 30 — đổi tên bang hội (ADR-172).
             Map.entry(
                     Opcode.OPCODE_RENAME_GUILD_COMMAND_VALUE,

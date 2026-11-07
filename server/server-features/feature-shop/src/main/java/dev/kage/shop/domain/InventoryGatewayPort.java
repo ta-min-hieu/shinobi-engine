@@ -62,4 +62,17 @@ public interface InventoryGatewayPort {
                 ? RemoveItemOutcome.OK
                 : RemoveItemOutcome.INSUFFICIENT_QUANTITY;
     }
+
+    /**
+     * ADR-202 — cấp cường hoá của món {@code itemId} (đọc TRƯỚC khi bớt — bán hết thì dòng biến mất). Mặc định 0 cho
+     * các fake ở test; adapter thật đọc dưới khoá túi đồ.
+     */
+    default int enhanceLevelOf(Transaction tx, long characterId, long itemId) {
+        return 0;
+    }
+
+    /** ADR-202 — ghi món vừa bán vào danh sách mua lại, cùng transaction bán. Mặc định không ghi (fake ở test). */
+    default void recordSale(Transaction tx, SoldItem sale) {
+        // fake trong test: không có danh sách mua lại
+    }
 }

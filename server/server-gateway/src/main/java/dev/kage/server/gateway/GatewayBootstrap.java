@@ -704,7 +704,8 @@ public final class GatewayBootstrap {
                         databaseBootstrap.expansion().wireFriendNoteFacade()),
                 lot31Facades(databaseBootstrap),
                 lot32Facades(databaseBootstrap),
-                lot33Facades(databaseBootstrap));
+                lot33Facades(databaseBootstrap),
+                new Lot34Facades(databaseBootstrap.expansion().wireBuybackFacade()));
     }
 
     /** Facade lô 31 (ADR-175…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

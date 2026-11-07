@@ -77,3 +77,42 @@ message SellItemCommand {
 message SellItemResponse {
   SellOutcome outcome = 1;
 }
+
+// ===== ADR-202 (Accepted 2026-11-07, chủ dự án chọn) — mua lại đồ đã bán cho cửa hàng NPC. CHỈ THÊM. =====
+
+// Một món mua lại được. price = đúng số vàng đã nhận lúc bán; seconds_left = còn bao lâu trước khi hết hạn (1 giờ).
+message BuybackView {
+  int64 entry_id = 1;
+  int64 item_template_id = 2;
+  int32 quantity = 3;
+  int32 enhance_level = 4;
+  int64 price = 5;
+  int64 seconds_left = 6;
+}
+
+// Request: Client -> Server (OPCODE_LIST_BUYBACK_REQUEST = 1036).
+message ListBuybackRequest {}
+
+// Response: Server -> Client (OPCODE_LIST_BUYBACK_RESPONSE = 1037). Mới nhất trước, tối đa 10.
+message ListBuybackResponse {
+  repeated BuybackView entries = 1;
+}
+
+// Command: Client -> Server (OPCODE_BUYBACK_COMMAND = 1038).
+message BuybackCommand {
+  int64 entry_id = 1;
+}
+
+enum BuybackOutcome {
+  BUYBACK_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  BUYBACK_OUTCOME_OK = 1;
+  BUYBACK_OUTCOME_NOT_FOUND = 2;          // không có, của người khác, hoặc đã quá 1 giờ
+  BUYBACK_OUTCOME_INSUFFICIENT_GOLD = 3;
+  BUYBACK_OUTCOME_BAG_FULL = 4;
+}
+
+// Response: Server -> Client (OPCODE_BUYBACK_RESPONSE = 1039). Mang danh sách SAU lệnh; vàng mới đi bằng 209.
+message BuybackResponse {
+  BuybackOutcome outcome = 1;
+  repeated BuybackView entries = 2;
+}

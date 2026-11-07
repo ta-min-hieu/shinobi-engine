@@ -6,6 +6,7 @@ import dev.kage.shop.domain.IdempotencyKeyReusedException;
 import dev.kage.shop.domain.OwnedItem;
 import dev.kage.shop.domain.RemoveItemOutcome;
 import dev.kage.shop.domain.ShopListing;
+import dev.kage.shop.domain.SoldItem;
 import dev.kage.shop.domain.Transaction;
 import dev.kage.shop.domain.TransactionRunner;
 
@@ -41,29 +42,41 @@ public final class SellItemUseCase {
         long totalCredit = listing.totalSellCredit(quantity);
 
         AtomicReference<SellResult> resultHolder = new AtomicReference<SellResult>();
+        Sale sale = new Sale(characterId, itemId, quantity, owned.itemTemplateId(), totalCredit);
         try {
-            tx.inTransaction((Transaction t) -> {
-                // Khoá túi đồ ĐẦU TIÊN, trước vàng — thứ tự khoá chung (DATABASE.md §5.1).
-                ports.inventoryGatewayPort().lockInventory(t, characterId);
-                ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
-                RemoveItemOutcome removed =
-                        ports.inventoryGatewayPort().removeUnequippedQuantity(t, characterId, itemId, quantity);
-                if (removed != RemoveItemOutcome.OK) {
-                    resultHolder.set(toSellResult(removed));
-                    return;
-                }
-                ports.goldPort().creditGold(t, characterId, totalCredit);
-                // itemTemplateId (dòng 66(b), 2026-10-17): itemId là dòng túi đồ — dòng đó có thể đã biến
-                // mất khi bán hết, nên một mình nó không dựng lại được LOẠI vật phẩm rời khỏi game.
-                String detail = "{\"itemId\":%d,\"itemTemplateId\":%d,\"quantity\":%d,\"goldEarned\":%d}"
-                        .formatted(itemId, owned.itemTemplateId(), quantity, totalCredit);
-                ports.auditPort().log(t, characterId, "SHOP_SELL", detail);
-                resultHolder.set(SellResult.OK);
-            });
+            tx.inTransaction((Transaction t) -> resultHolder.set(sellIn(t, sale, idempotencyKey)));
         } catch (IdempotencyKeyReusedException e) {
             return SellResult.DUPLICATE_REQUEST;
         }
         return resultHolder.get();
+    }
+
+    /** Một lần bán đã kiểm xong phần đọc. */
+    private record Sale(long characterId, long itemId, int quantity, long itemTemplateId, long totalCredit) {}
+
+    private SellResult sellIn(Transaction t, Sale sale, String idempotencyKey) {
+        long characterId = sale.characterId();
+        // Khoá túi đồ ĐẦU TIÊN, trước vàng — thứ tự khoá chung (DATABASE.md §5.1).
+        ports.inventoryGatewayPort().lockInventory(t, characterId);
+        ports.idempotencyPort().recordOrThrow(t, idempotencyKey);
+        int enhanceLevel = ports.inventoryGatewayPort().enhanceLevelOf(t, characterId, sale.itemId()); // ADR-202
+        RemoveItemOutcome removed =
+                ports.inventoryGatewayPort().removeUnequippedQuantity(t, characterId, sale.itemId(), sale.quantity());
+        if (removed != RemoveItemOutcome.OK) {
+            return toSellResult(removed);
+        }
+        ports.goldPort().creditGold(t, characterId, sale.totalCredit());
+        // itemTemplateId (dòng 66(b), 2026-10-17): itemId là dòng túi đồ — dòng đó có thể đã biến
+        // mất khi bán hết, nên một mình nó không dựng lại được LOẠI vật phẩm rời khỏi game.
+        String detail = "{\"itemId\":%d,\"itemTemplateId\":%d,\"quantity\":%d,\"goldEarned\":%d}"
+                .formatted(sale.itemId(), sale.itemTemplateId(), sale.quantity(), sale.totalCredit());
+        ports.auditPort().log(t, characterId, "SHOP_SELL", detail);
+        ports.inventoryGatewayPort()
+                .recordSale(
+                        t,
+                        new SoldItem(
+                                characterId, sale.itemTemplateId(), sale.quantity(), enhanceLevel, sale.totalCredit()));
+        return SellResult.OK;
     }
 
     private static SellResult toSellResult(RemoveItemOutcome removed) {
