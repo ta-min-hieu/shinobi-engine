@@ -114,7 +114,9 @@ final class LeaderboardCoordinator implements WindowFlow {
                             entry.getRank(),
                             entry.getName(),
                             entry.getLevel(),
-                            entry.getValue())
+                            entry.getValue(),
+                            entry.getMemberCount(), // ADR-181
+                            entry.getTotalContribution())
                     : format(
                             "leaderboard.row",
                             entry.getRank(),

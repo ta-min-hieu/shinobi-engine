@@ -35,6 +35,9 @@ message LeaderboardEntry {
   Faction faction = 4;
   int32 level = 5;
   int64 value = 6; // EXP / Elo / Lực Chiến tuỳ kind
+  // ADR-181 — chỉ bảng bang (LEADERBOARD_KIND_GUILD): số thành viên và tổng cống hiến của thành viên HIỆN TẠI. 0 ở bảng khác.
+  int32 member_count = 7;
+  int64 total_contribution = 8;
 }
 
 // Response: Server -> Client (OPCODE_GET_LEADERBOARD_RESPONSE = 1203). Bảng có thể trễ tới 60 giây

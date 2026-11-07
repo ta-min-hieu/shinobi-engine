@@ -77,7 +77,8 @@ public final class PostgresGuildProgressionAdapter implements GuildProgressionPo
 
     private static final String RANK = """
             SELECT g.id, g.name, g.leader_character_id, g.level, g.exp,
-                   ARRAY_AGG(gm.character_id ORDER BY gm.character_id) AS members
+                   ARRAY_AGG(gm.character_id ORDER BY gm.character_id) AS members,
+                   SUM(gm.contribution) AS contribution
               FROM guild g JOIN guild_member gm ON gm.guild_id = g.id
              GROUP BY g.id
              ORDER BY g.exp DESC, g.id
@@ -218,7 +219,8 @@ public final class PostgresGuildProgressionAdapter implements GuildProgressionPo
                         rs.getLong("leader_character_id"),
                         rs.getInt("level"),
                         rs.getLong("exp"),
-                        members(rs.getArray("members"))));
+                        members(rs.getArray("members")),
+                        rs.getLong("contribution")));
     }
 
     private static List<Long> members(Array array) throws SQLException {

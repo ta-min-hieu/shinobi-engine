@@ -58,8 +58,14 @@ final class LeaderboardCache {
         TRIBULATION
     }
 
-    /** Một dòng đã xếp hạng. {@code rank} bắt đầu từ 1. */
-    record Row(int rank, long characterId, String name, Faction faction, int level, long value) {}
+    /** ADR-181 — phần thêm của dòng bảng bang: số thành viên, tổng cống hiến thành viên hiện tại. */
+    record GuildStats(int members, long contribution) {
+        /** Dòng không phải bang. */
+        static final GuildStats NONE = new GuildStats(0, 0L);
+    }
+
+    /** Một dòng đã xếp hạng. {@code rank} bắt đầu từ 1; {@code guild} = {@link GuildStats#NONE} trừ bảng bang. */
+    record Row(int rank, long characterId, String name, Faction faction, int level, long value, GuildStats guild) {}
 
     /** Một bản bảng xếp hạng: toàn bộ dòng theo thứ hạng + tra hạng theo nhân vật. */
     record Board(List<Row> rows, Map<Long, Row> byCharacterId, Instant computedAt) {}
@@ -149,7 +155,8 @@ final class LeaderboardCache {
     private static List<Row> rank(List<Character> ordered, ToLongFunction<Character> value) {
         List<Row> rows = new ArrayList<>(ordered.size());
         for (Character c : ordered) {
-            rows.add(new Row(rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), value.applyAsLong(c)));
+            rows.add(new Row(
+                    rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), value.applyAsLong(c), GuildStats.NONE));
         }
         return rows;
     }
@@ -165,7 +172,7 @@ final class LeaderboardCache {
         List<Row> rows = new ArrayList<>(scored.size());
         for (Scored s : scored) {
             Character c = s.character();
-            rows.add(new Row(rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), s.power()));
+            rows.add(new Row(rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), s.power(), GuildStats.NONE));
         }
         return rows;
     }
@@ -184,7 +191,13 @@ final class LeaderboardCache {
             Character leader = charactersById.get(guild.leaderCharacterId());
             Faction faction = leader == null ? Faction.HOA : leader.faction();
             Row row = new Row(
-                    rows.size() + 1, guild.leaderCharacterId(), guild.name(), faction, guild.level(), guild.exp());
+                    rows.size() + 1,
+                    guild.leaderCharacterId(),
+                    guild.name(),
+                    faction,
+                    guild.level(),
+                    guild.exp(),
+                    new GuildStats(guild.memberIds().size(), guild.totalContribution()));
             rows.add(row);
             for (long member : guild.memberIds()) {
                 byId.put(member, row);
@@ -207,7 +220,8 @@ final class LeaderboardCache {
         scored.sort(Comparator.comparingInt((Character c) -> scores.get(c.id())).reversed());
         List<Row> rows = new ArrayList<>(scored.size());
         for (Character c : scored) {
-            rows.add(new Row(rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), scores.get(c.id())));
+            rows.add(new Row(
+                    rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), scores.get(c.id()), GuildStats.NONE));
         }
         return rows;
     }
@@ -222,7 +236,14 @@ final class LeaderboardCache {
         for (WorldBossPort.DamageRank damage : bossDamage.get()) {
             Character c = byId.get(damage.characterId());
             if (c != null) {
-                rows.add(new Row(rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), damage.totalDamage()));
+                rows.add(new Row(
+                        rows.size() + 1,
+                        c.id(),
+                        c.name(),
+                        c.faction(),
+                        c.level(),
+                        damage.totalDamage(),
+                        GuildStats.NONE));
             }
         }
         return rows;
@@ -239,7 +260,8 @@ final class LeaderboardCache {
             if (c == null) {
                 continue; // nhân vật đã xoá mà dòng rating còn — không có tên để hiện
             }
-            rows.add(new Row(rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), rating.rating()));
+            rows.add(new Row(
+                    rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), rating.rating(), GuildStats.NONE));
         }
         return rows;
     }

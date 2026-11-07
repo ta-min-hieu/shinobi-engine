@@ -3350,7 +3350,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         .setName(row.name())
                         .setFaction(toProtoFaction(row.faction()))
                         .setLevel(row.level())
-                        .setValue(row.value()));
+                        .setValue(row.value())
+                        .setMemberCount(row.guild().members()) // ADR-181 — 0 trừ bảng bang
+                        .setTotalContribution(row.guild().contribution()));
             }
             LeaderboardCache.Row own = board.byCharacterId().get(characterId);
             if (own != null) {

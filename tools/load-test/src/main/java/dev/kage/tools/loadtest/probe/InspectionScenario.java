@@ -208,11 +208,13 @@ final class InspectionScenario {
                 .limit(LEADERBOARD_ROWS_SHOWN)
                 .forEach((LeaderboardEntry entry) -> line.append(String.format(
                         Locale.ROOT,
-                        " | #%d %s Lv%d %d",
+                        " | #%d %s Lv%d %d tv=%d cốngHiến=%d",
                         entry.getRank(),
                         entry.getName(),
                         entry.getLevel(),
-                        entry.getValue())));
+                        entry.getValue(),
+                        entry.getMemberCount(),
+                        entry.getTotalContribution())));
         session.note(line.toString());
     }
 }

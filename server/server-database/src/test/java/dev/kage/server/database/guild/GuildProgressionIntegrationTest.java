@@ -205,5 +205,7 @@ class GuildProgressionIntegrationTest {
         GuildRank top = ranks.get(order.indexOf(big.id()));
         assertThat(top.memberIds()).containsExactly(b);
         assertThat(top.level()).isEqualTo(2);
+        assertThat(top.totalContribution()).isEqualTo(15_000L); // ADR-181
+        assertThat(ranks.get(order.indexOf(small.id())).totalContribution()).isEqualTo(1_000L);
     }
 }
