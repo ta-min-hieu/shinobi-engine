@@ -24,4 +24,15 @@ public interface StoragePort {
     default String auditScope() {
         return "STORAGE";
     }
+
+    /**
+     * Một lần gửi / rút vừa ghi xong, cùng transaction — kho bang (ADR-198) ghi nhật ký bang ở đây. Mặc định không làm
+     * gì.
+     */
+    default void recorded(Transaction tx, Movement movement) {
+        // kho tông môn / kho chung tài khoản: audit là đủ
+    }
+
+    /** Một lần chuyển túi ↔ kho. */
+    record Movement(long characterId, boolean deposit, long itemTemplateId, int quantity) {}
 }

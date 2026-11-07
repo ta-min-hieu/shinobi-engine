@@ -16,8 +16,9 @@ import dev.kage.protocol.TransferPartyLeaderResponse;
 /**
  * Bước lô 33: nhường trưởng nhóm (ADR-191) {@code partyLeader:<tên>}; đặt tên linh thú (ADR-193) {@code petName:<tên>}
  * ({@code petName:} trống = xoá); cừu nhân (ADR-194) {@code enemies}, {@code unenemy:<tên>}; theo dõi phường thị
- * (ADR-196) {@code watch:<id mẫu>=<giá mỗi cái>} (giá 0 = bỏ); kho chung tài khoản (ADR-197) {@code vault},
- * {@code vaultDeposit:<id>:<sl>}, {@code vaultWithdraw:<id>:<sl>}. Nối sau {@link Lot32Steps}.
+ * (ADR-196) {@code watch:<id mẫu>=<giá mỗi cái>} (giá 0 = bỏ); kho chung tài khoản (ADR-197) {@code vault}, {@code
+ * vaultDeposit:<id>:<sl>}, {@code vaultWithdraw:<id>:<sl>}; kho bang (ADR-198) {@code bank}, {@code
+ * bankDeposit:<id>:<sl>}, {@code bankWithdraw:<id>:<sl>}. Nối sau {@link Lot32Steps}.
  */
 final class Lot33Steps {
 
@@ -101,21 +102,27 @@ final class Lot33Steps {
                         .name());
     }
 
-    /** Kho chung tài khoản (ADR-197) — tách vì trần CyclomaticComplexity của {@link #step}. */
+    /** Kho chung tài khoản (ADR-197) và kho bang (ADR-198) — tách vì trần CyclomaticComplexity của {@link #step}. */
     private String vaultStep(String verb, String arg) throws IOException {
         return switch (verb) {
-            case "vault" -> vault();
-            case "vaultDeposit" -> vaultMove(arg, true);
-            case "vaultWithdraw" -> vaultMove(arg, false);
+            case "vault" -> vault(ACCOUNT);
+            case "vaultDeposit" -> vaultMove(ACCOUNT, arg, true);
+            case "vaultWithdraw" -> vaultMove(ACCOUNT, arg, false);
+            case "bank" -> vault(GUILD);
+            case "bankDeposit" -> vaultMove(GUILD, arg, true);
+            case "bankWithdraw" -> vaultMove(GUILD, arg, false);
             default -> "bước không hiểu";
         };
     }
 
-    private String vault() throws IOException {
+    private static final dev.kage.protocol.StorageKind ACCOUNT = dev.kage.protocol.StorageKind.STORAGE_KIND_ACCOUNT;
+    private static final dev.kage.protocol.StorageKind GUILD = dev.kage.protocol.StorageKind.STORAGE_KIND_GUILD;
+
+    private String vault(dev.kage.protocol.StorageKind kind) throws IOException {
         return asker.ask(
                 Opcode.OPCODE_LIST_STORAGE_REQUEST_VALUE,
                 dev.kage.protocol.ListStorageRequest.newBuilder()
-                        .setStorageKind(dev.kage.protocol.StorageKind.STORAGE_KIND_ACCOUNT)
+                        .setStorageKind(kind)
                         .build(),
                 Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE,
                 p -> describeVault(
@@ -123,7 +130,7 @@ final class Lot33Steps {
     }
 
     /** {@code <id>:<số lượng>} — id món trong túi (gửi) hoặc id dòng kho (rút). */
-    private String vaultMove(String arg, boolean deposit) throws IOException {
+    private String vaultMove(dev.kage.protocol.StorageKind kind, String arg, boolean deposit) throws IOException {
         String[] parts = arg.split(":", 2);
         long id = Long.parseLong(parts[0]);
         int quantity = Integer.parseInt(parts[1]);
@@ -133,7 +140,7 @@ final class Lot33Steps {
                     dev.kage.protocol.DepositItemCommand.newBuilder()
                             .setInventoryItemId(id)
                             .setQuantity(quantity)
-                            .setStorageKind(dev.kage.protocol.StorageKind.STORAGE_KIND_ACCOUNT)
+                            .setStorageKind(kind)
                             .build(),
                     Opcode.OPCODE_DEPOSIT_ITEM_RESPONSE_VALUE,
                     p -> {
@@ -146,7 +153,7 @@ final class Lot33Steps {
                 dev.kage.protocol.WithdrawItemCommand.newBuilder()
                         .setStoredItemId(id)
                         .setQuantity(quantity)
-                        .setStorageKind(dev.kage.protocol.StorageKind.STORAGE_KIND_ACCOUNT)
+                        .setStorageKind(kind)
                         .build(),
                 Opcode.OPCODE_WITHDRAW_ITEM_RESPONSE_VALUE,
                 p -> {

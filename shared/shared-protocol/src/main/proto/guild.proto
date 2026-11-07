@@ -485,6 +485,8 @@ enum GuildLogKind {
   GUILD_LOG_KIND_LEADER_CHANGED = 9; // ADR-183 — actor = bang chủ cũ, subject = bang chủ mới
   GUILD_LOG_KIND_VICE_APPOINTED = 10; // ADR-184 — actor = bang chủ, subject = phó mới
   GUILD_LOG_KIND_VICE_DISMISSED = 11;
+  GUILD_LOG_KIND_BANK_DEPOSIT = 12;   // ADR-198 — actor gửi kho bang; amount = số lượng, detail = mã vật phẩm
+  GUILD_LOG_KIND_BANK_WITHDRAW = 13;  // ADR-198 — actor rút kho bang
 }
 
 message GuildLogEntry {

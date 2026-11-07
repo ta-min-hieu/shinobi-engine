@@ -293,6 +293,7 @@ message StoredItemView {
 enum StorageKind {
   STORAGE_KIND_SECT = 0;
   STORAGE_KIND_ACCOUNT = 1; // kho chung mọi nhân vật cùng tài khoản
+  STORAGE_KIND_GUILD = 2;   // ADR-198 — kho bang: mọi thành viên gửi, bang chủ / phó rút; dùng ở đâu cũng được
 }
 
 // Command: Client -> Server (OPCODE_LIST_STORAGE_REQUEST = 514). Không field — characterId từ session.
@@ -320,6 +321,8 @@ enum StorageOutcome {
   STORAGE_OUTCOME_TOO_FAR = 8;          // không đứng gần người giữ kho
   STORAGE_OUTCOME_SOCKETED = 9;         // ADR-064 — món đang khảm Linh Ngọc, kho chưa chở được ngọc
   STORAGE_OUTCOME_LOCKED = 10;          // ADR-159 — người chơi đã khoá món này
+  STORAGE_OUTCOME_NOT_IN_GUILD = 11;    // ADR-198 — kho bang khi chưa vào bang
+  STORAGE_OUTCOME_NO_PERMISSION = 12;   // ADR-198 — chỉ bang chủ / phó bang chủ rút kho bang
 }
 
 // Command: Client -> Server (OPCODE_DEPOSIT_ITEM_COMMAND = 516). inventory_item_id là id THẬT trong túi.

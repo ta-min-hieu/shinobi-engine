@@ -2,6 +2,7 @@ package dev.kage.server.gateway;
 
 import dev.kage.character.api.LastOnlineFacade;
 import dev.kage.inventory.api.AccountStorageFacade;
+import dev.kage.inventory.api.GuildBankFacade;
 import dev.kage.inventory.api.PetNameFacade;
 import dev.kage.market.api.MarketWatchFacade;
 import dev.kage.pvp.api.EnemyListFacade;
@@ -12,7 +13,8 @@ record Lot33Facades(
         PetNameFacade petName,
         EnemyListFacade enemies,
         MarketWatchFacade marketWatch,
-        AccountStorageFacade accountStorage) {
+        AccountStorageFacade accountStorage,
+        GuildBankFacade guildBank) {
 
     /** Composition không có các tính năng này (test). */
     static final Lot33Facades DISABLED = new Lot33Facades(
@@ -20,5 +22,6 @@ record Lot33Facades(
             PetNameFacade.DISABLED,
             EnemyListFacade.DISABLED,
             MarketWatchFacade.DISABLED,
-            AccountStorageFacade.DISABLED);
+            AccountStorageFacade.DISABLED,
+            GuildBankFacade.DISABLED);
 }

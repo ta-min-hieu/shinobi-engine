@@ -27,7 +27,10 @@ final class GuildLog {
         LEADER_CHANGED,
         /** ADR-184 — actor = bang chủ, subject = người được bổ nhiệm / bãi nhiệm. */
         VICE_APPOINTED,
-        VICE_DISMISSED
+        VICE_DISMISSED,
+        /** ADR-198 — ghi thẳng bằng SQL trong transaction kho bang ({@code PostgresGuildStorageAdapter}). */
+        BANK_DEPOSIT,
+        BANK_WITHDRAW
     }
 
     /**

@@ -36,10 +36,12 @@ final class GuildLogCoordinator implements WindowFlow {
     private final ReportPanel panel;
     private final WorldCommandSender sender;
     private final I18NBundle i18n = KageI18n.load();
+    private final ItemCatalogCoordinator itemCatalog;
 
     GuildLogCoordinator(ReportPanel panel, WorldCommandSender sender, ReportWindows.Feeds feeds) {
         this.panel = panel;
         this.sender = sender;
+        this.itemCatalog = feeds.itemCatalog();
         panel.setOnRefresh(this::request);
         panel.setStatus(KageI18n.textOrKey(i18n, "guild_log.hint"));
         feeds.chat().addSlashCommands(this::onSlash);
@@ -87,13 +89,27 @@ final class GuildLogCoordinator implements WindowFlow {
             if (rows.size() >= MAX_ROWS) {
                 break;
             }
-            rows.add(new ReportPanel.Row(describe(i18n, entry, ZoneId.systemDefault()), false));
+            rows.add(new ReportPanel.Row(describe(i18n, withItemName(entry), ZoneId.systemDefault()), false));
         }
         if (rows.isEmpty()) {
             rows.add(new ReportPanel.Row(KageI18n.textOrKey(i18n, "guild_log.empty"), false));
         }
         panel.setRows(rows);
         return true;
+    }
+
+    /** ADR-198 — dòng kho bang mang mã vật phẩm ở {@code detail}; đổi sang tên hiển thị nếu catalog biết mã đó. */
+    private GuildLogEntry withItemName(GuildLogEntry entry) {
+        if (entry.getKind() != GuildLogKind.GUILD_LOG_KIND_BANK_DEPOSIT
+                && entry.getKind() != GuildLogKind.GUILD_LOG_KIND_BANK_WITHDRAW) {
+            return entry;
+        }
+        return itemCatalog
+                .byCode(entry.getDetail())
+                .map(item -> entry.toBuilder()
+                        .setDetail(KageI18n.textOrKey(i18n, item.getNameKey()))
+                        .build())
+                .orElse(entry);
     }
 
     /** Một dòng nhật ký — tĩnh để test không cần màn hình. Loại lạ (server mới hơn client) hiện câu chung. */

@@ -155,19 +155,29 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.trade.PostgresTradeHistoryAdapter(dataSource));
     }
 
+    /** ADR-198 — kho bang: luật kho tông môn, adapter theo bang. */
+    public dev.kage.inventory.api.GuildBankFacade wireGuildBankFacade() {
+        return new dev.kage.inventory.api.GuildBankFacade(
+                storageUseCase(new dev.kage.server.database.inventory.PostgresGuildStorageAdapter(dataSource)));
+    }
+
     /** ADR-197 — kho chung tài khoản: luật kho tông môn, adapter theo tài khoản. */
     public dev.kage.inventory.api.AccountStorageFacade wireAccountStorageFacade() {
-        dev.kage.server.database.inventory.PostgresInventoryAdapter inventory =
-                new dev.kage.server.database.inventory.PostgresInventoryAdapter(dataSource);
-        return new dev.kage.inventory.api.AccountStorageFacade(new dev.kage.inventory.application.StorageUseCase(
+        return new dev.kage.inventory.api.AccountStorageFacade(
+                storageUseCase(new dev.kage.server.database.inventory.PostgresAccountStorageAdapter(dataSource)));
+    }
+
+    /** Một {@code StorageUseCase} đủ cổng, cắm {@code port} làm nơi lưu (ADR-197/198). */
+    private dev.kage.inventory.application.StorageUseCase storageUseCase(dev.kage.inventory.domain.StoragePort port) {
+        return new dev.kage.inventory.application.StorageUseCase(
                 new dev.kage.inventory.application.StorageUseCase.Ports(
-                        inventory,
+                        new dev.kage.server.database.inventory.PostgresInventoryAdapter(dataSource),
                         new dev.kage.server.database.inventory.PostgresEquipmentAdapter(dataSource),
                         new dev.kage.server.database.inventory.PostgresItemTemplateAdapter(dataSource),
                         new dev.kage.server.database.inventory.PostgresInventoryTradeOfferAdapter()),
-                new dev.kage.server.database.inventory.PostgresAccountStorageAdapter(dataSource),
+                port,
                 new dev.kage.server.database.inventory.PostgresAuditAdapter(),
-                new dev.kage.server.database.inventory.JdbcInventoryTransactionRunner(dataSource)));
+                new dev.kage.server.database.inventory.JdbcInventoryTransactionRunner(dataSource));
     }
 
     /** ADR-196 — theo dõi phường thị. */

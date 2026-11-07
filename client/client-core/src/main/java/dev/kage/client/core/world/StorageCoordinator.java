@@ -54,6 +54,8 @@ final class StorageCoordinator implements WindowFlow {
         OUTCOME_KEYS.put(StorageOutcome.STORAGE_OUTCOME_TOO_FAR, "storage.error.too_far");
         OUTCOME_KEYS.put(StorageOutcome.STORAGE_OUTCOME_SOCKETED, "storage.error.socketed");
         OUTCOME_KEYS.put(StorageOutcome.STORAGE_OUTCOME_LOCKED, "storage.error.locked");
+        OUTCOME_KEYS.put(StorageOutcome.STORAGE_OUTCOME_NOT_IN_GUILD, "storage.error.not_in_guild"); // ADR-198
+        OUTCOME_KEYS.put(StorageOutcome.STORAGE_OUTCOME_NO_PERMISSION, "storage.error.no_permission");
     }
 
     /** Một dòng có nút: rút một dòng kho, gửi một dòng túi, hoặc ({@code toggle}) đổi sang kho kia (ADR-197). */
@@ -72,8 +74,8 @@ final class StorageCoordinator implements WindowFlow {
     private final List<StoredItemView> stored = new ArrayList<>();
     private final List<InventoryItemView> bag = new ArrayList<>();
     private int storageCapacity;
-    /** ADR-197 — đang xem kho chung tài khoản (theo cờ server trả về), không phải kho tông môn. */
-    private boolean accountMode;
+    /** ADR-197/198 — kho đang xem, theo {@code storage_kind} server trả về. */
+    private StorageKind mode = StorageKind.STORAGE_KIND_SECT;
 
     /** Hành động của từng dòng panel, cùng chỉ số với {@link ReportPanel#setRows}; dòng tiêu đề = rỗng. */
     private final List<Action> actions = new ArrayList<>();
@@ -89,18 +91,14 @@ final class StorageCoordinator implements WindowFlow {
     }
 
     private void request() {
-        requestStorage(accountMode);
+        requestStorage(mode);
         sender.listInventory();
     }
 
-    private static StorageKind kindOf(boolean account) {
-        return account ? StorageKind.STORAGE_KIND_ACCOUNT : StorageKind.STORAGE_KIND_SECT;
-    }
-
-    private void requestStorage(boolean account) {
+    private void requestStorage(StorageKind kind) {
         sender.sendReadRequest(
                 Opcode.OPCODE_LIST_STORAGE_REQUEST_VALUE,
-                ListStorageRequest.newBuilder().setStorageKind(kindOf(account)).build());
+                ListStorageRequest.newBuilder().setStorageKind(kind).build());
     }
 
     private void onRowAction(int rowIndex) {
@@ -109,7 +107,10 @@ final class StorageCoordinator implements WindowFlow {
         }
         Action action = actions.get(rowIndex);
         if (action.toggle()) {
-            requestStorage(!accountMode);
+            requestStorage(
+                    mode == StorageKind.STORAGE_KIND_SECT
+                            ? StorageKind.STORAGE_KIND_ACCOUNT
+                            : StorageKind.STORAGE_KIND_SECT);
             return;
         }
         if (action.withdraw()) {
@@ -118,7 +119,7 @@ final class StorageCoordinator implements WindowFlow {
                     WithdrawItemCommand.newBuilder()
                             .setStoredItemId(action.id())
                             .setQuantity(action.quantity())
-                            .setStorageKind(kindOf(accountMode))
+                            .setStorageKind(mode)
                             .build());
         } else {
             sender.sendReadRequest(
@@ -126,7 +127,7 @@ final class StorageCoordinator implements WindowFlow {
                     DepositItemCommand.newBuilder()
                             .setInventoryItemId(action.id())
                             .setQuantity(action.quantity())
-                            .setStorageKind(kindOf(accountMode))
+                            .setStorageKind(mode)
                             .build());
         }
     }
@@ -146,7 +147,7 @@ final class StorageCoordinator implements WindowFlow {
         int opcode = frame.header().opcode();
         if (opcode == Opcode.OPCODE_LIST_STORAGE_RESPONSE_VALUE) {
             ListStorageResponse response = ListStorageResponse.parseFrom(frame.payload());
-            accountMode = response.getStorageKind() == StorageKind.STORAGE_KIND_ACCOUNT;
+            mode = response.getStorageKind();
             replaceStorage(response.getItemsList(), response.getCapacity());
             panel.setStatus(text("storage.hint.open"));
             if (!panel.isOpen()) {
@@ -212,16 +213,15 @@ final class StorageCoordinator implements WindowFlow {
     private void redraw() {
         List<ReportPanel.Row> rows = new ArrayList<>();
         actions.clear();
+        if (mode != StorageKind.STORAGE_KIND_GUILD) { // kho bang mở bằng /khobang, không đổi qua lại ở đây
+            rows.add(new ReportPanel.Row(
+                    text(mode == StorageKind.STORAGE_KIND_ACCOUNT ? "storage.row.to_sect" : "storage.row.to_account"),
+                    false,
+                    "storage.action.switch"));
+            actions.add(new Action(false, 0L, 0, true));
+        }
         rows.add(new ReportPanel.Row(
-                text(accountMode ? "storage.row.to_sect" : "storage.row.to_account"), false, "storage.action.switch"));
-        actions.add(new Action(false, 0L, 0, true));
-        rows.add(new ReportPanel.Row(
-                KageI18n.formatOrKey(
-                        i18n,
-                        accountMode ? "storage.section.account_stored" : "storage.section.stored",
-                        stored.size(),
-                        storageCapacity),
-                true));
+                KageI18n.formatOrKey(i18n, sectionKey(mode), stored.size(), storageCapacity), true));
         actions.add(null);
         for (StoredItemView item : stored) {
             rows.add(new ReportPanel.Row(
@@ -242,6 +242,14 @@ final class StorageCoordinator implements WindowFlow {
         panel.setRows(rows);
     }
 
+    private static String sectionKey(StorageKind kind) {
+        return switch (kind) {
+            case STORAGE_KIND_ACCOUNT -> "storage.section.account_stored";
+            case STORAGE_KIND_GUILD -> "storage.section.guild_stored";
+            default -> "storage.section.stored";
+        };
+    }
+
     /** {@code Tên +cấp xSố} — tên tra catalog; chưa có catalog thì hiện dạng số, không bịa (Điều 24). */
     private String describe(long itemTemplateId, int enhanceLevel, int quantity) {
         String name = itemCatalog.nameKey(itemTemplateId).map(this::text).orElseGet(() -> "#" + itemTemplateId);
@@ -260,7 +268,7 @@ final class StorageCoordinator implements WindowFlow {
         stored.clear();
         bag.clear();
         actions.clear();
-        accountMode = false;
+        mode = StorageKind.STORAGE_KIND_SECT;
         panel.setRows(List.of());
         panel.setStatus(text("storage.hint.open"));
     }

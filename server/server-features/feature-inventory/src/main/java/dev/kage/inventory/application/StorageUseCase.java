@@ -142,6 +142,7 @@ public final class StorageUseCase {
                 characterId,
                 storagePort.auditScope() + "_DEPOSIT",
                 detail(item.itemTemplateId(), quantity, item.enhanceLevel()));
+        storagePort.recorded(t, new StoragePort.Movement(characterId, true, item.itemTemplateId(), quantity));
         return Outcome.OK;
     }
 
@@ -192,6 +193,7 @@ public final class StorageUseCase {
                 characterId,
                 storagePort.auditScope() + "_WITHDRAW",
                 detail(row.itemTemplateId(), quantity, row.enhanceLevel()));
+        storagePort.recorded(t, new StoragePort.Movement(characterId, false, row.itemTemplateId(), quantity));
         return Outcome.OK;
     }
 
