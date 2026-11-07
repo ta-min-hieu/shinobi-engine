@@ -28,6 +28,10 @@ import dev.kage.protocol.wire.PacketCodec;
  */
 final class ChatCoordinator implements WindowFlow {
 
+    /** ADR-187 — định dạng giờ gửi của tin riêng giao muộn. */
+    private static final java.time.format.DateTimeFormatter OFFLINE_WHEN =
+            java.time.format.DateTimeFormatter.ofPattern("dd/MM HH:mm");
+
     private final ChatController controller = new ChatController();
     private final ChatPanel panel;
     private final WorldCommandSender sender;
@@ -119,7 +123,7 @@ final class ChatCoordinator implements WindowFlow {
             if (event.getSenderId() != 0L && hiddenSender.test(event.getSenderId())) {
                 return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
             }
-            controller.onMessage(withTitle(markAutoReply(event)));
+            controller.onMessage(withTitle(markOffline(markAutoReply(event))));
             refreshLines();
             return true;
         }
@@ -128,6 +132,18 @@ final class ChatCoordinator implements WindowFlow {
             return true;
         }
         return false;
+    }
+
+    /** ADR-187 — tin riêng gửi lúc mình offline: ghi lúc gửi để không đọc nhầm là vừa nhắn. */
+    private ChatMessageEvent markOffline(ChatMessageEvent event) {
+        if (event.getSentAtEpochSeconds() <= 0) {
+            return event;
+        }
+        String when = OFFLINE_WHEN.format(java.time.Instant.ofEpochSecond(event.getSentAtEpochSeconds())
+                .atZone(java.time.ZoneId.systemDefault()));
+        return event.toBuilder()
+                .setBody(KageI18n.formatOrKey(i18n, "chat.offline_prefix", when) + " " + event.getBody())
+                .build();
     }
 
     /** ADR-178 — tin tự trả lời (người kia đang vắng) mang nhãn để không bị đọc nhầm là người thật vừa gõ. */

@@ -1729,6 +1729,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             expansion.lot29().expBuff().announce(characterId);
             // ADR-103 — thông báo server (RAM, không chạm DB).
             serviceDesk.sendNoticeOnEnter(characterId);
+            // ADR-187 — tin nhắn riêng gửi lúc mình offline; việc phụ, lỗi dừng bên trong.
+            expansion.lot32().offlineWhispers().deliverOnEnter(characterId);
         } catch (CharacterNotFoundException e) {
             // Cùng lỗi dù nhân vật không tồn tại hay thuộc account khác (fail secure — SECURITY.md §4).
             LOG.warn("Chọn nhân vật thất bại: không tìm thấy", e);
@@ -5760,20 +5762,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         dev.kage.chat.domain.ChatChannel domainChannel = domainChannelOpt.get();
         Character target = null;
         if (domainChannel == dev.kage.chat.domain.ChatChannel.PRIVATE) {
-            Optional<Character> found = characterFacade.findByName(command.getTargetName());
+            Optional<Character> found = resolvePrivateTarget(ctx, sequenceId, characterId, command.getTargetName());
             if (found.isEmpty()) {
-                sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_NOT_FOUND);
                 return;
             }
             target = found.get();
-            if (relations.blocks().eitherBlocks(characterId, target.id())) {
-                sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
-                return;
-            }
-            if (!worldGateway.registry().isOnline(target.id())) {
-                sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_OFFLINE);
-                return;
-            }
         }
         if (!isChannelMembershipValid(characterId, domainChannel, ctx, sequenceId)) {
             return;
@@ -5790,6 +5783,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             return;
         }
         ChatFacade.SendResult result = chatFacade.sendMessage(characterId, domainChannel, body, recipientId);
+        if (result == ChatFacade.SendResult.OK
+                && target != null
+                && !worldGateway.registry().isOnline(target.id())) {
+            // ADR-187 — người nhận offline: tin đã qua kiểm duyệt + audit ở trên, giữ lại giao khi họ vào game.
+            sendChatOutcome(ctx, sequenceId, expansion.lot32().offlineWhispers().store(characterId, target.id(), body));
+            return;
+        }
         sendChatOutcome(ctx, sequenceId, toProtoOutcome(result));
         if (result != ChatFacade.SendResult.OK) {
             return;
@@ -5797,6 +5797,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         String senderName =
                 characterFacade.findById(characterId).map(Character::name).orElse("");
         routeChatMessage(domainChannel, new ChatRouteContext(characterId, senderName, target, body));
+    }
+
+    /**
+     * Người nhận tin riêng theo tên — rỗng (và đã báo lỗi cho người gửi) nếu không có tên đó hoặc hai người chặn nhau.
+     * Người nhận offline KHÔNG bị từ chối nữa (ADR-187): tin được giữ lại sau khi qua kiểm duyệt.
+     */
+    private Optional<Character> resolvePrivateTarget(
+            ChannelHandlerContext ctx, int sequenceId, long characterId, String targetName) {
+        Optional<Character> found = characterFacade.findByName(targetName);
+        if (found.isEmpty()) {
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_NOT_FOUND);
+            return Optional.empty();
+        }
+        if (relations.blocks().eitherBlocks(characterId, found.get().id())) {
+            sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
+            return Optional.empty();
+        }
+        return found;
     }
 
     /** GUILD/PARTY chỉ gửi được nếu đang ở trong guild/party đó — tách khỏi

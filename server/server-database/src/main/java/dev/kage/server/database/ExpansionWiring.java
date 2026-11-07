@@ -149,6 +149,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.inventory.PostgresJunkSaleAdapter(dataSource));
     }
 
+    /** ADR-187 — nhắn riêng khi offline. */
+    public dev.kage.chat.api.OfflineWhisperFacade wireOfflineWhisperFacade() {
+        return new dev.kage.chat.api.OfflineWhisperFacade(
+                new dev.kage.server.database.chat.PostgresOfflineWhisperAdapter(dataSource));
+    }
+
     /** ADR-186 — điểm danh bang. */
     public dev.kage.guild.api.GuildCheckInFacade wireGuildCheckInFacade() {
         return new dev.kage.guild.api.GuildCheckInFacade(

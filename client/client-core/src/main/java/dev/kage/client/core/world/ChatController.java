@@ -228,17 +228,21 @@ final class ChatController {
      * của {@link #outcomeMessageKey}. Cái sau là kết quả của một server mới hơn client — không thể
      * liệt kê trước, chỉ có thể nói ra là không hiểu.
      */
-    private static final Map<SendChatMessageOutcome, String> OUTCOME_MESSAGE_KEYS = Map.of(
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_BLANK, "chat.error.blank",
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_TOO_LONG, "chat.error.too_long",
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_CONTAINS_BANNED_WORD, "chat.error.banned_word",
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_NOT_FOUND, "chat.error.target_not_found",
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_OFFLINE, "chat.error.target_offline",
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED, "chat.error.rate_limited",
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD, "chat.error.not_in_guild",
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY, "chat.error.not_in_party",
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MUTED, "chat.error.muted",
-            SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_SWORN, "chat.error.not_sworn");
+    private static final Map<SendChatMessageOutcome, String> OUTCOME_MESSAGE_KEYS = Map.ofEntries(
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_BLANK, "chat.error.blank"),
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MESSAGE_TOO_LONG, "chat.error.too_long"),
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_CONTAINS_BANNED_WORD, "chat.error.banned_word"),
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_NOT_FOUND, "chat.error.target_not_found"),
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_OFFLINE, "chat.error.target_offline"),
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RATE_LIMITED, "chat.error.rate_limited"),
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_GUILD, "chat.error.not_in_guild"),
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY, "chat.error.not_in_party"),
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_MUTED, "chat.error.muted"),
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_SWORN, "chat.error.not_sworn"),
+            Map.entry(SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_DELIVERED_LATER, "chat.notice.delivered_later"),
+            Map.entry(
+                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_RECIPIENT_INBOX_FULL,
+                    "chat.error.recipient_inbox_full"));
 
     /**
      * Câu giải thích một kết quả gửi, hoặc rỗng khi không có gì để nói.

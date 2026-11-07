@@ -42,6 +42,10 @@ enum SendChatMessageOutcome {
   SEND_CHAT_MESSAGE_OUTCOME_NOT_IN_PARTY = 9; // PARTY: người gửi chưa vào party nào
   SEND_CHAT_MESSAGE_OUTCOME_MUTED = 10; // ADR-052 (2026-10-18, chỉ thêm): tài khoản đang bị GM khoá chat
   SEND_CHAT_MESSAGE_OUTCOME_NOT_SWORN = 11; // ADR-110 (2026-10-25, chỉ thêm): SWORN mà chưa kết nghĩa
+  // ADR-187 (chỉ thêm): PRIVATE tới người đang offline — đã kiểm duyệt + audit, server giữ và giao khi họ vào game.
+  // Thay cho TARGET_OFFLINE ở server mới (TARGET_OFFLINE vẫn giữ trong enum cho client cũ / tương thích).
+  SEND_CHAT_MESSAGE_OUTCOME_DELIVERED_LATER = 12;
+  SEND_CHAT_MESSAGE_OUTCOME_RECIPIENT_INBOX_FULL = 13; // người nhận đã có 20 tin chờ
 }
 
 // Response: Server -> Client (OPCODE_SEND_CHAT_MESSAGE_RESPONSE).
@@ -60,6 +64,8 @@ message ChatMessageEvent {
   string sender_title_key = 5;
   // ADR-178 — tin TỰ TRẢ LỜI khi người kia đang treo "vắng mặt" (server gửi, không qua SendChatMessageCommand).
   bool auto_reply = 6;
+  // ADR-187 — tin nhắn riêng gửi lúc mình offline, giao lúc vào game: thời điểm GỬI. 0 = tin thời gian thực.
+  int64 sent_at_epoch_seconds = 7;
 }
 
 // ===== ADR-092 — biểu cảm. CHỈ THÊM. Phát cho mọi người đang nhìn thấy mình (AoI, gồm cả chính mình); client vẽ

@@ -59,6 +59,11 @@ final class RetentionJanitor {
 
     private static final String DELETE_GUILD_LOG_OLDER_THAN = "DELETE FROM guild_log WHERE created_at < ?";
 
+    /** ADR-187 — tin nhắn riêng chờ giao quá 7 ngày. */
+    private static final String DELETE_OFFLINE_WHISPER_OLDER_THAN = "DELETE FROM offline_whisper WHERE created_at < ?";
+
+    static final Duration OFFLINE_WHISPER_RETENTION = Duration.ofDays(7);
+
     private static final String DELETE_CHAT_AUDIT_OLDER_THAN = """
             DELETE FROM audit_log WHERE action = 'CHAT_MESSAGE' AND created_at < ?
             """;
@@ -105,6 +110,12 @@ final class RetentionJanitor {
                 dataSource, DELETE_GUILD_LOG_OLDER_THAN, Timestamp.from(now.minus(GUILD_LOG_RETENTION)));
     }
 
+    /** ADR-187 — xoá tin nhắn riêng chờ giao quá {@link #OFFLINE_WHISPER_RETENTION}. */
+    int purgeOfflineWhispers(Instant now) {
+        return JdbcOperations.update(
+                dataSource, DELETE_OFFLINE_WHISPER_OLDER_THAN, Timestamp.from(now.minus(OFFLINE_WHISPER_RETENTION)));
+    }
+
     int purgeChatAudit(Instant now) {
         return JdbcOperations.update(
                 dataSource, DELETE_CHAT_AUDIT_OLDER_THAN, Timestamp.from(now.minus(CHAT_AUDIT_RETENTION)));
@@ -147,6 +158,11 @@ final class RetentionJanitor {
             }
         } catch (RuntimeException e) {
             LOG.warn("Dọn nhật ký bang thất bại — lượt sau dọn bù", e);
+        }
+        try {
+            purgeOfflineWhispers(now);
+        } catch (RuntimeException e) {
+            LOG.warn("Dọn tin nhắn riêng chờ giao thất bại — lượt sau dọn bù", e);
         }
     }
 }

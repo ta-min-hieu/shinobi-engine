@@ -1,5 +1,6 @@
 package dev.kage.server.gateway;
 
+import dev.kage.chat.api.OfflineWhisperFacade;
 import dev.kage.guild.api.GuildCheckInFacade;
 import dev.kage.guild.api.GuildLeadershipFacade;
 import dev.kage.guild.api.GuildRecruitmentFacade;
@@ -8,9 +9,13 @@ import dev.kage.guild.api.GuildRecruitmentFacade;
 record Lot32Facades(
         GuildLeadershipFacade guildLeadership,
         GuildRecruitmentFacade guildRecruitment,
-        GuildCheckInFacade guildCheckIn) {
+        GuildCheckInFacade guildCheckIn,
+        OfflineWhisperFacade offlineWhispers) {
 
     /** Composition không có các tính năng này (test). */
     static final Lot32Facades DISABLED = new Lot32Facades(
-            GuildLeadershipFacade.DISABLED, GuildRecruitmentFacade.DISABLED, GuildCheckInFacade.DISABLED);
+            GuildLeadershipFacade.DISABLED,
+            GuildRecruitmentFacade.DISABLED,
+            GuildCheckInFacade.DISABLED,
+            OfflineWhisperFacade.DISABLED);
 }

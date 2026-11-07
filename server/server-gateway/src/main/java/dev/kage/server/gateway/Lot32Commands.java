@@ -10,6 +10,7 @@ import dev.kage.protocol.GuildCheckInResponse;
 record Lot32Commands(
         GuildLeadershipCommands guildLeadership,
         GuildRecruitmentCommands guildRecruitment,
+        OfflineWhisperCommands offlineWhispers,
         Lot32Facades facades,
         ConnectedCharacterRegistry registry) {
 
@@ -23,6 +24,11 @@ record Lot32Commands(
                         worldGateway.registry(),
                         Clock.systemUTC())),
                 new GuildRecruitmentCommands(lot32.guildRecruitment(), Clock.systemUTC()),
+                new OfflineWhisperCommands(new OfflineWhisperCommands.Deps(
+                        lot32.offlineWhispers(),
+                        gateway.progression().relationships().blocks(),
+                        worldGateway.registry(),
+                        Clock.systemUTC())),
                 lot32,
                 worldGateway.registry());
     }
