@@ -72,7 +72,11 @@ final class Lot30SocialSteps {
                         out.append(friend.getName())
                                 .append('[')
                                 .append(friend.getNote())
-                                .append("] ");
+                                .append("] online=")
+                                .append(friend.getOnline())
+                                .append(" lastOnline=") // ADR-192
+                                .append(friend.getLastOnlineEpochSeconds())
+                                .append(' ');
                     }
                     return out.toString();
                 });

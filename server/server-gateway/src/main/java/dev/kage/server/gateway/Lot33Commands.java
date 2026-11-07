@@ -11,13 +11,15 @@ import dev.kage.protocol.TransferPartyLeaderOutcome;
 import dev.kage.protocol.TransferPartyLeaderResponse;
 
 /** Lớp lệnh lô 33 (ADR-191…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
-record Lot33Commands(PartyFacade parties, CharacterFacade characters, ConnectedCharacterRegistry registry) {
+record Lot33Commands(
+        PartyFacade parties, CharacterFacade characters, ConnectedCharacterRegistry registry, Lot33Facades facades) {
 
     static Lot33Commands of(GatewayFacades gateway, WorldGateway worldGateway) {
         return new Lot33Commands(
                 gateway.contentFacades().socialFacades().partyFacade(),
                 gateway.characterFacade(),
-                worldGateway.registry());
+                worldGateway.registry(),
+                gateway.progression().expansion().lot33());
     }
 
     /** ADR-191 — Virtual Thread; {@code characterId} (trưởng nhóm hiện tại) từ session. Xong thì báo cả nhóm. */

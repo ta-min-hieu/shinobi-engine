@@ -29,7 +29,10 @@ import dev.kage.server.database.account.PostgresAccountAdapter;
 import dev.kage.server.database.character.JdbcCharacterTransactionRunner;
 import dev.kage.server.database.character.PostgresCharacterAdapter;
 
-/** ADR-187 — hộp tin riêng chờ trên Postgres thật: trần mỗi người nhận, lấy ra theo thứ tự gửi rồi xoá, bỏ tin quá hạn. */
+/**
+ * ADR-187 — hộp tin riêng chờ trên Postgres thật: trần mỗi người nhận, lấy ra theo thứ tự gửi rồi xoá, bỏ tin quá
+ * hạn.
+ */
 @Testcontainers
 final class OfflineWhisperIntegrationTest {
 

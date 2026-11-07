@@ -349,6 +349,15 @@ final class GuildCoordinator implements WindowFlow {
     private String memberText(GuildController.Member member) {
         String role = text(roleKey(member.leader(), controller.isViceLeader(member.characterId())));
         String presence = text(member.online() ? "guild.label.online" : "guild.label.offline");
+        String ago = member.online()
+                ? ""
+                : LastOnlineText.describe(
+                        i18n,
+                        controller.lastOnlineOf(member.characterId()),
+                        java.time.Instant.now().getEpochSecond());
+        if (!ago.isEmpty()) {
+            presence = presence + " " + ago; // ADR-192
+        }
         return member.name() + " — " + role + " · " + presence + " · "
                 + format("guild.label.contribution", controller.contributionOf(member.characterId()));
     }

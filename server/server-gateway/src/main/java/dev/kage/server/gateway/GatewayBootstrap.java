@@ -700,7 +700,8 @@ public final class GatewayBootstrap {
                         databaseBootstrap.expansion().wireGuildRenameFacade(),
                         databaseBootstrap.expansion().wireFriendNoteFacade()),
                 lot31Facades(databaseBootstrap),
-                lot32Facades(databaseBootstrap));
+                lot32Facades(databaseBootstrap),
+                lot33Facades(databaseBootstrap));
     }
 
     /** Facade lô 31 (ADR-175…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
@@ -720,6 +721,11 @@ public final class GatewayBootstrap {
                 databaseBootstrap.expansion().wireGuildCheckInFacade(),
                 databaseBootstrap.expansion().wireOfflineWhisperFacade(),
                 databaseBootstrap.expansion().wireTradeHistoryFacade());
+    }
+
+    /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
+    private static Lot33Facades lot33Facades(ServerDatabaseBootstrap databaseBootstrap) {
+        return new Lot33Facades(databaseBootstrap.expansion().wireLastOnlineFacade());
     }
 
     /** Boss thế giới (ADR-081) — ở khu vực ĐẦU TIÊN của world chính, khu vực không bao giờ đóng. */

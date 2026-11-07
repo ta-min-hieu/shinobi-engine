@@ -80,6 +80,7 @@ final class FriendController {
     }
 
     private final List<Friend> friends = new ArrayList<>();
+    private final java.util.Map<Long, Long> lastOnline = new java.util.HashMap<>();
 
     private final List<PendingRequest> pendingRequests = new ArrayList<>();
 
@@ -115,7 +116,9 @@ final class FriendController {
      */
     void onFriendList(ListFriendsResponse response) {
         friends.clear();
+        lastOnline.clear();
         for (FriendView view : response.getFriendsList()) {
+            lastOnline.put(view.getCharacterId(), view.getLastOnlineEpochSeconds()); // ADR-192
             friends.add(new Friend(
                     view.getCharacterId(), view.getName(), displayNameOf(view), view.getOnline(), view.getIntimacy()));
         }
@@ -154,12 +157,19 @@ final class FriendController {
         for (int index = 0; index < friends.size(); index++) {
             Friend friend = friends.get(index);
             if (friend.characterId() == characterId) {
+                lastOnline.put(
+                        characterId, online ? 0L : java.time.Instant.now().getEpochSecond());
                 friends.set(
                         index, new Friend(characterId, friend.name(), friend.displayName(), online, friend.intimacy()));
                 return Optional.of(friend.displayName());
             }
         }
         return Optional.empty();
+    }
+
+    /** ADR-192 — giây epoch lần cuối online của một người bạn đang offline; 0 = không biết. */
+    long lastOnlineOf(long characterId) {
+        return lastOnline.getOrDefault(characterId, 0L);
     }
 
     /** Danh sách bạn bè, online trước — xem {@link #onFriendList} về thứ tự. */

@@ -100,6 +100,7 @@ message FriendView {
   int32 intimacy = 4; // ADR-084 — thân mật của cặp bạn (tăng khi tặng quà)
   bool dao_lu = 5;     // ADR-094 — người này là đạo lữ của mình
   string note = 6;     // ADR-173 — ghi chú RIÊNG của mình về người bạn này ("" = không có)
+  int64 last_online_epoch_seconds = 7; // ADR-192 — lần cuối rời world; 0 = đang online hoặc chưa từng có mốc
 }
 
 message ListFriendsResponse {

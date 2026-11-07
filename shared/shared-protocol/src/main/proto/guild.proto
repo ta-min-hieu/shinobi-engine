@@ -131,6 +131,7 @@ message GuildMemberView {
   bool online = 4;
   int64 contribution = 5; // ADR-068 — điểm cống hiến
   bool is_vice_leader = 6; // ADR-184 — phó bang chủ
+  int64 last_online_epoch_seconds = 7; // ADR-192 — lần cuối rời world; 0 = đang online hoặc chưa từng có mốc
 }
 
 message ListGuildMembersResponse {

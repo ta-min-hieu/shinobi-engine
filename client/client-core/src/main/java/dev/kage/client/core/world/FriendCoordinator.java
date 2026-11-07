@@ -311,7 +311,7 @@ final class FriendCoordinator implements WindowFlow {
     private void refreshRows() {
         friendRows.clear();
         for (FriendController.Friend friend : controller.friends()) {
-            friendRows.add(new FriendPanel.FriendRow(friend.displayName(), friend.online(), friend.intimacy()));
+            friendRows.add(new FriendPanel.FriendRow(withLastOnline(friend), friend.online(), friend.intimacy()));
         }
         requestRows.clear();
         for (FriendController.PendingRequest request : controller.pendingRequests()) {
@@ -323,6 +323,17 @@ final class FriendCoordinator implements WindowFlow {
 
     private void notice(String messageKey) {
         panel.setNotice(text(messageKey));
+    }
+
+    /** ADR-192 — bạn đang offline thì kèm "(3 ngày trước)" sau tên. */
+    private String withLastOnline(FriendController.Friend friend) {
+        String ago = friend.online()
+                ? ""
+                : LastOnlineText.describe(
+                        i18n,
+                        controller.lastOnlineOf(friend.characterId()),
+                        java.time.Instant.now().getEpochSecond());
+        return ago.isEmpty() ? friend.displayName() : friend.displayName() + " (" + ago + ")";
     }
 
     /** Tra bản dịch, thiếu thì hiện thẳng khoá — cùng lý do {@code DialoguePanel#text}. */

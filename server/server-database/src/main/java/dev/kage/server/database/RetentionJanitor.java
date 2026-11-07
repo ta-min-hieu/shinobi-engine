@@ -151,6 +151,12 @@ final class RetentionJanitor {
         } catch (RuntimeException e) {
             LOG.warn("Dọn sổ vàng thất bại — lượt sau dọn bù", e);
         }
+        purgeSocialQuietly(now);
+    }
+
+    /** Nửa sau của {@link #purgeQuietly} (nhật ký bang, tin riêng chờ) — tách vì trần CyclomaticComplexity. */
+    @SuppressWarnings("PMD.AvoidCatchingGenericException") // cùng lý do purgeQuietly
+    private void purgeSocialQuietly(Instant now) {
         try {
             int deleted = purgeGuildLog(now);
             if (deleted > 0) {

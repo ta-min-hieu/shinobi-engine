@@ -223,6 +223,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-189](ADR-189-Trade-History.md) | Lịch sử giao dịch: đọc audit `TRADE_EXECUTED` sẵn có (chỉ mục V149), 30 lần / 30 ngày, 1415/1416; `/lichsugd` | ✅ Accepted (lô 32) |
 | [ADR-190](ADR-190-Key-Rebinding.md) | Đổi phím tắt phía client: 27 phím mở bảng/hành động, lưu Preferences, chặn trùng + phím dành riêng; `/phimtat` (không đổi protocol/DB) | ✅ Accepted (lô 32) |
 | [ADR-191](ADR-191-Party-Leader-Transfer.md) | Nhường trưởng nhóm khi vẫn ở lại nhóm: dùng lại `PartyPort.transferLeadership`, 1332/1333, báo 1318 LEADER_CHANGED; `/nhuongnhom` | ✅ Accepted (lô 33) |
+| [ADR-192](ADR-192-Last-Online.md) | Lần cuối online: cột `character.last_online_at` (V150) ghi khi rời world, field 7 ở `FriendView`/`GuildMemberView`; "3 ngày trước" | ✅ Accepted (lô 33) |
 ---
 
 ## ADR cần tạo (chưa viết)

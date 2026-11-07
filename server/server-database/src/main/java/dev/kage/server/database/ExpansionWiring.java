@@ -155,6 +155,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.trade.PostgresTradeHistoryAdapter(dataSource));
     }
 
+    /** ADR-192 — lần cuối online. */
+    public dev.kage.character.api.LastOnlineFacade wireLastOnlineFacade() {
+        return new dev.kage.character.api.LastOnlineFacade(
+                new dev.kage.server.database.character.PostgresLastOnlineAdapter(dataSource));
+    }
+
     /** ADR-187 — nhắn riêng khi offline. */
     public dev.kage.chat.api.OfflineWhisperFacade wireOfflineWhisperFacade() {
         return new dev.kage.chat.api.OfflineWhisperFacade(

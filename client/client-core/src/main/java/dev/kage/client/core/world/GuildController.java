@@ -110,6 +110,8 @@ final class GuildController {
     /** ADR-068 — cống hiến theo thành viên của lần liệt kê gần nhất. */
     private final Map<Long, Long> contributions = new HashMap<>();
 
+    private final Map<Long, Long> lastOnline = new HashMap<>();
+
     /** ADR-068/069 — cấp bang + nhiệm vụ tuần, theo lời server (mặc định rỗng = chưa biết). */
     private GuildProgressView progress = GuildProgressView.getDefaultInstance();
     /** ADR-179 — thông báo bang (đã lọc ký tự font không vẽ được); "" = chưa có. */
@@ -146,8 +148,10 @@ final class GuildController {
         members.clear();
         contributions.clear();
         viceLeaderIds.clear();
+        lastOnline.clear();
         for (GuildMemberView view : response.getMembersList()) {
             contributions.put(view.getCharacterId(), view.getContribution());
+            lastOnline.put(view.getCharacterId(), view.getLastOnlineEpochSeconds()); // ADR-192
             if (view.getIsViceLeader()) {
                 viceLeaderIds.add(view.getCharacterId());
             }
@@ -365,6 +369,11 @@ final class GuildController {
     /** Cấp bang + nhiệm vụ tuần mới nhất (ADR-068/069). */
     GuildProgressView progress() {
         return progress;
+    }
+
+    /** ADR-192 — giây epoch lần cuối online của một thành viên đang offline; 0 = không biết. */
+    long lastOnlineOf(long characterId) {
+        return lastOnline.getOrDefault(characterId, 0L);
     }
 
     /** Cống hiến của một thành viên (0 nếu chưa biết). */

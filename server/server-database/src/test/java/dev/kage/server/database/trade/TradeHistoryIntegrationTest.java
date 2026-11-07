@@ -73,14 +73,14 @@ final class TradeHistoryIntegrationTest {
         audit(me, NOW.minusSeconds(60), """
                 {"sessionId":1,"counterpartId":%d,"goldGiven":500,"goldReceived":0,
                  "itemsGiven":[],"itemsReceived":[{"itemId":9,"quantity":2,"itemTemplateId":20,"enhanceLevel":0}]}
-                """.formatted(other));
+                """.replace("%d", Long.toString(other)));
         audit(me, NOW.minusSeconds(10), """
                 {"sessionId":2,"counterpartId":%d,"goldGiven":0,"goldReceived":50,
                  "itemsGiven":[{"itemId":7,"quantity":1,"itemTemplateId":10,"enhanceLevel":3}],"itemsReceived":[]}
-                """.formatted(other));
+                """.replace("%d", Long.toString(other)));
         audit(me, NOW.minus(Duration.ofDays(40)), """
                 {"sessionId":0,"counterpartId":%d,"goldGiven":1,"goldReceived":1,"itemsGiven":[],"itemsReceived":[]}
-                """.formatted(other));
+                """.replace("%d", Long.toString(other)));
 
         List<TradeHistoryPort.Entry> history =
                 new PostgresTradeHistoryAdapter(dataSource).recent(me, NOW.minus(Duration.ofDays(30)), 30);
@@ -98,7 +98,8 @@ final class TradeHistoryIntegrationTest {
     private static void audit(long characterId, Instant at, String json) {
         JdbcOperations.update(
                 dataSource,
-                "INSERT INTO audit_log (character_id, action, detail_json, created_at) VALUES (?, 'TRADE_EXECUTED', ?, ?)",
+                "INSERT INTO audit_log (character_id, action, detail_json, created_at)"
+                        + " VALUES (?, 'TRADE_EXECUTED', ?, ?)",
                 characterId,
                 json.replace("\n", "").strip(),
                 Timestamp.from(at));

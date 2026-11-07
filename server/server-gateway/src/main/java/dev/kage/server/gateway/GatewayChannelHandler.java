@@ -4189,7 +4189,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             Map<Long, Integer> intimacy = friendGifts.intimacyOf(characterId);
             long daoLuPartner = relations.daoLu().partnerOf(characterId).orElse(0L);
             Map<Long, String> notes = expansion.lot30().facades().friendNotes().notesOf(characterId);
-            for (long friendId : friendFacade.listFriends(characterId)) {
+            List<Long> friendIds = friendFacade.listFriends(characterId);
+            Map<Long, java.time.Instant> lastOnline =
+                    expansion.lot33().facades().lastOnline().lastOnlineOf(friendIds);
+            for (long friendId : friendIds) {
                 // findByName/findById chạm DB mỗi bạn — chấp nhận N+1 ở quy mô danh sách bạn bè MVP
                 // (vài chục), không phải đường nóng mỗi tick (khác AoI/combat).
                 String name =
@@ -4201,6 +4204,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         .setIntimacy(intimacy.getOrDefault(friendId, 0))
                         .setDaoLu(friendId == daoLuPartner)
                         .setNote(notes.getOrDefault(friendId, ""))
+                        .setLastOnlineEpochSeconds(lastOnlineSeconds(lastOnline, friendId))
                         .build());
             }
             send(
@@ -4528,7 +4532,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .standingOf(characterId)
                 .map(standing -> guildProgression.contributionsOf(standing.guildId()))
                 .orElse(Map.of());
-        for (GuildFacade.MemberView member : guildFacade.listMembers(characterId)) {
+        List<GuildFacade.MemberView> members = guildFacade.listMembers(characterId);
+        Map<Long, java.time.Instant> lastOnline = expansion
+                .lot33()
+                .facades()
+                .lastOnline()
+                .lastOnlineOf(members.stream()
+                        .map(GuildFacade.MemberView::characterId)
+                        .toList());
+        for (GuildFacade.MemberView member : members) {
             // findById chạm DB mỗi thành viên — chấp nhận N+1 ở quy mô 1 bang MVP (vài chục),
             // cùng lý do ListFriendsResponse.
             String name = characterFacade
@@ -4542,6 +4554,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setIsViceLeader(member.isViceLeader()) // ADR-184
                     .setOnline(worldGateway.registry().isOnline(member.characterId()))
                     .setContribution(contributions.getOrDefault(member.characterId(), 0L))
+                    .setLastOnlineEpochSeconds(lastOnlineSeconds(lastOnline, member.characterId()))
                     .build());
         }
         send(
@@ -4549,6 +4562,15 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 Opcode.OPCODE_LIST_GUILD_MEMBERS_RESPONSE_VALUE,
                 sequenceId,
                 responseBuilder.build().toByteArray());
+    }
+
+    /** ADR-192 — giây epoch lần cuối online; 0 khi đang online hoặc chưa từng có mốc. */
+    private long lastOnlineSeconds(Map<Long, java.time.Instant> lastOnline, long characterId) {
+        if (worldGateway.registry().isOnline(characterId)) {
+            return 0L;
+        }
+        java.time.Instant at = lastOnline.get(characterId);
+        return at == null ? 0L : at.getEpochSecond();
     }
 
     private void handleListPendingGuildJoinRequestsRequest(
@@ -6392,7 +6414,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         handOverPartyLeadershipAfterDisconnect(characterId);
         // ADR-095/096 — mốc thoát cho bế quan + giây online của phiên; chạm DB nên lên authExecutor.
         CompletableFuture<Void> dailyRecorded =
-                CompletableFuture.runAsync(() -> daily.onLeftWorld(characterId), authExecutor);
+                CompletableFuture.runAsync(() -> recordLeftWorld(characterId), authExecutor);
         CompletableFuture.allOf(positionSaved, worldDrained, friendsNotified, dailyRecorded)
                 .whenComplete((ignored, error) -> finishRelease(bound, error));
     }
@@ -6505,6 +6527,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         Opcode.OPCODE_TRADE_CLOSED_EVENT_VALUE,
                         0,
                         event.toByteArray());
+    }
+
+    /** Mốc rời world: lần cuối online (ADR-192), rồi mốc thoát bế quan + giây online của phiên (ADR-095/096). */
+    private void recordLeftWorld(long characterId) {
+        expansion.lot33().facades().lastOnline().markLeft(characterId, java.time.Instant.now());
+        daily.onLeftWorld(characterId);
     }
 
     /** Trạng thái chỉ-trong-phiên phải bỏ khi rời world: tiến độ thành tựu đang đếm, lời nhắn vắng (ADR-178). */
