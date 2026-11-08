@@ -860,3 +860,10 @@ message GuildEventView {
 message ListGuildEventsResponse {
   repeated GuildEventView events = 1;
 }
+
+// ADR-266 (2026-11-08) — thành viên bang vừa vào game. Event: Server -> Client (OPCODE_GUILD_MEMBER_ONLINE_EVENT), tới
+// các thành viên khác đang online của cùng bang. Client tự quyết định có hiện hay không (lựa chọn lưu trên máy).
+message GuildMemberOnlineEvent {
+  int64 character_id = 1;
+  string name = 2;
+}

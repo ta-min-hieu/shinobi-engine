@@ -1155,6 +1155,73 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetEventCalendarRequest.parser(),
                             Opcode.OPCODE_GET_EVENT_CALENDAR_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot37().calendar())),
+            // Lô 42–43 — sẵn sàng (ADR-263), đếm ngược (264), xúc xắc (265), chia vàng (278).
+            Map.entry(
+                    Opcode.OPCODE_START_READY_CHECK_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.StartReadyCheckCommand.parser(),
+                            Opcode.OPCODE_START_READY_CHECK_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .startReadyCheck(id))),
+            Map.entry(
+                    Opcode.OPCODE_RESPOND_READY_CHECK_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.RespondReadyCheckCommand.parser(),
+                            Opcode.OPCODE_RESPOND_READY_CHECK_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .respondReadyCheck(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_START_PARTY_COUNTDOWN_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.StartPartyCountdownCommand.parser(),
+                            Opcode.OPCODE_START_PARTY_COUNTDOWN_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .startCountdown(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_ROLL_DICE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.RollDiceCommand.parser(),
+                            Opcode.OPCODE_ROLL_DICE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .rollDice(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_SPLIT_PARTY_GOLD_COMMAND_VALUE,
+                    pinGuarded(storageCommand(
+                            dev.kage.protocol.SplitPartyGoldCommand.parser(),
+                            Opcode.OPCODE_SPLIT_PARTY_GOLD_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .splitGold(id, c, h::currentWorldFacadeIfPresent)))),
             // Lô 41 — thông tin quái (ADR-255), lịch bang (ADR-256), dự tính cường hoá (ADR-257), xếp hạng bạn bè
             // (258).
             Map.entry(
@@ -2110,6 +2177,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             }
             sendInitialSelfState(characterId);
             announceOnlineToFriends(characterId);
+            announceOnlineToGuild(characterId); // ADR-266
             claimDailyCheckIn(characterId);
             // ADR-062 D4 — mở bù mốc đã đạt + nạp danh hiệu cho chat; việc phụ, lỗi dừng bên trong.
             worldGateway.registry().achievements.onEnteredWorld(characterId, character.level());
@@ -2151,6 +2219,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             correctStaleOnlineAnnouncement(characterId);
         } catch (RuntimeException e) {
             LOG.error("Không báo được trạng thái online cho bạn bè: characterId={}", characterId, e);
+        }
+    }
+
+    /** ADR-266 — báo đồng môn đang online; việc PHỤ của lần vào world, cùng luật {@link #announceOnlineToFriends}. */
+    // PMD AvoidCatchingGenericException: đúng ý — mọi lỗi của việc phụ này đều dừng ở đây.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private void announceOnlineToGuild(long characterId) {
+        try {
+            expansion.lot37().lot38().lot39().lot40().lot41().lot42().announceGuildOnline(characterId);
+        } catch (RuntimeException e) {
+            LOG.error("Không báo được online cho bang: characterId={}", characterId, e);
         }
     }
 

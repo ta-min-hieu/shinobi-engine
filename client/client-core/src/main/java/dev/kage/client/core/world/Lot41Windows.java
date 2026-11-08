@@ -12,7 +12,8 @@ record Lot41Windows(
         FriendRankingCoordinator friendRanking,
         ReminderTimerCoordinator reminders,
         ServerClockCoordinator serverClock,
-        NotebookCoordinator notebook) {
+        NotebookCoordinator notebook,
+        Lot42Windows lot42) {
 
     static Lot41Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot41Windows(
@@ -22,7 +23,8 @@ record Lot41Windows(
                 new FriendRankingCoordinator(sender, feeds.chat()),
                 new ReminderTimerCoordinator(feeds.chat()),
                 new ServerClockCoordinator(sender, feeds.chat(), System::currentTimeMillis),
-                new NotebookCoordinator(feeds.chat()));
+                new NotebookCoordinator(feeds.chat()),
+                Lot42Windows.create(sender, feeds)); // lô 42 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -34,5 +36,6 @@ record Lot41Windows(
         panels.register(reminders);
         panels.register(serverClock);
         panels.register(notebook);
+        lot42.registerInto(panels);
     }
 }

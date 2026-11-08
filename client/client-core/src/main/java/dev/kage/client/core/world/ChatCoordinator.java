@@ -51,6 +51,15 @@ final class ChatCoordinator implements WindowFlow {
 
     private Predicate<String> hiddenBody = body -> false; // ADR-249
 
+    /** ADR-268 — định dạng giờ trước mỗi dòng (giờ máy người chơi). */
+    private static final java.time.format.DateTimeFormatter LINE_TIME =
+            java.time.format.DateTimeFormatter.ofPattern("HH:mm");
+
+    private boolean timestamps; // ADR-268
+
+    /** ADR-273 — biệt danh lệnh: viết lại dòng gõ vào trước mọi xử lý khác. */
+    private java.util.function.UnaryOperator<String> lineRewriter = java.util.function.UnaryOperator.identity();
+
     ChatCoordinator(ChatPanel panel, WorldCommandSender sender) {
         this.panel = panel;
         this.sender = sender;
@@ -113,6 +122,17 @@ final class ChatCoordinator implements WindowFlow {
      */
     void addSlashCommands(Predicate<String> handler) {
         slashCommands.add(handler);
+    }
+
+    /** ADR-268 — bật / tắt hiện giờ {@code [HH:mm]} trước mỗi dòng nhật ký (vẽ lại ngay). */
+    void setTimestamps(boolean enabled) {
+        this.timestamps = enabled;
+        refreshLines();
+    }
+
+    /** ADR-273 — nối bộ viết lại dòng gõ (biệt danh lệnh). */
+    void useLineRewriter(java.util.function.UnaryOperator<String> rewriter) {
+        this.lineRewriter = rewriter;
     }
 
     /** ADR-249 — ẩn tin người chơi có nội dung khớp {@code filter} (lọc từ khoá). */
@@ -248,7 +268,8 @@ final class ChatCoordinator implements WindowFlow {
         });
     }
 
-    private void onSend(String typed) {
+    private void onSend(String raw) {
+        String typed = lineRewriter.apply(raw);
         String line = typed.strip();
         if (line.startsWith("/")) {
             for (Predicate<String> handler : slashCommands) {
@@ -298,10 +319,17 @@ final class ChatCoordinator implements WindowFlow {
      * người gửi nào để mà nêu tên.
      */
     private String render(ChatController.Line line) {
+        String time = timestamps ? timePrefix(line.receivedAtMillis(), java.time.ZoneId.systemDefault()) : "";
         if (line.senderName().isEmpty()) {
-            return line.body();
+            return time + line.body();
         }
-        return "[" + text(channelNameKey(line.channel())) + "] " + line.senderName() + ": " + line.body();
+        return time + "[" + text(channelNameKey(line.channel())) + "] " + line.senderName() + ": " + line.body();
+    }
+
+    /** ADR-268 — {@code [HH:mm] } của một dòng. Tĩnh để test. */
+    static String timePrefix(long epochMillis, java.time.ZoneId zone) {
+        return "["
+                + LINE_TIME.format(java.time.Instant.ofEpochMilli(epochMillis).atZone(zone)) + "] ";
     }
 
     /**

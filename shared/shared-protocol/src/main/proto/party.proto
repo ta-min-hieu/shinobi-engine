@@ -342,3 +342,85 @@ message PartyTargetMarkedEvent {
   int64 target_entity_id = 1; // 0 = bỏ đánh dấu
   string leader_name = 2;
 }
+
+// ===== ADR-263 (2026-11-08) — kiểm tra sẵn sàng nhóm. CHỈ THÊM. Trạng thái trong RAM gateway (mất khi khởi động lại);
+// lời mời và kết quả tới mọi thành viên đang online bằng dòng chat hệ thống (ChatMessageEvent, kênh UNSPECIFIED). =====
+
+// Command: Client -> Server (OPCODE_START_READY_CHECK_COMMAND). Chỉ trưởng nhóm; hết hạn sau 30 giây.
+message StartReadyCheckCommand {}
+
+enum StartReadyCheckOutcome {
+  START_READY_CHECK_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  START_READY_CHECK_OUTCOME_OK = 1;
+  START_READY_CHECK_OUTCOME_NOT_LEADER = 2;     // chưa vào nhóm, hoặc không phải trưởng nhóm
+  START_READY_CHECK_OUTCOME_ALREADY_ACTIVE = 3; // nhóm đang có một lượt kiểm tra chưa xong
+}
+
+// Response: Server -> Client (OPCODE_START_READY_CHECK_RESPONSE).
+message StartReadyCheckResponse {
+  StartReadyCheckOutcome outcome = 1;
+  int32 seconds = 2; // thời hạn trả lời
+}
+
+// Command: Client -> Server (OPCODE_RESPOND_READY_CHECK_COMMAND). Thành viên có mặt lúc mở lượt kiểm tra trả lời.
+message RespondReadyCheckCommand {
+  bool ready = 1;
+}
+
+enum RespondReadyCheckOutcome {
+  RESPOND_READY_CHECK_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  RESPOND_READY_CHECK_OUTCOME_OK = 1;
+  RESPOND_READY_CHECK_OUTCOME_NO_CHECK = 2; // nhóm không có lượt kiểm tra nào, hoặc mình vào nhóm sau khi nó mở
+}
+
+// Response: Server -> Client (OPCODE_RESPOND_READY_CHECK_RESPONSE).
+message RespondReadyCheckResponse {
+  RespondReadyCheckOutcome outcome = 1;
+}
+
+// ===== ADR-264 (2026-11-08) — đếm ngược nhóm. CHỈ THÊM. Server phát "N…" mỗi giây rồi "Bắt đầu!" bằng dòng chat hệ
+// thống cho mọi thành viên đang online. =====
+
+// Command: Client -> Server (OPCODE_START_PARTY_COUNTDOWN_COMMAND). Chỉ trưởng nhóm; seconds 3–10.
+message StartPartyCountdownCommand {
+  int32 seconds = 1;
+}
+
+enum StartPartyCountdownOutcome {
+  START_PARTY_COUNTDOWN_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  START_PARTY_COUNTDOWN_OUTCOME_OK = 1;
+  START_PARTY_COUNTDOWN_OUTCOME_NOT_LEADER = 2;
+  START_PARTY_COUNTDOWN_OUTCOME_INVALID_SECONDS = 3; // ngoài 3–10
+  START_PARTY_COUNTDOWN_OUTCOME_ALREADY_ACTIVE = 4;  // nhóm đang đếm
+}
+
+// Response: Server -> Client (OPCODE_START_PARTY_COUNTDOWN_RESPONSE).
+message StartPartyCountdownResponse {
+  StartPartyCountdownOutcome outcome = 1;
+}
+
+// ===== ADR-278 (2026-11-08) — chia vàng cho nhóm. CHỈ THÊM. Trừ vàng người chia, cộng đều cho đồng đội ĐANG online
+// cùng World trong MỘT giao dịch DB, mỗi bên một dòng audit (sổ vàng ADR-169). Phần dư (không chia hết) ở lại người
+// chia. Vàng rời túi ⇒ cần khoá an toàn (ADR-115) như giao dịch. =====
+
+// Command: Client -> Server (OPCODE_SPLIT_PARTY_GOLD_COMMAND).
+message SplitPartyGoldCommand {
+  int64 amount = 1; // tổng muốn chia, 1 – 1.000.000.000
+}
+
+enum SplitPartyGoldOutcome {
+  SPLIT_PARTY_GOLD_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  SPLIT_PARTY_GOLD_OUTCOME_OK = 1;
+  SPLIT_PARTY_GOLD_OUTCOME_NOT_IN_PARTY = 2;
+  SPLIT_PARTY_GOLD_OUTCOME_NO_RECIPIENT = 3;      // không đồng đội nào online cùng World
+  SPLIT_PARTY_GOLD_OUTCOME_INVALID_AMOUNT = 4;    // ngoài khoảng, hoặc nhỏ hơn số người nhận (mỗi người < 1)
+  SPLIT_PARTY_GOLD_OUTCOME_NOT_ENOUGH_GOLD = 5;
+}
+
+// Response: Server -> Client (OPCODE_SPLIT_PARTY_GOLD_RESPONSE).
+message SplitPartyGoldResponse {
+  SplitPartyGoldOutcome outcome = 1;
+  int64 each = 2;       // mỗi người nhận
+  int32 recipients = 3; // số người nhận
+  int64 gold_after = 4; // vàng còn lại của người chia
+}

@@ -218,3 +218,25 @@ message SetAwayMessageResponse {
   bool away = 2;      // trạng thái SAU lệnh
   string message = 3; // lời nhắn đã chuẩn hoá đang treo ("" = không vắng)
 }
+
+// ===== ADR-265 (2026-11-08) — gieo xúc xắc. CHỈ THÊM. Server bốc 1..max; kết quả là một dòng chat hệ thống tới cả nhóm
+// đang online (không có nhóm ⇒ chỉ mình). Giới hạn 1 lần / 3 giây mỗi nhân vật. =====
+
+// Command: Client -> Server (OPCODE_ROLL_DICE_COMMAND). max = 0 ⇒ 100.
+message RollDiceCommand {
+  int32 max = 1; // 2–1000
+}
+
+enum RollDiceOutcome {
+  ROLL_DICE_OUTCOME_UNSPECIFIED = 0; // KHÔNG dùng cho kết quả thật.
+  ROLL_DICE_OUTCOME_OK = 1;
+  ROLL_DICE_OUTCOME_INVALID_MAX = 2;
+  ROLL_DICE_OUTCOME_RATE_LIMITED = 3;
+}
+
+// Response: Server -> Client (OPCODE_ROLL_DICE_RESPONSE).
+message RollDiceResponse {
+  RollDiceOutcome outcome = 1;
+  int32 value = 2;
+  int32 max = 3;
+}

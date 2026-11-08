@@ -805,7 +805,9 @@ public final class GatewayBootstrap {
                                 databaseBootstrap.expansion().wireGuildPollFacade(),
                                 new Lot41Facades( // lô 41 lồng ở đây
                                         databaseBootstrap.expansion().wireMonsterInfoFacade(),
-                                        databaseBootstrap.expansion().wireGuildEventFacade()))));
+                                        databaseBootstrap.expansion().wireGuildEventFacade(),
+                                        new Lot42Facades( // lô 42–43 lồng ở đây
+                                                databaseBootstrap.expansion().wirePartyGoldSplitFacade())))));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

@@ -301,6 +301,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.monster.PostgresMonsterInfoAdapter(dataSource));
     }
 
+    /** ADR-278 — chia vàng cho nhóm. */
+    public dev.kage.party.api.PartyGoldSplitFacade wirePartyGoldSplitFacade() {
+        return new dev.kage.party.api.PartyGoldSplitFacade(
+                new dev.kage.server.database.party.PostgresPartyGoldSplitAdapter(dataSource));
+    }
+
     /** ADR-256 — lịch hoạt động bang. */
     public dev.kage.guild.api.GuildEventFacade wireGuildEventFacade() {
         return new dev.kage.guild.api.GuildEventFacade(

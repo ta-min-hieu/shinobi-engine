@@ -81,7 +81,13 @@ final class ChatController {
      * Một dòng trong nhật ký. {@code senderName} rỗng = dòng của hệ thống (báo lỗi gửi), không phải
      * của người chơi nào — widget dựa vào đó để không vẽ dấu hai chấm thừa.
      */
-    record Line(ChatChannel channel, String senderName, String body) {}
+    record Line(ChatChannel channel, String senderName, String body, long receivedAtMillis) {
+
+        /** Dòng nhận ngay lúc này (ADR-268 — giờ trước tin chat đọc {@link #receivedAtMillis}). */
+        Line(ChatChannel channel, String senderName, String body) {
+            this(channel, senderName, body, System.currentTimeMillis());
+        }
+    }
 
     /**
      * Kết quả biến một dòng gõ vào thành hành động. Ba nhánh, {@code sealed} để chỗ gọi không thể

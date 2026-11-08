@@ -294,6 +294,15 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-260](ADR-260-Server-Clock.md) | Đồng hồ giờ server: dùng lại gói 255/256, in giờ server (UTC+7), giờ máy, độ lệch; `/gio` (thuần client) | ✅ Accepted (lô 41) |
 | [ADR-261](ADR-261-Personal-Notebook.md) | Sổ ghi chép cá nhân: Preferences, 20 dòng; `/so` (thuần client) | ✅ Accepted (lô 41) |
 | [ADR-262](ADR-262-Chat-Line-Recall.md) | Gọi lại tin đã gõ: ↑/↓ trong ô chat, 30 dòng trong phiên (thuần client) | ✅ Accepted (lô 41) |
+| [ADR-263](ADR-263-Party-Ready-Check.md) | Kiểm tra sẵn sàng nhóm: 1337–1340; lời mời/kết quả qua dòng chat hệ thống; RAM gateway, 30 giây | ✅ Accepted (lô 42) |
+| [ADR-264](ADR-264-Party-Countdown.md) | Đếm ngược nhóm: 1341/1342; 3–10 giây; nhịp 1 giây qua dòng chat hệ thống | ✅ Accepted (lô 42) |
+| [ADR-265](ADR-265-Dice-Roll.md) | Gieo xúc xắc vào chat: 814/815; 1..max (2–1000, mặc định 100); 3 giây/lần; tới nhóm (khu vực gần: chưa) | ✅ Accepted (lô 42) |
+| [ADR-266](ADR-266-Guild-Member-Online-Notice.md) | Báo thành viên bang online: 782 tới đồng môn online lúc vào world; tắt ở client (Preferences) | ✅ Accepted (lô 42) |
+| [ADR-267](ADR-267-Command-Help.md) | Danh sách lệnh /trogiup: bảng tĩnh 11 nhóm, lọc không dấu | ✅ Accepted (lô 42) |
+| [ADR-268](ADR-268-Chat-Timestamps.md) | Giờ trước tin chat: `Line.receivedAtMillis`; `/giochat`; Preferences, mặc định tắt | ✅ Accepted (lô 42) |
+| [ADR-269](ADR-269-Ping-Command.md) | Đo ping /ping: dùng lại PING/PONG; ngưỡng 100/250 ms | ✅ Accepted (lô 42) |
+| [ADR-270](ADR-270-Coordinates-Command.md) | Toạ độ hiện tại /toado: hoành độ + trạng thái vùng; `/toado gui` gửi vào kênh đang chọn | ✅ Accepted (lô 42) |
+| [ADR-278](ADR-278-Party-Gold-Split.md) | Chia vàng cho nhóm: 1343/1344; cùng World; một transaction + audit; khoá an toàn | ✅ Accepted (lô 43) |
 ---
 
 ## ADR cần tạo (chưa viết)

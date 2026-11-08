@@ -177,6 +177,7 @@ record ExpansionWindows(
         lot40.damageMeter().useLocalId(intents.localCharacterId()); // ADR-251 /satthuong
         lot40.bagSearch().useItems(inventory::describedItems); // ADR-254 /timdo
         lot40.lot41().enhancePreview().useSelection(selectedId); // ADR-257 /dutinh
+        lot40.lot41().lot42().coordinates().usePosition(lot34.autoWalk().target(), zoneMap::state); // ADR-270
     }
 
     /** Nối HUD chiến đấu: mục tiêu cho thuần phục (ADR-124), máu cho cảnh báo máu thấp (ADR-243). */

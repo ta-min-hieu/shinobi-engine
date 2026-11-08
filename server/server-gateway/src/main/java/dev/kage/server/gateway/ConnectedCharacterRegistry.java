@@ -180,6 +180,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-178 — lời nhắn vắng: RAM, dùng chung mọi kết nối (người vắng và người nhắn ở hai kết nối khác nhau). */
     final AwayCommands away = new AwayCommands(java.time.Clock.systemUTC());
 
+    final PartySignals partySignals = new PartySignals(); // ADR-263..265 — sẵn sàng, đếm ngược, xúc xắc
+
     /** Bảng tìm nhóm (ADR-082) — RAM, dùng chung mọi kết nối; tin hết hạn 10 phút. */
     final PartyFinderBoard partyFinder = new PartyFinderBoard(java.time.Clock.systemUTC());
 

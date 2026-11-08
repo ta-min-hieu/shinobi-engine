@@ -33,6 +33,11 @@ import dev.kage.protocol.MonsterDropView;
 /** Lớp lệnh lô 41 (ADR-255…) — MỘT thành phần của {@link Lot40Commands}. Gọi trên Virtual Thread. */
 record Lot41Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 42 (ADR-263…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot42Commands lot42() {
+        return new Lot42Commands(gateway, registry);
+    }
+
     /** ADR-256 — trần giờ hẹn nhận từ gói (năm 9999); facade còn giới hạn chặt hơn (7 ngày tới). */
     static final long MAX_EPOCH_SECONDS = 253_402_300_799L;
 
