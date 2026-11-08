@@ -25,6 +25,11 @@ public final class ItemHistoryFacade {
         public List<EnhanceRecord> enhanceHistory(long characterId, int limit) {
             return List.of();
         }
+
+        @Override
+        public List<LootRecord> lootHistory(long characterId, int limit) {
+            return List.of();
+        }
     });
 
     /** Tổng thu về của một lần phân giải hàng loạt. */
@@ -63,5 +68,10 @@ public final class ItemHistoryFacade {
     /** ADR-233 — {@value #HISTORY_LIMIT} lần cường hoá gần nhất. */
     public List<ItemHistoryPort.EnhanceRecord> enhanceHistory(long characterId) {
         return port.enhanceHistory(characterId, HISTORY_LIMIT);
+    }
+
+    /** ADR-253 — {@value #HISTORY_LIMIT} lần nhặt đồ gần nhất. */
+    public List<ItemHistoryPort.LootRecord> lootHistory(long characterId) {
+        return port.lootHistory(characterId, HISTORY_LIMIT);
     }
 }

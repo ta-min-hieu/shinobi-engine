@@ -755,3 +755,55 @@ message ActivateGuildBuffResponse {
   int32 percent = 4;         // +% EXP của buff
   int64 cost = 5;            // kinh nghiệm bang mỗi lần bật
 }
+
+// ADR-248 (2026-11-08) — bình chọn trong bang. Command: Client -> Server (OPCODE_CREATE_GUILD_POLL_COMMAND).
+// Bang chủ / phó; tạo cuộc mới là đóng cuộc đang mở. Mở 24 giờ.
+message CreateGuildPollCommand {
+  string question = 1;          // ≤ 80 ký tự
+  repeated string options = 2;  // 2–4 lựa chọn, mỗi cái ≤ 32 ký tự
+}
+
+enum CreateGuildPollOutcome {
+  CREATE_GUILD_POLL_OUTCOME_UNSPECIFIED = 0;
+  CREATE_GUILD_POLL_OUTCOME_OK = 1;
+  CREATE_GUILD_POLL_OUTCOME_NOT_IN_GUILD = 2;
+  CREATE_GUILD_POLL_OUTCOME_NOT_OFFICER = 3;
+  CREATE_GUILD_POLL_OUTCOME_INVALID = 4;      // trống / quá dài / sai số lựa chọn
+  CREATE_GUILD_POLL_OUTCOME_BANNED_WORD = 5;
+}
+
+// Response: Server -> Client (OPCODE_CREATE_GUILD_POLL_RESPONSE). OK ⇒ cả bang online nhận một dòng chat hệ thống.
+message CreateGuildPollResponse {
+  CreateGuildPollOutcome outcome = 1;
+}
+
+// Command: Client -> Server (OPCODE_VOTE_GUILD_POLL_COMMAND). Bỏ phiếu lần nữa = đổi phiếu.
+message VoteGuildPollCommand {
+  int32 option_index = 1;  // 0-based
+}
+
+enum VoteGuildPollOutcome {
+  VOTE_GUILD_POLL_OUTCOME_UNSPECIFIED = 0;
+  VOTE_GUILD_POLL_OUTCOME_OK = 1;
+  VOTE_GUILD_POLL_OUTCOME_NOT_IN_GUILD = 2;
+  VOTE_GUILD_POLL_OUTCOME_NO_OPEN_POLL = 3;
+  VOTE_GUILD_POLL_OUTCOME_BAD_OPTION = 4;
+}
+
+// Response: Server -> Client (OPCODE_VOTE_GUILD_POLL_RESPONSE).
+message VoteGuildPollResponse {
+  VoteGuildPollOutcome outcome = 1;
+}
+
+// Request: Client -> Server (OPCODE_GET_GUILD_POLL_REQUEST).
+message GetGuildPollRequest {}
+
+// Response: Server -> Client (OPCODE_GET_GUILD_POLL_RESPONSE). Cuộc gần nhất của bang (mở hoặc đã đóng).
+message GetGuildPollResponse {
+  bool has_poll = 1;
+  string question = 2;
+  repeated string options = 3;
+  repeated int32 votes = 4;   // cùng thứ tự options
+  int32 my_vote = 5;          // -1 = chưa bỏ phiếu
+  int64 seconds_left = 6;     // 0 = đã đóng
+}

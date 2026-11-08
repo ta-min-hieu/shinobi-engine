@@ -25,4 +25,14 @@ public interface ItemHistoryPort {
 
     /** Tối đa {@code limit} lần cường hoá gần nhất, mới nhất trước. */
     List<EnhanceRecord> enhanceHistory(long characterId, int limit);
+
+    /**
+     * Một lần nhặt đồ (ADR-253, audit {@code LOOT_GRANT} sẵn có).
+     *
+     * @param source mã nguồn rơi (thường là mã quái)
+     */
+    record LootRecord(long itemTemplateId, int quantity, String source, Instant at) {}
+
+    /** Tối đa {@code limit} lần nhặt đồ gần nhất, mới nhất trước. */
+    List<LootRecord> lootHistory(long characterId, int limit);
 }

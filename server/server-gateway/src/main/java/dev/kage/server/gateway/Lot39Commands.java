@@ -22,6 +22,11 @@ import dev.kage.quest.application.PreviewQuestRewardUseCase;
 /** Lớp lệnh lô 39 (ADR-239…) — MỘT thành phần của {@link Lot38Commands}. Gọi trên Virtual Thread. */
 record Lot39Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 40 (ADR-247…) — dựng mỗi lần gọi (record rỗng trạng thái, rẻ). */
+    Lot40Commands lot40() {
+        return new Lot40Commands(gateway, registry);
+    }
+
     /** ADR-240 — vào world: nạp kỷ lục đã lưu vào bộ theo dõi RAM. */
     void onEnteredWorld(long characterId) {
         registry.records.load(characterId);

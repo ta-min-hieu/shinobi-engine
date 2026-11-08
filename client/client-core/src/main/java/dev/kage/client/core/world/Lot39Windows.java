@@ -11,7 +11,8 @@ record Lot39Windows(
         QuestRewardPreviewCoordinator questPreview,
         LowHealthWarning lowHealth,
         PhotoModeCoordinator photoMode,
-        BagSpaceWarningCoordinator bagSpace) {
+        BagSpaceWarningCoordinator bagSpace,
+        Lot40Windows lot40) {
 
     static Lot39Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot39Windows(
@@ -20,7 +21,8 @@ record Lot39Windows(
                 new QuestRewardPreviewCoordinator(sender, feeds.chat()),
                 new LowHealthWarning(feeds.chat()),
                 new PhotoModeCoordinator(feeds.chat()),
-                new BagSpaceWarningCoordinator(feeds.chat()));
+                new BagSpaceWarningCoordinator(feeds.chat()),
+                Lot40Windows.create(sender, feeds)); // lô 40 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -30,5 +32,6 @@ record Lot39Windows(
         panels.register(questPreview);
         panels.register(photoMode);
         panels.register(bagSpace);
+        lot40.registerInto(panels);
     }
 }

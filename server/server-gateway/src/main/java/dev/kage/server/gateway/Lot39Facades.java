@@ -10,12 +10,14 @@ record Lot39Facades(
         GuildBuffFacade guildBuff,
         PersonalRecordFacade personalRecords,
         WealthRankingFacade wealth,
-        QuestRewardPreviewFacade questPreview) {
+        QuestRewardPreviewFacade questPreview,
+        Lot40Facades lot40) {
 
     /** Composition không có các tính năng này (test). */
     static final Lot39Facades DISABLED = new Lot39Facades(
             GuildBuffFacade.DISABLED,
             PersonalRecordFacade.DISABLED,
             WealthRankingFacade.DISABLED,
-            QuestRewardPreviewFacade.DISABLED);
+            QuestRewardPreviewFacade.DISABLED,
+            Lot40Facades.DISABLED);
 }

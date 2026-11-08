@@ -795,3 +795,18 @@ message EnhanceHistoryEntry {
 message GetEnhanceHistoryResponse {
   repeated EnhanceHistoryEntry entries = 1;
 }
+
+// ADR-253 (2026-11-08) — lịch sử nhặt đồ. Request: Client -> Server (OPCODE_GET_LOOT_HISTORY_REQUEST).
+message GetLootHistoryRequest {}
+
+message LootHistoryEntry {
+  int64 item_template_id = 1;
+  int32 quantity = 2;
+  string source = 3;  // mã nguồn rơi (thường là mã quái)
+  int64 at_epoch_seconds = 4;
+}
+
+// Response: Server -> Client (OPCODE_GET_LOOT_HISTORY_RESPONSE). Tối đa 20 dòng, mới nhất trước.
+message GetLootHistoryResponse {
+  repeated LootHistoryEntry entries = 1;
+}

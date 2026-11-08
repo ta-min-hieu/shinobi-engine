@@ -289,6 +289,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.quest.PostgresQuestProgressAdapter(dataSource)));
     }
 
+    /** ADR-248 — bình chọn trong bang. */
+    public dev.kage.guild.api.GuildPollFacade wireGuildPollFacade() {
+        return new dev.kage.guild.api.GuildPollFacade(
+                new dev.kage.server.database.guild.PostgresGuildPollAdapter(dataSource));
+    }
+
     /** ADR-228 — danh mục nhiệm vụ. */
     public dev.kage.quest.api.QuestCatalogFacade wireQuestCatalogFacade() {
         return new dev.kage.quest.api.QuestCatalogFacade(

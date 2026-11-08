@@ -1155,6 +1155,35 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetEventCalendarRequest.parser(),
                             Opcode.OPCODE_GET_EVENT_CALENDAR_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot37().calendar())),
+            // Lô 40 — bình chọn trong bang (ADR-248), lịch sử nhặt đồ (ADR-253).
+            Map.entry(
+                    Opcode.OPCODE_CREATE_GUILD_POLL_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.CreateGuildPollCommand.parser(),
+                            Opcode.OPCODE_CREATE_GUILD_POLL_RESPONSE_VALUE,
+                            (h, id, c) ->
+                                    h.expansion.lot37().lot38().lot39().lot40().createPoll(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_VOTE_GUILD_POLL_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.VoteGuildPollCommand.parser(),
+                            Opcode.OPCODE_VOTE_GUILD_POLL_RESPONSE_VALUE,
+                            (h, id, c) ->
+                                    h.expansion.lot37().lot38().lot39().lot40().vote(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_GUILD_POLL_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetGuildPollRequest.parser(),
+                            Opcode.OPCODE_GET_GUILD_POLL_RESPONSE_VALUE,
+                            (h, id, c) ->
+                                    h.expansion.lot37().lot38().lot39().lot40().poll(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_LOOT_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetLootHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_LOOT_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) ->
+                                    h.expansion.lot37().lot38().lot39().lot40().lootHistory(id))),
             // Lô 39 — buff bang (ADR-239), kỷ lục cá nhân (ADR-240), xem trước thưởng nhiệm vụ (ADR-242).
             Map.entry(
                     Opcode.OPCODE_ACTIVATE_GUILD_BUFF_COMMAND_VALUE,

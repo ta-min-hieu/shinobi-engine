@@ -36,6 +36,17 @@ public final class PostgresItemHistoryAdapter implements ItemHistoryPort {
              LIMIT ?
             """;
 
+    private static final String LOOT = """
+            SELECT (detail_json::jsonb ->> 'itemTemplateId')::bigint AS template_id,
+                   (detail_json::jsonb ->> 'quantity')::int AS quantity,
+                   COALESCE(detail_json::jsonb ->> 'source', '') AS source,
+                   created_at
+              FROM audit_log
+             WHERE character_id = ? AND action = 'LOOT_GRANT'
+             ORDER BY id DESC
+             LIMIT ?
+            """;
+
     private final DataSource dataSource;
 
     /** Dựng ở composition root. */
@@ -59,6 +70,20 @@ public final class PostgresItemHistoryAdapter implements ItemHistoryPort {
                         rs.getInt("to_level"),
                         rs.getLong("gold_cost"),
                         rs.getString("result"),
+                        rs.getTimestamp("created_at").toInstant()),
+                characterId,
+                limit);
+    }
+
+    @Override
+    public List<LootRecord> lootHistory(long characterId, int limit) {
+        return JdbcOperations.query(
+                dataSource,
+                LOOT,
+                rs -> new LootRecord(
+                        rs.getLong("template_id"),
+                        rs.getInt("quantity"),
+                        rs.getString("source"),
                         rs.getTimestamp("created_at").toInstant()),
                 characterId,
                 limit);

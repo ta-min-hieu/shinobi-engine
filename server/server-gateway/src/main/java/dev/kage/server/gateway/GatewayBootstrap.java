@@ -349,6 +349,8 @@ public final class GatewayBootstrap {
         characterRegistry.quiz.bind(new QuizHooks.Deps( // ADR-122 — hỏi đáp tông môn
                 facades.progression().expansion().quiz(), mail, characterRegistry, java.time.Clock.systemUTC()));
         expansion.add(characterRegistry.quiz.job());
+        expansion.add(
+                DailyReminder.job(new DailyReminder.Deps(facades, characterRegistry, java.time.Clock.systemUTC())));
         characterRegistry.tournament.bind(new TournamentHooks.Deps( // ADR-125 — luận võ đại hội
                 facades.progression().expansion().tournament(),
                 worldGateway.arenaInstanceRegistry(),
@@ -777,7 +779,8 @@ public final class GatewayBootstrap {
                         databaseBootstrap.expansion().wireGuildBuffFacade(),
                         databaseBootstrap.expansion().wirePersonalRecordFacade(),
                         databaseBootstrap.expansion().wireWealthRankingFacade(),
-                        databaseBootstrap.expansion().wireQuestRewardPreviewFacade()));
+                        databaseBootstrap.expansion().wireQuestRewardPreviewFacade(),
+                        new Lot40Facades(databaseBootstrap.expansion().wireGuildPollFacade())));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
