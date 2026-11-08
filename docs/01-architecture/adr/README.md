@@ -286,6 +286,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-252](ADR-252-Daily-Reminder.md) | Nhắc việc ngày: ≤ 1 giờ trước reset nhắc một lần người online còn nhiệm vụ ngày chưa lĩnh (không nhắc điểm danh — đã tự nhận) | ✅ Accepted (lô 40) |
 | [ADR-253](ADR-253-Loot-History.md) | Lịch sử nhặt đồ: 566/567 đọc audit `LOOT_GRANT`, 20 dòng; `/lichsunhat` | ✅ Accepted (lô 40) |
 | [ADR-254](ADR-254-Bag-Search.md) | Tìm trong túi đồ: `/timdo` khớp không dấu trên mô tả món trong túi (thuần client) | ✅ Accepted (lô 40) |
+| [ADR-255](ADR-255-Monster-Info.md) | Xem thông tin quái: 416/417 chỉ số + bảng rơi từ `monster_template`/`drop_table_entry`; `/xemquai` (mục tiêu đang nhắm hoặc mã) | ✅ Accepted (lô 41) |
+| [ADR-256](ADR-256-Guild-Event-Schedule.md) | Lịch hoạt động bang: V170 `guild_event`, sĩ quan hẹn 1 phút–7 ngày, tối đa 5 buổi, nhắc 10 phút trước một lần; 776–781; `/lichbang` | ✅ Accepted (lô 41) |
+| [ADR-257](ADR-257-Enhance-Preview.md) | Dự tính cường hoá: 568/569 đọc `EnhancementTable` cho món đang chọn (giá, tỉ lệ, tụt cấp, Bảo Vệ Phù); `/dutinh` | ✅ Accepted (lô 41) |
+| [ADR-258](ADR-258-Friend-Ranking.md) | Xếp hạng bạn bè: 1155/1156 lọc bảng Lực Chiến đã đệm theo mình + bạn bè; `/xephangban` | ✅ Accepted (lô 41) |
+| [ADR-259](ADR-259-Reminder-Timer.md) | Hẹn giờ nhắc: `Timer` libGDX, tối đa 5 lời nhắc 1–600 phút; `/hengio` (thuần client) | ✅ Accepted (lô 41) |
+| [ADR-260](ADR-260-Server-Clock.md) | Đồng hồ giờ server: dùng lại gói 255/256, in giờ server (UTC+7), giờ máy, độ lệch; `/gio` (thuần client) | ✅ Accepted (lô 41) |
+| [ADR-261](ADR-261-Personal-Notebook.md) | Sổ ghi chép cá nhân: Preferences, 20 dòng; `/so` (thuần client) | ✅ Accepted (lô 41) |
+| [ADR-262](ADR-262-Chat-Line-Recall.md) | Gọi lại tin đã gõ: ↑/↓ trong ô chat, 30 dòng trong phiên (thuần client) | ✅ Accepted (lô 41) |
 ---
 
 ## ADR cần tạo (chưa viết)

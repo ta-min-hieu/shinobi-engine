@@ -110,6 +110,7 @@ public final class ChatPanel implements HudWindow {
     private final Table composer;
     private final TextButton channelButton;
     private final TextField input;
+    private final SentLineHistory sentLines = new SentLineHistory(); // ADR-262
 
     private Consumer<String> onSend;
 
@@ -208,7 +209,17 @@ public final class ChatPanel implements HudWindow {
 
             @Override
             public boolean keyDown(InputEvent event, int keycode) {
-                if (keycode != Input.Keys.ESCAPE || !isComposing()) {
+                if (!isComposing()) {
+                    return false;
+                }
+                if (keycode == Input.Keys.UP || keycode == Input.Keys.DOWN) { // ADR-262 — gọi lại tin đã gõ
+                    (keycode == Input.Keys.UP ? sentLines.previous() : sentLines.next()).ifPresent(line -> {
+                        input.setText(line);
+                        input.setCursorPosition(line.length());
+                    });
+                    return true;
+                }
+                if (keycode != Input.Keys.ESCAPE) {
                     return false;
                 }
                 closeComposer();
@@ -243,6 +254,7 @@ public final class ChatPanel implements HudWindow {
 
     private void submit() {
         String typed = input.getText();
+        sentLines.remember(typed); // ADR-262
         // Đóng TRƯỚC khi báo ra ngoài: người nhận có thể mở lại ô nhập (VD báo lỗi rồi cho gõ tiếp),
         // và nó phải thắng, không bị lệnh đóng này chạy sau đè mất.
         closeComposer();
