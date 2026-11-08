@@ -120,6 +120,7 @@ final class Lot37Commands {
     /** ADR-223 — vừa vào world: ghi mốc bắt đầu phiên. */
     void onEnteredWorld(long characterId) {
         sessions.put(characterId, deps.clock().instant());
+        lot38.lot39().onEnteredWorld(characterId); // ADR-240 — nạp kỷ lục
     }
 
     /** ADR-223 — rời world: cộng giây của phiên vào tổng giờ chơi (chạm DB — luồng blocking của handler). */

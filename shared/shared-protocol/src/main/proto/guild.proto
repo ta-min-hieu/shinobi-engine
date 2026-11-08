@@ -731,3 +731,27 @@ message SendGuildMailResponse {
   int32 recipients = 2;       // số thành viên nhận được thư
   int32 remaining_today = 3;  // số đợt bang còn gửi được hôm nay
 }
+
+// ADR-239 (2026-11-08) — buff bang. Command: Client -> Server (OPCODE_ACTIVATE_GUILD_BUFF_COMMAND). Chỉ bang chủ.
+message ActivateGuildBuffCommand {
+  bool query_only = 1;  // true = chỉ hỏi còn bao lâu (mọi thành viên)
+}
+
+enum ActivateGuildBuffOutcome {
+  ACTIVATE_GUILD_BUFF_OUTCOME_UNSPECIFIED = 0;
+  ACTIVATE_GUILD_BUFF_OUTCOME_OK = 1;
+  ACTIVATE_GUILD_BUFF_OUTCOME_NOT_IN_GUILD = 2;
+  ACTIVATE_GUILD_BUFF_OUTCOME_NOT_LEADER = 3;
+  ACTIVATE_GUILD_BUFF_OUTCOME_ALREADY_ACTIVE = 4;
+  ACTIVATE_GUILD_BUFF_OUTCOME_NOT_ENOUGH_EXP = 5;  // trừ xong sẽ tụt cấp bang
+  ACTIVATE_GUILD_BUFF_OUTCOME_STATUS = 6;          // trả lời query_only
+}
+
+// Response: Server -> Client (OPCODE_ACTIVATE_GUILD_BUFF_RESPONSE).
+message ActivateGuildBuffResponse {
+  ActivateGuildBuffOutcome outcome = 1;
+  int64 seconds_left = 2;    // 0 = không có buff
+  int64 guild_exp_left = 3;  // kinh nghiệm bang sau khi trừ (0 khi chỉ hỏi)
+  int32 percent = 4;         // +% EXP của buff
+  int64 cost = 5;            // kinh nghiệm bang mỗi lần bật
+}

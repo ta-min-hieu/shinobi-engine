@@ -21,7 +21,8 @@ enum LeaderboardKind {
   LEADERBOARD_KIND_BOSS_DAMAGE = 5; // ADR-081 — tổng sát thương lên boss thế giới; chỉ người đã từng gây sát thương
   LEADERBOARD_KIND_CAVE = 6;        // ADR-134 — cấp linh mạch động phủ; chỉ người đã dựng động phủ
   LEADERBOARD_KIND_TRIBULATION = 7; // ADR-134 — số kiếp Thiên Kiếp đã qua; chỉ người đã qua ít nhất một kiếp
-  LEADERBOARD_KIND_ACHIEVEMENT = 8; // ADR-209 — số thành tựu đã mở; chỉ người đã mở ít nhất một
+  LEADERBOARD_KIND_ACHIEVEMENT = 8;
+  LEADERBOARD_KIND_WEALTH = 9;      // ADR-241 — linh thạch đang có; chỉ 100 người nhiều nhất (ít nhất 1) // ADR-209 — số thành tựu đã mở; chỉ người đã mở ít nhất một
 }
 
 // Command: Client -> Server (OPCODE_GET_LEADERBOARD_REQUEST = 1202).

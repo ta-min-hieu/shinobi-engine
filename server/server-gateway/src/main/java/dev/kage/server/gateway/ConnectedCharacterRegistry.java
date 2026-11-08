@@ -132,6 +132,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     final EnemyHooks enemies = new EnemyHooks(); // ADR-194
     final DeathRecapHooks deathRecap = new DeathRecapHooks(System::currentTimeMillis); // ADR-195
+    final PersonalRecordHooks records = new PersonalRecordHooks(); // ADR-240
     final AutoSellHooks autoSell = new AutoSellHooks(); // ADR-204
 
     /** ADR-112 — mở lô đấu giá khi boss Bí Cảnh chết + nhịp chốt/gửi thư; nối sau khi DB đã dựng. */
@@ -526,6 +527,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     @Override
     public void onAttackResult(long targetCharacterId, WorldOutboundSink.AttackOutcome outcome) {
         deathRecap.onAttackObserved(targetCharacterId, outcome); // ADR-195
+        records.onAttackObserved(targetCharacterId, outcome); // ADR-240
         ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
@@ -562,6 +564,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     @Override
     public void onSkillResult(long targetCharacterId, WorldOutboundSink.SkillOutcome outcome) {
         deathRecap.onSkillObserved(targetCharacterId, outcome); // ADR-195
+        records.onSkillObserved(targetCharacterId, outcome); // ADR-240
         ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
@@ -671,6 +674,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         killingIntent.onCharacterDefeated(defeatedCharacterId, killerEntityId, victimAt, guildWars.roster); // ADR-142
         enemies.onCharacterDefeated(defeatedCharacterId, killerEntityId, killingIntent.inPvpZone(victimAt)); // ADR-194
         deathRecap.onDefeated(defeatedCharacterId, killerEntityId, this); // ADR-195
+        records.onDefeated(defeatedCharacterId); // ADR-240
     }
 
     @Override
@@ -693,6 +697,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onMonsterKilled(long killerCharacterId, String monsterCode, long expReward) {
+        records.onKill(killerCharacterId); // ADR-240 — RAM, tick thread
         lootExecutor.dispatch(
                 KillRewardDispatcher.Step.LOOT,
                 killerCharacterId,

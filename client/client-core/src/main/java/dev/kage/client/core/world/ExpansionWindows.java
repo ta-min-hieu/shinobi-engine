@@ -171,6 +171,17 @@ record ExpansionWindows(
         lot36.lot37().lot38().priceHint().useSelection(inventory::selectedItem); // ADR-234 /giacho
     }
 
+    /** Nối HUD chiến đấu: mục tiêu cho thuần phục (ADR-124), máu cho cảnh báo máu thấp (ADR-243). */
+    void useCombat(CombatHudController combat) {
+        taming.useTarget(combat::currentTargetId);
+        lot39().lowHealth().useHealth(combat);
+    }
+
+    /** Luồng lô 39 (ADR-239…) — cho {@code WorldScreen} vẽ cảnh báo máu thấp / ẩn HUD. */
+    Lot39Windows lot39() {
+        return lot31.lot32().lot33().lot34().lot35().lot36().lot37().lot38().lot39();
+    }
+
     /**
      * ADR-220 — vẽ ký hiệu "mục tiêu nhóm" trên đầu con quái trưởng nhóm đánh dấu (ADR-213), giữa {@code begin}/{@code
      * end} của {@link RealmTitles}. Không cấp phát mỗi khung: khoá tra đã đóng hộp sẵn lúc nhận event.

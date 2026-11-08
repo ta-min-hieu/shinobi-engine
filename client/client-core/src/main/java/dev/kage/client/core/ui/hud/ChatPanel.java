@@ -101,6 +101,9 @@ public final class ChatPanel implements HudWindow {
     /** ADR-152 — loa thế giới: cam sáng, khác vàng nhạt của dòng hệ thống; tiền tố [Loa] mang nghĩa, màu chỉ phụ. */
     private static final Color BROADCAST_COLOR = Color.valueOf("FF9F43");
 
+    /** ADR-245 — tin nhắc tên mình: xanh lơ sáng, khác hẳn mọi kênh. */
+    private static final Color MENTION_COLOR = Color.valueOf("5FE7FF");
+
     private final Stage stage;
     private final Table panel;
     private final List<Label> lineLabels = new ArrayList<>();
@@ -341,7 +344,9 @@ public final class ChatPanel implements HudWindow {
         PRIVATE,
         SYSTEM,
         /** ADR-152 — loa thế giới (Truyền Âm Phù). */
-        BROADCAST
+        BROADCAST,
+        /** ADR-245 — tin có nhắc tên mình. */
+        MENTION
     }
 
     private static Color colorOf(LineKind kind) {
@@ -351,6 +356,7 @@ public final class ChatPanel implements HudWindow {
             case SYSTEM -> SYSTEM_COLOR;
             case WORLD -> WORLD_COLOR;
             case BROADCAST -> BROADCAST_COLOR;
+            case MENTION -> MENTION_COLOR;
         };
     }
 

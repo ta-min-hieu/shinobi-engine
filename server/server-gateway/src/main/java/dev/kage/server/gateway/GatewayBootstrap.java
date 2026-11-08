@@ -396,6 +396,17 @@ public final class GatewayBootstrap {
         characterRegistry.enemies.bind(new EnemyHooks.Deps(
                 facades.progression().expansion().lot33().enemies(), java.time.Clock.systemUTC())); // ADR-194
         characterRegistry.deathRecap.bind(facades.characterFacade()); // ADR-195
+        characterRegistry.records.bind( // ADR-240
+                facades.progression()
+                        .expansion()
+                        .lot34()
+                        .lot35()
+                        .lot36()
+                        .lot37()
+                        .lot38()
+                        .lot39()
+                        .personalRecords(),
+                characterRegistry);
         bindLot37Hooks(characterRegistry, facades); // ADR-223, ADR-230
         characterRegistry.autoSell.bind(new AutoSellHooks.Deps(
                 facades.progression().expansion().lot34().autoSell(), characterRegistry)); // ADR-204
@@ -761,7 +772,12 @@ public final class GatewayBootstrap {
                 databaseBootstrap.expansion().wireMarketPriceHintFacade(),
                 databaseBootstrap.expansion().wireGuildMailFacade(),
                 databaseBootstrap.expansion().wireContactPrivacyFacade(),
-                databaseBootstrap.expansion().wireLoginHistoryFacade());
+                databaseBootstrap.expansion().wireLoginHistoryFacade(),
+                new Lot39Facades( // lô 39 lồng ở đây
+                        databaseBootstrap.expansion().wireGuildBuffFacade(),
+                        databaseBootstrap.expansion().wirePersonalRecordFacade(),
+                        databaseBootstrap.expansion().wireWealthRankingFacade(),
+                        databaseBootstrap.expansion().wireQuestRewardPreviewFacade()));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
@@ -1036,7 +1052,18 @@ public final class GatewayBootstrap {
     private static long fortuneBoosted(GatewayFacades facades, long characterId, long amount) {
         java.time.Instant now = java.time.Instant.now();
         long afterFortune = facades.progression().expansion().fortune().boostedExp(characterId, amount, now);
+        // ADR-239 — buff bang (+%, đọc qua bộ đệm 30 giây).
+        long afterGuildBuff = facades.progression()
+                .expansion()
+                .lot34()
+                .lot35()
+                .lot36()
+                .lot37()
+                .lot38()
+                .lot39()
+                .guildBuff()
+                .boosted(characterId, afterFortune, now);
         // ADR-164 — Đan x2 kinh nghiệm nhân đôi SAU mọi hệ số khác (đọc từ RAM, không chạm DB mỗi lần hạ quái).
-        return facades.progression().expansion().lot29().expBuff().boosted(characterId, afterFortune, now);
+        return facades.progression().expansion().lot29().expBuff().boosted(characterId, afterGuildBuff, now);
     }
 }

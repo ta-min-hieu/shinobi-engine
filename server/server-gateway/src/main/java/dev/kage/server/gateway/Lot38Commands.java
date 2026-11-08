@@ -15,7 +15,11 @@ import dev.kage.protocol.GetMarketPriceHintRequest;
 import dev.kage.protocol.GetMarketPriceHintResponse;
 
 /** Lớp lệnh lô 38 (ADR-231…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
-record Lot38Commands(GatewayFacades gateway, ContactPrivacyCommands contactPrivacy, GuildMailCommands guildMail) {
+record Lot38Commands(
+        GatewayFacades gateway,
+        ContactPrivacyCommands contactPrivacy,
+        GuildMailCommands guildMail,
+        Lot39Commands lot39) {
 
     static Lot38Commands of(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
         return new Lot38Commands(
@@ -32,7 +36,8 @@ record Lot38Commands(GatewayFacades gateway, ContactPrivacyCommands contactPriva
                                 .lot38()
                                 .guildMail(),
                         registry,
-                        java.time.Clock.systemUTC())));
+                        java.time.Clock.systemUTC())),
+                new Lot39Commands(gateway, registry)); // lô 39 lồng ở đây
     }
 
     /** ADR-238 — luồng đăng nhập (Virtual Thread): ghi một lần đăng nhập thành công với IP đã che. */

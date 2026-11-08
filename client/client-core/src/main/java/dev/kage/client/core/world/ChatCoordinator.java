@@ -36,6 +36,7 @@ final class ChatCoordinator implements WindowFlow {
     private final ChatPanel panel;
     private final WorldCommandSender sender;
     private final I18NBundle i18n = KageI18n.load();
+    private final MentionWatch mentions = new MentionWatch(); // ADR-245
 
     /** Đệm dựng sẵn cho {@link ChatPanel#setLines} — chỉ đổi khi CÓ TIN MỚI, không phải mỗi khung. */
     private final List<String> renderedLines = new ArrayList<>();
@@ -59,6 +60,12 @@ final class ChatCoordinator implements WindowFlow {
         // khung chat coi như không tồn tại với người chơi lần đầu.
         controller.appendSystem(text("chat.hint.open"));
         refreshLines();
+    }
+
+    /** ADR-245 — tên nhân vật đang chơi, để tô sáng tin nhắc tên mình. Trả chính nó (gọi nối ngay sau khi dựng). */
+    ChatCoordinator withOwnName(String name) {
+        mentions.useOwnName(name);
+        return this;
     }
 
     /**
@@ -134,6 +141,9 @@ final class ChatCoordinator implements WindowFlow {
                 return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
             }
             controller.onMessage(withTitle(markLinked(markOffline(markAutoReply(event)))));
+            if (mentions.mentions(event.getSenderName(), event.getBody())) { // ADR-245
+                controller.appendSystem(KageI18n.formatOrKey(i18n, "mention.notice", event.getSenderName()));
+            }
             refreshLines();
             return true;
         }
@@ -262,7 +272,10 @@ final class ChatCoordinator implements WindowFlow {
         lineKinds.clear();
         for (ChatController.Line line : controller.lines()) {
             renderedLines.add(render(line));
-            lineKinds.add(kindOf(line.channel()));
+            lineKinds.add(
+                    mentions.mentions(line.senderName(), line.body())
+                            ? ChatPanel.LineKind.MENTION
+                            : kindOf(line.channel()));
         }
         panel.setLines(renderedLines, lineKinds);
     }

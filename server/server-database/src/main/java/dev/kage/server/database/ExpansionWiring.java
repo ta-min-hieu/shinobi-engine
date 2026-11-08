@@ -264,6 +264,31 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.account.PostgresLoginHistoryAdapter(dataSource));
     }
 
+    /** ADR-239 — buff bang. */
+    public dev.kage.guild.api.GuildBuffFacade wireGuildBuffFacade() {
+        return new dev.kage.guild.api.GuildBuffFacade(
+                new dev.kage.server.database.guild.PostgresGuildBuffAdapter(dataSource));
+    }
+
+    /** ADR-240 — kỷ lục cá nhân. */
+    public dev.kage.character.api.PersonalRecordFacade wirePersonalRecordFacade() {
+        return new dev.kage.character.api.PersonalRecordFacade(
+                new dev.kage.server.database.character.PostgresPersonalRecordAdapter(dataSource));
+    }
+
+    /** ADR-241 — bảng giàu có. */
+    public dev.kage.character.api.WealthRankingFacade wireWealthRankingFacade() {
+        return new dev.kage.character.api.WealthRankingFacade(
+                new dev.kage.server.database.character.PostgresWealthRankingAdapter(dataSource));
+    }
+
+    /** ADR-242 — xem trước thưởng nhiệm vụ (chạy on_claim không ghi gì). */
+    public dev.kage.quest.api.QuestRewardPreviewFacade wireQuestRewardPreviewFacade() {
+        return new dev.kage.quest.api.QuestRewardPreviewFacade(new dev.kage.quest.application.PreviewQuestRewardUseCase(
+                new dev.kage.server.database.quest.PostgresQuestTemplateAdapter(dataSource),
+                new dev.kage.server.database.quest.PostgresQuestProgressAdapter(dataSource)));
+    }
+
     /** ADR-228 — danh mục nhiệm vụ. */
     public dev.kage.quest.api.QuestCatalogFacade wireQuestCatalogFacade() {
         return new dev.kage.quest.api.QuestCatalogFacade(

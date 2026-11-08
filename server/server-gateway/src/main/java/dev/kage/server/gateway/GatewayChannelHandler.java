@@ -1155,6 +1155,25 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetEventCalendarRequest.parser(),
                             Opcode.OPCODE_GET_EVENT_CALENDAR_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot37().calendar())),
+            // Lô 39 — buff bang (ADR-239), kỷ lục cá nhân (ADR-240), xem trước thưởng nhiệm vụ (ADR-242).
+            Map.entry(
+                    Opcode.OPCODE_ACTIVATE_GUILD_BUFF_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ActivateGuildBuffCommand.parser(),
+                            Opcode.OPCODE_ACTIVATE_GUILD_BUFF_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().lot38().lot39().guildBuff(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_PERSONAL_RECORDS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetPersonalRecordsRequest.parser(),
+                            Opcode.OPCODE_GET_PERSONAL_RECORDS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().lot38().lot39().personalRecords(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_QUEST_REWARD_PREVIEW_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetQuestRewardPreviewRequest.parser(),
+                            Opcode.OPCODE_GET_QUEST_REWARD_PREVIEW_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().lot38().lot39().questPreview(id, c))),
             // Lô 38 — thư toàn bang (ADR-235), riêng tư liên lạc (ADR-236/237), lịch sử đăng nhập (ADR-238).
             Map.entry(
                     Opcode.OPCODE_SEND_GUILD_MAIL_COMMAND_VALUE,
@@ -3650,7 +3669,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 () -> worldBoss.topDamage(LeaderboardCache.TOP_SIZE),
                 expansion.cave()::veinLevels, // ADR-134
                 worldGateway.registry().tribulation::passedByCharacter,
-                worldGateway.registry().achievements.facade()::unlockedCounts); // ADR-209
+                worldGateway.registry().achievements.facade()::unlockedCounts, // ADR-209
+                expansion.lot37().lot38().lot39()::richest); // ADR-241
     }
 
     private static LeaderboardCache.Kind toCacheKind(LeaderboardKind kind) {
@@ -3662,6 +3682,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case LEADERBOARD_KIND_CAVE -> LeaderboardCache.Kind.CAVE;
             case LEADERBOARD_KIND_TRIBULATION -> LeaderboardCache.Kind.TRIBULATION;
             case LEADERBOARD_KIND_ACHIEVEMENT -> LeaderboardCache.Kind.ACHIEVEMENT;
+            case LEADERBOARD_KIND_WEALTH -> LeaderboardCache.Kind.WEALTH;
             // UNSPECIFIED/lạ (client mới hơn server) ⇒ bảng cảnh giới, không lỗi.
             default -> LeaderboardCache.Kind.REALM;
         };
@@ -3719,6 +3740,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case CAVE -> LeaderboardKind.LEADERBOARD_KIND_CAVE;
             case TRIBULATION -> LeaderboardKind.LEADERBOARD_KIND_TRIBULATION;
             case ACHIEVEMENT -> LeaderboardKind.LEADERBOARD_KIND_ACHIEVEMENT;
+            case WEALTH -> LeaderboardKind.LEADERBOARD_KIND_WEALTH;
         };
     }
 

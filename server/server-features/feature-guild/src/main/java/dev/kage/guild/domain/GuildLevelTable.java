@@ -28,6 +28,11 @@ public final class GuildLevelTable {
         return level;
     }
 
+    /** Kinh nghiệm tích luỹ tối thiểu của cấp {@code level} (dưới mức này là tụt cấp) — ADR-239. */
+    public static long expToReach(int level) {
+        return EXP_TO_REACH[Math.clamp(level, 1, MAX_LEVEL) - 1];
+    }
+
     /** Tổng kinh nghiệm cần để lên cấp kế; 0 nếu đã tối đa. */
     public static long expForNextLevel(int level) {
         return level >= MAX_LEVEL ? 0L : EXP_TO_REACH[Math.max(level, 1)];

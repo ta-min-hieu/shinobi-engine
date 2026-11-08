@@ -270,6 +270,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-236](ADR-236-Do-Not-Disturb.md) | Không làm phiền: cột `do_not_disturb` (V167) chặn tin riêng/mời nhóm/giao dịch/kết bạn từ người không phải bạn (lỗi 403), 1153/1154; `/khonglamphien` | ✅ Accepted (lô 38) |
 | [ADR-237](ADR-237-Block-Stranger-Invites.md) | Chặn lời mời người lạ: cột `block_stranger_invites` (V167), chỉ bạn bè/cùng bang mời nhóm/giao dịch được; dùng chung 1153/1154; `/chanloimoi` | ✅ Accepted (lô 38) |
 | [ADR-238](ADR-238-Login-History.md) | Lịch sử đăng nhập: bảng `login_history` (V167) chỉ lưu IP đã che, giữ 50 dòng/tài khoản; 265/266 trả 10 dòng; `/lichsudangnhap` | ✅ Accepted (lô 38) |
+| [ADR-239](ADR-239-Guild-Buff.md) | Buff bang: 768/769 bang chủ tiêu 1.000 kinh nghiệm bang (không được tụt cấp) ⇒ cả bang +20% EXP 1 giờ; cột `guild.exp_buff_until` (V168), đệm 30 giây; `/buffbang` | ✅ Accepted (lô 39) |
+| [ADR-240](ADR-240-Personal-Records.md) | Kỷ lục cá nhân: đòn mạnh nhất + chuỗi hạ quái, theo dõi RAM trên tick thread, ghi khi phá (bảng `personal_record` V168), báo chat; 267/268; `/kyluc` | ✅ Accepted (lô 39) |
+| [ADR-241](ADR-241-Wealth-Leaderboard.md) | Xếp hạng giàu có: `LEADERBOARD_KIND_WEALTH` top 100 theo linh thạch; tab "Phú hộ" | ✅ Accepted (lô 39) |
+| [ADR-242](ADR-242-Quest-Reward-Preview.md) | Xem trước thưởng nhiệm vụ: 630/631 chạy `on_claim` vào danh sách rồi bỏ — không ghi gì; `/xemthuong` | ✅ Accepted (lô 39) |
+| [ADR-243](ADR-243-Low-Health-Warning.md) | Cảnh báo máu thấp: < 30% viền đỏ nháy + một dòng nhắc (thuần client) | ✅ Accepted (lô 39) |
+| [ADR-244](ADR-244-Photo-Mode.md) | Chế độ chụp ảnh: F10 / `/chupanh` ẩn HUD + chat (thuần client) | ✅ Accepted (lô 39) |
+| [ADR-245](ADR-245-Mention-Highlight.md) | Tô sáng khi bị nhắc tên: khớp tên không dấu, dòng màu `MENTION` + một dòng báo (thuần client) | ✅ Accepted (lô 39) |
+| [ADR-246](ADR-246-Bag-Nearly-Full-Warning.md) | Cảnh báo sắp đầy túi: ≤ 2 ô trống nhắc một dòng + gợi ý `/tubanrac`, `/phangiai` (thuần client) | ✅ Accepted (lô 39) |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -741,3 +741,13 @@ message LoginHistoryEntry {
 message GetLoginHistoryResponse {
   repeated LoginHistoryEntry entries = 1;
 }
+
+// ADR-240 (2026-11-08) — kỷ lục cá nhân. Request: Client -> Server (OPCODE_GET_PERSONAL_RECORDS_REQUEST).
+message GetPersonalRecordsRequest {}
+
+// Response: Server -> Client (OPCODE_GET_PERSONAL_RECORDS_RESPONSE). Phá kỷ lục thì server báo thêm một dòng chat hệ thống.
+message GetPersonalRecordsResponse {
+  int64 highest_hit = 1;           // sát thương một đòn cao nhất
+  int64 longest_kill_streak = 2;   // chuỗi hạ quái dài nhất không chết
+  int64 current_kill_streak = 3;   // chuỗi hiện tại (RAM, mất khi server khởi động lại)
+}

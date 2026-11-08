@@ -57,7 +57,9 @@ final class LeaderboardCache {
         /** ADR-134 — số kiếp Thiên Kiếp đã qua. */
         TRIBULATION,
         /** ADR-209 — số thành tựu đã mở. */
-        ACHIEVEMENT
+        ACHIEVEMENT,
+        /** ADR-241 — linh thạch đang có. */
+        WEALTH
     }
 
     /** ADR-181 — phần thêm của dòng bảng bang: số thành viên, tổng cống hiến thành viên hiện tại. */
@@ -80,6 +82,7 @@ final class LeaderboardCache {
     private final Supplier<Map<Long, Integer>> caveLevels;
     private final Supplier<Map<Long, Integer>> tribulations;
     private final Supplier<Map<Long, Integer>> achievements;
+    private final Supplier<Map<Long, Long>> wealth;
     private final Clock clock;
     private final Map<Kind, Board> boards = new EnumMap<>(Kind.class);
     private final Map<Kind, Object> locks = new EnumMap<>(Kind.class);
@@ -93,7 +96,8 @@ final class LeaderboardCache {
             Supplier<List<WorldBossPort.DamageRank>> bossDamage,
             Supplier<Map<Long, Integer>> caveLevels,
             Supplier<Map<Long, Integer>> tribulations,
-            Supplier<Map<Long, Integer>> achievements) {}
+            Supplier<Map<Long, Integer>> achievements,
+            Supplier<Map<Long, Long>> wealth) {}
 
     LeaderboardCache(Sources sources, Clock clock) {
         this.characterFacade = sources.characterFacade();
@@ -104,6 +108,7 @@ final class LeaderboardCache {
         this.caveLevels = sources.caveLevels();
         this.tribulations = sources.tribulations();
         this.achievements = sources.achievements();
+        this.wealth = sources.wealth();
         this.clock = clock;
         for (Kind kind : Kind.values()) {
             locks.put(kind, new Object());
@@ -151,9 +156,17 @@ final class LeaderboardCache {
             case ARENA -> rankByRating(characters);
             case GUILD -> List.of();
             case BOSS_DAMAGE -> rankByBossDamage(characters);
-            case CAVE -> rankByScore(characters, caveLevels.get());
-            case TRIBULATION -> rankByScore(characters, tribulations.get());
-            case ACHIEVEMENT -> rankByScore(characters, achievements.get());
+            default -> rankByScore(characters, scoreSource(kind).get());
+        };
+    }
+
+    /** Bảng kiểu "điểm theo nhân vật" (ADR-134/209/241) — tra thay nhánh switch (trần CyclomaticComplexity). */
+    private Supplier<? extends Map<Long, ? extends Number>> scoreSource(Kind kind) {
+        return switch (kind) {
+            case CAVE -> caveLevels;
+            case TRIBULATION -> tribulations;
+            case ACHIEVEMENT -> achievements;
+            default -> wealth;
         };
     }
 
@@ -216,18 +229,25 @@ final class LeaderboardCache {
      * ADR-134 — xếp theo điểm giảm dần, chỉ người CÓ điểm; hoà điểm thì giữ thứ tự cảnh giới của {@code ordered}
      * (cấp, EXP, id — đúng thứ tự SQL), nên sắp xếp phải ổn định.
      */
-    private static List<Row> rankByScore(List<Character> ordered, Map<Long, Integer> scores) {
+    private static List<Row> rankByScore(List<Character> ordered, Map<Long, ? extends Number> scores) {
         List<Character> scored = new ArrayList<>();
         for (Character c : ordered) {
             if (scores.containsKey(c.id())) {
                 scored.add(c);
             }
         }
-        scored.sort(Comparator.comparingInt((Character c) -> scores.get(c.id())).reversed());
+        scored.sort(Comparator.comparingLong((Character c) -> scores.get(c.id()).longValue())
+                .reversed());
         List<Row> rows = new ArrayList<>(scored.size());
         for (Character c : scored) {
             rows.add(new Row(
-                    rows.size() + 1, c.id(), c.name(), c.faction(), c.level(), scores.get(c.id()), GuildStats.NONE));
+                    rows.size() + 1,
+                    c.id(),
+                    c.name(),
+                    c.faction(),
+                    c.level(),
+                    scores.get(c.id()).longValue(),
+                    GuildStats.NONE));
         }
         return rows;
     }

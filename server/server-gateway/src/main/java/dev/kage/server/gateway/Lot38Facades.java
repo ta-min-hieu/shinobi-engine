@@ -17,7 +17,8 @@ record Lot38Facades(
         MarketPriceHintFacade priceHint,
         GuildMailFacade guildMail,
         ContactPrivacyFacade contactPrivacy,
-        LoginHistoryFacade loginHistory) {
+        LoginHistoryFacade loginHistory,
+        Lot39Facades lot39) {
 
     /** Composition không có các tính năng này (test). */
     static final Lot38Facades DISABLED = new Lot38Facades(
@@ -26,5 +27,6 @@ record Lot38Facades(
             MarketPriceHintFacade.DISABLED,
             GuildMailFacade.DISABLED,
             ContactPrivacyFacade.DISABLED,
-            LoginHistoryFacade.DISABLED);
+            LoginHistoryFacade.DISABLED,
+            Lot39Facades.DISABLED);
 }

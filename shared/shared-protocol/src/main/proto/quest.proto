@@ -291,3 +291,24 @@ message GetNextQuestHintResponse {
   string quest_code = 2;
   string npc_code = 3;
 }
+
+// ADR-242 (2026-11-08) — xem trước thưởng. Request: Client -> Server (OPCODE_GET_QUEST_REWARD_PREVIEW_REQUEST).
+message GetQuestRewardPreviewRequest {
+  string quest_code = 1;
+}
+
+enum QuestRewardPreviewOutcome {
+  QUEST_REWARD_PREVIEW_OUTCOME_UNSPECIFIED = 0;
+  QUEST_REWARD_PREVIEW_OUTCOME_OK = 1;
+  QUEST_REWARD_PREVIEW_OUTCOME_NOT_FOUND = 2;
+  QUEST_REWARD_PREVIEW_OUTCOME_UNAVAILABLE = 3;  // thưởng phụ thuộc tiến độ mà tiến độ hiện tại chưa đủ để tính
+}
+
+// Response: Server -> Client (OPCODE_GET_QUEST_REWARD_PREVIEW_RESPONSE). Chạy on_claim không ghi gì.
+message GetQuestRewardPreviewResponse {
+  string quest_code = 1;
+  QuestRewardPreviewOutcome outcome = 2;
+  int64 exp = 3;
+  int64 gold = 4;
+  repeated ItemRewardView items = 5;
+}

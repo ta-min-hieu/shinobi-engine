@@ -13,7 +13,8 @@ record Lot38Windows(
         MarketPriceHintCoordinator priceHint,
         GuildMailCoordinator guildMail,
         ContactPrivacyCoordinator contactPrivacy,
-        LoginHistoryCoordinator loginHistory) {
+        LoginHistoryCoordinator loginHistory,
+        Lot39Windows lot39) {
 
     static Lot38Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot38Windows(
@@ -23,7 +24,8 @@ record Lot38Windows(
                 new MarketPriceHintCoordinator(sender, feeds.chat()),
                 new GuildMailCoordinator(sender, feeds.chat()),
                 new ContactPrivacyCoordinator(sender, feeds.chat()),
-                new LoginHistoryCoordinator(sender, feeds.chat()));
+                new LoginHistoryCoordinator(sender, feeds.chat()),
+                Lot39Windows.create(sender, feeds)); // lô 39 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -35,5 +37,6 @@ record Lot38Windows(
         panels.register(guildMail);
         panels.register(contactPrivacy);
         panels.register(loginHistory);
+        lot39.registerInto(panels);
     }
 }

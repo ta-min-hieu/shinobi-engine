@@ -105,6 +105,10 @@ public final class WorldScreen implements GameScreen {
     private final Viewport viewport =
             new FitViewport(WorldConstants.VIEWPORT_HEIGHT_UNITS, WorldConstants.VIEWPORT_HEIGHT_UNITS, camera);
     private final ShapeRenderer shapeRenderer = new ShapeRenderer();
+
+    /** ADR-244 — đồng bộ HUD; dựng sẵn một lần để khung hình không cấp phát. */
+    private final Runnable hudSync = this::syncCombatHud;
+
     private final HorizonBackdrop backdrop = new HorizonBackdrop();
     // MEDIUM tường minh — bản cài đóng gói đúng 1 tier mặc định theo ADR-028, không phải để trống
     // dựa vào default ngầm (không có default: WorldModelRenderer bắt buộc tham số tier).
@@ -324,7 +328,7 @@ public final class WorldScreen implements GameScreen {
         // SAU combatFeedback: quests mượn nó để báo khi hoàn thành/lĩnh thưởng.
         this.quests = new QuestCoordinator(combatHud, questLogPanel, sender, combatFeedback);
         this.dialogue = new DialogueCoordinator(dialoguePanel, sender, quests);
-        this.chat = new ChatCoordinator(chatPanel, sender);
+        this.chat = new ChatCoordinator(chatPanel, sender).withOwnName(character.getName()); // ADR-245
         // SAU chat: cả ba coordinator dưới đây mượn nhật ký chat/chữ nổi làm chỗ báo lý do thất bại.
         this.party = new PartyCoordinator(partyPanel, sender, chat);
         this.friends = new FriendCoordinator(friendPanel, sender, combatFeedback, panels::noneOpen);
@@ -502,7 +506,7 @@ public final class WorldScreen implements GameScreen {
         panels.register(reports.guildSkillPanel(), reports.guildSkills());
         panels.register(reports.spiritVeinPanel(), reports.spiritVeins());
         reports.community().registerInto(panels);
-        reports.community().expansion().taming().useTarget(combatHudController::currentTargetId); // ADR-124
+        reports.community().expansion().useCombat(combatHudController); // ADR-124 thuần phục, ADR-243 máu thấp
         // ADR-133 — nút pháp bảo trên HUD và phím 1 cùng gọi ArtifactCoordinator.use.
         combatHud.setOnArtifactClicked(
                 intents.setOnArtifact(reports.community().expansion().artifact()::use));
@@ -1015,9 +1019,17 @@ public final class WorldScreen implements GameScreen {
         WeatherCoordinator weather = reports.community().expansion().weather(); // ADR-144 — trước lớp phủ đêm
         weather.render(shapeRenderer, POSITION.get(localPlayer).x, Gdx.graphics.getDeltaTime());
         dayNight.render(shapeRenderer, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-
-        syncCombatHud();
-        panels.render(Gdx.graphics.getDeltaTime());
+        reports.community() // ADR-243 — viền đỏ khi máu thấp
+                .expansion()
+                .lot39()
+                .lowHealth()
+                .render(shapeRenderer, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        // ADR-244 — chế độ chụp ảnh: khung đang ẩn thì không vẽ HUD/khung chat.
+        reports.community()
+                .expansion()
+                .lot39()
+                .photoMode()
+                .renderUnlessHidden(Gdx.input.isKeyPressed(Input.Keys.F10), panels.noneOpen(), hudSync, panels);
     }
 
     /**
