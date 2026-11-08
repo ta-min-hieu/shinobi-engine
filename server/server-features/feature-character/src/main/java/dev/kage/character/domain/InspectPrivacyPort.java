@@ -6,4 +6,10 @@ public interface InspectPrivacyPort {
     boolean hidden(long characterId);
 
     void setHidden(long characterId, boolean hidden);
+
+    /** ADR-218 — dòng giới thiệu tự viết ("" = chưa viết). */
+    String bio(long characterId);
+
+    /** ADR-218 — ghi dòng giới thiệu (đã kiểm độ dài / ký tự ở facade). */
+    void setBio(long characterId, String bio);
 }

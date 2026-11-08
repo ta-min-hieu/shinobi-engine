@@ -70,6 +70,7 @@ message MailView {
   int64 gold_amount = 6;
   repeated MailAttachmentView attachments = 7;
   bool claimed = 8;
+  bool pinned = 9;  // ADR-217 — thư ghim; server trả thư ghim lên đầu danh sách
 }
 
 message ListMailResponse {
@@ -168,4 +169,25 @@ message SetStrangerMailBlockCommand {
 // Response: Server -> Client (OPCODE_SET_STRANGER_MAIL_BLOCK_RESPONSE).
 message SetStrangerMailBlockResponse {
   bool enabled = 1;
+}
+
+// ADR-216 (2026-11-08) — xoá hàng loạt thư đã nhận / không đính kèm (trừ thư ghim).
+// Command: Client -> Server (OPCODE_DELETE_FINISHED_MAIL_COMMAND).
+message DeleteFinishedMailCommand {}
+
+// Response: Server -> Client (OPCODE_DELETE_FINISHED_MAIL_RESPONSE).
+message DeleteFinishedMailResponse {
+  int32 deleted = 1;
+}
+
+// ADR-217 (2026-11-08) — ghim / bỏ ghim một thư. Command: Client -> Server (OPCODE_PIN_MAIL_COMMAND).
+message PinMailCommand {
+  int64 mail_id = 1;
+  bool pinned = 2;
+}
+
+// Response: Server -> Client (OPCODE_PIN_MAIL_RESPONSE). ok = false ⇒ thư không tồn tại / không phải của mình.
+message PinMailResponse {
+  bool ok = 1;
+  bool pinned = 2;
 }

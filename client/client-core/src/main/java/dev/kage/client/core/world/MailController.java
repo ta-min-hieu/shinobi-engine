@@ -132,6 +132,9 @@ final class MailController {
     /** Id lá thư đang mở đọc, 0 = chưa chọn lá nào. */
     private long selectedMailId;
 
+    /** ADR-217 — dấu thư ghim đặt trước tiêu đề (ký tự ASCII: font tiếng Việt không có ký hiệu ghim). */
+    static final String PINNED_MARK = "[*] ";
+
     /** Có thư mới đến trong lúc đang chơi mà chưa mở hòm thư xem — xem {@link #onNewMail}. */
     private boolean newMailPending;
 
@@ -168,7 +171,7 @@ final class MailController {
                 view.getMailId(),
                 view.getHasSender(),
                 view.getSenderId(),
-                ChatController.sanitize(view.getSubject()),
+                (view.getPinned() ? PINNED_MARK : "") + ChatController.sanitize(view.getSubject()), // ADR-217
                 ChatController.sanitize(view.getBody()),
                 view.getGoldAmount(),
                 List.copyOf(attachments),

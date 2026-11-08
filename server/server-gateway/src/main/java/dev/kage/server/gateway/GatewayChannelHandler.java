@@ -1117,6 +1117,31 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetAutoSellJunkCommand.parser(),
                             Opcode.OPCODE_SET_AUTO_SELL_JUNK_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot34().setAutoSellJunk(id, c))),
+            // Lô 36 — tách chồng (ADR-215), xoá hàng loạt thư (ADR-216), ghim thư (ADR-217), hồ sơ (ADR-218).
+            Map.entry(
+                    Opcode.OPCODE_SPLIT_STACK_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SplitStackCommand.parser(),
+                            Opcode.OPCODE_SPLIT_STACK_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot36().splitStack(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_DELETE_FINISHED_MAIL_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.DeleteFinishedMailCommand.parser(),
+                            Opcode.OPCODE_DELETE_FINISHED_MAIL_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot36().deleteFinishedMail(id))),
+            Map.entry(
+                    Opcode.OPCODE_PIN_MAIL_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.PinMailCommand.parser(),
+                            Opcode.OPCODE_PIN_MAIL_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot36().pinMail(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_SET_BIO_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetBioCommand.parser(),
+                            Opcode.OPCODE_SET_BIO_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot36().setBio(id, c))),
             // Lô 35 — góp vật phẩm cho bang (ADR-207).
             Map.entry(
                     Opcode.OPCODE_DONATE_ITEM_TO_GUILD_COMMAND_VALUE,
@@ -5844,7 +5869,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     private void handleListMailBlocking(ChannelHandlerContext ctx, int sequenceId, long characterId) {
         ListMailResponse.Builder responseBuilder = ListMailResponse.newBuilder();
-        for (MailFacade.MailView mail : mailFacade.listMail(characterId)) {
+        java.util.Set<Long> pinned =
+                expansion.lot36().facades().mailHousekeeping().pinned(characterId); // ADR-217
+        for (MailFacade.MailView mail : pinnedFirst(mailFacade.listMail(characterId), pinned)) {
             MailView.Builder viewBuilder = MailView.newBuilder()
                     .setMailId(mail.mailId())
                     .setHasSender(mail.senderId() != null)
@@ -5852,7 +5879,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setSubject(mail.subject())
                     .setBody(mail.body())
                     .setGoldAmount(mail.goldAmount())
-                    .setClaimed(mail.claimed());
+                    .setClaimed(mail.claimed())
+                    .setPinned(pinned.contains(mail.mailId()));
             for (MailFacade.AttachmentView attachment : mail.attachments()) {
                 viewBuilder.addAttachments(MailAttachmentView.newBuilder()
                         .setItemTemplateId(attachment.itemTemplateId())
@@ -5867,6 +5895,13 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 Opcode.OPCODE_LIST_MAIL_RESPONSE_VALUE,
                 sequenceId,
                 responseBuilder.build().toByteArray());
+    }
+
+    /** ADR-217 — thư ghim lên đầu, giữ nguyên thứ tự còn lại. */
+    private static List<MailFacade.MailView> pinnedFirst(List<MailFacade.MailView> mails, java.util.Set<Long> pinned) {
+        List<MailFacade.MailView> ordered = new java.util.ArrayList<>(mails);
+        ordered.sort(java.util.Comparator.comparing(mail -> !pinned.contains(mail.mailId())));
+        return ordered;
     }
 
     private void handleClaimMailCommand(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)

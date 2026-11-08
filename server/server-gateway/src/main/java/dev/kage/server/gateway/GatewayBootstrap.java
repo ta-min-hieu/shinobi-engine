@@ -740,7 +740,10 @@ public final class GatewayBootstrap {
                         databaseBootstrap.expansion().wireGuildItemDonationFacade(),
                         databaseBootstrap.expansion().wireGuildWarHistoryFacade(),
                         databaseBootstrap.expansion().wireTitleBonusFacade(),
-                        databaseBootstrap.expansion().wireStrangerMailFacade()));
+                        databaseBootstrap.expansion().wireStrangerMailFacade(),
+                        new Lot36Facades(
+                                databaseBootstrap.expansion().wireStackSplitFacade(),
+                                databaseBootstrap.expansion().wireMailHousekeepingFacade())));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

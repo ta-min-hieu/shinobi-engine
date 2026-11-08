@@ -140,6 +140,10 @@ final class InspectCoordinator implements WindowFlow {
 
     private List<ReportPanel.Row> rows(InspectCharacterResponse response) {
         List<ReportPanel.Row> rows = new ArrayList<>();
+        if (!response.getBio().isBlank()) { // ADR-218 — dòng giới thiệu tự viết của người được soi
+            rows.add(new ReportPanel.Row(
+                    KageI18n.formatOrKey(i18n, "inspect.bio", ChatController.sanitize(response.getBio())), false));
+        }
         for (InspectedEquipment item : response.getEquipmentList()) {
             if (rows.size() >= MAX_ROWS) {
                 break;

@@ -228,6 +228,18 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.chat.PostgresOfflineWhisperAdapter(dataSource));
     }
 
+    /** ADR-215 — tách chồng vật phẩm. */
+    public dev.kage.inventory.api.StackSplitFacade wireStackSplitFacade() {
+        return new dev.kage.inventory.api.StackSplitFacade(
+                new dev.kage.server.database.inventory.PostgresStackSplitAdapter(dataSource));
+    }
+
+    /** ADR-216/217 — xoá hàng loạt thư đã xong, ghim thư. */
+    public dev.kage.mail.api.MailHousekeepingFacade wireMailHousekeepingFacade() {
+        return new dev.kage.mail.api.MailHousekeepingFacade(
+                new dev.kage.server.database.mail.PostgresMailHousekeepingAdapter(dataSource));
+    }
+
     /** ADR-212 — chặn thư người lạ. */
     public dev.kage.mail.api.StrangerMailFacade wireStrangerMailFacade() {
         return new dev.kage.mail.api.StrangerMailFacade(

@@ -603,6 +603,7 @@ message InspectCharacterResponse {
   Faction faction = 4;
   int64 combat_power = 5;
   repeated InspectedEquipment equipment = 6;
+  string bio = 7;  // ADR-218 — dòng giới thiệu tự viết ("" = chưa viết)
 }
 
 // Command: Client -> Server (OPCODE_SET_INSPECT_PRIVACY_COMMAND = 251). hidden = true ⇒ người khác không soi được mình.
@@ -670,4 +671,22 @@ enum DeleteCharacterOutcome {
 message DeleteCharacterResponse {
   DeleteCharacterOutcome outcome = 1;
   repeated CharacterSummary characters = 2;
+}
+
+// ADR-218 (2026-11-08) — hồ sơ cá nhân. Command: Client -> Server (OPCODE_SET_BIO_COMMAND). bio rỗng = xoá.
+message SetBioCommand {
+  string bio = 1;
+}
+
+enum SetBioOutcome {
+  SET_BIO_OUTCOME_UNSPECIFIED = 0;
+  SET_BIO_OUTCOME_OK = 1;
+  SET_BIO_OUTCOME_TOO_LONG = 2;      // quá 60 ký tự, hoặc chứa ký tự điều khiển
+  SET_BIO_OUTCOME_BANNED_WORD = 3;   // chứa từ cấm (cùng bộ lọc chat)
+}
+
+// Response: Server -> Client (OPCODE_SET_BIO_RESPONSE).
+message SetBioResponse {
+  SetBioOutcome outcome = 1;
+  string bio = 2;  // dòng đang lưu sau lệnh
 }

@@ -132,7 +132,10 @@ final class Lot30Steps {
                             .append(" cấp=")
                             .append(r.getLevel())
                             .append(" lựcChiến=")
-                            .append(r.getCombatPower());
+                            .append(r.getCombatPower())
+                            .append(" giớiThiệu='")
+                            .append(r.getBio())
+                            .append('\'');
                     r.getEquipmentList().forEach(e -> line.append(" ô")
                             .append(e.getSlot())
                             .append('=')

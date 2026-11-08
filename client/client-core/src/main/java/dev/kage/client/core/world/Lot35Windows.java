@@ -10,7 +10,8 @@ record Lot35Windows(
         GuildWarHistoryCoordinator warHistory,
         FriendSuggestionCoordinator friendSuggestions,
         StrangerMailCoordinator strangerMail,
-        PartyMarkCoordinator partyMark) {
+        PartyMarkCoordinator partyMark,
+        Lot36Windows lot36) {
 
     static Lot35Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot35Windows(
@@ -18,7 +19,8 @@ record Lot35Windows(
                 new GuildWarHistoryCoordinator(sender, feeds.chat()),
                 new FriendSuggestionCoordinator(sender, feeds.chat()),
                 new StrangerMailCoordinator(sender, feeds.chat()),
-                new PartyMarkCoordinator(sender, feeds.chat()));
+                new PartyMarkCoordinator(sender, feeds.chat()),
+                Lot36Windows.create(sender, feeds)); // lô 36 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -28,5 +30,6 @@ record Lot35Windows(
         panels.register(friendSuggestions);
         panels.register(strangerMail);
         panels.register(partyMark);
+        lot36.registerInto(panels);
     }
 }

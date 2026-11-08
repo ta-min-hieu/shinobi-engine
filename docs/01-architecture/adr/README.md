@@ -246,6 +246,10 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-212](ADR-212-Stranger-Mail-Block.md) | Chặn thư người lạ: `block_stranger_mail` (V163), thư người chơi không phải bạn ⇒ `SEND_MAIL_OUTCOME_STRANGER_MAIL_BLOCKED`, 913/914; `/chanthu` | ✅ Accepted (lô 35) |
 | [ADR-213](ADR-213-Party-Target-Marker.md) | Đánh dấu mục tiêu nhóm: trưởng nhóm gửi id entity, server phát event 1336 cho nhóm (không lưu), 1334/1335; `/danhdau`, `/theodau` | ✅ Accepted (lô 35) |
 | [ADR-214](ADR-214-Idle-Disconnect.md) | Tự ngắt khi treo máy: im (trừ PING) quá `KAGE_IDLE_KICK_MINUTES` (30, 0 = tắt) trong world ⇒ báo một dòng chat rồi đóng kết nối | ✅ Accepted (lô 35) |
+| [ADR-215](ADR-215-Split-Stack.md) | Tách chồng vật phẩm sang ô mới cuối túi (giữ cường hoá + cờ khoá), 558/559; `/tach` | ✅ Accepted (lô 36) |
+| [ADR-216](ADR-216-Delete-Finished-Mail.md) | Xoá hàng loạt thư đã nhận / không đính kèm, trừ thư ghim, 915/916; `/xoathu` | ✅ Accepted (lô 36) |
+| [ADR-217](ADR-217-Pin-Mail.md) | Ghim thư: `mail.pinned` (V164), lên đầu hộp thư, không bị xoá hàng loạt, `MailView.pinned`, 917/918; `/ghimthu` | ✅ Accepted (lô 36) |
+| [ADR-218](ADR-218-Character-Bio.md) | Hồ sơ cá nhân: `character.bio` 60 ký tự (V164), lọc từ cấm, hiện khi soi trang bị, 259/260; `/gioithieu` | ✅ Accepted (lô 36) |
 ---
 
 ## ADR cần tạo (chưa viết)

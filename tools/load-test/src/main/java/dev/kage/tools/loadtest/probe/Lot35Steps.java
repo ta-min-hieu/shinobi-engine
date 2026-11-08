@@ -13,9 +13,11 @@ import dev.kage.protocol.Opcode;
 final class Lot35Steps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot36Steps lot36;
 
     Lot35Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot36 = new Lot36Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -25,7 +27,7 @@ final class Lot35Steps {
             case "suggestFriends" -> suggestFriends();
             case "strangerMail" -> strangerMail(arg);
             case "markTarget" -> markTarget(Long.parseLong(arg));
-            default -> "bước không hiểu";
+            default -> lot36.step(verb, arg);
         };
     }
 

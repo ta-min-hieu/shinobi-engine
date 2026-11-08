@@ -56,7 +56,8 @@ final class InspectCommands {
                 .setName(found.name())
                 .setLevel(found.level())
                 .setFaction(FactionMapping.toProto(found.faction()))
-                .setCombatPower(combatPowerOf.applyAsLong(found.id()));
+                .setCombatPower(combatPowerOf.applyAsLong(found.id()))
+                .setBio(deps.privacy().bio(found.id())); // ADR-218
         InventorySnapshot snapshot = deps.inventory().listInventory(found.id());
         Map<Long, Long> sockets = deps.inventory().socketsOf(found.id());
         for (Map.Entry<EquipmentSlotType, Long> slot :

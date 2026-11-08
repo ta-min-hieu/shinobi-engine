@@ -49,6 +49,12 @@ final class MailCoordinator implements WindowFlow {
     private String pendingSendKey = "";
 
     private final MailController controller = new MailController();
+
+    /** ADR-217 — id lá thư đang mở đọc; 0 nếu chưa chọn lá nào (lệnh {@code /ghimthu}). */
+    long selectedMailId() {
+        return controller.selected().map(MailController.Mail::mailId).orElse(0L);
+    }
+
     private final MailPanel panel;
     private final WorldCommandSender sender;
 

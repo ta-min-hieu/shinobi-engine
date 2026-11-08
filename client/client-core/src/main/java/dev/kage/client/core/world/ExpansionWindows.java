@@ -153,13 +153,16 @@ record ExpansionWindows(
      * Lệnh chat dùng MÓN ĐANG CHỌN trong túi: dùng nhiều (ADR-176), khoe vật phẩm (ADR-188), góp vật phẩm cho bang
      * (ADR-207); và tự tìm đường (ADR-206) lái nhân vật qua {@link LocalIntentSender}.
      */
-    void useLocalInput(InventoryCoordinator inventory, LocalIntentSender intents) {
+    void useLocalInput(InventoryCoordinator inventory, LocalIntentSender intents, MailCoordinator mail) {
         lot31.bulkUse().useSelection(inventory::selectedItemId);
         lot31.lot32().itemLink().useSelection(inventory::selectedItem);
         Lot34Windows lot34 = lot31.lot32().lot33().lot34();
         intents.useAutoWalk(lot34.autoWalk().target());
         lot34.lot35().guildItemDonation().useSelection(inventory::selectedItemId); // ADR-207 /gopdo
         lot34.lot35().partyMark().useTargeting(intents); // ADR-213 /danhdau, /theodau
+        Lot36Windows lot36 = lot34.lot35().lot36();
+        lot36.stackSplit().useSelection(inventory::selectedItemId); // ADR-215 /tach
+        lot36.mailCleanup().useSelection(mail::selectedMailId); // ADR-217 /ghimthu
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

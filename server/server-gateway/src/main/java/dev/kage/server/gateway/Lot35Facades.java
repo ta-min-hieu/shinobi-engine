@@ -13,12 +13,14 @@ record Lot35Facades(
         GuildItemDonationFacade guildItemDonation,
         GuildWarHistoryFacade warHistory,
         TitleBonusFacade titleBonus,
-        StrangerMailFacade strangerMail) {
+        StrangerMailFacade strangerMail,
+        Lot36Facades lot36) {
 
     /** Composition không có các tính năng này (test). */
     static final Lot35Facades DISABLED = new Lot35Facades(
             GuildItemDonationFacade.DISABLED,
             GuildWarHistoryFacade.DISABLED,
             TitleBonusFacade.DISABLED,
-            StrangerMailFacade.DISABLED);
+            StrangerMailFacade.DISABLED,
+            Lot36Facades.DISABLED);
 }

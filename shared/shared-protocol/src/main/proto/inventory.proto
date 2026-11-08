@@ -728,3 +728,22 @@ message SetAutoSellJunkCommand {
 message SetAutoSellJunkResponse {
   bool enabled = 1;
 }
+
+// ADR-215 (2026-11-08) — tách chồng vật phẩm. Command: Client -> Server (OPCODE_SPLIT_STACK_COMMAND).
+message SplitStackCommand {
+  int64 inventory_item_id = 1;
+  int32 amount = 2;  // số cái chuyển sang ô mới; 1 … (số đang có − 1)
+}
+
+enum SplitStackOutcome {
+  SPLIT_STACK_OUTCOME_UNSPECIFIED = 0;
+  SPLIT_STACK_OUTCOME_OK = 1;
+  SPLIT_STACK_OUTCOME_NOT_FOUND = 2;       // không có trong túi, đang mặc, hoặc đang chào giao dịch
+  SPLIT_STACK_OUTCOME_INVALID_AMOUNT = 3;
+  SPLIT_STACK_OUTCOME_BAG_FULL = 4;
+}
+
+// Response: Server -> Client (OPCODE_SPLIT_STACK_RESPONSE). OK ⇒ client hỏi lại túi.
+message SplitStackResponse {
+  SplitStackOutcome outcome = 1;
+}
