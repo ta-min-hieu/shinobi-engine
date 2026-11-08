@@ -833,3 +833,14 @@ message GetEnhancePreviewResponse {
   bool drops_on_fail = 5;       // thất bại thì tụt một cấp (trừ khi dùng Bảo Vệ Phù)
   int32 protection_charms = 6;  // số Bảo Vệ Phù đang có trong túi
 }
+
+// ADR-274 (2026-11-08) — tổng giá trị túi đồ. Request: Client -> Server (OPCODE_GET_BAG_VALUE_REQUEST). SERVER cộng giá
+// bán cho cửa hàng (shop_item.sell_price × số lượng) của mọi món trong túi; client không tự tính giá.
+message GetBagValueRequest {}
+
+// Response: Server -> Client (OPCODE_GET_BAG_VALUE_RESPONSE).
+message GetBagValueResponse {
+  int64 total_gold = 1;      // tổng (bão hoà ở int64 max)
+  int32 priced_stacks = 2;   // số chồng có giá bán cửa hàng
+  int32 unpriced_stacks = 3; // số chồng cửa hàng không thu mua (không cộng vào tổng)
+}

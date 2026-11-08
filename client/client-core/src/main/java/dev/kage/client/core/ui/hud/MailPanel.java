@@ -174,6 +174,7 @@ public final class MailPanel implements HudWindow {
     private LongConsumer onDelete;
     private Consumer<Composed> onSend;
     private Runnable onOpened;
+    private Runnable onClosed = () -> {}; // ADR-277
 
     /** ADR-167 — bấm "Nhận hết". */
     private Runnable onClaimAll = () -> {};
@@ -431,7 +432,11 @@ public final class MailPanel implements HudWindow {
     }
 
     public void close() {
+        boolean wasOpen = panel.isVisible();
         panel.setVisible(false);
+        if (wasOpen) {
+            fire(onClosed); // ADR-277 — lưu thư nháp
+        }
         // Bỏ focus THẬT: ô nhập còn giữ keyboard focus là còn nuốt phím dù đã ẩn đi.
         stage.setKeyboardFocus(null);
     }
@@ -555,6 +560,24 @@ public final class MailPanel implements HudWindow {
     public void showNoMail(String hint) {
         readHeaderLabel.setText(hint);
         readBodyLabel.setText("");
+    }
+
+    /** ADR-277 — nội dung bốn ô soạn hiện tại (chưa kiểm, chưa cắt). */
+    public Composed composerContents() {
+        return new Composed(recipientField.getText(), subjectField.getText(), bodyField.getText(), goldField.getText());
+    }
+
+    /** ADR-277 — điền bốn ô soạn từ một bản nháp. */
+    public void fillComposer(Composed draft) {
+        recipientField.setText(draft.recipient());
+        subjectField.setText(draft.subject());
+        bodyField.setText(draft.body());
+        goldField.setText(draft.gold());
+    }
+
+    /** ADR-277 — gọi mỗi lần khung đang mở bị đóng lại. */
+    public void setOnClosed(Runnable listener) {
+        this.onClosed = listener;
     }
 
     /** Dọn khung soạn thư sau khi server nhận thư — không để người chơi gửi trùng vì tưởng chưa gửi. */

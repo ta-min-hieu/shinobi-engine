@@ -66,6 +66,7 @@ final class MailCoordinator implements WindowFlow {
     private final CombatFeedbackPresenter feedback;
 
     private final I18NBundle i18n = KageI18n.load();
+    private final MailDraftStore drafts = new MailDraftStore(); // ADR-277
 
     /** Đệm dựng sẵn cho {@link MailPanel#setMails} — chỉ đổi khi server vừa trả lời, không mỗi khung. */
     private final List<MailPanel.MailRow> mailRows = new ArrayList<>();
@@ -90,6 +91,7 @@ final class MailCoordinator implements WindowFlow {
                 Opcode.OPCODE_CLAIM_ALL_MAIL_COMMAND_VALUE,
                 ClaimAllMailCommand.newBuilder().setDeleteClaimed(true).build()));
         panel.setOnSend(this::onSend);
+        panel.setOnClosed(() -> drafts.save(panel.composerContents())); // ADR-277
         panel.setStatus(text("mail.hint.open"));
         refreshView();
     }
@@ -178,6 +180,7 @@ final class MailCoordinator implements WindowFlow {
         if (outcome == SendMailOutcome.SEND_MAIL_OUTCOME_OK
                 || outcome == SendMailOutcome.SEND_MAIL_OUTCOME_DUPLICATE_REQUEST) {
             panel.clearComposer();
+            drafts.clear(); // ADR-277
         }
         settle(MailController.sendMessageKey(outcome));
     }
@@ -218,6 +221,9 @@ final class MailCoordinator implements WindowFlow {
 
     /** Người chơi vừa mở cửa sổ (hoặc bấm Làm mới) — dấu "có thư mới" hết nhiệm vụ, và hỏi lại server. */
     private void onOpened() {
+        if (MailDraftStore.isBlank(panel.composerContents())) {
+            drafts.load().ifPresent(panel::fillComposer); // ADR-277 — điền lại thư viết dở
+        }
         controller.clearNewMailFlag();
         panel.setNewMailBadge(false);
         sender.listMail();

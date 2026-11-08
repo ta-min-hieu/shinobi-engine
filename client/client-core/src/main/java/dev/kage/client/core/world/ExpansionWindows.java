@@ -153,9 +153,9 @@ record ExpansionWindows(
 
     /**
      * Lệnh chat dùng MÓN ĐANG CHỌN trong túi: dùng nhiều (ADR-176), khoe vật phẩm (ADR-188), góp vật phẩm cho bang
-     * (ADR-207); và tự tìm đường (ADR-206) lái nhân vật qua {@link LocalIntentSender}.
+     * (ADR-207); và tự tìm đường (ADR-206) lái nhân vật qua {@link LocalIntentSender}. Trả chính nó để nối tiếp.
      */
-    void useLocalInput(
+    ExpansionWindows useLocalInput(
             InventoryCoordinator inventory, LocalIntentSender intents, MailCoordinator mail, QuestCoordinator quests) {
         Supplier<Optional<Long>> selectedId = () -> inventory.selectedItem().map(InventoryController.Item::itemId);
         lot31.bulkUse().useSelection(selectedId);
@@ -178,6 +178,13 @@ record ExpansionWindows(
         lot40.bagSearch().useItems(inventory::describedItems); // ADR-254 /timdo
         lot40.lot41().enhancePreview().useSelection(selectedId); // ADR-257 /dutinh
         lot40.lot41().lot42().coordinates().usePosition(lot34.autoWalk().target(), zoneMap::state); // ADR-270
+        lot40.lot41().lot42().lot43().session().useLocalId(intents.localCharacterId()); // ADR-271 đếm quái hạ
+        return this;
+    }
+
+    /** ADR-276 — khung bạn bè xếp bạn yêu thích lên đầu. */
+    void useFriends(FriendCoordinator friends) {
+        lot39().lot40().lot41().lot42().lot43().useFriends(friends);
     }
 
     /** Nối HUD chiến đấu: mục tiêu cho thuần phục (ADR-124), máu cho cảnh báo máu thấp (ADR-243). */

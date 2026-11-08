@@ -302,6 +302,13 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-268](ADR-268-Chat-Timestamps.md) | Giờ trước tin chat: `Line.receivedAtMillis`; `/giochat`; Preferences, mặc định tắt | ✅ Accepted (lô 42) |
 | [ADR-269](ADR-269-Ping-Command.md) | Đo ping /ping: dùng lại PING/PONG; ngưỡng 100/250 ms | ✅ Accepted (lô 42) |
 | [ADR-270](ADR-270-Coordinates-Command.md) | Toạ độ hiện tại /toado: hoành độ + trạng thái vùng; `/toado gui` gửi vào kênh đang chọn | ✅ Accepted (lô 42) |
+| [ADR-271](ADR-271-Session-Summary.md) | Tóm tắt phiên chơi: nghe 208/209/500/402/406; `/phien`; RAM | ✅ Accepted (lô 43) |
+| [ADR-272](ADR-272-Exp-Per-Hour.md) | Đồng hồ EXP/giờ: `/exph`; tốc độ trung bình cả phiên; ETA từ 208 | ✅ Accepted (lô 43) |
+| [ADR-273](ADR-273-Command-Aliases.md) | Biệt danh lệnh /alias: Preferences, 20 biệt danh; viết lại một lần trước xử lý | ✅ Accepted (lô 43) |
+| [ADR-274](ADR-274-Bag-Value.md) | Tổng giá trị túi đồ: 570/571; Σ sell_price × số lượng, bão hoà | ✅ Accepted (lô 43) |
+| [ADR-275](ADR-275-Mail-Search.md) | Tìm thư theo từ khoá: dùng lại 902/903; lọc tiêu đề + nội dung + thư hệ thống | ✅ Accepted (lô 43) |
+| [ADR-276](ADR-276-Favorite-Friends.md) | Bạn bè yêu thích: Preferences; ghim lên đầu, ★; cùng thứ tự cho vẽ và nút Xoá | ✅ Accepted (lô 43) |
+| [ADR-277](ADR-277-Mail-Draft.md) | Thư nháp: Preferences; lưu lúc đóng, điền lúc mở, xoá khi gửi OK | ✅ Accepted (lô 43) |
 | [ADR-278](ADR-278-Party-Gold-Split.md) | Chia vàng cho nhóm: 1343/1344; cùng World; một transaction + audit; khoá an toàn | ✅ Accepted (lô 43) |
 ---
 

@@ -14,7 +14,8 @@ record Lot42Windows(
         PartyCountdownCoordinator countdown,
         DiceRollCoordinator dice,
         GuildOnlineNoticeCoordinator guildOnline,
-        PartyGoldSplitCoordinator goldSplit) {
+        PartyGoldSplitCoordinator goldSplit,
+        Lot43Windows lot43) {
 
     static Lot42Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot42Windows(
@@ -26,7 +27,8 @@ record Lot42Windows(
                 new PartyCountdownCoordinator(sender, feeds.chat()),
                 new DiceRollCoordinator(sender, feeds.chat()),
                 new GuildOnlineNoticeCoordinator(feeds.chat()),
-                new PartyGoldSplitCoordinator(sender, feeds.chat()));
+                new PartyGoldSplitCoordinator(sender, feeds.chat()),
+                Lot43Windows.create(sender, feeds)); // lô 43 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -40,5 +42,6 @@ record Lot42Windows(
         panels.register(dice);
         panels.register(guildOnline);
         panels.register(goldSplit);
+        lot43.registerInto(panels);
     }
 }

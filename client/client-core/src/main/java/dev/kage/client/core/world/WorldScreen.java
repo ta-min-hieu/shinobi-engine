@@ -516,7 +516,7 @@ public final class WorldScreen implements GameScreen {
         guild.useGuildWar(guildWars::open);
         ExpansionWindows expansion = reports.community().expansion(); // ADR-141 biển PvP, 143 cài đặt, 144 thời tiết
         expansion.wireDisplay(combatHud, realmTitles, combatFeedback, backdrop);
-        expansion.useLocalInput(inventory, intents, mail, quests); // ADR-176, 188, 206, 213, 215, 217, 221
+        expansion.useLocalInput(inventory, intents, mail, quests).useFriends(friends); // ADR-176…221, ADR-276
         duelTargeting.useGuildWar(
                 expansion.zoneMap().orInPvpZone(guildWars::isMyWarActive),
                 dev.kage.client.core.ui.theme.KageI18n.textOrKey(i18n, "guildwar.target"));

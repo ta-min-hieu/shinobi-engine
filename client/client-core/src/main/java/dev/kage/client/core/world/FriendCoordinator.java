@@ -73,6 +73,8 @@ final class FriendCoordinator implements WindowFlow {
     /** Đệm dựng sẵn cho {@link FriendPanel} — chỉ đổi khi danh sách đổi, không phải mỗi khung. */
     private final List<FriendPanel.FriendRow> friendRows = new ArrayList<>();
 
+    private java.util.function.Predicate<String> favorite = name -> false; // ADR-276
+
     private final List<FriendPanel.RequestRow> requestRows = new ArrayList<>();
 
     /**
@@ -282,7 +284,7 @@ final class FriendCoordinator implements WindowFlow {
     }
 
     private void onRemove(int rowIndex) {
-        List<FriendController.Friend> friends = controller.friends();
+        List<FriendController.Friend> friends = orderedFriends();
         if (rowIndex < 0 || rowIndex >= friends.size()) {
             return;
         }
@@ -302,6 +304,31 @@ final class FriendCoordinator implements WindowFlow {
         return Optional.of(requests.get(rowIndex));
     }
 
+    /** ADR-276 — nối bạn yêu thích; vẽ lại ngay. */
+    void useFavorites(java.util.function.Predicate<String> isFavorite) {
+        this.favorite = isFavorite;
+        refreshRows();
+    }
+
+    /**
+     * ADR-276 — bạn yêu thích lên đầu (giữ thứ tự server trong mỗi nhóm). Dòng vẽ VÀ nút Xoá theo chỉ số dòng dùng
+     * CÙNG danh sách này — lệch thứ tự là xoá nhầm người.
+     */
+    private List<FriendController.Friend> orderedFriends() {
+        List<FriendController.Friend> ordered = new ArrayList<>();
+        for (FriendController.Friend friend : controller.friends()) {
+            if (favorite.test(friend.name())) {
+                ordered.add(friend);
+            }
+        }
+        for (FriendController.Friend friend : controller.friends()) {
+            if (!favorite.test(friend.name())) {
+                ordered.add(friend);
+            }
+        }
+        return ordered;
+    }
+
     /** Hỏi server cả hai danh sách — xem javadoc lớp về việc không có gói đẩy nào cho chuyện này. */
     private void refreshFromServer() {
         sender.listFriends();
@@ -310,8 +337,12 @@ final class FriendCoordinator implements WindowFlow {
 
     private void refreshRows() {
         friendRows.clear();
-        for (FriendController.Friend friend : controller.friends()) {
-            friendRows.add(new FriendPanel.FriendRow(withLastOnline(friend), friend.online(), friend.intimacy()));
+        for (FriendController.Friend friend : orderedFriends()) {
+            String label = withLastOnline(friend);
+            if (favorite.test(friend.name())) {
+                label = text("favorite.prefix") + " " + label; // ADR-276
+            }
+            friendRows.add(new FriendPanel.FriendRow(label, friend.online(), friend.intimacy()));
         }
         requestRows.clear();
         for (FriendController.PendingRequest request : controller.pendingRequests()) {

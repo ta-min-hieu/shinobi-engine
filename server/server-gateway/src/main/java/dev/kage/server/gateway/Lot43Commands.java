@@ -1,18 +1,23 @@
 package dev.kage.server.gateway;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.LongFunction;
 
 import dev.kage.character.domain.Character;
+import dev.kage.inventory.domain.ItemStack;
 import dev.kage.party.api.PartyFacade;
 import dev.kage.party.api.PartyGoldSplitFacade;
+import dev.kage.protocol.GetBagValueResponse;
 import dev.kage.protocol.Opcode;
 import dev.kage.protocol.SplitPartyGoldCommand;
 import dev.kage.protocol.SplitPartyGoldOutcome;
 import dev.kage.protocol.SplitPartyGoldResponse;
 import dev.kage.server.world.WorldFacade;
+import dev.kage.shop.domain.ShopListing;
 
 /** Lớp lệnh lô 43 (ADR-271…) — MỘT thành phần của {@link Lot42Commands}. Gọi trên Virtual Thread. */
 record Lot43Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
@@ -52,6 +57,46 @@ record Lot43Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
                 .setRecipients(recipients.size())
                 .setGoldAfter(result.goldAfter())
                 .build();
+    }
+
+    /**
+     * ADR-274 — tổng giá bán cho cửa hàng của mọi món trong túi: giá {@code shop_item.sell_price} × số lượng (cộng
+     * bão hoà, không tràn). Món không có trong bảng giá cửa hàng (không bán được cho NPC) đếm riêng, không cộng.
+     */
+    GetBagValueResponse bagValue(long characterId) {
+        Map<Long, Long> sellPrices = new HashMap<>();
+        for (ShopListing listing : gateway.contentFacades().shopFacade().listItems()) {
+            sellPrices.put(listing.itemTemplateId(), listing.sellPrice());
+        }
+        long total = 0L;
+        int priced = 0;
+        int unpriced = 0;
+        for (ItemStack stack :
+                gateway.inventoryFacade().listInventory(characterId).inventory().items()) {
+            long price = sellPrices.getOrDefault(stack.itemTemplateId(), 0L);
+            if (price <= 0L) {
+                unpriced++;
+                continue;
+            }
+            priced++;
+            total = saturatingAdd(total, saturatingMultiply(price, stack.quantity()));
+        }
+        return GetBagValueResponse.newBuilder()
+                .setTotalGold(total)
+                .setPricedStacks(priced)
+                .setUnpricedStacks(unpriced)
+                .build();
+    }
+
+    /** Cộng không tràn. Tĩnh để test. */
+    static long saturatingAdd(long a, long b) {
+        long sum = a + b;
+        return ((a ^ sum) & (b ^ sum)) < 0 ? Long.MAX_VALUE : sum;
+    }
+
+    /** Nhân không tràn (hai số không âm). Tĩnh để test. */
+    static long saturatingMultiply(long a, long b) {
+        return b != 0 && a > Long.MAX_VALUE / b ? Long.MAX_VALUE : a * b;
     }
 
     /** Dòng báo người nhận. Tĩnh để test. */

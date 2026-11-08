@@ -1155,7 +1155,21 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetEventCalendarRequest.parser(),
                             Opcode.OPCODE_GET_EVENT_CALENDAR_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot37().calendar())),
-            // Lô 42–43 — sẵn sàng (ADR-263), đếm ngược (264), xúc xắc (265), chia vàng (278).
+            // Lô 42–43 — sẵn sàng (ADR-263), đếm ngược (264), xúc xắc (265), chia vàng (278), giá trị túi (274).
+            Map.entry(
+                    Opcode.OPCODE_GET_BAG_VALUE_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetBagValueRequest.parser(),
+                            Opcode.OPCODE_GET_BAG_VALUE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .bagValue(id))),
             Map.entry(
                     Opcode.OPCODE_START_READY_CHECK_COMMAND_VALUE,
                     storageCommand(

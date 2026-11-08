@@ -279,6 +279,8 @@ enum Opcode {
   OPCODE_GET_LOOT_HISTORY_RESPONSE = 567;
   OPCODE_GET_ENHANCE_PREVIEW_REQUEST = 568;  // ADR-257 (2026-11-08) — dự tính cường hoá
   OPCODE_GET_ENHANCE_PREVIEW_RESPONSE = 569;
+  OPCODE_GET_BAG_VALUE_REQUEST = 570;  // ADR-274 (2026-11-08) — tổng giá trị túi đồ
+  OPCODE_GET_BAG_VALUE_RESPONSE = 571;
   // 511 để TRỐNG CÓ CHỦ Ý — dành sẵn cho ITEM_REMOVED_EVENT (ADR-035 Revisit Trigger #3, chỉ
   // thêm khi ĐO thấy việc hỏi lại toàn bộ túi sau mỗi hành động tốn thật). ĐỪNG cấp cho packet khác.
 
