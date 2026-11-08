@@ -747,3 +747,51 @@ enum SplitStackOutcome {
 message SplitStackResponse {
   SplitStackOutcome outcome = 1;
 }
+
+// ADR-231 (2026-11-08) — huỷ vật phẩm. Command: Client -> Server (OPCODE_DESTROY_ITEM_COMMAND). Huỷ cả chồng.
+message DestroyItemCommand {
+  int64 item_id = 1;
+}
+
+enum DestroyItemOutcome {
+  DESTROY_ITEM_OUTCOME_UNSPECIFIED = 0;
+  DESTROY_ITEM_OUTCOME_OK = 1;
+  DESTROY_ITEM_OUTCOME_NOT_FOUND = 2;
+  DESTROY_ITEM_OUTCOME_LOCKED = 3;    // ADR-159 — mở khoá trước
+  DESTROY_ITEM_OUTCOME_EQUIPPED = 4;
+  DESTROY_ITEM_OUTCOME_IN_TRADE = 5;
+}
+
+// Response: Server -> Client (OPCODE_DESTROY_ITEM_RESPONSE). OK ⇒ client hỏi lại túi.
+message DestroyItemResponse {
+  DestroyItemOutcome outcome = 1;
+}
+
+// ADR-232 (2026-11-08) — phân giải hàng loạt. Command: Client -> Server (OPCODE_BULK_DISMANTLE_COMMAND).
+message BulkDismantleCommand {
+  int32 max_required_level = 1;  // chỉ phân giải trang bị có cấp yêu cầu ≤ số này
+}
+
+// Response: Server -> Client (OPCODE_BULK_DISMANTLE_RESPONSE). Tổng thu về.
+message BulkDismantleResponse {
+  int32 dismantled = 1;
+  int64 gold = 2;
+  int32 herbs = 3;
+}
+
+// ADR-233 (2026-11-08) — lịch sử cường hoá. Request: Client -> Server (OPCODE_GET_ENHANCE_HISTORY_REQUEST).
+message GetEnhanceHistoryRequest {}
+
+message EnhanceHistoryEntry {
+  int64 item_template_id = 1;  // 0 = món không còn trong túi
+  int32 from_level = 2;
+  int32 to_level = 3;
+  int64 gold_cost = 4;
+  string result = 5;           // SUCCESS / FAILED_NO_DROP / FAILED_DROPPED / …
+  int64 at_epoch_seconds = 6;
+}
+
+// Response: Server -> Client (OPCODE_GET_ENHANCE_HISTORY_RESPONSE). Tối đa 20 dòng, mới nhất trước.
+message GetEnhanceHistoryResponse {
+  repeated EnhanceHistoryEntry entries = 1;
+}

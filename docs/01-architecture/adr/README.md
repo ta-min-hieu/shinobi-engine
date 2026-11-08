@@ -262,6 +262,10 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-228](ADR-228-Next-Quest-Hint.md) | Gợi ý nhiệm vụ tiếp: đang làm → chờ nhận → nhiệm vụ cốt truyện kế tiếp có NPC giao (đọc script hội thoại), 628/629; `/tieptheo [di]` | ✅ Accepted (lô 37) |
 | [ADR-229](ADR-229-Chat-Channel-Filter.md) | Lọc kênh chat ở client, lưu Preferences; `/an`, `/hien`, `/kenh` | ✅ Accepted (lô 37) |
 | [ADR-230](ADR-230-Guild-Achievement-Share.md) | Khoe thành tựu vào bang: event 1707 tới cả bang khi mở thành tựu, công tắc `share_achievements` (V166) mặc định bật, 1705/1706; `/khoett` | ✅ Accepted (lô 37) |
+| [ADR-231](ADR-231-Destroy-Item.md) | Huỷ vật phẩm: 560/561 huỷ cả chồng, chặn khoá/đang mặc/đang giao dịch, audit `ITEM_DESTROYED`; `/huy` + `/huy xacnhan` trong 10 giây | ✅ Accepted (lô 38) |
+| [ADR-232](ADR-232-Bulk-Dismantle.md) | Phân giải hàng loạt: 562/563 gọi lại `DismantleFacade` từng món (loại khoá/mặc/khảm ngọc), tối đa 40; `/phangiai <cấp>` | ✅ Accepted (lô 38) |
+| [ADR-233](ADR-233-Enhance-History.md) | Lịch sử cường hoá: 564/565 đọc audit `ENHANCE_ITEM`, 20 dòng, không bảng mới; `/lichsucuonghoa` | ✅ Accepted (lô 38) |
+| [ADR-234](ADR-234-Market-Price-Hint.md) | Giá gợi ý phường thị: 1040/1041 giá một cái — rẻ nhất đang rao + trung bình đã bán 7 ngày; `/giacho` | ✅ Accepted (lô 38) |
 ---
 
 ## ADR cần tạo (chưa viết)

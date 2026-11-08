@@ -749,7 +749,16 @@ public final class GatewayBootstrap {
                                         databaseBootstrap.expansion().wireLifetimeStatsFacade(),
                                         databaseBootstrap.expansion().wireQuestCatalogFacade(),
                                         databaseBootstrap.expansion().wireAchievementShareFacade(),
-                                        databaseBootstrap.expansion().wireStarterGiftFacade()))));
+                                        databaseBootstrap.expansion().wireStarterGiftFacade(),
+                                        lot38Facades(databaseBootstrap)))));
+    }
+
+    /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */
+    private static Lot38Facades lot38Facades(ServerDatabaseBootstrap databaseBootstrap) {
+        return new Lot38Facades(
+                databaseBootstrap.expansion().wireItemDestroyFacade(),
+                databaseBootstrap.expansion().wireItemHistoryFacade(),
+                databaseBootstrap.expansion().wireMarketPriceHintFacade());
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

@@ -11,7 +11,8 @@ record Lot37Windows(
         CombatLogCoordinator combatLog,
         NextQuestHintCoordinator nextQuest,
         ChatFilterCoordinator chatFilter,
-        AchievementShareCoordinator achievementShare) {
+        AchievementShareCoordinator achievementShare,
+        Lot38Windows lot38) {
 
     static Lot37Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot37Windows(
@@ -20,7 +21,8 @@ record Lot37Windows(
                 new CombatLogCoordinator(feeds.chat()),
                 new NextQuestHintCoordinator(sender, feeds.chat()),
                 new ChatFilterCoordinator(feeds.chat()),
-                new AchievementShareCoordinator(sender, feeds.chat()));
+                new AchievementShareCoordinator(sender, feeds.chat()),
+                Lot38Windows.create(sender, feeds)); // lô 38 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -31,5 +33,6 @@ record Lot37Windows(
         panels.register(nextQuest);
         panels.register(chatFilter);
         panels.register(achievementShare);
+        lot38.registerInto(panels);
     }
 }

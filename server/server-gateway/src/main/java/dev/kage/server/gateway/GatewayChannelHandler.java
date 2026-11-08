@@ -1155,6 +1155,32 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetEventCalendarRequest.parser(),
                             Opcode.OPCODE_GET_EVENT_CALENDAR_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot37().calendar())),
+            // Lô 38 — huỷ vật phẩm (ADR-231), phân giải hàng loạt (ADR-232), lịch sử cường hoá (ADR-233), giá gợi ý
+            // (234).
+            Map.entry(
+                    Opcode.OPCODE_DESTROY_ITEM_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.DestroyItemCommand.parser(),
+                            Opcode.OPCODE_DESTROY_ITEM_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().lot38().destroyItem(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_BULK_DISMANTLE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.BulkDismantleCommand.parser(),
+                            Opcode.OPCODE_BULK_DISMANTLE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().lot38().bulkDismantle(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_ENHANCE_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetEnhanceHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_ENHANCE_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().lot38().enhanceHistory(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_MARKET_PRICE_HINT_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetMarketPriceHintRequest.parser(),
+                            Opcode.OPCODE_GET_MARKET_PRICE_HINT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().lot38().priceHint(c))),
             // Lô 37 — gợi ý nhiệm vụ tiếp (ADR-228), khoe thành tựu vào bang (ADR-230).
             Map.entry(
                     Opcode.OPCODE_GET_NEXT_QUEST_HINT_REQUEST_VALUE,

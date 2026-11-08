@@ -35,10 +35,17 @@ final class Lot37Commands {
 
     private final Deps deps;
     private final Map<Long, Instant> sessions;
+    private final Lot38Commands lot38;
 
     Lot37Commands(Deps deps) {
         this.deps = deps;
         this.sessions = SESSIONS_BY_REGISTRY.computeIfAbsent(deps.registry(), r -> new ConcurrentHashMap<>());
+        this.lot38 = Lot38Commands.of(deps.gateway()); // lô 38 lồng ở đây (trần MethodLength của ExpansionCommands.of)
+    }
+
+    /** Lớp lệnh lô 38 (ADR-231…). */
+    Lot38Commands lot38() {
+        return lot38;
     }
 
     static Lot37Commands of(GatewayFacades gateway, WorldGateway worldGateway, NpcProximity proximity) {

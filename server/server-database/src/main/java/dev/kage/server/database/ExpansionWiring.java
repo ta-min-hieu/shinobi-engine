@@ -228,6 +228,24 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.chat.PostgresOfflineWhisperAdapter(dataSource));
     }
 
+    /** ADR-231 — huỷ vật phẩm. */
+    public dev.kage.inventory.api.ItemDestroyFacade wireItemDestroyFacade() {
+        return new dev.kage.inventory.api.ItemDestroyFacade(
+                new dev.kage.server.database.inventory.PostgresItemDestroyAdapter(dataSource));
+    }
+
+    /** ADR-232/233 — phân giải hàng loạt, lịch sử cường hoá. */
+    public dev.kage.inventory.api.ItemHistoryFacade wireItemHistoryFacade() {
+        return new dev.kage.inventory.api.ItemHistoryFacade(
+                new dev.kage.server.database.inventory.PostgresItemHistoryAdapter(dataSource));
+    }
+
+    /** ADR-234 — giá gợi ý phường thị. */
+    public dev.kage.market.api.MarketPriceHintFacade wireMarketPriceHintFacade() {
+        return new dev.kage.market.api.MarketPriceHintFacade(
+                new dev.kage.server.database.market.PostgresMarketPriceHintAdapter(dataSource));
+    }
+
     /** ADR-228 — danh mục nhiệm vụ. */
     public dev.kage.quest.api.QuestCatalogFacade wireQuestCatalogFacade() {
         return new dev.kage.quest.api.QuestCatalogFacade(

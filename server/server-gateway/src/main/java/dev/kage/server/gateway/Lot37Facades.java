@@ -13,12 +13,14 @@ record Lot37Facades(
         LifetimeStatsFacade lifetime,
         QuestCatalogFacade questCatalog,
         AchievementShareFacade achievementShare,
-        StarterGiftFacade starterGift) {
+        StarterGiftFacade starterGift,
+        Lot38Facades lot38) {
 
     /** Composition không có các tính năng này (test). */
     static final Lot37Facades DISABLED = new Lot37Facades(
             LifetimeStatsFacade.DISABLED,
             QuestCatalogFacade.DISABLED,
             AchievementShareFacade.DISABLED,
-            StarterGiftFacade.DISABLED);
+            StarterGiftFacade.DISABLED,
+            Lot38Facades.DISABLED);
 }

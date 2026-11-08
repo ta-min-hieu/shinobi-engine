@@ -293,3 +293,16 @@ message MarketWatchAlertEvent {
   int64 unit_price = 5;
   string seller_name = 6;
 }
+
+// ADR-234 (2026-11-08) — giá gợi ý phường thị. Request: Client -> Server (OPCODE_GET_MARKET_PRICE_HINT_REQUEST).
+message GetMarketPriceHintRequest {
+  int64 item_template_id = 1;
+}
+
+// Response: Server -> Client (OPCODE_GET_MARKET_PRICE_HINT_RESPONSE). Giá MỘT cái; 0 = chưa có dữ liệu.
+message GetMarketPriceHintResponse {
+  int64 item_template_id = 1;
+  int64 lowest_active = 2;   // rẻ nhất đang rao
+  int64 average_sold = 3;    // trung bình đã bán 7 ngày qua
+  int32 sold_listings = 4;   // số dòng đã bán 7 ngày qua
+}
