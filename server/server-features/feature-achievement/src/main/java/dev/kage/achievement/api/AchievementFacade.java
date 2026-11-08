@@ -54,6 +54,16 @@ public final class AchievementFacade {
         return useCases.activeTitleCode(characterId);
     }
 
+    /** ADR-223 — bộ đếm cộng dồn (hạ quái, trả nhiệm vụ, thắng luận võ, điểm danh). */
+    public Map<AchievementKind, Long> counters(long characterId) {
+        return useCases.counters(characterId);
+    }
+
+    /** ADR-223 — số thành tựu đã mở của {@code characterId}. */
+    public int unlockedCount(long characterId) {
+        return useCases.unlockedCount(characterId);
+    }
+
     /** ADR-209 — số thành tựu đã mở của mọi nhân vật (bảng xếp hạng Thành tựu). */
     public Map<Long, Integer> unlockedCounts() {
         return useCases.unlockedCounts();

@@ -396,6 +396,14 @@ public final class GatewayBootstrap {
         characterRegistry.enemies.bind(new EnemyHooks.Deps(
                 facades.progression().expansion().lot33().enemies(), java.time.Clock.systemUTC())); // ADR-194
         characterRegistry.deathRecap.bind(facades.characterFacade()); // ADR-195
+        characterRegistry.deathRecap.bindDeathCounter( // ADR-223
+                facades.progression()
+                        .expansion()
+                        .lot34()
+                        .lot35()
+                        .lot36()
+                        .lot37()
+                        .lifetime()::addDeath);
         characterRegistry.autoSell.bind(new AutoSellHooks.Deps(
                 facades.progression().expansion().lot34().autoSell(), characterRegistry)); // ADR-204
         return List.of(
@@ -743,7 +751,8 @@ public final class GatewayBootstrap {
                         databaseBootstrap.expansion().wireStrangerMailFacade(),
                         new Lot36Facades(
                                 databaseBootstrap.expansion().wireStackSplitFacade(),
-                                databaseBootstrap.expansion().wireMailHousekeepingFacade())));
+                                databaseBootstrap.expansion().wireMailHousekeepingFacade(),
+                                new Lot37Facades(databaseBootstrap.expansion().wireLifetimeStatsFacade()))));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

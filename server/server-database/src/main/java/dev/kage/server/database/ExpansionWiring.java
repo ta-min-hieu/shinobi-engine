@@ -228,6 +228,12 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.chat.PostgresOfflineWhisperAdapter(dataSource));
     }
 
+    /** ADR-223 — thống kê cả đời. */
+    public dev.kage.character.api.LifetimeStatsFacade wireLifetimeStatsFacade() {
+        return new dev.kage.character.api.LifetimeStatsFacade(
+                new dev.kage.server.database.character.PostgresLifetimeStatsAdapter(dataSource));
+    }
+
     /** ADR-215 — tách chồng vật phẩm. */
     public dev.kage.inventory.api.StackSplitFacade wireStackSplitFacade() {
         return new dev.kage.inventory.api.StackSplitFacade(

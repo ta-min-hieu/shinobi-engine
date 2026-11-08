@@ -106,6 +106,9 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     /** ADR-072 — linh thú đang mặc nhận EXP cùng chủ nhân. */
     final PetHooks pets = new PetHooks();
 
+    /** ADR-224 — lịch boss thế giới cho lịch sự kiện (WorldBossScheduler ghi). */
+    final WorldBossTimes worldBossTimes = new WorldBossTimes();
+
     /** ADR-071 — bậc chiêu cho mọi đường attach ({@link CharacterLoadout}). */
     final SkillRankSource skillRanks = new SkillRankSource();
 

@@ -57,6 +57,12 @@ final class WorldBossScheduler implements WorldBossListener {
     // Lịch là tham số — đọc MỘT lần lúc start(): vòng hỏi 15 s không được chạm DB (lúc tắt server pool đã đóng).
     private volatile List<WorldBossSchedule> schedules = List.of();
     private final Set<String> alive = ConcurrentHashMap.newKeySet();
+
+    /** ADR-225 — boss đã được nhắc trước cho lần xuất hiện sắp tới (xoá khi boss xuất hiện). */
+    private final Set<String> warned = ConcurrentHashMap.newKeySet();
+
+    /** ADR-225 — báo trước bao lâu. */
+    static final Duration WARN_AHEAD = Duration.ofMinutes(5);
     // Future của vòng hỏi lịch — {@link #stop} huỷ nó (luồng daemon cũng chết cùng tiến trình).
     private volatile ScheduledFuture<?> ticking;
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -79,6 +85,7 @@ final class WorldBossScheduler implements WorldBossListener {
         for (WorldBossSchedule schedule : schedules) {
             Duration wait = firstOverride.orElse(Duration.ofMinutes(schedule.intervalMinutes()));
             nextSpawnAt.put(schedule.monsterCode(), now.plus(wait));
+            deps.registry().worldBossTimes.scheduled(now.plus(wait)); // ADR-224
         }
         world.setWorldBossListener(this);
         ticking = timer.scheduleWithFixedDelay(this::checkSchedules, 0, CHECK_PERIOD.toSeconds(), TimeUnit.SECONDS);
@@ -114,7 +121,10 @@ final class WorldBossScheduler implements WorldBossListener {
             Instant now = clock.instant();
             for (WorldBossSchedule schedule : schedules) {
                 Instant due = nextSpawnAt.get(schedule.monsterCode());
+                warnIfClose(schedule.monsterCode(), due, now); // ADR-225
                 if (due != null && !now.isBefore(due) && alive.add(schedule.monsterCode())) {
+                    warned.remove(schedule.monsterCode());
+                    deps.registry().worldBossTimes.spawned(); // ADR-224
                     world.spawnWorldBoss(schedule.monsterCode(), schedule.spawnX(), schedule.spawnY());
                     announce(
                             "Yêu Vương đã xuất hiện ở phía tây tông môn (x=%d)! / The Demon King has appeared west of"
@@ -126,6 +136,25 @@ final class WorldBossScheduler implements WorldBossListener {
         } catch (RuntimeException e) {
             LOG.error("Lịch boss thế giới lỗi — thử lại lượt sau", e);
         }
+    }
+
+    /**
+     * ADR-225 — còn không quá {@link #WARN_AHEAD} tới giờ xuất hiện (và boss chưa sống) ⇒ báo toàn server MỘT lần cho
+     * lần xuất hiện đó.
+     */
+    private void warnIfClose(String monsterCode, Instant due, Instant now) {
+        if (due == null
+                || alive.contains(monsterCode)
+                || !now.isBefore(due)
+                || now.plus(WARN_AHEAD).isBefore(due)
+                || !warned.add(monsterCode)) {
+            return;
+        }
+        long minutes = Math.max(1L, Duration.between(now, due).toMinutes());
+        announce(
+                "Yêu Vương sẽ xuất hiện sau khoảng %d phút ở phía tây tông môn! / The Demon King appears in about %d"
+                        + " minutes west of the sect!",
+                minutes);
     }
 
     /** Tick thread — chỉ đẩy việc sang luồng nền. */
@@ -145,6 +174,7 @@ final class WorldBossScheduler implements WorldBossListener {
                     .findFirst()
                     .orElse(1);
             nextSpawnAt.put(monsterCode, clock.instant().plus(Duration.ofMinutes(interval)));
+            deps.registry().worldBossTimes.scheduled(clock.instant().plus(Duration.ofMinutes(interval))); // ADR-224
             deps.bosses().addDamage(damageByCharacter);
             List<WorldBossRanking.Entry> ranked = WorldBossRanking.rank(damageByCharacter);
             List<WorldBossReward> tiers = deps.bosses().rewards(monsterCode);

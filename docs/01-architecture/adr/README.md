@@ -254,6 +254,10 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-220](ADR-220-Party-Mark-Overhead.md) | Ký hiệu "[ MỤC TIÊU NHÓM ]" trên đầu quái được đánh dấu (client, `RealmTitles.drawMarker`), vẽ cả khi tắt danh hiệu | ✅ Accepted (lô 36) |
 | [ADR-221](ADR-221-Quest-Go-To-Button.md) | Nút "Đi tới" trong nhật ký nhiệm vụ: NPC cần gặp đọc từ script quest, `QuestLogEntry.target_npc_code = 3`, dùng tự tìm đường | ✅ Accepted (lô 36) |
 | [ADR-222](ADR-222-Trade-Chat-Channel.md) | Kênh chat giao dịch `CHAT_CHANNEL_TRADE = 8` toàn server, ẩn / hiện ở client; `/gd`, `/kenhgd` | ✅ Accepted (lô 36) |
+| [ADR-223](ADR-223-Personal-Stats.md) | Thống kê cá nhân: số cũ từ bộ đếm thành tựu / `pvp_rating` + `character_lifetime_stats` deaths/playtime (V165), 261/262; `/thongke` | ✅ Accepted (lô 37) |
+| [ADR-224](ADR-224-Event-Calendar.md) | Lịch sự kiện: boss thế giới kế tiếp, làm mới ngày / tuần, luận võ đại hội, 263/264; `/lich` | ✅ Accepted (lô 37) |
+| [ADR-225](ADR-225-World-Boss-Warning.md) | Nhắc trước boss thế giới 5 phút, một lần mỗi lần xuất hiện, qua chat hệ thống | ✅ Accepted (lô 37) |
+| [ADR-226](ADR-226-Combat-Log.md) | Nhật ký chiến đấu client: nghe gói kết quả đòn, 20 dòng của chính mình; `/nhatkychien` | ✅ Accepted (lô 37) |
 ---
 
 ## ADR cần tạo (chưa viết)

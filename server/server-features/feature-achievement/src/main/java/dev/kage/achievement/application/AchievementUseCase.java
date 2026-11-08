@@ -87,6 +87,16 @@ public final class AchievementUseCase {
         return opened;
     }
 
+    /** ADR-223 — bộ đếm cộng dồn của {@code characterId} (hạ quái, trả nhiệm vụ…). */
+    public Map<AchievementKind, Long> counters(long characterId) {
+        return port.counters(characterId);
+    }
+
+    /** ADR-223 — số thành tựu đã mở của {@code characterId}. */
+    public int unlockedCount(long characterId) {
+        return port.unlocked(characterId).size();
+    }
+
     /** ADR-209 — số thành tựu đã mở của mọi nhân vật có ít nhất một. */
     public Map<Long, Integer> unlockedCounts() {
         return port.unlockedCounts();

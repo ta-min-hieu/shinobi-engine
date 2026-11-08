@@ -10,7 +10,8 @@ record Lot36Windows(
         MailCleanupCoordinator mailCleanup,
         BioCoordinator bio,
         GuildInviteCoordinator guildInvite,
-        TradeChannelCoordinator tradeChannel) {
+        TradeChannelCoordinator tradeChannel,
+        Lot37Windows lot37) {
 
     static Lot36Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot36Windows(
@@ -18,7 +19,8 @@ record Lot36Windows(
                 new MailCleanupCoordinator(sender, feeds.chat()),
                 new BioCoordinator(sender, feeds.chat()),
                 new GuildInviteCoordinator(sender, feeds.chat()),
-                new TradeChannelCoordinator(feeds.chat()));
+                new TradeChannelCoordinator(feeds.chat()),
+                Lot37Windows.create(sender, feeds)); // lô 37 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -28,5 +30,6 @@ record Lot36Windows(
         panels.register(bio);
         panels.register(guildInvite);
         panels.register(tradeChannel);
+        lot37.registerInto(panels);
     }
 }

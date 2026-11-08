@@ -690,3 +690,41 @@ message SetBioResponse {
   SetBioOutcome outcome = 1;
   string bio = 2;  // dòng đang lưu sau lệnh
 }
+
+// ADR-223 (2026-11-08) — thống kê cá nhân. Request: Client -> Server (OPCODE_GET_PERSONAL_STATS_REQUEST).
+message GetPersonalStatsRequest {}
+
+// Response: Server -> Client (OPCODE_GET_PERSONAL_STATS_RESPONSE). Số quái / nhiệm vụ từ bộ đếm thành tựu; giờ chơi gồm
+// cả phiên đang chơi.
+message GetPersonalStatsResponse {
+  int64 monsters_killed = 1;
+  int64 quests_claimed = 2;
+  int32 deaths = 3;
+  int32 pvp_wins = 4;
+  int32 pvp_losses = 5;
+  int32 achievements_unlocked = 6;
+  int64 playtime_seconds = 7;
+}
+
+// ADR-224 (2026-11-08) — lịch sự kiện tuần. Request: Client -> Server (OPCODE_GET_EVENT_CALENDAR_REQUEST).
+message GetEventCalendarRequest {}
+
+enum CalendarEventKind {
+  CALENDAR_EVENT_KIND_UNSPECIFIED = 0;
+  CALENDAR_EVENT_KIND_WORLD_BOSS = 1;    // lần xuất hiện kế tiếp; active = đang sống
+  CALENDAR_EVENT_KIND_DAILY_RESET = 2;
+  CALENDAR_EVENT_KIND_WEEKLY_RESET = 3;
+  CALENDAR_EVENT_KIND_TOURNAMENT = 4;    // Luận võ đại hội; active = đã tới giờ (đang diễn ra)
+}
+
+message CalendarEntry {
+  CalendarEventKind kind = 1;
+  int64 at_epoch_seconds = 2;
+  bool active = 3;
+}
+
+// Response: Server -> Client (OPCODE_GET_EVENT_CALENDAR_RESPONSE). Sớm nhất trước.
+message GetEventCalendarResponse {
+  int64 server_now_epoch_seconds = 1;
+  repeated CalendarEntry entries = 2;
+}

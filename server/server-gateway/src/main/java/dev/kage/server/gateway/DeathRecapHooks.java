@@ -59,9 +59,17 @@ final class DeathRecapHooks {
         this.clockMillis = clockMillis;
     }
 
+    /** ADR-223 — đếm lần bị hạ (thống kê cả đời); mặc định không đếm. */
+    private volatile java.util.function.LongConsumer deathCounter = characterId -> {};
+
     /** Nối bản thật — một lần, lúc khởi động. */
     void bind(CharacterFacade realCharacters) {
         this.characters = Optional.of(realCharacters);
+    }
+
+    /** ADR-223 — nối bộ đếm lần bị hạ (chạm DB: chạy trên Virtual Thread riêng). */
+    void bindDeathCounter(java.util.function.LongConsumer counter) {
+        this.deathCounter = counter;
     }
 
     /** Tick thread — {@code observerId} vừa thấy một đòn đánh thường; ghi nếu chính họ là người bị trúng. */
@@ -96,6 +104,8 @@ final class DeathRecapHooks {
 
     /** Tick thread — nhân vật vừa bị hạ: gom và gửi tóm tắt (nếu có đòn nào trong cửa sổ). */
     void onDefeated(long victimId, long killerEntityId, ConnectedCharacterRegistry registry) {
+        java.util.function.LongConsumer counter = deathCounter;
+        senders.execute(() -> countDeath(counter, victimId)); // ADR-223
         Deque<Hit> queue = hits.get(victimId);
         if (queue == null) {
             return;
@@ -112,6 +122,16 @@ final class DeathRecapHooks {
         }
         if (!recent.isEmpty()) {
             senders.execute(() -> send(victimId, killerEntityId, recent, registry));
+        }
+    }
+
+    // PMD AvoidCatchingGenericException: việc phụ chạy trên Virtual Thread riêng — lỗi dừng ở đây.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    private static void countDeath(java.util.function.LongConsumer counter, long victimId) {
+        try {
+            counter.accept(victimId);
+        } catch (RuntimeException e) {
+            LOG.warn("Đếm lần bị hạ lỗi: {}", victimId, e);
         }
     }
 

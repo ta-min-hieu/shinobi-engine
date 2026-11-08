@@ -7,8 +7,9 @@ import dev.kage.mail.api.MailHousekeepingFacade;
  * Facade lô 36 (ADR-215…) gom thành MỘT thành phần của {@link Lot35Facades} (lồng nhau để {@code
  * GatewayBootstrap.expansionFacades} khỏi chạm trần {@code MethodLength}).
  */
-record Lot36Facades(StackSplitFacade stackSplit, MailHousekeepingFacade mailHousekeeping) {
+record Lot36Facades(StackSplitFacade stackSplit, MailHousekeepingFacade mailHousekeeping, Lot37Facades lot37) {
 
     /** Composition không có các tính năng này (test). */
-    static final Lot36Facades DISABLED = new Lot36Facades(StackSplitFacade.DISABLED, MailHousekeepingFacade.DISABLED);
+    static final Lot36Facades DISABLED =
+            new Lot36Facades(StackSplitFacade.DISABLED, MailHousekeepingFacade.DISABLED, Lot37Facades.DISABLED);
 }

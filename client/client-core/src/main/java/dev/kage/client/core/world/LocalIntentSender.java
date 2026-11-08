@@ -137,6 +137,11 @@ final class LocalIntentSender {
         return action;
     }
 
+    /** ADR-226 — id nhân vật của chính mình. */
+    long localCharacterId() {
+        return context.localCharacterId();
+    }
+
     /** ADR-213 — mục tiêu đang nhắm (0 = không có). */
     long currentTargetId() {
         return context.combat().currentTargetId();

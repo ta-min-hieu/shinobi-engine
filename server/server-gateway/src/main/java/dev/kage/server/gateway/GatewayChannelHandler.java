@@ -1142,6 +1142,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetBioCommand.parser(),
                             Opcode.OPCODE_SET_BIO_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot36().setBio(id, c))),
+            // Lô 37 — thống kê cá nhân (ADR-223), lịch sự kiện (ADR-224).
+            Map.entry(
+                    Opcode.OPCODE_GET_PERSONAL_STATS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetPersonalStatsRequest.parser(),
+                            Opcode.OPCODE_GET_PERSONAL_STATS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().personalStats(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_EVENT_CALENDAR_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetEventCalendarRequest.parser(),
+                            Opcode.OPCODE_GET_EVENT_CALENDAR_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().calendar())),
             // Lô 36 — mời thẳng vào bang (ADR-219).
             Map.entry(
                     Opcode.OPCODE_INVITE_TO_GUILD_COMMAND_VALUE,
@@ -1910,8 +1923,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             claimDailyCheckIn(characterId);
             // ADR-062 D4 — mở bù mốc đã đạt + nạp danh hiệu cho chat; việc phụ, lỗi dừng bên trong.
             worldGateway.registry().achievements.onEnteredWorld(characterId, character.level());
-            // ADR-095/096 — quỹ bế quan + giờ vào world; việc phụ, lỗi dừng bên trong.
+            // ADR-095/096 — quỹ bế quan + giờ vào world; việc phụ, lỗi dừng bên trong. ADR-223 — giờ chơi.
             daily.onEnteredWorld(characterId);
+            expansion.lot37().onEnteredWorld(characterId);
             // ADR-164 — x2 EXP còn hạn thì báo HUD; việc phụ, lỗi dừng bên trong.
             expansion.lot29().expBuff().announce(characterId);
             // ADR-103 — thông báo server (RAM, không chạm DB).
@@ -6808,6 +6822,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     private void recordLeftWorld(long characterId) {
         expansion.lot33().facades().lastOnline().markLeft(characterId, java.time.Instant.now());
         daily.onLeftWorld(characterId);
+        expansion.lot37().onLeftWorld(characterId); // ADR-223 — cộng giờ chơi của phiên
     }
 
     /** Trạng thái chỉ-trong-phiên phải bỏ khi rời world: tiến độ thành tựu đang đếm, lời nhắn vắng (ADR-178). */
