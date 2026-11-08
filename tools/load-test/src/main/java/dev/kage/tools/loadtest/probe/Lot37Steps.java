@@ -20,6 +20,8 @@ final class Lot37Steps {
         return switch (verb) {
             case "personalStats" -> personalStats();
             case "calendar" -> calendar();
+            case "nextQuest" -> nextQuest();
+            case "shareAch" -> shareAch(arg);
             default -> "bước không hiểu";
         };
     }
@@ -55,5 +57,34 @@ final class Lot37Steps {
                             .append(e.getActive() ? "(đang)" : ""));
                     return out.toString();
                 });
+    }
+
+    private String nextQuest() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_NEXT_QUEST_HINT_REQUEST_VALUE,
+                dev.kage.protocol.GetNextQuestHintRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_NEXT_QUEST_HINT_RESPONSE_VALUE,
+                p -> {
+                    dev.kage.protocol.GetNextQuestHintResponse r =
+                            dev.kage.protocol.GetNextQuestHintResponse.parseFrom(p);
+                    return r.getKind().name() + " quest=" + r.getQuestCode() + " npc=" + r.getNpcCode();
+                });
+    }
+
+    private String shareAch(String arg) throws IOException {
+        dev.kage.protocol.SetAchievementShareCommand.Builder command =
+                dev.kage.protocol.SetAchievementShareCommand.newBuilder();
+        if ("?".equals(arg)) {
+            command.setQueryOnly(true);
+        } else {
+            command.setEnabled("on".equals(arg));
+        }
+        return asker.ask(
+                Opcode.OPCODE_SET_ACHIEVEMENT_SHARE_COMMAND_VALUE,
+                command.build(),
+                Opcode.OPCODE_SET_ACHIEVEMENT_SHARE_RESPONSE_VALUE,
+                p -> "khoe="
+                        + dev.kage.protocol.SetAchievementShareResponse.parseFrom(p)
+                                .getEnabled());
     }
 }

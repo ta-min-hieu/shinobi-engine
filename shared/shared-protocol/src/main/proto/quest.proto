@@ -273,3 +273,21 @@ message EscortStateEvent {
   string state = 5;
   float end_x = 6;
 }
+
+// ADR-228 (2026-11-08) — gợi ý nhiệm vụ tiếp. Request: Client -> Server (OPCODE_GET_NEXT_QUEST_HINT_REQUEST).
+message GetNextQuestHintRequest {}
+
+enum NextQuestHintKind {
+  NEXT_QUEST_HINT_KIND_UNSPECIFIED = 0;
+  NEXT_QUEST_HINT_KIND_NONE = 1;      // không còn gì để gợi ý (hết nhiệm vụ cốt truyện mở được)
+  NEXT_QUEST_HINT_KIND_CONTINUE = 2;  // đang làm dở: quest_code, npc_code = NPC cần gặp (có thể rỗng)
+  NEXT_QUEST_HINT_KIND_CLAIM = 3;     // đã xong, chưa nhận thưởng
+  NEXT_QUEST_HINT_KIND_NEW = 4;       // nhiệm vụ mới mở được: npc_code = NPC giao
+}
+
+// Response: Server -> Client (OPCODE_GET_NEXT_QUEST_HINT_RESPONSE).
+message GetNextQuestHintResponse {
+  NextQuestHintKind kind = 1;
+  string quest_code = 2;
+  string npc_code = 3;
+}

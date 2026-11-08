@@ -34,6 +34,9 @@ final class AchievementHooks {
     private volatile AchievementFacade facade;
     private volatile Sink sink;
 
+    /** ADR-230 — báo ra ngoài các thành tựu vừa mở (khoe vào bang); mặc định không làm gì. */
+    private volatile java.util.function.BiConsumer<Long, List<Achievement>> onUnlocked = (id, opened) -> {};
+
     /** Khoá i18n danh hiệu đang đeo của người ĐANG trong world — vắng mặt = không đeo. */
     private final Map<Long, String> activeTitleKeys = new ConcurrentHashMap<>();
 
@@ -51,6 +54,11 @@ final class AchievementHooks {
     void bind(AchievementFacade realFacade, Sink realSink) {
         this.facade = realFacade;
         this.sink = realSink;
+    }
+
+    /** ADR-230 — nối nơi nhận thành tựu vừa mở (một lần, lúc khởi động). */
+    void bindUnlockListener(java.util.function.BiConsumer<Long, List<Achievement>> listener) {
+        this.onUnlocked = listener;
     }
 
     void onMonsterKilled(long characterId) {
@@ -131,6 +139,9 @@ final class AchievementHooks {
     }
 
     private void announce(long characterId, List<Achievement> opened) {
+        if (!opened.isEmpty()) {
+            onUnlocked.accept(characterId, opened); // ADR-230
+        }
         for (Achievement achievement : opened) {
             sink.send(
                     characterId,

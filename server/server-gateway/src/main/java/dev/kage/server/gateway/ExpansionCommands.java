@@ -80,6 +80,6 @@ record ExpansionCommands(
                 Lot34Commands.of(facades, proximity),
                 Lot35Commands.of(facades, worldGateway),
                 Lot36Commands.of(facades, worldGateway),
-                Lot37Commands.of(facades, worldGateway));
+                Lot37Commands.of(facades, worldGateway, proximity));
     }
 }

@@ -396,14 +396,7 @@ public final class GatewayBootstrap {
         characterRegistry.enemies.bind(new EnemyHooks.Deps(
                 facades.progression().expansion().lot33().enemies(), java.time.Clock.systemUTC())); // ADR-194
         characterRegistry.deathRecap.bind(facades.characterFacade()); // ADR-195
-        characterRegistry.deathRecap.bindDeathCounter( // ADR-223
-                facades.progression()
-                        .expansion()
-                        .lot34()
-                        .lot35()
-                        .lot36()
-                        .lot37()
-                        .lifetime()::addDeath);
+        bindLot37Hooks(characterRegistry, facades); // ADR-223, ADR-230
         characterRegistry.autoSell.bind(new AutoSellHooks.Deps(
                 facades.progression().expansion().lot34().autoSell(), characterRegistry)); // ADR-204
         return List.of(
@@ -752,7 +745,11 @@ public final class GatewayBootstrap {
                         new Lot36Facades(
                                 databaseBootstrap.expansion().wireStackSplitFacade(),
                                 databaseBootstrap.expansion().wireMailHousekeepingFacade(),
-                                new Lot37Facades(databaseBootstrap.expansion().wireLifetimeStatsFacade()))));
+                                new Lot37Facades(
+                                        databaseBootstrap.expansion().wireLifetimeStatsFacade(),
+                                        databaseBootstrap.expansion().wireQuestCatalogFacade(),
+                                        databaseBootstrap.expansion().wireAchievementShareFacade(),
+                                        databaseBootstrap.expansion().wireStarterGiftFacade()))));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */
@@ -963,6 +960,18 @@ public final class GatewayBootstrap {
                 .lot35()
                 .titleBonus()
                 .bonusOf(characterRegistry.achievements.facade().activeTitleCode(characterId));
+    }
+
+    /** Lô 37 — đếm lần bị hạ (ADR-223), khoe thành tựu vào bang (ADR-230). */
+    private static void bindLot37Hooks(ConnectedCharacterRegistry characterRegistry, GatewayFacades facades) {
+        Lot37Facades lot37 =
+                facades.progression().expansion().lot34().lot35().lot36().lot37();
+        characterRegistry.deathRecap.bindDeathCounter(lot37.lifetime()::addDeath);
+        characterRegistry.achievements.bindUnlockListener(new AchievementShareHooks(new AchievementShareHooks.Deps(
+                lot37.achievementShare(),
+                facades.contentFacades().socialFacades().guildFacade(),
+                facades.characterFacade(),
+                characterRegistry))::onUnlocked);
     }
 
     private static java.util.List<Long> partyMembers(PartyFacade partyFacade, long characterId) {

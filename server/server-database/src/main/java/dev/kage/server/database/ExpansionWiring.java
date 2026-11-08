@@ -228,6 +228,24 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.chat.PostgresOfflineWhisperAdapter(dataSource));
     }
 
+    /** ADR-228 — danh mục nhiệm vụ. */
+    public dev.kage.quest.api.QuestCatalogFacade wireQuestCatalogFacade() {
+        return new dev.kage.quest.api.QuestCatalogFacade(
+                new dev.kage.server.database.quest.PostgresQuestCatalogAdapter(dataSource));
+    }
+
+    /** ADR-230 — công tắc khoe thành tựu vào bang. */
+    public dev.kage.achievement.api.AchievementShareFacade wireAchievementShareFacade() {
+        return new dev.kage.achievement.api.AchievementShareFacade(
+                new dev.kage.server.database.achievement.PostgresAchievementShareAdapter(dataSource));
+    }
+
+    /** ADR-227 — cờ gói quà tân thủ. */
+    public dev.kage.character.api.StarterGiftFacade wireStarterGiftFacade() {
+        return new dev.kage.character.api.StarterGiftFacade(
+                new dev.kage.server.database.character.PostgresStarterGiftAdapter(dataSource));
+    }
+
     /** ADR-223 — thống kê cả đời. */
     public dev.kage.character.api.LifetimeStatsFacade wireLifetimeStatsFacade() {
         return new dev.kage.character.api.LifetimeStatsFacade(

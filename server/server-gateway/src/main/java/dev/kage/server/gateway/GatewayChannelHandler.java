@@ -1155,6 +1155,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetEventCalendarRequest.parser(),
                             Opcode.OPCODE_GET_EVENT_CALENDAR_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot37().calendar())),
+            // Lô 37 — gợi ý nhiệm vụ tiếp (ADR-228), khoe thành tựu vào bang (ADR-230).
+            Map.entry(
+                    Opcode.OPCODE_GET_NEXT_QUEST_HINT_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetNextQuestHintRequest.parser(),
+                            Opcode.OPCODE_GET_NEXT_QUEST_HINT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().nextQuestHint(id))),
+            Map.entry(
+                    Opcode.OPCODE_SET_ACHIEVEMENT_SHARE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetAchievementShareCommand.parser(),
+                            Opcode.OPCODE_SET_ACHIEVEMENT_SHARE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().setAchievementShare(id, c))),
             // Lô 36 — mời thẳng vào bang (ADR-219).
             Map.entry(
                     Opcode.OPCODE_INVITE_TO_GUILD_COMMAND_VALUE,
@@ -1860,6 +1873,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setCharacter(toProto(character))
                     .build();
             send(ctx, Opcode.OPCODE_CREATE_CHARACTER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            expansion.lot37().grantStarterGift(character.id()); // ADR-227 — việc phụ, lỗi dừng bên trong
         } catch (IllegalArgumentException e) {
             LOG.warn("Tạo nhân vật thất bại: tên không hợp lệ", e);
             sendError(ctx, sequenceId, 400, "error.invalid_character_name");

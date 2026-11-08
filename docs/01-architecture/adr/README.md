@@ -258,6 +258,10 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-224](ADR-224-Event-Calendar.md) | Lịch sự kiện: boss thế giới kế tiếp, làm mới ngày / tuần, luận võ đại hội, 263/264; `/lich` | ✅ Accepted (lô 37) |
 | [ADR-225](ADR-225-World-Boss-Warning.md) | Nhắc trước boss thế giới 5 phút, một lần mỗi lần xuất hiện, qua chat hệ thống | ✅ Accepted (lô 37) |
 | [ADR-226](ADR-226-Combat-Log.md) | Nhật ký chiến đấu client: nghe gói kết quả đòn, 20 dòng của chính mình; `/nhatkychien` | ✅ Accepted (lô 37) |
+| [ADR-227](ADR-227-Starter-Gift.md) | Gói quà tân thủ: thư 5 đan + 200 linh thạch khi tạo nhân vật, cờ một lần `starter_gift_sent` (V166) | ✅ Accepted (lô 37) |
+| [ADR-228](ADR-228-Next-Quest-Hint.md) | Gợi ý nhiệm vụ tiếp: đang làm → chờ nhận → nhiệm vụ cốt truyện kế tiếp có NPC giao (đọc script hội thoại), 628/629; `/tieptheo [di]` | ✅ Accepted (lô 37) |
+| [ADR-229](ADR-229-Chat-Channel-Filter.md) | Lọc kênh chat ở client, lưu Preferences; `/an`, `/hien`, `/kenh` | ✅ Accepted (lô 37) |
+| [ADR-230](ADR-230-Guild-Achievement-Share.md) | Khoe thành tựu vào bang: event 1707 tới cả bang khi mở thành tựu, công tắc `share_achievements` (V166) mặc định bật, 1705/1706; `/khoett` | ✅ Accepted (lô 37) |
 ---
 
 ## ADR cần tạo (chưa viết)

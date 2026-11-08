@@ -81,6 +81,13 @@ final class NpcProximity {
         return Optional.of(all);
     }
 
+    /** ADR-228 — mã mọi NPC đặt TĨNH ở world chính (không trùng). */
+    java.util.Set<String> staticNpcCodes() {
+        java.util.Set<String> codes = new java.util.LinkedHashSet<>();
+        npcs.placements().forEach(p -> codes.add(p.npcCode()));
+        return codes;
+    }
+
     private static boolean anyClose(
             List<NpcCatalogSnapshot.NpcPlacementDefinition> placements, String npcCode, float x, float y) {
         for (NpcCatalogSnapshot.NpcPlacementDefinition placement : placements) {

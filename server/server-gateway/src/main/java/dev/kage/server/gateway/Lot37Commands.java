@@ -23,8 +23,15 @@ final class Lot37Commands {
     private static final Map<ConnectedCharacterRegistry, Map<Long, Instant>> SESSIONS_BY_REGISTRY =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
-    /** Nguồn dữ liệu. */
-    record Deps(GatewayFacades gateway, ConnectedCharacterRegistry registry, Clock clock) {}
+    /** Nguồn dữ liệu; {@code proximity} cho danh sách NPC đặt tĩnh (NPC giao nhiệm vụ, ADR-228). */
+    record Deps(GatewayFacades gateway, ConnectedCharacterRegistry registry, NpcProximity proximity, Clock clock) {}
+
+    /** ADR-227 — gói quà tân thủ: số Tiểu Hồi Xuân Đan và linh thạch. PLACEHOLDER cân bằng (Điều 27). */
+    static final int STARTER_PILLS = 5;
+
+    static final long STARTER_GOLD = 200L;
+
+    private static final String STARTER_PILL_CODE = "minor_healing_pill";
 
     private final Deps deps;
     private final Map<Long, Instant> sessions;
@@ -34,8 +41,72 @@ final class Lot37Commands {
         this.sessions = SESSIONS_BY_REGISTRY.computeIfAbsent(deps.registry(), r -> new ConcurrentHashMap<>());
     }
 
-    static Lot37Commands of(GatewayFacades gateway, WorldGateway worldGateway) {
-        return new Lot37Commands(new Deps(gateway, worldGateway.registry(), Clock.systemUTC()));
+    static Lot37Commands of(GatewayFacades gateway, WorldGateway worldGateway, NpcProximity proximity) {
+        return new Lot37Commands(new Deps(gateway, worldGateway.registry(), proximity, Clock.systemUTC()));
+    }
+
+    /**
+     * ADR-227 — vừa tạo nhân vật: gửi MỘT thư quà tân thủ (cờ trong DB bảo đảm đúng một lần; khoá chống trùng suy từ
+     * id). Việc phụ trên luồng blocking của lệnh tạo nhân vật — lỗi dừng ở đây, không làm hỏng việc tạo.
+     */
+    // PMD AvoidCatchingGenericException: việc phụ — không được làm hỏng lệnh tạo nhân vật.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    void grantStarterGift(long characterId) {
+        try {
+            if (!facades().starterGift().markSent(characterId)) {
+                return;
+            }
+            java.util.List<dev.kage.mail.api.MailFacade.AttachmentRequest> items =
+                    deps.gateway().inventoryFacade().itemCatalog().entries().stream()
+                            .filter(entry -> STARTER_PILL_CODE.equals(entry.code()))
+                            .map(entry -> new dev.kage.mail.api.MailFacade.AttachmentRequest(entry.id(), STARTER_PILLS))
+                            .toList();
+            deps.gateway()
+                    .contentFacades()
+                    .socialFacades()
+                    .mailFacade()
+                    .sendMail(
+                            new dev.kage.mail.api.MailFacade.SendMailRequest(
+                                    null,
+                                    characterId,
+                                    "Quà nhập môn / Welcome gift",
+                                    "Chúc đạo hữu tu hành thuận lợi! / May your cultivation go smoothly!",
+                                    STARTER_GOLD,
+                                    items),
+                            java.util
+                                    .UUID
+                                    .nameUUIDFromBytes(("starter-gift:" + characterId)
+                                            .getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                                    .toString());
+        } catch (RuntimeException e) {
+            org.slf4j.LoggerFactory.getLogger(Lot37Commands.class)
+                    .warn("Gửi quà tân thủ lỗi: characterId={}", characterId, e);
+        }
+    }
+
+    /** ADR-228 — Virtual Thread; nên làm nhiệm vụ nào tiếp và gặp NPC nào. */
+    dev.kage.protocol.GetNextQuestHintResponse nextQuestHint(long characterId) {
+        java.util.Map<String, dev.kage.quest.domain.QuestStatus> log = new java.util.LinkedHashMap<>();
+        deps.gateway()
+                .contentFacades()
+                .questFacade()
+                .listQuests(characterId)
+                .forEach(entry -> log.put(entry.questCode(), entry.status()));
+        return NextQuestHint.of(
+                log,
+                facades().questCatalog().all(),
+                QuestGivers.index(deps.proximity().staticNpcCodes()));
+    }
+
+    /** ADR-230 — Virtual Thread; bật / tắt (hoặc chỉ hỏi) khoe thành tựu vào bang. */
+    dev.kage.protocol.SetAchievementShareResponse setAchievementShare(
+            long characterId, dev.kage.protocol.SetAchievementShareCommand command) {
+        if (!command.getQueryOnly()) {
+            facades().achievementShare().setEnabled(characterId, command.getEnabled());
+        }
+        return dev.kage.protocol.SetAchievementShareResponse.newBuilder()
+                .setEnabled(facades().achievementShare().enabled(characterId))
+                .build();
     }
 
     /** ADR-223 — vừa vào world: ghi mốc bắt đầu phiên. */
@@ -105,13 +176,10 @@ final class Lot37Commands {
     }
 
     private dev.kage.character.api.LifetimeStatsFacade lifetime() {
-        return deps.gateway()
-                .progression()
-                .expansion()
-                .lot34()
-                .lot35()
-                .lot36()
-                .lot37()
-                .lifetime();
+        return facades().lifetime();
+    }
+
+    private Lot37Facades facades() {
+        return deps.gateway().progression().expansion().lot34().lot35().lot36().lot37();
     }
 }

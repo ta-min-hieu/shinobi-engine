@@ -166,6 +166,7 @@ record ExpansionWindows(
         lot36.stackSplit().useSelection(inventory::selectedItemId); // ADR-215 /tach
         lot36.mailCleanup().useSelection(mail::selectedMailId); // ADR-217 /ghimthu
         lot36.lot37().combatLog().useLocalId(intents.localCharacterId()); // ADR-226 /nhatkychien
+        lot36.lot37().nextQuest().useWalker(lot34.autoWalk()::walkToNpc); // ADR-228 /tieptheo di
     }
 
     /**

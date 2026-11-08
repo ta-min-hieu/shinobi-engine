@@ -58,3 +58,21 @@ message AchievementUnlockedEvent {
   string name_key = 2;
   string title_key = 3;
 }
+
+// ADR-230 (2026-11-08) — khoe thành tựu vào bang. Command: Client -> Server (OPCODE_SET_ACHIEVEMENT_SHARE_COMMAND).
+message SetAchievementShareCommand {
+  bool enabled = 1;
+  bool query_only = 2;  // true = chỉ hỏi trạng thái
+}
+
+// Response: Server -> Client (OPCODE_SET_ACHIEVEMENT_SHARE_RESPONSE).
+message SetAchievementShareResponse {
+  bool enabled = 1;
+}
+
+// Event: Server -> Client (OPCODE_GUILD_ACHIEVEMENT_SHARED_EVENT) — tới mọi thành viên bang đang online khi một
+// người trong bang mở thành tựu (và đang bật khoe). Client tự dịch tên thành tựu.
+message GuildAchievementSharedEvent {
+  string character_name = 1;
+  string achievement_name_key = 2;
+}
