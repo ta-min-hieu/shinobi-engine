@@ -246,6 +246,24 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.market.PostgresMarketPriceHintAdapter(dataSource));
     }
 
+    /** ADR-235 — hạn mức thư toàn bang. */
+    public dev.kage.guild.api.GuildMailFacade wireGuildMailFacade() {
+        return new dev.kage.guild.api.GuildMailFacade(
+                new dev.kage.server.database.guild.PostgresGuildMailQuotaAdapter(dataSource));
+    }
+
+    /** ADR-236/237 — không làm phiền, chặn lời mời người lạ. */
+    public dev.kage.friend.api.ContactPrivacyFacade wireContactPrivacyFacade() {
+        return new dev.kage.friend.api.ContactPrivacyFacade(
+                new dev.kage.server.database.friend.PostgresContactPrivacyAdapter(dataSource));
+    }
+
+    /** ADR-238 — lịch sử đăng nhập. */
+    public dev.kage.account.api.LoginHistoryFacade wireLoginHistoryFacade() {
+        return new dev.kage.account.api.LoginHistoryFacade(
+                new dev.kage.server.database.account.PostgresLoginHistoryAdapter(dataSource));
+    }
+
     /** ADR-228 — danh mục nhiệm vụ. */
     public dev.kage.quest.api.QuestCatalogFacade wireQuestCatalogFacade() {
         return new dev.kage.quest.api.QuestCatalogFacade(

@@ -15,10 +15,42 @@ import dev.kage.protocol.GetMarketPriceHintRequest;
 import dev.kage.protocol.GetMarketPriceHintResponse;
 
 /** Lớp lệnh lô 38 (ADR-231…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
-record Lot38Commands(GatewayFacades gateway) {
+record Lot38Commands(GatewayFacades gateway, ContactPrivacyCommands contactPrivacy, GuildMailCommands guildMail) {
 
-    static Lot38Commands of(GatewayFacades gateway) {
-        return new Lot38Commands(gateway);
+    static Lot38Commands of(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
+        return new Lot38Commands(
+                gateway,
+                new ContactPrivacyCommands(gateway),
+                new GuildMailCommands(new GuildMailCommands.Deps(
+                        gateway,
+                        gateway.progression()
+                                .expansion()
+                                .lot34()
+                                .lot35()
+                                .lot36()
+                                .lot37()
+                                .lot38()
+                                .guildMail(),
+                        registry,
+                        java.time.Clock.systemUTC())));
+    }
+
+    /** ADR-238 — luồng đăng nhập (Virtual Thread): ghi một lần đăng nhập thành công với IP đã che. */
+    void recordLogin(long accountId, java.net.SocketAddress address) {
+        facades().loginHistory().record(accountId, address, Instant.now());
+    }
+
+    /** ADR-238 — Virtual Thread; 10 lần đăng nhập gần nhất của tài khoản sở hữu nhân vật. */
+    dev.kage.protocol.GetLoginHistoryResponse loginHistory(long characterId) {
+        dev.kage.protocol.GetLoginHistoryResponse.Builder response =
+                dev.kage.protocol.GetLoginHistoryResponse.newBuilder();
+        gateway.characterFacade().findById(characterId).ifPresent(character -> facades()
+                .loginHistory()
+                .recent(character.accountId())
+                .forEach(entry -> response.addEntries(dev.kage.protocol.LoginHistoryEntry.newBuilder()
+                        .setMaskedIp(entry.maskedIp())
+                        .setAtEpochSeconds(entry.at().getEpochSecond()))));
+        return response.build();
     }
 
     /** ADR-231 — Virtual Thread; huỷ cả chồng một món. */

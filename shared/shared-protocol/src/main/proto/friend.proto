@@ -444,3 +444,21 @@ message FriendSuggestion {
 message SuggestFriendsResponse {
   repeated FriendSuggestion suggestions = 1;
 }
+
+// ADR-236/237 (2026-11-08) — riêng tư liên lạc. Command: Client -> Server (OPCODE_SET_CONTACT_PRIVACY_COMMAND).
+enum ContactPrivacySetting {
+  CONTACT_PRIVACY_SETTING_UNSPECIFIED = 0;       // chỉ hỏi trạng thái
+  CONTACT_PRIVACY_SETTING_DO_NOT_DISTURB = 1;     // chặn tin riêng + mọi lời mời từ người không phải bạn
+  CONTACT_PRIVACY_SETTING_BLOCK_STRANGER_INVITES = 2;  // chặn lời mời nhóm/giao dịch từ người không phải bạn/cùng bang
+}
+
+message SetContactPrivacyCommand {
+  ContactPrivacySetting setting = 1;
+  bool enabled = 2;
+}
+
+// Response: Server -> Client (OPCODE_SET_CONTACT_PRIVACY_RESPONSE). Trạng thái sau khi đổi.
+message SetContactPrivacyResponse {
+  bool do_not_disturb = 1;
+  bool block_stranger_invites = 2;
+}

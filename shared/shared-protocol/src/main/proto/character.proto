@@ -728,3 +728,16 @@ message GetEventCalendarResponse {
   int64 server_now_epoch_seconds = 1;
   repeated CalendarEntry entries = 2;
 }
+
+// ADR-238 (2026-11-08) — lịch sử đăng nhập của TÀI KHOẢN. Request: Client -> Server (OPCODE_GET_LOGIN_HISTORY_REQUEST).
+message GetLoginHistoryRequest {}
+
+message LoginHistoryEntry {
+  string masked_ip = 1;  // "203.113.x.x" — server không lưu IP đầy đủ
+  int64 at_epoch_seconds = 2;
+}
+
+// Response: Server -> Client (OPCODE_GET_LOGIN_HISTORY_RESPONSE). 10 lần gần nhất, mới trước.
+message GetLoginHistoryResponse {
+  repeated LoginHistoryEntry entries = 1;
+}

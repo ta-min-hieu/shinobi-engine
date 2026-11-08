@@ -709,3 +709,25 @@ message RespondGuildInviteResponse {
   RespondGuildInviteOutcome outcome = 1;
   string guild_name = 2;
 }
+
+// ADR-235 (2026-11-08) — thư toàn bang. Command: Client -> Server (OPCODE_SEND_GUILD_MAIL_COMMAND). Bang chủ / phó.
+message SendGuildMailCommand {
+  string subject = 1;
+  string body = 2;
+}
+
+enum SendGuildMailOutcome {
+  SEND_GUILD_MAIL_OUTCOME_UNSPECIFIED = 0;
+  SEND_GUILD_MAIL_OUTCOME_OK = 1;
+  SEND_GUILD_MAIL_OUTCOME_NOT_IN_GUILD = 2;
+  SEND_GUILD_MAIL_OUTCOME_NOT_OFFICER = 3;
+  SEND_GUILD_MAIL_OUTCOME_DAILY_LIMIT = 4;
+  SEND_GUILD_MAIL_OUTCOME_INVALID_CONTENT = 5;  // trống / quá dài / từ cấm, hoặc bang không còn ai khác
+}
+
+// Response: Server -> Client (OPCODE_SEND_GUILD_MAIL_RESPONSE).
+message SendGuildMailResponse {
+  SendGuildMailOutcome outcome = 1;
+  int32 recipients = 2;       // số thành viên nhận được thư
+  int32 remaining_today = 3;  // số đợt bang còn gửi được hôm nay
+}

@@ -1155,6 +1155,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetEventCalendarRequest.parser(),
                             Opcode.OPCODE_GET_EVENT_CALENDAR_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot37().calendar())),
+            // Lô 38 — thư toàn bang (ADR-235), riêng tư liên lạc (ADR-236/237), lịch sử đăng nhập (ADR-238).
+            Map.entry(
+                    Opcode.OPCODE_SEND_GUILD_MAIL_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SendGuildMailCommand.parser(),
+                            Opcode.OPCODE_SEND_GUILD_MAIL_RESPONSE_VALUE,
+                            (h, id, c) ->
+                                    h.expansion.lot37().lot38().guildMail().send(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_SET_CONTACT_PRIVACY_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetContactPrivacyCommand.parser(),
+                            Opcode.OPCODE_SET_CONTACT_PRIVACY_RESPONSE_VALUE,
+                            (h, id, c) ->
+                                    h.expansion.lot37().lot38().contactPrivacy().set(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_LOGIN_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetLoginHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_LOGIN_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot37().lot38().loginHistory(id))),
             // Lô 38 — huỷ vật phẩm (ADR-231), phân giải hàng loạt (ADR-232), lịch sử cường hoá (ADR-233), giá gợi ý
             // (234).
             Map.entry(
@@ -1793,6 +1814,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             LoginResult result = accountFacade.login(username);
             boundAccountId = result.accountId();
             pinGate.reset(expansion.securityPin().hasPin(result.accountId()));
+            expansion
+                    .lot37()
+                    .lot38()
+                    .recordLogin(result.accountId(), ctx.channel().remoteAddress()); // ADR-238
             // Đăng nhập lại trên cùng kết nối (chưa vào world): phiên trước không còn ai dùng — thu hồi.
             String previousToken = sessionToken;
             sessionToken = result.sessionToken();
@@ -4252,8 +4277,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 send(ctx, Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE, sequenceId, response.toByteArray());
                 return;
             }
-            if (relations.blocks().eitherBlocks(characterId, target.get().id())) {
-                sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
+            if (refuseContact(
+                    ctx,
+                    sequenceId,
+                    new ContactPrivacyCommands.Attempt(
+                            characterId, target.get().id(), dev.kage.friend.api.ContactPrivacyFacade.Contact.FRIEND))) {
                 return;
             }
             FriendFacade.SendRequestResult result =
@@ -4963,8 +4991,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        if (relations.blocks().eitherBlocks(characterId, target.get().id())) {
-            sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
+        if (refuseContact(
+                ctx,
+                sequenceId,
+                new ContactPrivacyCommands.Attempt(
+                        characterId, target.get().id(), dev.kage.friend.api.ContactPrivacyFacade.Contact.PARTY))) {
             return;
         }
         PartyFacade.InviteResult result =
@@ -5506,8 +5537,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             send(ctx, Opcode.OPCODE_REQUEST_TRADE_RESPONSE_VALUE, sequenceId, response.toByteArray());
             return;
         }
-        if (relations.blocks().eitherBlocks(characterId, target.get().id())) {
-            sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
+        if (refuseContact(
+                ctx,
+                sequenceId,
+                new ContactPrivacyCommands.Attempt(
+                        characterId, target.get().id(), dev.kage.friend.api.ContactPrivacyFacade.Contact.TRADE))) {
             return;
         }
         TradeFacade.RequestResult result =
@@ -6155,11 +6189,28 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_TARGET_NOT_FOUND);
             return Optional.empty();
         }
-        if (relations.blocks().eitherBlocks(characterId, found.get().id())) {
-            sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
+        if (refuseContact(
+                ctx,
+                sequenceId,
+                new ContactPrivacyCommands.Attempt(
+                        characterId, found.get().id(), dev.kage.friend.api.ContactPrivacyFacade.Contact.WHISPER))) {
             return Optional.empty();
         }
         return found;
+    }
+
+    /**
+     * Kiểm chặn (ADR-091) rồi riêng tư liên lạc của người nhận (ADR-236 không làm phiền, ADR-237 chặn lời mời người lạ)
+     * — bị từ chối thì đã báo lỗi cho người gửi và trả {@code true}. Chạy trên Virtual Thread.
+     */
+    private boolean refuseContact(ChannelHandlerContext ctx, int sequenceId, ContactPrivacyCommands.Attempt attempt) {
+        if (relations.blocks().eitherBlocks(attempt.senderId(), attempt.targetId())) {
+            sendError(ctx, sequenceId, BlockCommands.BLOCKED_CODE, BlockCommands.BLOCKED_KEY);
+            return true;
+        }
+        Optional<String> refusal = expansion.lot37().lot38().contactPrivacy().refusal(attempt);
+        refusal.ifPresent(key -> sendError(ctx, sequenceId, ContactPrivacyCommands.REFUSED_CODE, key));
+        return refusal.isPresent();
     }
 
     /** GUILD/PARTY chỉ gửi được nếu đang ở trong guild/party đó — tách khỏi

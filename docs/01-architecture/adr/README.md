@@ -266,6 +266,10 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-232](ADR-232-Bulk-Dismantle.md) | Phân giải hàng loạt: 562/563 gọi lại `DismantleFacade` từng món (loại khoá/mặc/khảm ngọc), tối đa 40; `/phangiai <cấp>` | ✅ Accepted (lô 38) |
 | [ADR-233](ADR-233-Enhance-History.md) | Lịch sử cường hoá: 564/565 đọc audit `ENHANCE_ITEM`, 20 dòng, không bảng mới; `/lichsucuonghoa` | ✅ Accepted (lô 38) |
 | [ADR-234](ADR-234-Market-Price-Hint.md) | Giá gợi ý phường thị: 1040/1041 giá một cái — rẻ nhất đang rao + trung bình đã bán 7 ngày; `/giacho` | ✅ Accepted (lô 38) |
+| [ADR-235](ADR-235-Guild-Mail.md) | Thư toàn bang: 766/767 bang chủ/phó gửi thư thường tới mọi thành viên khác, 3 đợt/bang/ngày đếm trên audit `GUILD_MAIL`; `/thubang` | ✅ Accepted (lô 38) |
+| [ADR-236](ADR-236-Do-Not-Disturb.md) | Không làm phiền: cột `do_not_disturb` (V167) chặn tin riêng/mời nhóm/giao dịch/kết bạn từ người không phải bạn (lỗi 403), 1153/1154; `/khonglamphien` | ✅ Accepted (lô 38) |
+| [ADR-237](ADR-237-Block-Stranger-Invites.md) | Chặn lời mời người lạ: cột `block_stranger_invites` (V167), chỉ bạn bè/cùng bang mời nhóm/giao dịch được; dùng chung 1153/1154; `/chanloimoi` | ✅ Accepted (lô 38) |
+| [ADR-238](ADR-238-Login-History.md) | Lịch sử đăng nhập: bảng `login_history` (V167) chỉ lưu IP đã che, giữ 50 dòng/tài khoản; 265/266 trả 10 dòng; `/lichsudangnhap` | ✅ Accepted (lô 38) |
 ---
 
 ## ADR cần tạo (chưa viết)

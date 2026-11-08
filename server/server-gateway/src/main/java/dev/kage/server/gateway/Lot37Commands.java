@@ -40,7 +40,8 @@ final class Lot37Commands {
     Lot37Commands(Deps deps) {
         this.deps = deps;
         this.sessions = SESSIONS_BY_REGISTRY.computeIfAbsent(deps.registry(), r -> new ConcurrentHashMap<>());
-        this.lot38 = Lot38Commands.of(deps.gateway()); // lô 38 lồng ở đây (trần MethodLength của ExpansionCommands.of)
+        this.lot38 = Lot38Commands.of(
+                deps.gateway(), deps.registry()); // lô 38 lồng ở đây (trần MethodLength của ExpansionCommands.of)
     }
 
     /** Lớp lệnh lô 38 (ADR-231…). */
