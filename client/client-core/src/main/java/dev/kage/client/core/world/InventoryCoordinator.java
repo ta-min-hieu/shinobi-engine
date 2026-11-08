@@ -186,11 +186,6 @@ final class InventoryCoordinator implements WindowFlow {
         return controller.selected();
     }
 
-    /** ADR-176 — id món đang chọn trong túi (rỗng nếu chưa chọn); lệnh {@code /dungnhieu} dùng món này. */
-    Optional<Long> selectedItemId() {
-        return controller.selected().map(InventoryController.Item::itemId);
-    }
-
     /** Xem {@link #onSellRequested} — {@code WorldScreen} nối lời gọi này sang cửa hàng. */
     void setOnSellRequested(LongConsumer listener) {
         this.onSellRequested = listener;
@@ -600,6 +595,16 @@ final class InventoryCoordinator implements WindowFlow {
                 .byId(item.itemTemplateId())
                 .map(ItemCatalogEntry::getCode)
                 .orElse("");
+    }
+
+    /** ADR-254 — mọi món trong túi kèm mô tả đang hiện (tìm bằng {@code /timdo}). */
+    List<BagSearchCoordinator.Described> describedItems() {
+        List<BagSearchCoordinator.Described> described = new ArrayList<>();
+        for (InventoryController.Item item : controller.items()) {
+            described.add(
+                    new BagSearchCoordinator.Described(item.slotIndex(), item.quantity(), itemText.describe(item)));
+        }
+        return described;
     }
 
     private String capacityText(int itemCount) {

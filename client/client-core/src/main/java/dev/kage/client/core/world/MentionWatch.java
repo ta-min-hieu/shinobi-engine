@@ -25,10 +25,15 @@ final class MentionWatch {
         return MARKS.matcher(Normalizer.normalize(lower, Normalizer.Form.NFD)).replaceAll("");
     }
 
+    /** {@code senderName} là chính mình (chứa tên mình — có thể kèm danh hiệu); chưa biết tên ⇒ {@code false}. */
+    boolean isSelf(String senderName) {
+        return !foldedName.isEmpty() && fold(senderName).contains(foldedName);
+    }
+
     /** Tin của {@code senderName} có nhắc tên mình không (tin hệ thống / của chính mình ⇒ không). */
     boolean mentions(String senderName, String body) {
         // Tên người gửi có thể mang danh hiệu đứng trước (ADR-062) — chứa tên mình là tin của chính mình.
-        if (foldedName.isEmpty() || senderName.isEmpty() || fold(senderName).contains(foldedName)) {
+        if (foldedName.isEmpty() || senderName.isEmpty() || isSelf(senderName)) {
             return false;
         }
         String folded = fold(body);

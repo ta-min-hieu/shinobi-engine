@@ -278,6 +278,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-244](ADR-244-Photo-Mode.md) | Chế độ chụp ảnh: F10 / `/chupanh` ẩn HUD + chat (thuần client) | ✅ Accepted (lô 39) |
 | [ADR-245](ADR-245-Mention-Highlight.md) | Tô sáng khi bị nhắc tên: khớp tên không dấu, dòng màu `MENTION` + một dòng báo (thuần client) | ✅ Accepted (lô 39) |
 | [ADR-246](ADR-246-Bag-Nearly-Full-Warning.md) | Cảnh báo sắp đầy túi: ≤ 2 ô trống nhắc một dòng + gợi ý `/tubanrac`, `/phangiai` (thuần client) | ✅ Accepted (lô 39) |
+| [ADR-247](ADR-247-Quick-Reply.md) | Trả lời nhanh tin riêng: `/r` gửi tin riêng tới người vừa nhắn mình (thuần client) | ✅ Accepted (lô 40) |
+| [ADR-248](ADR-248-Guild-Poll.md) | Bình chọn trong bang: V169 `guild_poll`/`guild_poll_vote`, bang chủ/phó mở 2–4 lựa chọn 24 giờ, đổi phiếu được; 770–775; `/binhchon` | ✅ Accepted (lô 40) |
+| [ADR-249](ADR-249-Chat-Keyword-Filter.md) | Lọc chat theo từ khoá: tối đa 20 từ, khớp không dấu, chỉ ẩn tin người chơi; `/locchu` (thuần client) | ✅ Accepted (lô 40) |
+| [ADR-250](ADR-250-Location-Bookmarks.md) | Đánh dấu vị trí yêu thích: 10 toạ độ X có tên, đi bằng đường tự đi ADR-206; `/luuvitri`, `/vitri` (thuần client) | ✅ Accepted (lô 40) |
+| [ADR-251](ADR-251-Party-Damage-Meter.md) | Bảng sát thương nhóm: cộng sát thương mình + nhóm từ gói đòn đánh, trận cách 30 giây; `/satthuong` (thuần client) | ✅ Accepted (lô 40) |
+| [ADR-252](ADR-252-Daily-Reminder.md) | Nhắc việc ngày: ≤ 1 giờ trước reset nhắc một lần người online còn nhiệm vụ ngày chưa lĩnh (không nhắc điểm danh — đã tự nhận) | ✅ Accepted (lô 40) |
+| [ADR-253](ADR-253-Loot-History.md) | Lịch sử nhặt đồ: 566/567 đọc audit `LOOT_GRANT`, 20 dòng; `/lichsunhat` | ✅ Accepted (lô 40) |
+| [ADR-254](ADR-254-Bag-Search.md) | Tìm trong túi đồ: `/timdo` khớp không dấu trên mô tả món trong túi (thuần client) | ✅ Accepted (lô 40) |
 ---
 
 ## ADR cần tạo (chưa viết)

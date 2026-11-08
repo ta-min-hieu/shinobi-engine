@@ -1,6 +1,8 @@
 package dev.kage.client.core.world;
 
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 import com.badlogic.gdx.Input;
 
@@ -155,20 +157,25 @@ record ExpansionWindows(
      */
     void useLocalInput(
             InventoryCoordinator inventory, LocalIntentSender intents, MailCoordinator mail, QuestCoordinator quests) {
-        lot31.bulkUse().useSelection(inventory::selectedItemId);
+        Supplier<Optional<Long>> selectedId = () -> inventory.selectedItem().map(InventoryController.Item::itemId);
+        lot31.bulkUse().useSelection(selectedId);
         lot31.lot32().itemLink().useSelection(inventory::selectedItem);
         Lot34Windows lot34 = lot31.lot32().lot33().lot34();
         intents.useAutoWalk(lot34.autoWalk().target());
         quests.useGoTo(lot34.autoWalk()::walkToNpc); // ADR-221 — nút "Đi tới" trong nhật ký nhiệm vụ
-        lot34.lot35().guildItemDonation().useSelection(inventory::selectedItemId); // ADR-207 /gopdo
+        lot34.lot35().guildItemDonation().useSelection(selectedId); // ADR-207 /gopdo
         lot34.lot35().partyMark().useTargeting(intents); // ADR-213 /danhdau, /theodau
         Lot36Windows lot36 = lot34.lot35().lot36();
-        lot36.stackSplit().useSelection(inventory::selectedItemId); // ADR-215 /tach
+        lot36.stackSplit().useSelection(selectedId); // ADR-215 /tach
         lot36.mailCleanup().useSelection(mail::selectedMailId); // ADR-217 /ghimthu
         lot36.lot37().combatLog().useLocalId(intents.localCharacterId()); // ADR-226 /nhatkychien
         lot36.lot37().nextQuest().useWalker(lot34.autoWalk()::walkToNpc); // ADR-228 /tieptheo di
-        lot36.lot37().lot38().destroy().useSelection(inventory::selectedItemId); // ADR-231 /huy
+        lot36.lot37().lot38().destroy().useSelection(selectedId); // ADR-231 /huy
         lot36.lot37().lot38().priceHint().useSelection(inventory::selectedItem); // ADR-234 /giacho
+        Lot40Windows lot40 = lot36.lot37().lot38().lot39().lot40();
+        lot40.bookmarks().useWalker(lot34.autoWalk().target()); // ADR-250 /vitri
+        lot40.damageMeter().useLocalId(intents.localCharacterId()); // ADR-251 /satthuong
+        lot40.bagSearch().useItems(inventory::describedItems); // ADR-254 /timdo
     }
 
     /** Nối HUD chiến đấu: mục tiêu cho thuần phục (ADR-124), máu cho cảnh báo máu thấp (ADR-243). */

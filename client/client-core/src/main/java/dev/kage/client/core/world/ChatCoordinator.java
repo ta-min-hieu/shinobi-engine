@@ -49,6 +49,8 @@ final class ChatCoordinator implements WindowFlow {
     /** Người gửi bị ẩn tin (danh sách chặn — ADR-091); chỉ là hiển thị, luật chặn ở server. */
     private LongPredicate hiddenSender = senderId -> false;
 
+    private Predicate<String> hiddenBody = body -> false; // ADR-249
+
     ChatCoordinator(ChatPanel panel, WorldCommandSender sender) {
         this.panel = panel;
         this.sender = sender;
@@ -113,6 +115,16 @@ final class ChatCoordinator implements WindowFlow {
         slashCommands.add(handler);
     }
 
+    /** ADR-249 — ẩn tin người chơi có nội dung khớp {@code filter} (lọc từ khoá). */
+    void hideBodiesMatching(Predicate<String> filter) {
+        this.hiddenBody = filter;
+    }
+
+    /** ADR-247 — {@code name} có phải nhân vật đang chơi không (kể cả có danh hiệu đứng trước). */
+    boolean isOwnName(String name) {
+        return mentions.isSelf(name);
+    }
+
     /** Ẩn tin của những người gửi khớp {@code filter} (ADR-091 — người mình đã chặn). */
     void hideSendersMatching(LongPredicate filter) {
         this.hiddenSender = filter;
@@ -137,7 +149,8 @@ final class ChatCoordinator implements WindowFlow {
     private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE) {
             ChatMessageEvent event = ChatMessageEvent.parseFrom(payload);
-            if (event.getSenderId() != 0L && hiddenSender.test(event.getSenderId())) {
+            if (event.getSenderId() != 0L
+                    && (hiddenSender.test(event.getSenderId()) || hiddenBody.test(event.getBody()))) { // ADR-091, 249
                 return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
             }
             controller.onMessage(withTitle(markLinked(markOffline(markAutoReply(event)))));
