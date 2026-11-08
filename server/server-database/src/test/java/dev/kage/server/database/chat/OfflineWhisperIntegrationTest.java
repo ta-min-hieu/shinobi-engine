@@ -70,19 +70,28 @@ final class OfflineWhisperIntegrationTest {
         long recipient = createFreshCharacter("OwRecipient");
         PostgresOfflineWhisperAdapter adapter = new PostgresOfflineWhisperAdapter(dataSource);
 
-        assertThat(adapter.store(sender, recipient, "cũ quá", NOW.minus(Duration.ofDays(8)), 3))
+        assertThat(adapter.store(
+                        new dev.kage.chat.domain.OfflineWhisperPort.Draft(
+                                sender, recipient, "cũ quá", NOW.minus(Duration.ofDays(8))),
+                        3))
                 .isTrue();
-        assertThat(adapter.store(sender, recipient, "một", NOW, 3)).isTrue();
-        assertThat(adapter.store(sender, recipient, "hai", NOW.plusSeconds(1), 3))
+        assertThat(adapter.store(new dev.kage.chat.domain.OfflineWhisperPort.Draft(sender, recipient, "một", NOW), 3))
                 .isTrue();
-        assertThat(adapter.store(sender, recipient, "ba", NOW.plusSeconds(2), 3))
+        assertThat(adapter.store(
+                        new dev.kage.chat.domain.OfflineWhisperPort.Draft(sender, recipient, "hai", NOW.plusSeconds(1)),
+                        3))
+                .isTrue();
+        assertThat(adapter.store(
+                        new dev.kage.chat.domain.OfflineWhisperPort.Draft(sender, recipient, "ba", NOW.plusSeconds(2)),
+                        3))
                 .isFalse(); // đầy (3 tin)
 
         List<OfflineWhisperPort.Pending> taken = adapter.takeAll(recipient, NOW.minus(Duration.ofDays(7)));
         assertThat(taken).extracting(OfflineWhisperPort.Pending::body).containsExactly("một", "hai");
         assertThat(taken.get(0).senderName()).isEqualTo("OwSender");
         assertThat(adapter.takeAll(recipient, NOW.minus(Duration.ofDays(7)))).isEmpty(); // đã xoá
-        assertThat(adapter.store(sender, recipient, "bốn", NOW, 3)).isTrue(); // hộp trống lại
+        assertThat(adapter.store(new dev.kage.chat.domain.OfflineWhisperPort.Draft(sender, recipient, "bốn", NOW), 3))
+                .isTrue(); // hộp trống lại
     }
 
     private static long createFreshCharacter(String name) {

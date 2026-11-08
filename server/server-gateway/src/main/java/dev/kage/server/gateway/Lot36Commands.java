@@ -13,13 +13,22 @@ import dev.kage.protocol.SplitStackOutcome;
 import dev.kage.protocol.SplitStackResponse;
 
 /** Lớp lệnh lô 36 (ADR-215…) gom thành MỘT thành phần của {@link ExpansionCommands}. */
-record Lot36Commands(Lot36Facades facades, InspectPrivacyFacade profiles, ConnectedCharacterRegistry registry) {
+record Lot36Commands(
+        Lot36Facades facades,
+        InspectPrivacyFacade profiles,
+        ConnectedCharacterRegistry registry,
+        GuildInviteCommands guildInvites) {
 
     static Lot36Commands of(GatewayFacades gateway, WorldGateway worldGateway) {
         return new Lot36Commands(
                 gateway.progression().expansion().lot34().lot35().lot36(),
                 gateway.progression().expansion().lot30().inspectPrivacy(),
-                worldGateway.registry());
+                worldGateway.registry(),
+                new GuildInviteCommands(new GuildInviteCommands.Deps(
+                        gateway.characterFacade(),
+                        gateway.contentFacades().socialFacades().guildFacade(),
+                        worldGateway.registry(),
+                        java.time.Clock.systemUTC())));
     }
 
     /** ADR-215 — Virtual Thread; tách {@code amount} cái khỏi một chồng sang ô mới. */

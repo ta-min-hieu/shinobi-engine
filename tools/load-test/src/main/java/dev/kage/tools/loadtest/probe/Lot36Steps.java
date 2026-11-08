@@ -6,8 +6,9 @@ import dev.kage.protocol.Opcode;
 
 /**
  * Bước lô 36: tách chồng (ADR-215) {@code split:<inventory item id>/<số>}; xoá thư đã xong (ADR-216) {@code cleanMail};
- * ghim thư (ADR-217) {@code pinMail:<mail id>/on|off}; dòng giới thiệu (ADR-218) {@code bio:<chữ>}. Nối sau {@link
- * Lot35Steps}.
+ * ghim thư (ADR-217) {@code pinMail:<mail id>/on|off}; dòng giới thiệu (ADR-218) {@code bio:<chữ>}; mời vào bang
+ * (ADR-219) {@code guildInvite:<tên>}, {@code guildRespond:yes|no}; kênh giao dịch (ADR-222) {@code tradeChat:<chữ>};
+ * NPC cần gặp của nhiệm vụ (ADR-221) {@code quests}. Nối sau {@link Lot35Steps}.
  */
 final class Lot36Steps {
 
@@ -23,6 +24,10 @@ final class Lot36Steps {
             case "cleanMail" -> cleanMail();
             case "pinMail" -> pinMail(arg);
             case "bio" -> bio(arg);
+            case "guildInvite" -> guildInvite(arg);
+            case "guildRespond" -> guildRespond("yes".equals(arg));
+            case "tradeChat" -> tradeChat(arg);
+            case "quests" -> quests();
             default -> "bước không hiểu";
         };
     }
@@ -74,6 +79,63 @@ final class Lot36Steps {
                 p -> {
                     dev.kage.protocol.SetBioResponse r = dev.kage.protocol.SetBioResponse.parseFrom(p);
                     return r.getOutcome().name() + " bio='" + r.getBio() + "'";
+                });
+    }
+
+    private String guildInvite(String name) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_INVITE_TO_GUILD_COMMAND_VALUE,
+                dev.kage.protocol.InviteToGuildCommand.newBuilder()
+                        .setTargetName(name)
+                        .build(),
+                Opcode.OPCODE_INVITE_TO_GUILD_RESPONSE_VALUE,
+                p -> dev.kage.protocol.InviteToGuildResponse.parseFrom(p)
+                        .getOutcome()
+                        .name());
+    }
+
+    private String guildRespond(boolean accept) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_RESPOND_GUILD_INVITE_COMMAND_VALUE,
+                dev.kage.protocol.RespondGuildInviteCommand.newBuilder()
+                        .setAccept(accept)
+                        .build(),
+                Opcode.OPCODE_RESPOND_GUILD_INVITE_RESPONSE_VALUE,
+                p -> {
+                    dev.kage.protocol.RespondGuildInviteResponse r =
+                            dev.kage.protocol.RespondGuildInviteResponse.parseFrom(p);
+                    return r.getOutcome().name() + " bang=" + r.getGuildName();
+                });
+    }
+
+    private String tradeChat(String body) throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_SEND_CHAT_MESSAGE_COMMAND_VALUE,
+                dev.kage.protocol.SendChatMessageCommand.newBuilder()
+                        .setChannel(dev.kage.protocol.ChatChannel.CHAT_CHANNEL_TRADE)
+                        .setBody(body)
+                        .build(),
+                Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE,
+                p -> {
+                    dev.kage.protocol.ChatMessageEvent e = dev.kage.protocol.ChatMessageEvent.parseFrom(p);
+                    return "kênh=" + e.getChannel().name() + " body=" + e.getBody();
+                });
+    }
+
+    private String quests() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_LIST_QUESTS_REQUEST_VALUE,
+                dev.kage.protocol.ListQuestsRequest.getDefaultInstance(),
+                Opcode.OPCODE_LIST_QUESTS_RESPONSE_VALUE,
+                p -> {
+                    StringBuilder out = new StringBuilder("nhiệmVụ=");
+                    dev.kage.protocol.ListQuestsResponse.parseFrom(p).getQuestsList().stream()
+                            .filter(q -> q.getStatus() == dev.kage.protocol.QuestStatus.QUEST_STATUS_IN_PROGRESS)
+                            .forEach(q -> out.append(' ')
+                                    .append(q.getQuestCode())
+                                    .append("->")
+                                    .append(q.getTargetNpcCode().isEmpty() ? "-" : q.getTargetNpcCode()));
+                    return out.toString();
                 });
     }
 }

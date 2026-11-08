@@ -21,7 +21,7 @@ public final class OfflineWhisperFacade {
     /** Composition không có hộp tin chờ (test): không giữ gì. */
     public static final OfflineWhisperFacade DISABLED = new OfflineWhisperFacade(new OfflineWhisperPort() {
         @Override
-        public boolean store(long senderId, long recipientId, String body, Instant at, int maxPending) {
+        public boolean store(Draft draft, int maxPending) {
             return false;
         }
 
@@ -40,7 +40,7 @@ public final class OfflineWhisperFacade {
 
     /** Giữ một tin (đã kiểm duyệt); {@code false} nếu hộp người nhận đầy. */
     public boolean store(long senderId, long recipientId, String body, Instant at) {
-        return port.store(senderId, recipientId, body, at, MAX_PENDING);
+        return port.store(new OfflineWhisperPort.Draft(senderId, recipientId, body, at), MAX_PENDING);
     }
 
     /** Lấy ra và xoá mọi tin chờ còn hạn của {@code recipientId}, cũ trước. */

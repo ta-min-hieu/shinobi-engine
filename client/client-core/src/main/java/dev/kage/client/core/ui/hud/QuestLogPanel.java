@@ -113,7 +113,14 @@ public final class QuestLogPanel implements HudWindow {
      * @param abandonable có bày nút Bỏ cho dòng này không (ADR-054 — chỉ nhiệm vụ đang làm). Một dòng
      *     không bao giờ vừa lĩnh được vừa bỏ được, nên hai nút dùng chung MỘT ô.
      */
-    public record QuestRow(String questCode, String displayText, boolean claimable, boolean abandonable) {}
+    public record QuestRow(
+            String questCode, String displayText, boolean claimable, boolean abandonable, String targetNpcCode) {
+
+        /** Dòng không có NPC cần gặp. */
+        public QuestRow(String questCode, String displayText, boolean claimable, boolean abandonable) {
+            this(questCode, displayText, claimable, abandonable, "");
+        }
+    }
 
     private final Stage stage;
     private final KageSkin skin;
@@ -124,6 +131,10 @@ public final class QuestLogPanel implements HudWindow {
 
     private Consumer<String> onClaim;
     private Consumer<String> onAbandon;
+
+    /** ADR-221 — mã NPC của dòng người chơi vừa bấm "Đi tới". */
+    private Consumer<String> onGoTo = npcCode -> {};
+
     private Runnable onOpened;
 
     /**
@@ -292,6 +303,11 @@ public final class QuestLogPanel implements HudWindow {
         this.canOpen = condition;
     }
 
+    /** ADR-221 — mã NPC cần gặp của dòng người chơi vừa bấm "Đi tới". */
+    public void setOnGoTo(Consumer<String> listener) {
+        this.onGoTo = listener;
+    }
+
     /** Mã nhiệm vụ người chơi vừa XÁC NHẬN bỏ (bấm Bỏ hai lần, ADR-054). */
     public void setOnAbandon(Consumer<String> listener) {
         this.onAbandon = listener;
@@ -347,12 +363,15 @@ public final class QuestLogPanel implements HudWindow {
                     .padBottom(ROW_PAD_PX);
         } else if (row.abandonable()) {
             boolean armed = row.questCode().equals(armedAbandonQuestCode);
-            questList
-                    .add(actionButton(
-                            armed ? "questlog.action.abandon_confirm" : "questlog.action.abandon",
-                            () -> onAbandonClicked(row.questCode())))
-                    .minWidth(ROW_BUTTON_MIN_WIDTH_PX)
-                    .padBottom(ROW_PAD_PX);
+            Table actions = new Table();
+            if (!row.targetNpcCode().isEmpty()) { // ADR-221 — đi tới NPC cần gặp
+                actions.add(actionButton("questlog.action.go_to", () -> onGoTo.accept(row.targetNpcCode())))
+                        .padRight(4f);
+            }
+            actions.add(actionButton(
+                    armed ? "questlog.action.abandon_confirm" : "questlog.action.abandon",
+                    () -> onAbandonClicked(row.questCode())));
+            questList.add(actions).minWidth(ROW_BUTTON_MIN_WIDTH_PX).padBottom(ROW_PAD_PX);
         } else {
             questList.add().minWidth(ROW_BUTTON_MIN_WIDTH_PX).padBottom(ROW_PAD_PX);
         }

@@ -1142,6 +1142,19 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.SetBioCommand.parser(),
                             Opcode.OPCODE_SET_BIO_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot36().setBio(id, c))),
+            // Lô 36 — mời thẳng vào bang (ADR-219).
+            Map.entry(
+                    Opcode.OPCODE_INVITE_TO_GUILD_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.InviteToGuildCommand.parser(),
+                            Opcode.OPCODE_INVITE_TO_GUILD_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot36().guildInvites().invite(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_RESPOND_GUILD_INVITE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.RespondGuildInviteCommand.parser(),
+                            Opcode.OPCODE_RESPOND_GUILD_INVITE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion.lot36().guildInvites().respond(id, c))),
             // Lô 35 — góp vật phẩm cho bang (ADR-207).
             Map.entry(
                     Opcode.OPCODE_DONATE_ITEM_TO_GUILD_COMMAND_VALUE,
@@ -3453,6 +3466,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             response.addQuests(dev.kage.protocol.QuestLogEntry.newBuilder()
                     .setQuestCode(entry.questCode())
                     .setStatus(toProtoQuestStatus(entry.status()))
+                    .setTargetNpcCode( // ADR-221
+                            entry.status() == dev.kage.quest.domain.QuestStatus.IN_PROGRESS
+                                    ? QuestNpcTargets.of(entry.questCode())
+                                    : "")
                     .build());
         }
         send(
@@ -6143,19 +6160,26 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return linked;
     }
 
+    /** Kênh phát toàn server: Thế giới (kèm chấm hỏi đáp, ADR-122) và Giao dịch (ADR-222). */
+    private void broadcastServerWide(dev.kage.chat.domain.ChatChannel domainChannel, ChatRouteContext ctx) {
+        boolean world = domainChannel == dev.kage.chat.domain.ChatChannel.WORLD;
+        worldGateway
+                .registry()
+                .broadcastToAll(
+                        Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE,
+                        chatEvent(world ? ChatChannel.CHAT_CHANNEL_WORLD : ChatChannel.CHAT_CHANNEL_TRADE, ctx)
+                                .toByteArray());
+        if (world) {
+            // ADR-122 — chấm SAU khi tin đã phát: câu trả lời đúng vẫn hiện trên kênh như mọi tin khác.
+            worldGateway.registry().quiz.onWorldChat(ctx.characterId(), ctx.senderName(), ctx.body());
+        }
+    }
+
     /** Định tuyến người nhận SAU KHI {@code ChatFacade.sendMessage} đã trả OK — tách khỏi
      * {@code handleSendChatMessageBlocking} để giữ method đó dưới giới hạn Checkstyle MethodLength. */
     private void routeChatMessage(dev.kage.chat.domain.ChatChannel domainChannel, ChatRouteContext ctx) {
         switch (domainChannel) {
-            case WORLD -> {
-                worldGateway
-                        .registry()
-                        .broadcastToAll(
-                                Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE,
-                                chatEvent(ChatChannel.CHAT_CHANNEL_WORLD, ctx).toByteArray());
-                // ADR-122 — chấm SAU khi tin đã phát: câu trả lời đúng vẫn hiện trên kênh như mọi tin khác.
-                worldGateway.registry().quiz.onWorldChat(ctx.characterId(), ctx.senderName(), ctx.body());
-            }
+            case WORLD, TRADE -> broadcastServerWide(domainChannel, ctx); // ADR-222 — giao dịch cũng toàn server
             case PRIVATE -> {
                 worldGateway
                         .registry()
@@ -6257,6 +6281,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             case CHAT_CHANNEL_GUILD -> Optional.of(dev.kage.chat.domain.ChatChannel.GUILD);
             case CHAT_CHANNEL_PARTY -> Optional.of(dev.kage.chat.domain.ChatChannel.PARTY);
             case CHAT_CHANNEL_SWORN -> Optional.of(dev.kage.chat.domain.ChatChannel.SWORN);
+            case CHAT_CHANNEL_TRADE -> Optional.of(dev.kage.chat.domain.ChatChannel.TRADE); // ADR-222
             default -> Optional.empty();
         };
     }

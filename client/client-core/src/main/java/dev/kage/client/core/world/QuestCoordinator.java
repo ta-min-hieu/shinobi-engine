@@ -57,6 +57,10 @@ final class QuestCoordinator implements WindowFlow {
     private final QuestTracker tracker = new QuestTracker();
     private final CombatHud hud;
     private final QuestLogPanel panel;
+
+    /** ADR-221 — tự đi tới một NPC theo mã (tự tìm đường ADR-206); mặc định không làm gì tới khi được nối. */
+    private java.util.function.Consumer<String> goTo = npcCode -> {};
+
     private final WorldCommandSender sender;
     private final CombatFeedbackPresenter feedback;
     private final I18NBundle i18n = KageI18n.load();
@@ -87,7 +91,13 @@ final class QuestCoordinator implements WindowFlow {
         panel.setOnRefresh(this::onLogOpened);
         panel.setOnClaim(this::claimFromLog);
         panel.setOnAbandon(sender::abandonQuest);
+        panel.setOnGoTo(npcCode -> goTo.accept(npcCode)); // ADR-221 — nối thật ở useGoTo
         panel.setStatus(text("questlog.hint.open"));
+    }
+
+    /** ADR-221 — nối nút "Đi tới" vào tự tìm đường (một lần, lúc dựng màn hình). */
+    void useGoTo(java.util.function.Consumer<String> walker) {
+        this.goTo = walker;
     }
 
     /**
@@ -350,7 +360,8 @@ final class QuestCoordinator implements WindowFlow {
                     entry.questCode(),
                     rowText(entry),
                     rowClaimable(entry),
-                    entry.status() == QuestStatus.QUEST_STATUS_IN_PROGRESS));
+                    entry.status() == QuestStatus.QUEST_STATUS_IN_PROGRESS,
+                    entry.targetNpcCode()));
         }
         panel.setQuests(questRows, listNotice(all.size(), all.size() - shown));
     }

@@ -664,3 +664,48 @@ message GuildWarHistoryEntry {
 message GetGuildWarHistoryResponse {
   repeated GuildWarHistoryEntry entries = 1;
 }
+
+// ADR-219 (2026-11-08) — mời thẳng vào bang. Command: Client -> Server (OPCODE_INVITE_TO_GUILD_COMMAND).
+// Chỉ bang chủ / phó bang chủ; người được mời phải đang online. Lời mời sống 5 phút trong RAM server.
+message InviteToGuildCommand {
+  string target_name = 1;
+}
+
+enum InviteToGuildOutcome {
+  INVITE_TO_GUILD_OUTCOME_UNSPECIFIED = 0;
+  INVITE_TO_GUILD_OUTCOME_OK = 1;
+  INVITE_TO_GUILD_OUTCOME_NOT_AUTHORIZED = 2;   // không ở bang, hoặc không phải bang chủ / phó
+  INVITE_TO_GUILD_OUTCOME_TARGET_NOT_FOUND = 3; // không có tên đó, hoặc đang offline
+  INVITE_TO_GUILD_OUTCOME_TARGET_IN_GUILD = 4;  // đã ở một bang (hoặc tự mời mình)
+}
+
+// Response: Server -> Client (OPCODE_INVITE_TO_GUILD_RESPONSE).
+message InviteToGuildResponse {
+  InviteToGuildOutcome outcome = 1;
+}
+
+// Event: Server -> Client (OPCODE_GUILD_INVITE_EVENT) — tới người được mời.
+message GuildInviteEvent {
+  string guild_name = 1;
+  string inviter_name = 2;
+}
+
+// Command: Client -> Server (OPCODE_RESPOND_GUILD_INVITE_COMMAND) — trả lời lời mời đang treo của chính mình.
+message RespondGuildInviteCommand {
+  bool accept = 1;
+}
+
+enum RespondGuildInviteOutcome {
+  RESPOND_GUILD_INVITE_OUTCOME_UNSPECIFIED = 0;
+  RESPOND_GUILD_INVITE_OUTCOME_JOINED = 1;
+  RESPOND_GUILD_INVITE_OUTCOME_DECLINED = 2;
+  RESPOND_GUILD_INVITE_OUTCOME_NO_INVITE = 3;        // không có / hết hạn / người mời mất quyền
+  RESPOND_GUILD_INVITE_OUTCOME_GUILD_FULL = 4;
+  RESPOND_GUILD_INVITE_OUTCOME_ALREADY_IN_GUILD = 5;
+}
+
+// Response: Server -> Client (OPCODE_RESPOND_GUILD_INVITE_RESPONSE).
+message RespondGuildInviteResponse {
+  RespondGuildInviteOutcome outcome = 1;
+  string guild_name = 2;
+}

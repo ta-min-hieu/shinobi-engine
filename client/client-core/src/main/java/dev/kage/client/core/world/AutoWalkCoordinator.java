@@ -47,6 +47,13 @@ final class AutoWalkCoordinator implements WindowFlow {
         return target;
     }
 
+    /** ADR-221 — tự đi tới NPC có mã {@code npcCode} (nút "Đi tới" trong nhật ký nhiệm vụ). */
+    void walkToNpc(String npcCode) {
+        pendingQuery = npcCode;
+        sender.sendReadRequest(
+                Opcode.OPCODE_LIST_NPC_LOCATIONS_REQUEST_VALUE, ListNpcLocationsRequest.getDefaultInstance());
+    }
+
     private boolean onSlash(String line) {
         String[] words = line.strip().split("\\s+", 2);
         String command = words[0].toLowerCase(Locale.ROOT);

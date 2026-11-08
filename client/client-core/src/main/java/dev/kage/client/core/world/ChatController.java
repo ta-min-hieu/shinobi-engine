@@ -52,6 +52,14 @@ final class ChatController {
     /** Tiền tố tin nhắn riêng: {@code /w <tên> <nội dung>}. */
     private static final String PRIVATE_PREFIX = "/w ";
 
+    /** ADR-222 — tiền tố một tin lên kênh giao dịch: {@code /gd <nội dung>} (hoặc {@code /trade}). */
+    private static final String TRADE_PREFIX_VI = "/gd ";
+
+    private static final String TRADE_PREFIX_EN = "/trade ";
+
+    /** ADR-222/229 — kênh người chơi đã tắt hiển thị (tin tới vẫn nhận, chỉ không thêm vào khung chat). */
+    private final java.util.Set<ChatChannel> hiddenChannels = java.util.EnumSet.noneOf(ChatChannel.class);
+
     /**
      * Kênh mặc định lúc vào game. Gửi một tin riêng bằng {@code /w} KHÔNG đổi giá trị này — nhắn
      * riêng một câu rồi bị kẹt ở kênh riêng là cách quen thuộc nhất để lỡ tay nói to chuyện riêng
@@ -113,6 +121,14 @@ final class ChatController {
         if (trimmed.startsWith(PRIVATE_PREFIX)) {
             return composePrivate(trimmed.substring(PRIVATE_PREFIX.length()).strip());
         }
+        for (String prefix : new String[] {TRADE_PREFIX_VI, TRADE_PREFIX_EN}) {
+            if (trimmed.toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) {
+                return validated(
+                        ChatChannel.CHAT_CHANNEL_TRADE,
+                        "",
+                        trimmed.substring(prefix.length()).strip());
+            }
+        }
         return validated(channel, "", trimmed);
     }
 
@@ -154,7 +170,7 @@ final class ChatController {
     }
 
     /**
-     * Đổi kênh gửi mặc định: Thế giới → Khu vực → (Nhóm nếu đang ở trong nhóm) → Thế giới.
+     * Đổi kênh gửi mặc định: Thế giới → Giao dịch (ADR-222) → Khu vực → (Nhóm nếu đang ở trong nhóm) → Thế giới.
      *
      * <p>Bang hội vẫn KHÔNG có trong vòng xoay: client chưa nối một opcode nào của Guild (700-799)
      * nên không vào bang được để mà nhắn. Kênh riêng đi qua {@code /w} ({@link #compose}) vì nó cần
@@ -162,7 +178,8 @@ final class ChatController {
      */
     void toggleChannel() {
         channel = switch (channel) {
-            case CHAT_CHANNEL_WORLD -> ChatChannel.CHAT_CHANNEL_AREA;
+            case CHAT_CHANNEL_WORLD -> ChatChannel.CHAT_CHANNEL_TRADE; // ADR-222
+            case CHAT_CHANNEL_TRADE -> ChatChannel.CHAT_CHANNEL_AREA;
             case CHAT_CHANNEL_AREA -> partyAvailable ? ChatChannel.CHAT_CHANNEL_PARTY : DEFAULT_CHANNEL;
             default -> DEFAULT_CHANNEL;
         };
@@ -174,7 +191,23 @@ final class ChatController {
 
     /** Tin nhắn từ server — của người khác, hoặc của chính mình dội lại (chat.proto). */
     void onMessage(ChatMessageEvent event) {
+        if (hiddenChannels.contains(event.getChannel())) {
+            return; // ADR-222/229 — kênh đã tắt hiển thị
+        }
         append(new Line(event.getChannel(), sanitize(event.getSenderName()), sanitize(event.getBody())));
+    }
+
+    /** ADR-222/229 — bật / tắt hiển thị một kênh (dòng hệ thống không bao giờ bị ẩn). */
+    void setChannelVisible(ChatChannel channel, boolean visible) {
+        if (visible) {
+            hiddenChannels.remove(channel);
+        } else {
+            hiddenChannels.add(channel);
+        }
+    }
+
+    boolean isChannelVisible(ChatChannel channel) {
+        return !hiddenChannels.contains(channel);
     }
 
     /**

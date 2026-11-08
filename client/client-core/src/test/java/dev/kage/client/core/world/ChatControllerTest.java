@@ -49,9 +49,12 @@ class ChatControllerTest {
     }
 
     @Test
-    @DisplayName("Chưa vào nhóm: xoay vòng Thế giới ↔ Khu vực, không có kênh Nhóm")
+    @DisplayName("Chưa vào nhóm: xoay vòng Thế giới → Giao dịch → Khu vực, không có kênh Nhóm")
     void togglesBetweenWorldAndAreaWhenPartyless() {
         assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_WORLD);
+
+        controller.toggleChannel();
+        assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_TRADE); // ADR-222
 
         controller.toggleChannel();
         assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_AREA);
@@ -65,6 +68,9 @@ class ChatControllerTest {
     @DisplayName("Đang trong nhóm: kênh Nhóm chen vào giữa Khu vực và Thế giới")
     void includesPartyChannelWhenInParty() {
         controller.setPartyAvailable(true);
+
+        controller.toggleChannel();
+        assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_TRADE); // ADR-222
 
         controller.toggleChannel();
         assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_AREA);
@@ -82,6 +88,7 @@ class ChatControllerTest {
         controller.setPartyAvailable(true);
         controller.toggleChannel();
         controller.toggleChannel();
+        controller.toggleChannel();
         assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_PARTY);
 
         // Không rơi về thì câu tiếp theo gõ vào sẽ bay đi rồi bật lại lỗi, trong khi người chơi
@@ -96,6 +103,7 @@ class ChatControllerTest {
     void keepsAreaChannelWhenLeavingParty() {
         controller.setPartyAvailable(true);
         controller.toggleChannel();
+        controller.toggleChannel();
         assertThat(controller.channel()).isEqualTo(ChatChannel.CHAT_CHANNEL_AREA);
 
         controller.setPartyAvailable(false);
@@ -106,6 +114,7 @@ class ChatControllerTest {
     @Test
     @DisplayName("Kênh đang chọn quyết định kênh gửi")
     void composesOnAreaAfterToggle() {
+        controller.toggleChannel(); // Thế giới → Giao dịch (ADR-222)
         controller.toggleChannel();
 
         ChatController.ComposeResult result = controller.compose("ai ở gần đây không");

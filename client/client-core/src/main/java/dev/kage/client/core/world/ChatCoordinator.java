@@ -88,6 +88,16 @@ final class ChatCoordinator implements WindowFlow {
         refreshLines();
     }
 
+    /** ADR-222/229 — bật / tắt hiển thị một kênh chat. */
+    void setChannelVisible(ChatChannel channel, boolean visible) {
+        controller.setChannelVisible(channel, visible);
+    }
+
+    /** ADR-222/229 — kênh có đang hiện không. */
+    boolean isChannelVisible(ChatChannel channel) {
+        return controller.isChannelVisible(channel);
+    }
+
     /**
      * Thêm một bộ lệnh gạch chéo phía client — dòng gõ vào bắt đầu bằng {@code /} được hỏi qua từng bộ trước khi đi
      * đường chat thường ({@code /w}, {@code /gm} vẫn tới server vì không bộ nào nhận).
@@ -274,6 +284,7 @@ final class ChatCoordinator implements WindowFlow {
      * "Hệ thống" để không vỡ bố cục.
      */
     private static final Map<ChatChannel, String> CHANNEL_NAME_KEYS = Map.of(
+            ChatChannel.CHAT_CHANNEL_TRADE, "chat.channel.trade", // ADR-222
             ChatChannel.CHAT_CHANNEL_WORLD, "chat.channel.world",
             ChatChannel.CHAT_CHANNEL_AREA, "chat.channel.area",
             ChatChannel.CHAT_CHANNEL_PRIVATE, "chat.channel.private",
@@ -284,6 +295,7 @@ final class ChatCoordinator implements WindowFlow {
 
     /** Màu dòng theo kênh — cùng lý do bảng tra; ngoài bảng là dòng hệ thống. */
     private static final Map<ChatChannel, ChatPanel.LineKind> LINE_KINDS = Map.of(
+            ChatChannel.CHAT_CHANNEL_TRADE, ChatPanel.LineKind.WORLD, // ADR-222
             ChatChannel.CHAT_CHANNEL_AREA, ChatPanel.LineKind.AREA,
             ChatChannel.CHAT_CHANNEL_PRIVATE, ChatPanel.LineKind.PRIVATE,
             ChatChannel.CHAT_CHANNEL_WORLD, ChatPanel.LineKind.WORLD,

@@ -53,7 +53,13 @@ import dev.kage.protocol.QuestStatus;
 final class QuestTracker {
 
     /** Một dòng nhật ký — bản sao BẤT BIẾN trả ra ngoài, xem {@link #questLog()}. */
-    record LoggedQuest(String questCode, QuestStatus status) {}
+    record LoggedQuest(String questCode, QuestStatus status, String targetNpcCode) {
+
+        /** Dòng không có NPC cần gặp. */
+        LoggedQuest(String questCode, QuestStatus status) {
+            this(questCode, status, "");
+        }
+    }
 
     private String questCode = "";
     private QuestStatus status = QuestStatus.QUEST_STATUS_UNSPECIFIED;
@@ -64,6 +70,9 @@ final class QuestTracker {
      * định giữa hai lần vẽ vẫn tốt hơn xáo trộn ngẫu nhiên theo hash.
      */
     private final Map<String, QuestStatus> log = new LinkedHashMap<>();
+
+    /** ADR-221 — NPC cần gặp của nhiệm vụ đang làm, theo bản danh sách gần nhất server gửi. */
+    private final Map<String, String> npcTargets = new java.util.HashMap<>();
 
     /**
      * Mã nhiệm vụ của lệnh nhận thưởng ĐANG CHỜ server trả lời — rỗng nếu không có lệnh nào đang
@@ -134,8 +143,12 @@ final class QuestTracker {
      */
     void onQuestsListed(ListQuestsResponse response) {
         log.clear();
+        npcTargets.clear();
         for (QuestLogEntry entry : response.getQuestsList()) {
             log.put(entry.getQuestCode(), entry.getStatus());
+            if (!entry.getTargetNpcCode().isEmpty()) {
+                npcTargets.put(entry.getQuestCode(), entry.getTargetNpcCode());
+            }
         }
         // Đồng bộ lại ô "đang theo dõi" của HUD góc màn hình theo bản mới nhất, NẾU nó còn nhắc tới
         // đúng mã đó — tránh góc màn hình đứng yên với trạng thái CŨ trong khi nhật ký đầy đủ vừa có
@@ -248,7 +261,10 @@ final class QuestTracker {
     List<LoggedQuest> questLog() {
         List<LoggedQuest> result = new ArrayList<>(log.size());
         for (Map.Entry<String, QuestStatus> entry : log.entrySet()) {
-            result.add(new LoggedQuest(entry.getKey(), entry.getValue()));
+            String target = entry.getValue() == QuestStatus.QUEST_STATUS_IN_PROGRESS
+                    ? npcTargets.getOrDefault(entry.getKey(), "")
+                    : "";
+            result.add(new LoggedQuest(entry.getKey(), entry.getValue(), target));
         }
         return List.copyOf(result);
     }

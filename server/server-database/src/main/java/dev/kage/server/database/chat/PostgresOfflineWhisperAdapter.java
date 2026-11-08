@@ -39,16 +39,11 @@ public final class PostgresOfflineWhisperAdapter implements OfflineWhisperPort {
     // PMD ExcessiveParameterList: chữ ký do OfflineWhisperPort (feature-chat) quy định — adapter chỉ hiện thực nó.
     @SuppressWarnings("PMD.ExcessiveParameterList")
     @Override
-    public boolean store(long senderId, long recipientId, String body, Instant at, int maxPending) {
-        return JdbcTransactionRunner.call(
-                dataSource,
-                connection -> storeIn(connection, new Message(senderId, recipientId, body, at), maxPending));
+    public boolean store(Draft draft, int maxPending) {
+        return JdbcTransactionRunner.call(dataSource, connection -> storeIn(connection, draft, maxPending));
     }
 
-    /** Một tin cần giữ. */
-    private record Message(long senderId, long recipientId, String body, Instant at) {}
-
-    private static boolean storeIn(Connection connection, Message message, int maxPending) {
+    private static boolean storeIn(Connection connection, Draft message, int maxPending) {
         JdbcOperations.queryOne(connection, LOCK_RECIPIENT, rs -> rs.getLong(1), message.recipientId());
         int pending = JdbcOperations.queryOne(connection, COUNT, rs -> rs.getInt(1), message.recipientId())
                 .orElse(0);

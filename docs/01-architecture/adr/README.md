@@ -250,6 +250,10 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-216](ADR-216-Delete-Finished-Mail.md) | Xoá hàng loạt thư đã nhận / không đính kèm, trừ thư ghim, 915/916; `/xoathu` | ✅ Accepted (lô 36) |
 | [ADR-217](ADR-217-Pin-Mail.md) | Ghim thư: `mail.pinned` (V164), lên đầu hộp thư, không bị xoá hàng loạt, `MailView.pinned`, 917/918; `/ghimthu` | ✅ Accepted (lô 36) |
 | [ADR-218](ADR-218-Character-Bio.md) | Hồ sơ cá nhân: `character.bio` 60 ký tự (V164), lọc từ cấm, hiện khi soi trang bị, 259/260; `/gioithieu` | ✅ Accepted (lô 36) |
+| [ADR-219](ADR-219-Guild-Direct-Invite.md) | Mời thẳng vào bang: bang chủ / phó mời người online, lời mời RAM 5 phút, đồng ý đi đường xin vào + duyệt sẵn có, 761–765; `/moibang`, `/vaobang` | ✅ Accepted (lô 36) |
+| [ADR-220](ADR-220-Party-Mark-Overhead.md) | Ký hiệu "[ MỤC TIÊU NHÓM ]" trên đầu quái được đánh dấu (client, `RealmTitles.drawMarker`), vẽ cả khi tắt danh hiệu | ✅ Accepted (lô 36) |
+| [ADR-221](ADR-221-Quest-Go-To-Button.md) | Nút "Đi tới" trong nhật ký nhiệm vụ: NPC cần gặp đọc từ script quest, `QuestLogEntry.target_npc_code = 3`, dùng tự tìm đường | ✅ Accepted (lô 36) |
+| [ADR-222](ADR-222-Trade-Chat-Channel.md) | Kênh chat giao dịch `CHAT_CHANNEL_TRADE = 8` toàn server, ẩn / hiện ở client; `/gd`, `/kenhgd` | ✅ Accepted (lô 36) |
 ---
 
 ## ADR cần tạo (chưa viết)

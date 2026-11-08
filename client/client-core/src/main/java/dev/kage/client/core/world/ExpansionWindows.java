@@ -153,16 +153,31 @@ record ExpansionWindows(
      * Lệnh chat dùng MÓN ĐANG CHỌN trong túi: dùng nhiều (ADR-176), khoe vật phẩm (ADR-188), góp vật phẩm cho bang
      * (ADR-207); và tự tìm đường (ADR-206) lái nhân vật qua {@link LocalIntentSender}.
      */
-    void useLocalInput(InventoryCoordinator inventory, LocalIntentSender intents, MailCoordinator mail) {
+    void useLocalInput(
+            InventoryCoordinator inventory, LocalIntentSender intents, MailCoordinator mail, QuestCoordinator quests) {
         lot31.bulkUse().useSelection(inventory::selectedItemId);
         lot31.lot32().itemLink().useSelection(inventory::selectedItem);
         Lot34Windows lot34 = lot31.lot32().lot33().lot34();
         intents.useAutoWalk(lot34.autoWalk().target());
+        quests.useGoTo(lot34.autoWalk()::walkToNpc); // ADR-221 — nút "Đi tới" trong nhật ký nhiệm vụ
         lot34.lot35().guildItemDonation().useSelection(inventory::selectedItemId); // ADR-207 /gopdo
         lot34.lot35().partyMark().useTargeting(intents); // ADR-213 /danhdau, /theodau
         Lot36Windows lot36 = lot34.lot35().lot36();
         lot36.stackSplit().useSelection(inventory::selectedItemId); // ADR-215 /tach
         lot36.mailCleanup().useSelection(mail::selectedMailId); // ADR-217 /ghimthu
+    }
+
+    /**
+     * ADR-220 — vẽ ký hiệu "mục tiêu nhóm" trên đầu con quái trưởng nhóm đánh dấu (ADR-213), giữa {@code begin}/{@code
+     * end} của {@link RealmTitles}. Không cấp phát mỗi khung: khoá tra đã đóng hộp sẵn lúc nhận event.
+     */
+    void drawPartyMark(RealmTitles titles, CombatHudController combat) {
+        lot31.lot32().lot33().lot34().lot35().partyMark().markedKey().ifPresent(key -> {
+            CombatHudController.MonsterState monster = combat.monsters().get(key);
+            if (monster != null) {
+                titles.drawMarker(monster.x(), monster.y());
+            }
+        });
     }
 
     /** Cổng phím chung ({@code PanelHub#noneOpen}). */

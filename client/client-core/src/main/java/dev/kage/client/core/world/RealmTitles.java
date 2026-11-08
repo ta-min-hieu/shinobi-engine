@@ -45,6 +45,12 @@ final class RealmTitles implements Disposable {
     /** ADR-142 — nhãn Ma Đầu: đỏ son, một dòng phía trên danh hiệu. */
     private static final Color OUTLAW = Color.valueOf("FF5A4AFF");
 
+    /** ADR-220 — ký hiệu mục tiêu nhóm: cam sáng, cao hơn đầu quái một chút. */
+    private static final Color PARTY_MARK = Color.valueOf("FFB347FF");
+
+    /** ADR-220 — độ cao neo ký hiệu mục tiêu nhóm (quái thấp hơn người, nhưng cần nổi trên thanh máu). */
+    private static final float MARK_HEIGHT_UNITS = 1.8f;
+
     /** Khoảng cách dòng Ma Đầu phía trên danh hiệu, theo pixel màn hình. */
     private static final float OUTLAW_LINE_OFFSET_PX = 16f;
 
@@ -71,13 +77,14 @@ final class RealmTitles implements Disposable {
 
     void begin(WorldToScreen activeProjector) {
         active = enabled.getAsBoolean();
-        if (!active) {
-            return;
-        }
+        // Ma trận + phép chiếu dựng cả khi tắt danh hiệu: ký hiệu mục tiêu nhóm (ADR-220) vẫn vẽ qua drawMarker.
         this.projector = activeProjector;
         screenProjection.setToOrtho2D(0f, 0f, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         Gdx.gl.glDisable(GL20.GL_DEPTH_TEST);
         batch.setProjectionMatrix(screenProjection);
+        if (!active) {
+            return;
+        }
         previousScaleX = font.getData().scaleX;
         previousScaleY = font.getData().scaleY;
         font.getData().setScale(previousScaleX * SCALE, previousScaleY * SCALE);
@@ -99,6 +106,26 @@ final class RealmTitles implements Disposable {
         line(i18n.get(CultivationRealm.of(level).nameKey()), scratch.y, TITLE);
         if (outlaw) {
             line(i18n.get("realm.outlaw"), scratch.y + OUTLAW_LINE_OFFSET_PX, OUTLAW);
+        }
+    }
+
+    /**
+     * ADR-220 — ký hiệu "mục tiêu nhóm" trên đầu con quái tại ({@code x}, {@code y}). Vẽ cả khi tắt danh hiệu trên đầu
+     * (ADR-143): đây là thông tin chiến đấu, không phải trang trí — nên tự bật batch nếu {@link #begin} đã bỏ qua.
+     */
+    void drawMarker(float x, float y) {
+        if (projector == null) {
+            return;
+        }
+        boolean opened = !active;
+        if (opened) {
+            batch.begin();
+        }
+        scratch.set(x, y, MARK_HEIGHT_UNITS);
+        projector.project(scratch);
+        line(i18n.get("party_mark.overhead"), scratch.y, PARTY_MARK);
+        if (opened) {
+            batch.end();
         }
     }
 

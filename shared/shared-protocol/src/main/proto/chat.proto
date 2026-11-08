@@ -19,6 +19,7 @@ enum ChatChannel {
   CHAT_CHANNEL_PARTY = 5;
   CHAT_CHANNEL_SWORN = 6;   // ADR-110 (2026-10-25) — huynh đệ kết nghĩa
   CHAT_CHANNEL_BROADCAST = 7; // ADR-152 (2026-11-02) — loa thế giới (Truyền Âm Phù); CHỈ server phát, lệnh chat thường gửi kênh này bị từ chối
+  CHAT_CHANNEL_TRADE = 8;   // ADR-222 (2026-11-08) — kênh giao dịch: phát toàn server như Thế giới, tách riêng cho mua bán
 }
 
 // Command: Client -> Server (OPCODE_SEND_CHAT_MESSAGE_COMMAND). target_name CHỈ có ý nghĩa khi

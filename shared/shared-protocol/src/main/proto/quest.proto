@@ -120,6 +120,9 @@ message ListQuestsRequest {
 message QuestLogEntry {
   string quest_code = 1;
   QuestStatus status = 2;
+  // ADR-221 (2026-11-08, chỉ thêm) — NPC cần gặp của nhiệm vụ đang làm (từ script quest); "" nếu không có hoặc
+  // nhiệm vụ không còn đang làm. Client dùng cho nút "Đi tới" (tự tìm đường ADR-206).
+  string target_npc_code = 3;
 }
 
 // Response: Server -> Client (OPCODE_LIST_QUESTS_RESPONSE = 611). Gồm cả quest đã CLAIMED để client

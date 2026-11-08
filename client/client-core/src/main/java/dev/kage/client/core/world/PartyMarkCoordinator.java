@@ -32,6 +32,9 @@ final class PartyMarkCoordinator implements WindowFlow {
     private LocalIntentSender targeting;
     private long markedTargetId;
 
+    /** ADR-220 — {@link #markedTargetId} đã đóng hộp MỘT lần lúc nhận event, để vẽ mỗi khung không cấp phát. */
+    private java.util.Optional<Long> markedKey = java.util.Optional.empty();
+
     PartyMarkCoordinator(WorldCommandSender sender, ChatCoordinator chat) {
         this.sender = sender;
         this.chat = chat;
@@ -95,6 +98,7 @@ final class PartyMarkCoordinator implements WindowFlow {
         if (opcode == Opcode.OPCODE_PARTY_TARGET_MARKED_EVENT_VALUE) {
             PartyTargetMarkedEvent event = PartyTargetMarkedEvent.parseFrom(frame.payload());
             markedTargetId = event.getTargetEntityId();
+            markedKey = markedTargetId == 0L ? java.util.Optional.empty() : java.util.Optional.of(markedTargetId);
             chat.showSystemNotice(KageI18n.formatOrKey(
                     i18n, markedTargetId == 0L ? "party_mark.cleared" : "party_mark.marked", event.getLeaderName()));
             return true;
@@ -102,8 +106,14 @@ final class PartyMarkCoordinator implements WindowFlow {
         return false;
     }
 
+    /** ADR-220 — mục tiêu nhóm đang được đánh dấu (rỗng = không có). */
+    java.util.Optional<Long> markedKey() {
+        return markedKey;
+    }
+
     @Override
     public void reset() {
         markedTargetId = 0L;
+        markedKey = java.util.Optional.empty();
     }
 }
