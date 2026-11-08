@@ -11,7 +11,8 @@ record Lot40Windows(
         KeywordFilterCoordinator keywordFilter,
         LocationBookmarkCoordinator bookmarks,
         PartyDamageMeterCoordinator damageMeter,
-        BagSearchCoordinator bagSearch) {
+        BagSearchCoordinator bagSearch,
+        Lot41Windows lot41) {
 
     static Lot40Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot40Windows(
@@ -21,7 +22,8 @@ record Lot40Windows(
                 new KeywordFilterCoordinator(feeds.chat()),
                 new LocationBookmarkCoordinator(feeds.chat()),
                 new PartyDamageMeterCoordinator(feeds.chat(), System::currentTimeMillis),
-                new BagSearchCoordinator(feeds.chat()));
+                new BagSearchCoordinator(feeds.chat()),
+                Lot41Windows.create(sender, feeds)); // lô 41 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -33,5 +35,6 @@ record Lot40Windows(
         panels.register(bookmarks);
         panels.register(damageMeter);
         panels.register(bagSearch);
+        lot41.registerInto(panels);
     }
 }

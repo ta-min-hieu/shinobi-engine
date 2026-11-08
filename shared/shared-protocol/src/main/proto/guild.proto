@@ -807,3 +807,56 @@ message GetGuildPollResponse {
   int32 my_vote = 5;          // -1 = chưa bỏ phiếu
   int64 seconds_left = 6;     // 0 = đã đóng
 }
+
+// ADR-256 (2026-11-08) — lịch hoạt động bang. Command: Client -> Server (OPCODE_CREATE_GUILD_EVENT_COMMAND).
+// Bang chủ / phó; hẹn trong 1 phút – 7 ngày tới; tối đa 5 buổi sắp tới; cả bang được nhắc trước 10 phút.
+message CreateGuildEventCommand {
+  string title = 1;               // ≤ 60 ký tự
+  int64 starts_at_epoch_seconds = 2;
+}
+
+enum CreateGuildEventOutcome {
+  CREATE_GUILD_EVENT_OUTCOME_UNSPECIFIED = 0;
+  CREATE_GUILD_EVENT_OUTCOME_OK = 1;
+  CREATE_GUILD_EVENT_OUTCOME_NOT_IN_GUILD = 2;
+  CREATE_GUILD_EVENT_OUTCOME_NOT_OFFICER = 3;
+  CREATE_GUILD_EVENT_OUTCOME_INVALID = 4;
+  CREATE_GUILD_EVENT_OUTCOME_FULL = 5;
+  CREATE_GUILD_EVENT_OUTCOME_BANNED_WORD = 6;
+}
+
+// Response: Server -> Client (OPCODE_CREATE_GUILD_EVENT_RESPONSE).
+message CreateGuildEventResponse {
+  CreateGuildEventOutcome outcome = 1;
+}
+
+// Command: Client -> Server (OPCODE_CANCEL_GUILD_EVENT_COMMAND). Bang chủ / phó.
+message CancelGuildEventCommand {
+  int64 event_id = 1;
+}
+
+enum CancelGuildEventOutcome {
+  CANCEL_GUILD_EVENT_OUTCOME_UNSPECIFIED = 0;
+  CANCEL_GUILD_EVENT_OUTCOME_OK = 1;
+  CANCEL_GUILD_EVENT_OUTCOME_NOT_FOUND = 2;
+  CANCEL_GUILD_EVENT_OUTCOME_NOT_OFFICER = 3;
+}
+
+// Response: Server -> Client (OPCODE_CANCEL_GUILD_EVENT_RESPONSE).
+message CancelGuildEventResponse {
+  CancelGuildEventOutcome outcome = 1;
+}
+
+// Request: Client -> Server (OPCODE_LIST_GUILD_EVENTS_REQUEST).
+message ListGuildEventsRequest {}
+
+message GuildEventView {
+  int64 event_id = 1;
+  string title = 2;
+  int64 starts_at_epoch_seconds = 3;
+}
+
+// Response: Server -> Client (OPCODE_LIST_GUILD_EVENTS_RESPONSE). Các buổi sắp tới, sớm nhất trước.
+message ListGuildEventsResponse {
+  repeated GuildEventView events = 1;
+}

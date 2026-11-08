@@ -1155,6 +1155,83 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                             dev.kage.protocol.GetEventCalendarRequest.parser(),
                             Opcode.OPCODE_GET_EVENT_CALENDAR_RESPONSE_VALUE,
                             (h, id, c) -> h.expansion.lot37().calendar())),
+            // Lô 41 — thông tin quái (ADR-255), lịch bang (ADR-256), dự tính cường hoá (ADR-257), xếp hạng bạn bè
+            // (258).
+            Map.entry(
+                    Opcode.OPCODE_GET_MONSTER_INFO_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetMonsterInfoRequest.parser(),
+                            Opcode.OPCODE_GET_MONSTER_INFO_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .monsterInfo(c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_ENHANCE_PREVIEW_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetEnhancePreviewRequest.parser(),
+                            Opcode.OPCODE_GET_ENHANCE_PREVIEW_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .enhancePreview(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_CREATE_GUILD_EVENT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.CreateGuildEventCommand.parser(),
+                            Opcode.OPCODE_CREATE_GUILD_EVENT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .createEvent(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_CANCEL_GUILD_EVENT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.CancelGuildEventCommand.parser(),
+                            Opcode.OPCODE_CANCEL_GUILD_EVENT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .cancelEvent(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_LIST_GUILD_EVENTS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListGuildEventsRequest.parser(),
+                            Opcode.OPCODE_LIST_GUILD_EVENTS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .listEvents(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_FRIEND_RANKING_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetFriendRankingRequest.parser(),
+                            Opcode.OPCODE_GET_FRIEND_RANKING_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .friendRanking(
+                                            id,
+                                            LeaderboardCache.shared(h.leaderboardSources())
+                                                    .board(LeaderboardCache.Kind.COMBAT_POWER)))),
             // Lô 40 — bình chọn trong bang (ADR-248), lịch sử nhặt đồ (ADR-253).
             Map.entry(
                     Opcode.OPCODE_CREATE_GUILD_POLL_COMMAND_VALUE,

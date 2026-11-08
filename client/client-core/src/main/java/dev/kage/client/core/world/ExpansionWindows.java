@@ -176,12 +176,14 @@ record ExpansionWindows(
         lot40.bookmarks().useWalker(lot34.autoWalk().target()); // ADR-250 /vitri
         lot40.damageMeter().useLocalId(intents.localCharacterId()); // ADR-251 /satthuong
         lot40.bagSearch().useItems(inventory::describedItems); // ADR-254 /timdo
+        lot40.lot41().enhancePreview().useSelection(selectedId); // ADR-257 /dutinh
     }
 
     /** Nối HUD chiến đấu: mục tiêu cho thuần phục (ADR-124), máu cho cảnh báo máu thấp (ADR-243). */
     void useCombat(CombatHudController combat) {
         taming.useTarget(combat::currentTargetId);
         lot39().lowHealth().useHealth(combat);
+        lot39().lot40().lot41().monsterInfo().useTarget(combat); // ADR-255 /xemquai
     }
 
     /** Luồng lô 39 (ADR-239…) — cho {@code WorldScreen} vẽ cảnh báo máu thấp / ẩn HUD. */

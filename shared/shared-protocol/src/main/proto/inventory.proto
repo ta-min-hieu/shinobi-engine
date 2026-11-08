@@ -810,3 +810,26 @@ message LootHistoryEntry {
 message GetLootHistoryResponse {
   repeated LootHistoryEntry entries = 1;
 }
+
+// ADR-257 (2026-11-08) — dự tính cường hoá. Request: Client -> Server (OPCODE_GET_ENHANCE_PREVIEW_REQUEST). Chỉ đọc.
+message GetEnhancePreviewRequest {
+  int64 item_id = 1;
+}
+
+enum EnhancePreviewOutcome {
+  ENHANCE_PREVIEW_OUTCOME_UNSPECIFIED = 0;
+  ENHANCE_PREVIEW_OUTCOME_OK = 1;
+  ENHANCE_PREVIEW_OUTCOME_NOT_FOUND = 2;
+  ENHANCE_PREVIEW_OUTCOME_NOT_EQUIPMENT = 3;
+  ENHANCE_PREVIEW_OUTCOME_MAX_LEVEL = 4;
+}
+
+// Response: Server -> Client (OPCODE_GET_ENHANCE_PREVIEW_RESPONSE). Đúng bảng server dùng khi cường hoá thật.
+message GetEnhancePreviewResponse {
+  EnhancePreviewOutcome outcome = 1;
+  int32 current_level = 2;
+  int64 gold_cost = 3;
+  int32 success_percent = 4;
+  bool drops_on_fail = 5;       // thất bại thì tụt một cấp (trừ khi dùng Bảo Vệ Phù)
+  int32 protection_charms = 6;  // số Bảo Vệ Phù đang có trong túi
+}

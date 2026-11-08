@@ -462,3 +462,19 @@ message SetContactPrivacyResponse {
   bool do_not_disturb = 1;
   bool block_stranger_invites = 2;
 }
+
+// ADR-258 (2026-11-08) — xếp hạng bạn bè. Request: Client -> Server (OPCODE_GET_FRIEND_RANKING_REQUEST).
+message GetFriendRankingRequest {}
+
+message FriendRankEntry {
+  int64 character_id = 1;
+  string name = 2;
+  int32 level = 3;
+  int64 combat_power = 4;
+  bool is_self = 5;
+}
+
+// Response: Server -> Client (OPCODE_GET_FRIEND_RANKING_RESPONSE). Mình + bạn bè, Lực Chiến giảm dần (bộ đệm 60 giây).
+message GetFriendRankingResponse {
+  repeated FriendRankEntry entries = 1;
+}

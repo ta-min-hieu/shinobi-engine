@@ -25,6 +25,11 @@ import dev.kage.protocol.VoteGuildPollResponse;
 /** Lớp lệnh lô 40 (ADR-247…) — MỘT thành phần của {@link Lot39Commands}. Gọi trên Virtual Thread. */
 record Lot40Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 41 (ADR-255…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot41Commands lot41() {
+        return new Lot41Commands(gateway, registry);
+    }
+
     /** ADR-248 — bang chủ / phó tạo cuộc bình chọn (lọc từ cấm như chat); OK ⇒ báo cả bang đang online. */
     CreateGuildPollResponse createPoll(long characterId, CreateGuildPollCommand command) {
         boolean banned = ProfanityFilter.containsBannedWord(command.getQuestion())

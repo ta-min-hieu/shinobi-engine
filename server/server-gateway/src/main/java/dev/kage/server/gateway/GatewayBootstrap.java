@@ -349,8 +349,7 @@ public final class GatewayBootstrap {
         characterRegistry.quiz.bind(new QuizHooks.Deps( // ADR-122 — hỏi đáp tông môn
                 facades.progression().expansion().quiz(), mail, characterRegistry, java.time.Clock.systemUTC()));
         expansion.add(characterRegistry.quiz.job());
-        expansion.add(
-                DailyReminder.job(new DailyReminder.Deps(facades, characterRegistry, java.time.Clock.systemUTC())));
+        addReminders(expansion, facades, characterRegistry); // ADR-252 việc ngày, ADR-256 lịch bang
         characterRegistry.tournament.bind(new TournamentHooks.Deps( // ADR-125 — luận võ đại hội
                 facades.progression().expansion().tournament(),
                 worldGateway.arenaInstanceRegistry(),
@@ -766,6 +765,28 @@ public final class GatewayBootstrap {
                                         lot38Facades(databaseBootstrap)))));
     }
 
+    /** ADR-252 nhắc việc ngày + ADR-256 nhắc lịch bang. */
+    private static void addReminders(
+            ExpansionJobs expansion, GatewayFacades facades, ConnectedCharacterRegistry characterRegistry) {
+        java.time.Clock clock = java.time.Clock.systemUTC();
+        expansion.add(DailyReminder.job(new DailyReminder.Deps(facades, characterRegistry, clock)));
+        expansion.add(GuildEventReminder.job(new GuildEventReminder.Deps(
+                facades.progression()
+                        .expansion()
+                        .lot34()
+                        .lot35()
+                        .lot36()
+                        .lot37()
+                        .lot38()
+                        .lot39()
+                        .lot40()
+                        .lot41()
+                        .guildEvents(),
+                facades.contentFacades().socialFacades().guildFacade(),
+                characterRegistry,
+                clock)));
+    }
+
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */
     private static Lot38Facades lot38Facades(ServerDatabaseBootstrap databaseBootstrap) {
         return new Lot38Facades(
@@ -780,7 +801,11 @@ public final class GatewayBootstrap {
                         databaseBootstrap.expansion().wirePersonalRecordFacade(),
                         databaseBootstrap.expansion().wireWealthRankingFacade(),
                         databaseBootstrap.expansion().wireQuestRewardPreviewFacade(),
-                        new Lot40Facades(databaseBootstrap.expansion().wireGuildPollFacade())));
+                        new Lot40Facades(
+                                databaseBootstrap.expansion().wireGuildPollFacade(),
+                                new Lot41Facades( // lô 41 lồng ở đây
+                                        databaseBootstrap.expansion().wireMonsterInfoFacade(),
+                                        databaseBootstrap.expansion().wireGuildEventFacade()))));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

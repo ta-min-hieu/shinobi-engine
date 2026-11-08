@@ -295,6 +295,18 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.guild.PostgresGuildPollAdapter(dataSource));
     }
 
+    /** ADR-255 — xem thông tin quái. */
+    public dev.kage.monster.api.MonsterInfoFacade wireMonsterInfoFacade() {
+        return new dev.kage.monster.api.MonsterInfoFacade(
+                new dev.kage.server.database.monster.PostgresMonsterInfoAdapter(dataSource));
+    }
+
+    /** ADR-256 — lịch hoạt động bang. */
+    public dev.kage.guild.api.GuildEventFacade wireGuildEventFacade() {
+        return new dev.kage.guild.api.GuildEventFacade(
+                new dev.kage.server.database.guild.PostgresGuildEventAdapter(dataSource));
+    }
+
     /** ADR-228 — danh mục nhiệm vụ. */
     public dev.kage.quest.api.QuestCatalogFacade wireQuestCatalogFacade() {
         return new dev.kage.quest.api.QuestCatalogFacade(
