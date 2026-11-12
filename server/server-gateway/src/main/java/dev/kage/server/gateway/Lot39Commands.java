@@ -30,6 +30,7 @@ record Lot39Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
     /** ADR-240 — vào world: nạp kỷ lục đã lưu vào bộ theo dõi RAM. */
     void onEnteredWorld(long characterId) {
         registry.records.load(characterId);
+        lot40().lot41().lot42().lot43().lot44().lot45().onEnteredWorld(characterId); // ADR-289 — quà mốc gắn bó
     }
 
     /** ADR-239 — bang chủ bật buff (hoặc ai cũng hỏi còn bao lâu); bật xong báo cả bang đang online. */

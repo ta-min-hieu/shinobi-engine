@@ -1268,6 +1268,38 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot44()
                                     .lookupItem(c))),
             Map.entry(
+                    Opcode.OPCODE_GET_SHOP_PURCHASE_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetShopPurchaseHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_SHOP_PURCHASE_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .purchaseHistory(id))),
+            Map.entry(
+                    Opcode.OPCODE_LIST_SENT_MAIL_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListSentMailRequest.parser(),
+                            Opcode.OPCODE_LIST_SENT_MAIL_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .sentMail(id))),
+            Map.entry(
                     Opcode.OPCODE_GET_DUEL_HISTORY_REQUEST_VALUE,
                     storageCommand(
                             dev.kage.protocol.GetDuelHistoryRequest.parser(),

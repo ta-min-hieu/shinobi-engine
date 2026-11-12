@@ -318,6 +318,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-284](ADR-284-Whisper-History.md) | Lịch sử tin riêng: RAM, 30 dòng/người; `/tinrieng` (thuần client) | ✅ Accepted (lô 44) |
 | [ADR-285](ADR-285-Hide-Others-Damage.md) | Ẩn số sát thương người ngoài nhóm: cài đặt hiển thị mặc định tắt (thuần client) | ✅ Accepted (lô 44) |
 | [ADR-286](ADR-286-Auto-Accept-Friend-Party.md) | Tự nhận lời mời nhóm từ bạn bè: V171 cột công tắc, server tự chấp nhận khi người mời là bạn; 1345/1346; `/tunhannhom` | ✅ Accepted (lô 44) |
+| [ADR-287](ADR-287-Guild-Contribution-Board.md) | Bảng cống hiến bang: Dùng lại 714/715; xếp ở client; `/conghien` | ✅ Accepted (lô 45) |
+| [ADR-288](ADR-288-Shop-Purchase-History.md) | Lịch sử mua cửa hàng NPC: Audit `SHOP_BUY` + V172 chỉ mục; 1042/1043; `/lichsumua` | ✅ Accepted (lô 45) |
+| [ADR-289](ADR-289-Loyalty-Milestone-Gift.md) | Quà mốc gắn bó: Mốc 30 ngày từ `created_at`; thư idempotent; 1000×min(n,12) linh thạch | ✅ Accepted (lô 45) |
+| [ADR-290](ADR-290-Sent-Mail.md) | Thư đã gửi: `mail.sender_id` + V172 chỉ mục; 919/920; `/thudagui` | ✅ Accepted (lô 45) |
+| [ADR-291](ADR-291-Pin-Chat-Line.md) | Ghim tin chat: Nhãn ghim trong `ChatPanel`; `/ghimchat [bo]` | ✅ Accepted (lô 45) |
+| [ADR-292](ADR-292-Chat-Idle-Fade.md) | Thu gọn khung chat khi rảnh: Mờ dần 2 giây cuối; `/chatan` 3–300 hoặc tắt; Preferences | ✅ Accepted (lô 45) |
+| [ADR-293](ADR-293-Combo-Counter.md) | Đếm combo đòn đánh: `ComboCounter` 3 giây, hiện từ đòn 3; `/combo` | ✅ Accepted (lô 45) |
+| [ADR-294](ADR-294-Chat-Font-Size.md) | Cỡ chữ khung chat: 3 cỡ chữ qua `setFontScale`; Preferences | ✅ Accepted (lô 45) |
 ---
 
 ## ADR cần tạo (chưa viết)

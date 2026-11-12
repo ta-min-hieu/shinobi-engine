@@ -151,6 +151,8 @@ record ExpansionWindows(
         displaySettings.usePartyMembers(lot39().lot40().damageMeter()::isTracked); // ADR-285
         displaySettings.applyTo(titles, feedback, backdrop, weather.overlay());
         lot39().lot40().lot41().lot42().lot43().lot44().fps().useHud(hud::setFpsVisible); // ADR-283
+        feedback.useCombo(
+                lot39().lot40().lot41().lot42().lot43().lot44().lot45().combo()::enabled); // ADR-293
     }
 
     /**

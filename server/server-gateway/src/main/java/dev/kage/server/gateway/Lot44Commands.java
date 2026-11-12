@@ -22,6 +22,11 @@ record Lot44Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
     /** Số cảnh giới (Luyện Khí … Hoá Thần). */
     static final int REALMS = 6;
 
+    /** Lớp lệnh lô 45 (ADR-287…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot45Commands lot45() {
+        return new Lot45Commands(gateway, registry);
+    }
+
     /** ADR-279 — giá cửa hàng NPC + nguồn rơi của một mẫu vật phẩm (thông tin công khai). */
     LookupItemResponse lookupItem(LookupItemRequest request) {
         ItemLookupPort.Lookup lookup = facades().itemLookup().lookup(request.getItemTemplateId());

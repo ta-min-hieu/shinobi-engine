@@ -819,7 +819,16 @@ public final class GatewayBootstrap {
                                                                 .wireDuelHistoryFacade(),
                                                         databaseBootstrap
                                                                 .expansion()
-                                                                .wirePartyAutoAcceptFacade()))))));
+                                                                .wirePartyAutoAcceptFacade(),
+                                                        new Lot45Facades( // lô 45 lồng ở đây
+                                                                databaseBootstrap
+                                                                        .expansion()
+                                                                        .lot45()
+                                                                        .wirePurchaseHistoryFacade(),
+                                                                databaseBootstrap
+                                                                        .expansion()
+                                                                        .lot45()
+                                                                        .wireSentMailFacade())))))));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

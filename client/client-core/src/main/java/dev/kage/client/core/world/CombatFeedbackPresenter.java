@@ -45,6 +45,8 @@ final class CombatFeedbackPresenter implements Disposable {
     private BooleanSupplier damageNumbers = () -> true;
     private BooleanSupplier hideOthers = () -> false; // ADR-285
     private java.util.function.LongPredicate partyMember = id -> false; // ADR-285
+    private final ComboCounter combo = new ComboCounter(); // ADR-293
+    private BooleanSupplier comboOn = () -> false; // ADR-293
     // Bundle RIÊNG đúng quy ước KageI18n (mỗi nơi tự nạp, không dùng chung instance) — cần cho nhãn
     // "Né!" của số damage bay lên.
     private final I18NBundle i18n = KageI18n.load();
@@ -128,6 +130,22 @@ final class CombatFeedbackPresenter implements Disposable {
         Color color =
                 targetEntityId == localCharacterId ? FloatingCombatText.DAMAGE_TAKEN : FloatingCombatText.DAMAGE_DEALT;
         floatingText.show("-" + damage, color, anchor);
+        if (attackerEntityId == localCharacterId && targetEntityId != localCharacterId) {
+            countCombo();
+        }
+    }
+
+    /** ADR-293 — một đòn trúng của mình; từ đòn thứ {@link ComboCounter#SHOW_FROM} hiện chữ trên đầu nhân vật. */
+    private void countCombo() {
+        int hits = combo.hit();
+        if (hits >= ComboCounter.SHOW_FROM && comboOn.getAsBoolean()) {
+            showSelfText(KageI18n.formatOrKey(i18n, "combo.label", hits), FloatingCombatText.LEVEL_UP);
+        }
+    }
+
+    /** ADR-293 — công tắc chữ combo. */
+    void useCombo(BooleanSupplier enabled) {
+        this.comboOn = enabled;
     }
 
     /**
@@ -191,6 +209,7 @@ final class CombatFeedbackPresenter implements Disposable {
      *     hình cho chữ sắc nét (xem {@link FloatingCombatText}).
      */
     void render(float deltaTime, Matrix4 projection, WorldToScreen projector) {
+        combo.tick(deltaTime); // ADR-293
         skillVfx.render(deltaTime, projection);
         if (damageNumbers.getAsBoolean()) {
             floatingText.render(deltaTime, projector);

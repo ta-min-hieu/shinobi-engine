@@ -3,6 +3,7 @@ package dev.kage.client.core.world;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.LongPredicate;
 import java.util.function.Predicate;
 
@@ -78,6 +79,22 @@ final class ChatCoordinator implements WindowFlow {
     /** ADR-284 — nghe mọi tin ô nhập vừa gửi đi (sau khi qua lệnh gạch chéo). */
     void onOutgoing(java.util.function.Consumer<ChatController.ComposeResult.Send> listener) {
         this.outgoing = listener;
+    }
+
+    /** ADR-291/292/294 — khung chat (ghim tin, thu gọn khi rảnh, cỡ chữ). */
+    ChatPanel panel() {
+        return panel;
+    }
+
+    /** ADR-291 — dòng NGƯỜI CHƠI gần nhất đã ghép sẵn để hiển thị (bỏ dòng hệ thống). */
+    Optional<String> latestPlayerLine() {
+        List<ChatController.Line> lines = controller.lines();
+        for (int index = lines.size() - 1; index >= 0; index--) {
+            if (!lines.get(index).senderName().isEmpty()) {
+                return Optional.of(render(lines.get(index)));
+            }
+        }
+        return Optional.empty();
     }
 
     /** ADR-245 — tên nhân vật đang chơi, để tô sáng tin nhắc tên mình. Trả chính nó (gọi nối ngay sau khi dựng). */

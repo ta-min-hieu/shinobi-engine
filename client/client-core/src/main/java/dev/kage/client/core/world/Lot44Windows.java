@@ -11,7 +11,8 @@ record Lot44Windows(
         OnlineCountCoordinator onlineCount,
         FpsCoordinator fps,
         WhisperHistoryCoordinator whispers,
-        PartyAutoAcceptCoordinator autoParty) {
+        PartyAutoAcceptCoordinator autoParty,
+        Lot45Windows lot45) {
 
     static Lot44Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot44Windows(
@@ -20,7 +21,8 @@ record Lot44Windows(
                 new OnlineCountCoordinator(sender, feeds.chat()),
                 new FpsCoordinator(feeds.chat()),
                 new WhisperHistoryCoordinator(feeds.chat()),
-                new PartyAutoAcceptCoordinator(sender, feeds.chat()));
+                new PartyAutoAcceptCoordinator(sender, feeds.chat()),
+                Lot45Windows.create(sender, feeds)); // lô 45 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -31,5 +33,6 @@ record Lot44Windows(
         panels.register(fps);
         panels.register(whispers);
         panels.register(autoParty);
+        lot45.registerInto(panels);
     }
 }

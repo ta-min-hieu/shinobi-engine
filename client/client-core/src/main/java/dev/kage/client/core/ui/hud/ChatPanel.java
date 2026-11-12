@@ -65,6 +65,12 @@ public final class ChatPanel implements HudWindow {
      */
     private static final float IDLE_HIDE_SECONDS = 12f;
 
+    /** ADR-292 — mờ dần trong bấy nhiêu giây cuối trước khi ẩn hẳn (thay vì biến mất cái rụp). */
+    private static final float FADE_SECONDS = 2f;
+
+    /** ADR-291 — màu dòng đang ghim: vàng nhạt, khác mọi kênh. */
+    private static final Color PINNED_COLOR = Color.valueOf("FFE08A");
+
     private static final float PANEL_PAD_PX = 10f;
 
     private static final float LEFT_MARGIN_PX = 14f;
@@ -111,6 +117,10 @@ public final class ChatPanel implements HudWindow {
     private final TextButton channelButton;
     private final TextField input;
     private final SentLineHistory sentLines = new SentLineHistory(); // ADR-262
+    private final Label pinnedLabel; // ADR-291
+
+    /** ADR-292 — giây rảnh trước khi ẩn; {@code 0} = không bao giờ ẩn. */
+    private float idleHideSeconds = IDLE_HIDE_SECONDS;
 
     private Consumer<String> onSend;
 
@@ -131,6 +141,7 @@ public final class ChatPanel implements HudWindow {
     public ChatPanel(KageSkin skin, int maxLines) {
         this.stage = new Stage(new ScreenViewport(), new SpriteBatch());
 
+        this.pinnedLabel = pinnedLabel(skin);
         Table log = new Table();
         for (int index = 0; index < maxLines; index++) {
             Label label = new Label("", skin.labelStyle);
@@ -155,6 +166,12 @@ public final class ChatPanel implements HudWindow {
         this.panel = new Table();
         panel.setBackground(skin.panel);
         panel.pad(PANEL_PAD_PX);
+        panel.add(pinnedLabel)
+                .width(PANEL_WIDTH_PX)
+                .growX()
+                .left()
+                .padBottom(4f)
+                .row(); // ADR-291
         panel.add(log).width(PANEL_WIDTH_PX).growX().row();
         panel.add(composer).padTop(6f).width(PANEL_WIDTH_PX).growX().row();
         panel.setVisible(false); // chưa có dòng nào thì không bày một khung rỗng ra giữa màn hình
@@ -174,6 +191,15 @@ public final class ChatPanel implements HudWindow {
                 }
             }
         });
+    }
+
+    /** ADR-291 — nhãn dòng ghim ở đầu khung, ẩn khi chưa ghim gì. */
+    private static Label pinnedLabel(KageSkin skin) {
+        Label label = new Label("", skin.labelStyle);
+        label.setWrap(true);
+        label.setColor(PINNED_COLOR);
+        label.setVisible(false);
+        return label;
     }
 
     /**
@@ -346,7 +372,31 @@ public final class ChatPanel implements HudWindow {
         }
         // Dòng mới ⇒ hiện lại và đếm giờ từ đầu (xem IDLE_HIDE_SECONDS).
         sinceLastLine = 0f;
+        panel.getColor().a = 1f;
         panel.setVisible(!renderedLines.isEmpty() || isComposing());
+    }
+
+    /** ADR-291 — ghim một dòng lên đầu khung ({@code ""} = bỏ ghim). */
+    public void setPinnedLine(String line) {
+        pinnedLabel.setText(line);
+        pinnedLabel.setVisible(!line.isEmpty());
+    }
+
+    /** ADR-292 — đổi số giây rảnh trước khi khung tự mờ rồi ẩn; {@code 0} = luôn hiện. */
+    public void setIdleHideSeconds(float seconds) {
+        this.idleHideSeconds = Math.max(0f, seconds);
+        sinceLastLine = 0f;
+        panel.getColor().a = 1f;
+        panel.setVisible(hasAnyLine() || isComposing());
+    }
+
+    /** ADR-294 — cỡ chữ nhật ký chat (hệ số so với font gốc). */
+    public void setFontScale(float scale) {
+        for (Label label : lineLabels) {
+            label.setFontScale(scale);
+        }
+        pinnedLabel.setFontScale(scale);
+        panel.invalidateHierarchy();
     }
 
     /** Loại dòng chat, chỉ để chọn màu — panel không cần biết enum protobuf. */
@@ -389,11 +439,23 @@ public final class ChatPanel implements HudWindow {
         if (sinceLastLine < Float.MAX_VALUE) {
             sinceLastLine += deltaTime;
         }
-        if (!isComposing() && sinceLastLine > IDLE_HIDE_SECONDS) {
+        panel.getColor().a = idleAlpha(isComposing() ? 0f : sinceLastLine, idleHideSeconds);
+        if (panel.getColor().a <= 0f) {
             panel.setVisible(false);
         }
         stage.act(deltaTime);
         stage.draw();
+    }
+
+    /**
+     * ADR-292 — độ đậm của khung sau {@code idle} giây rảnh: 1 cho tới {@value #FADE_SECONDS} giây cuối, rồi giảm đều
+     * về 0 ở mốc ẩn. {@code hideAfter == 0} = không bao giờ ẩn. Tĩnh để test.
+     */
+    public static float idleAlpha(float idle, float hideAfter) {
+        if (hideAfter <= 0f || idle <= hideAfter - FADE_SECONDS) {
+            return 1f;
+        }
+        return Math.clamp((hideAfter - idle) / FADE_SECONDS, 0f, 1f);
     }
 
     /** KHÔNG dispose {@link KageSkin} nhận ở constructor — của {@link CombatHud}, xem javadoc đó. */

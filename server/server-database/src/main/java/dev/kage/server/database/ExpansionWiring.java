@@ -325,6 +325,11 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.pvp.PostgresDuelHistoryAdapter(dataSource));
     }
 
+    /** Facade lô 45+ (ADR-287…) — tách sang {@link Lot45Wiring} vì lớp này chạm trần độ phức tạp PMD. */
+    public Lot45Wiring lot45() {
+        return new Lot45Wiring(dataSource);
+    }
+
     /** ADR-286 — tự nhận lời mời nhóm từ bạn bè. */
     public dev.kage.party.api.PartyAutoAcceptFacade wirePartyAutoAcceptFacade() {
         return new dev.kage.party.api.PartyAutoAcceptFacade(
