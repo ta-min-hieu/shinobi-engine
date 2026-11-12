@@ -23,18 +23,23 @@ final class HudTargetFrame {
 
     private int shownHp = -1;
     private int shownMaxHp = -1;
+    private final Label distanceLabel; // ADR-299
+    private int shownDistance = Integer.MIN_VALUE;
 
     HudTargetFrame(KageSkin skin, I18NBundle i18n) {
         this.i18n = i18n;
         this.nameLabel = new Label("", skin.labelStyle);
         this.hpBar = new HealthBar(skin);
         this.hpLabel = new Label("", skin.statLabelStyle);
+        this.distanceLabel = new Label("", skin.statLabelStyle);
         this.group = new Table();
         group.setBackground(skin.panel);
         group.add(nameLabel).row();
         group.add(HudLayout.overlay(hpBar, hpLabel))
                 .size(HudLayout.BAR_WIDTH, HudLayout.BAR_HEIGHT)
-                .padTop(4f);
+                .padTop(4f)
+                .row();
+        group.add(distanceLabel).padTop(2f);
         group.pad(8f);
         group.setVisible(false);
     }
@@ -88,6 +93,15 @@ final class HudTargetFrame {
         } else {
             hpLabel.setText(KageI18n.textOrKey(i18n, "hud.target.hp_unknown"));
         }
+    }
+
+    /** ADR-299 — khoảng cách (mét); âm = ẩn. setText chỉ khi số đổi (UI.md §9). */
+    void setDistance(int meters) {
+        if (meters == shownDistance) {
+            return;
+        }
+        shownDistance = meters;
+        distanceLabel.setText(meters < 0 ? "" : KageI18n.formatOrKey(i18n, "hud.target.distance", meters));
     }
 
     void clear() {

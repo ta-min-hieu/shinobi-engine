@@ -678,7 +678,10 @@ final class DungeonInstanceRegistry {
                     .<List<Long>>map(instance -> List.copyOf(instance.characterIds()))
                     .orElse(List.of(killerCharacterId));
         }
-        defeatExecutor.execute(() -> rewards.onBossKilled(killerCharacterId, members, DUNGEON_CODE));
+        defeatExecutor.execute(() -> {
+            rewards.onBossKilled(killerCharacterId, members, DUNGEON_CODE);
+            registry.bossKills.dungeonBoss(DUNGEON_BOSS_CODE, members); // ADR-296
+        });
     }
 
     /** Một con quái của tầng tháp vừa chết dưới tay {@code killerCharacterId}; có giá trị khi đó là con cuối. */

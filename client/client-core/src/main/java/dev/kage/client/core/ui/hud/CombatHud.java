@@ -249,6 +249,11 @@ public final class CombatHud implements HudWindow {
         target.setCharacter(displayName, current, max);
     }
 
+    /** ADR-299 — số mét tới mục tiêu ({@code < 0} = ẩn). Chỉ đổi chữ khi số đổi. */
+    public void setTargetDistance(int meters) {
+        target.setDistance(meters);
+    }
+
     public void clearTarget() {
         target.clear();
     }

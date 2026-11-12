@@ -10,7 +10,8 @@ record Lot45Windows(
         PurchaseHistoryCoordinator purchases,
         SentMailCoordinator sentMail,
         ChatLayoutCoordinator chatLayout,
-        ComboCoordinator combo) {
+        ComboCoordinator combo,
+        Lot46Windows lot46) {
 
     static Lot45Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot45Windows(
@@ -18,7 +19,8 @@ record Lot45Windows(
                 new PurchaseHistoryCoordinator(sender, feeds.chat(), feeds.itemCatalog()),
                 new SentMailCoordinator(sender, feeds.chat()),
                 new ChatLayoutCoordinator(feeds.chat()),
-                new ComboCoordinator(feeds.chat()));
+                new ComboCoordinator(feeds.chat()),
+                Lot46Windows.create(sender, feeds)); // lô 46 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -28,5 +30,6 @@ record Lot45Windows(
         panels.register(sentMail);
         panels.register(chatLayout);
         panels.register(combo);
+        lot46.registerInto(panels);
     }
 }

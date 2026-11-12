@@ -208,3 +208,26 @@ message SentMailEntry {
 message ListSentMailResponse {
   repeated SentMailEntry entries = 1;
 }
+
+// ADR-297 (2026-11-12) — thư hẹn giờ (chỉ chữ). Command: Client -> Server (OPCODE_SCHEDULE_MAIL_COMMAND).
+message ScheduleMailCommand {
+  string recipient_name = 1;
+  string subject = 2;
+  string body = 3;
+  int32 delay_minutes = 4; // 1..10080
+}
+
+enum ScheduleMailOutcome {
+  SCHEDULE_MAIL_OUTCOME_UNSPECIFIED = 0;
+  SCHEDULE_MAIL_OUTCOME_OK = 1;
+  SCHEDULE_MAIL_OUTCOME_RECIPIENT_NOT_FOUND = 2;
+  SCHEDULE_MAIL_OUTCOME_INVALID_DELAY = 3;
+  SCHEDULE_MAIL_OUTCOME_TOO_MANY_PENDING = 4;
+  SCHEDULE_MAIL_OUTCOME_INVALID_TEXT = 5;
+}
+
+// Response: Server -> Client (OPCODE_SCHEDULE_MAIL_RESPONSE). pending = số thư đang chờ sau lượt này.
+message ScheduleMailResponse {
+  ScheduleMailOutcome outcome = 1;
+  int32 pending = 2;
+}

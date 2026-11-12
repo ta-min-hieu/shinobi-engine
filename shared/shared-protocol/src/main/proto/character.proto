@@ -604,6 +604,7 @@ message InspectCharacterResponse {
   int64 combat_power = 5;
   repeated InspectedEquipment equipment = 6;
   string bio = 7;  // ADR-218 — dòng giới thiệu tự viết ("" = chưa viết)
+  int32 likes = 8;  // ADR-298 — tổng lượt thích hồ sơ
 }
 
 // Command: Client -> Server (OPCODE_SET_INSPECT_PRIVACY_COMMAND = 251). hidden = true ⇒ người khác không soi được mình.
@@ -765,4 +766,24 @@ message GetOnlineCountResponse {
   int32 total = 1;
   repeated FactionCount by_faction = 2;
   repeated int32 by_realm = 3;  // chỉ số i = cảnh giới thứ i (18 cấp mỗi cảnh giới như BreakthroughHooks; Lv1–18 là 0)
+}
+
+// ADR-298 (2026-11-12) — thích hồ sơ. Command: Client -> Server (OPCODE_LIKE_PROFILE_COMMAND).
+message LikeProfileCommand {
+  string target_name = 1;
+}
+
+enum LikeProfileOutcome {
+  LIKE_PROFILE_OUTCOME_UNSPECIFIED = 0;
+  LIKE_PROFILE_OUTCOME_OK = 1;
+  LIKE_PROFILE_OUTCOME_ALREADY_TODAY = 2;
+  LIKE_PROFILE_OUTCOME_SELF = 3;
+  LIKE_PROFILE_OUTCOME_NOT_FOUND = 4;
+}
+
+// Response: Server -> Client (OPCODE_LIKE_PROFILE_RESPONSE). likes = tổng lượt thích người đó SAU lượt này.
+message LikeProfileResponse {
+  LikeProfileOutcome outcome = 1;
+  string target_name = 2;
+  int32 likes = 3;
 }

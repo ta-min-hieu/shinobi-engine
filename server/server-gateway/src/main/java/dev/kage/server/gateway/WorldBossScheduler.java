@@ -177,6 +177,7 @@ final class WorldBossScheduler implements WorldBossListener {
             deps.registry().worldBossTimes.scheduled(clock.instant().plus(Duration.ofMinutes(interval))); // ADR-224
             deps.bosses().addDamage(damageByCharacter);
             List<WorldBossRanking.Entry> ranked = WorldBossRanking.rank(damageByCharacter);
+            deps.registry().bossKills.worldBoss(monsterCode, ranked); // ADR-296
             List<WorldBossReward> tiers = deps.bosses().rewards(monsterCode);
             for (WorldBossRanking.Entry entry : ranked) {
                 WorldBossRanking.rewardFor(entry.rank(), tiers).ifPresent(tier -> mailReward(entry, tier));

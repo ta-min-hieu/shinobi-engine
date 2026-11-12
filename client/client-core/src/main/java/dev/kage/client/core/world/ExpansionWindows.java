@@ -153,6 +153,15 @@ record ExpansionWindows(
         lot39().lot40().lot41().lot42().lot43().lot44().fps().useHud(hud::setFpsVisible); // ADR-283
         feedback.useCombo(
                 lot39().lot40().lot41().lot42().lot43().lot44().lot45().combo()::enabled); // ADR-293
+        lot39().photoMode() // ADR-300 — F12 chụp sau khi khung vẽ xong
+                .afterRender(lot39().lot40()
+                        .lot41()
+                        .lot42()
+                        .lot43()
+                        .lot44()
+                        .lot45()
+                        .lot46()
+                        .screenshot());
     }
 
     /**
@@ -162,6 +171,15 @@ record ExpansionWindows(
     ExpansionWindows useLocalInput(
             InventoryCoordinator inventory, LocalIntentSender intents, MailCoordinator mail, QuestCoordinator quests) {
         Supplier<Optional<Long>> selectedId = () -> inventory.selectedItem().map(InventoryController.Item::itemId);
+        lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .forward()
+                .useMail(mail::selectedMail); // ADR-295
         lot31.bulkUse().useSelection(selectedId);
         lot31.lot32().itemLink().useSelection(inventory::selectedItem);
         Lot34Windows lot34 = lot31.lot32().lot33().lot34();

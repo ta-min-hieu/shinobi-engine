@@ -1268,6 +1268,57 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot44()
                                     .lookupItem(c))),
             Map.entry(
+                    Opcode.OPCODE_GET_BOSS_KILLS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetBossKillsRequest.parser(),
+                            Opcode.OPCODE_GET_BOSS_KILLS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .bossKills(id))),
+            Map.entry(
+                    Opcode.OPCODE_SCHEDULE_MAIL_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ScheduleMailCommand.parser(),
+                            Opcode.OPCODE_SCHEDULE_MAIL_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .scheduleMail(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_LIKE_PROFILE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.LikeProfileCommand.parser(),
+                            Opcode.OPCODE_LIKE_PROFILE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .likeProfile(id, c))),
+            Map.entry(
                     Opcode.OPCODE_GET_SHOP_PURCHASE_HISTORY_REQUEST_VALUE,
                     storageCommand(
                             dev.kage.protocol.GetShopPurchaseHistoryRequest.parser(),
@@ -1588,8 +1639,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     storageCommand(
                             dev.kage.protocol.InspectCharacterRequest.parser(),
                             Opcode.OPCODE_INSPECT_CHARACTER_RESPONSE_VALUE,
-                            (h, id, c) -> h.expansion.lot30().inspect().inspect(id, c, target -> h.statSheetOf(target)
-                                    .combatPower()))),
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .withLikes(
+                                            h.expansion.lot30().inspect().inspect(id, c, target -> h.statSheetOf(target)
+                                                    .combatPower())))), // ADR-298 — kèm lượt thích
             Map.entry(
                     Opcode.OPCODE_SET_INSPECT_PRIVACY_COMMAND_VALUE,
                     storageCommand(

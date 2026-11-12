@@ -787,6 +787,36 @@ public final class GatewayBootstrap {
                 facades.contentFacades().socialFacades().guildFacade(),
                 characterRegistry,
                 clock)));
+        Lot46Facades lot46 = facades.progression()
+                .expansion()
+                .lot34()
+                .lot35()
+                .lot36()
+                .lot37()
+                .lot38()
+                .lot39()
+                .lot40()
+                .lot41()
+                .lot42()
+                .lot44()
+                .lot45()
+                .lot46();
+        characterRegistry.bossKills.bind(lot46.bossKills()); // ADR-296
+        expansion.add(ScheduledMailJob.job(new ScheduledMailJob.Deps( // ADR-297
+                lot46.scheduledMail(),
+                facades.contentFacades().socialFacades().mailFacade(),
+                facades.progression().expansion().lot34().lot35().strangerMail(),
+                facades.contentFacades().socialFacades().friendFacade(),
+                characterRegistry,
+                clock)));
+    }
+
+    /** Facade lô 46 (ADR-295…) — tách ra cho gọn khối lồng nhau. */
+    private static Lot46Facades lot46Facades(ServerDatabaseBootstrap databaseBootstrap) {
+        dev.kage.server.database.Lot45Wiring wiring =
+                databaseBootstrap.expansion().lot45();
+        return new Lot46Facades(
+                wiring.wireBossKillLogFacade(), wiring.wireScheduledMailFacade(), wiring.wireProfileLikeFacade());
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */
@@ -828,7 +858,8 @@ public final class GatewayBootstrap {
                                                                 databaseBootstrap
                                                                         .expansion()
                                                                         .lot45()
-                                                                        .wireSentMailFacade())))))));
+                                                                        .wireSentMailFacade(),
+                                                                lot46Facades(databaseBootstrap))))))));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

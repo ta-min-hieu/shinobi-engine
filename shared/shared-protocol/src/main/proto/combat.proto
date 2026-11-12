@@ -262,3 +262,19 @@ message GetMonsterInfoResponse {
   bool boss = 9;
   repeated MonsterDropView drops = 10;
 }
+
+// ADR-296 (2026-11-12) — lịch sử boss đã hạ. Request: Client -> Server (OPCODE_GET_BOSS_KILLS_REQUEST).
+message GetBossKillsRequest {}
+
+message BossKillEntry {
+  string boss_code = 1;   // monster_template.code
+  bool world_boss = 2;    // false = boss Bí Cảnh
+  int32 rank = 3;         // hạng sát thương (boss thế giới); 0 = không xếp hạng
+  int64 damage = 4;
+  int64 at_epoch_seconds = 5;
+}
+
+// Response: Server -> Client (OPCODE_GET_BOSS_KILLS_RESPONSE). 20 lần gần nhất, mới trước (chỉ từ ADR-296).
+message GetBossKillsResponse {
+  repeated BossKillEntry entries = 1;
+}

@@ -1,6 +1,7 @@
 package dev.kage.client.core.world;
 
 import dev.kage.client.core.ui.hud.CombatHud;
+import dev.kage.engine.ecs.component.PositionComponent;
 
 /**
  * Đẩy mục tiêu hiện tại của {@link CombatHudController} xuống khung mục tiêu của {@link CombatHud},
@@ -15,7 +16,9 @@ final class TargetHudSync {
 
     private TargetHudSync() {}
 
-    static void sync(CombatHudController combat, CombatHud hud) {
+    static void sync(CombatHudController combat, CombatHud hud, PositionComponent local) {
+        PickablePoint point = combat.targetPointPerFrame(); // ADR-299 — khoảng cách tới mục tiêu
+        hud.setTargetDistance(point == null ? -1 : meters(point.x() - local.x, point.y() - local.y));
         if (combat.hasCharacterTarget()) {
             hud.setCharacterTarget(
                     combat.characterTargetName(), combat.characterTargetHp(), combat.characterTargetMaxHp());
@@ -27,5 +30,10 @@ final class TargetHudSync {
         } else {
             hud.clearTarget();
         }
+    }
+
+    /** Khoảng cách làm tròn tới mét (đơn vị thế giới = mét). Tĩnh để test. */
+    static int meters(float dx, float dy) {
+        return Math.round((float) Math.hypot(dx, dy));
     }
 }

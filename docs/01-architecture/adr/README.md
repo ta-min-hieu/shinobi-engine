@@ -326,6 +326,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-292](ADR-292-Chat-Idle-Fade.md) | Thu gọn khung chat khi rảnh: Mờ dần 2 giây cuối; `/chatan` 3–300 hoặc tắt; Preferences | ✅ Accepted (lô 45) |
 | [ADR-293](ADR-293-Combo-Counter.md) | Đếm combo đòn đánh: `ComboCounter` 3 giây, hiện từ đòn 3; `/combo` | ✅ Accepted (lô 45) |
 | [ADR-294](ADR-294-Chat-Font-Size.md) | Cỡ chữ khung chat: 3 cỡ chữ qua `setFontScale`; Preferences | ✅ Accepted (lô 45) |
+| [ADR-295](ADR-295-Mail-Forward.md) | Chuyển tiếp thư: Client dựng `SendMailCommand` từ thư đang chọn; `/chuyentiep` | ✅ Accepted (lô 46) |
+| [ADR-296](ADR-296-Boss-Kill-History.md) | Lịch sử boss đã hạ: Audit `BOSS_KILL` mỗi người; 418/419; `/bossdaha` | ✅ Accepted (lô 46) |
+| [ADR-297](ADR-297-Scheduled-Mail.md) | Thư hẹn giờ gửi: Bảng `scheduled_mail`; job 60 giây qua đường thư thường; 921/922; `/thuhengio` | ✅ Accepted (lô 46) |
+| [ADR-298](ADR-298-Profile-Likes.md) | Thích hồ sơ người chơi: Bảng `profile_like`; 271/272; `InspectCharacterResponse.likes` | ✅ Accepted (lô 46) |
+| [ADR-299](ADR-299-Target-Distance.md) | Khoảng cách tới mục tiêu: Dòng khoảng cách trong `HudTargetFrame` | ✅ Accepted (lô 46) |
+| [ADR-300](ADR-300-Screenshot-Key.md) | Chụp màn hình F12: F12 → PNG trong `~/KageScreenshots`, ghi trên Virtual Thread | ✅ Accepted (lô 46) |
+| [ADR-301](ADR-301-Stopwatch.md) | Đồng hồ bấm giờ: `/bamgio [xem]` | ✅ Accepted (lô 46) |
+| [ADR-302](ADR-302-Quick-Calculator.md) | Máy tính nhanh: Phân tích đệ quy xuống, `BigDecimal`; `/tinh` | ✅ Accepted (lô 46) |
 ---
 
 ## ADR cần tạo (chưa viết)

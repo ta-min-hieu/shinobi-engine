@@ -33,7 +33,7 @@ final class Lot44Steps {
                         p -> dev.kage.protocol.LeavePartyResponse.parseFrom(p)
                                 .getOutcome()
                                 .name());
-            default -> lot45.step(verb);
+            default -> lot45.step(verb, arg);
         };
     }
 

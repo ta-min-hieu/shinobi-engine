@@ -20,6 +20,7 @@ final class PhotoModeCoordinator implements WindowFlow {
     private final I18NBundle i18n = KageI18n.load();
     private final KeyPressEdge toggleKey = new KeyPressEdge();
     private boolean hidingHud;
+    private ScreenshotCoordinator screenshot; // ADR-300 — chụp SAU khi vẽ xong khung
 
     PhotoModeCoordinator(ChatCoordinator chat) {
         this.chat = chat;
@@ -43,6 +44,14 @@ final class PhotoModeCoordinator implements WindowFlow {
             syncHud.run();
             panels.render(com.badlogic.gdx.Gdx.graphics.getDeltaTime());
         }
+        if (screenshot != null) {
+            screenshot.poll(com.badlogic.gdx.Gdx.input.isKeyPressed(com.badlogic.gdx.Input.Keys.F12));
+        }
+    }
+
+    /** ADR-300 — chụp màn hình đọc phím F12 sau khi khung đã vẽ xong (kể cả khi đang ẩn HUD). */
+    void afterRender(ScreenshotCoordinator capture) {
+        this.screenshot = capture;
     }
 
     /** Đang ẩn HUD. */

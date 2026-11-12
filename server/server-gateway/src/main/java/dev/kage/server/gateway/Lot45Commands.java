@@ -28,6 +28,11 @@ record Lot45Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
 
     private static final String LOYALTY_SUBJECT = "Quà gắn bó / Loyalty gift";
 
+    /** Lớp lệnh lô 46 (ADR-295…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot46Commands lot46() {
+        return new Lot46Commands(gateway, registry);
+    }
+
     /** ADR-288 — 20 lần mua cửa hàng NPC gần nhất. */
     GetShopPurchaseHistoryResponse purchaseHistory(long characterId) {
         GetShopPurchaseHistoryResponse.Builder response = GetShopPurchaseHistoryResponse.newBuilder();

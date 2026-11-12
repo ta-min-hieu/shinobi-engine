@@ -1060,7 +1060,7 @@ public final class WorldScreen implements GameScreen {
         combatHud.setPlayerHp(combatHudController.playerHp(), combatHudController.playerMaxHp());
         combatHud.setPlayerChi(combatHudController.playerChi(), combatHudController.playerMaxChi());
         combatHud.setLevel(characterLevel);
-        TargetHudSync.sync(combatHudController, combatHud);
+        TargetHudSync.sync(combatHudController, combatHud, POSITION.get(localPlayer));
         combatHud.setSkillState(combatHudController.skillNameKey(), combatHudController.skillCooldownRemaining());
         combatHud.setSkillReady(combatHudController.canUseSkill());
         combatHud.setArtifactCooldown(reports.community().expansion().artifact().cooldownRemainingSeconds());
