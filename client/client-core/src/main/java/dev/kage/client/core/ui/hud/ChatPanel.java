@@ -142,14 +142,7 @@ public final class ChatPanel implements HudWindow {
         this.stage = new Stage(new ScreenViewport(), new SpriteBatch());
 
         this.pinnedLabel = pinnedLabel(skin);
-        Table log = new Table();
-        for (int index = 0; index < maxLines; index++) {
-            Label label = new Label("", skin.labelStyle);
-            label.setWrap(true);
-            label.setAlignment(Align.left);
-            lineLabels.add(label);
-            log.add(label).width(PANEL_WIDTH_PX).growX().left().row();
-        }
+        Table log = buildLog(skin, maxLines);
 
         this.channelButton = new TextButton("", skin.buttonStyle);
         this.input = new TextField("", skin.textFieldStyle);
@@ -191,6 +184,19 @@ public final class ChatPanel implements HudWindow {
                 }
             }
         });
+    }
+
+    /** Dựng SẴN {@code maxLines} nhãn nhật ký (tái dùng, không tạo actor mỗi lần có tin). */
+    private Table buildLog(KageSkin skin, int maxLines) {
+        Table log = new Table();
+        for (int index = 0; index < maxLines; index++) {
+            Label label = new Label("", skin.labelStyle);
+            label.setWrap(true);
+            label.setAlignment(Align.left);
+            lineLabels.add(label);
+            log.add(label).width(PANEL_WIDTH_PX).growX().left().row();
+        }
+        return log;
     }
 
     /** ADR-291 — nhãn dòng ghim ở đầu khung, ẩn khi chưa ghim gì. */
