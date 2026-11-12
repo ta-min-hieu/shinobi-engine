@@ -23,6 +23,14 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.chat",
                     List.of(
+                            "/tinrieng",
+                            "/whispers",
+                            "/ghimchat",
+                            "/pinchat",
+                            "/chatan",
+                            "/chatfade",
+                            "/cochu",
+                            "/fontsize",
                             "/w",
                             "/r",
                             "/reply",
@@ -49,6 +57,8 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.friend",
                     List.of(
+                            "/thich",
+                            "/like",
                             "/ketban",
                             "/addfriend",
                             "/quanhe",
@@ -71,6 +81,8 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.party",
                     List.of(
+                            "/tunhannhom",
+                            "/autoparty",
                             "/nhuongnhom",
                             "/partyleader",
                             "/danhdau",
@@ -88,6 +100,8 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.guild",
                     List.of(
+                            "/conghien",
+                            "/contrib",
                             "/vaobang",
                             "/moibang",
                             "/ginvite",
@@ -161,6 +175,12 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.mail",
                     List.of(
+                            "/thudagui",
+                            "/sentmail",
+                            "/chuyentiep",
+                            "/forward",
+                            "/thuhengio",
+                            "/mailat",
                             "/xoathu",
                             "/cleanmail",
                             "/ghimthu",
@@ -202,6 +222,15 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.info",
                     List.of(
+                            "/vatpham",
+                            "/item",
+                            "/lichsudau",
+                            "/duels",
+                            "/online",
+                            "/bossdaha",
+                            "/bosskills",
+                            "/lichsumua",
+                            "/purchases",
                             "/thongke",
                             "/stats",
                             "/kyluc",
@@ -224,6 +253,12 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.tools",
                     List.of(
+                            "/fps",
+                            "/combo",
+                            "/bamgio",
+                            "/stopwatch",
+                            "/tinh",
+                            "/calc",
                             "/trogiup",
                             "/help",
                             "/gio",

@@ -45,7 +45,7 @@ final class ScreenshotCoordinator implements WindowFlow {
         int width = Gdx.graphics.getBackBufferWidth();
         int height = Gdx.graphics.getBackBufferHeight();
         Pixmap pixmap = Pixmap.createFromFrameBuffer(0, 0, width, height);
-        FileHandle file = Gdx.files.external(fileName(LocalDateTime.now()));
+        FileHandle file = Gdx.files.external(fileName(LocalDateTime.now(java.time.ZoneId.systemDefault())));
         Thread.ofVirtual().name("screenshot-writer").start(() -> write(pixmap, file));
     }
 

@@ -50,12 +50,12 @@ final class MailCoordinator implements WindowFlow {
 
     private final MailController controller = new MailController();
 
-    /** ADR-217 — id lá thư đang mở đọc; 0 nếu chưa chọn lá nào (lệnh {@code /ghimthu}). */
     /** ADR-295 — lá thư đang chọn (cho chuyển tiếp). */
     java.util.Optional<MailController.Mail> selectedMail() {
         return controller.selected();
     }
 
+    /** ADR-217 — id lá thư đang mở đọc; 0 nếu chưa chọn lá nào (lệnh {@code /ghimthu}). */
     long selectedMailId() {
         return controller.selected().map(MailController.Mail::mailId).orElse(0L);
     }
