@@ -1236,6 +1236,67 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot42()
                                     .lot43()
                                     .splitGold(id, c, h::currentWorldFacadeIfPresent)))),
+            Map.entry( // ADR-286 — tự nhận lời mời nhóm từ bạn bè
+                    Opcode.OPCODE_SET_PARTY_AUTO_ACCEPT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetPartyAutoAcceptCommand.parser(),
+                            Opcode.OPCODE_SET_PARTY_AUTO_ACCEPT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .setAutoAccept(id, c))),
+            // Lô 44 — tra cứu vật phẩm (ADR-279), lịch sử đấu tay đôi (ADR-280), đếm người online (ADR-281).
+            Map.entry(
+                    Opcode.OPCODE_LOOKUP_ITEM_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.LookupItemRequest.parser(),
+                            Opcode.OPCODE_LOOKUP_ITEM_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lookupItem(c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_DUEL_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetDuelHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_DUEL_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .duelHistory(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_ONLINE_COUNT_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetOnlineCountRequest.parser(),
+                            Opcode.OPCODE_GET_ONLINE_COUNT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .onlineCount())),
             // Lô 41 — thông tin quái (ADR-255), lịch bang (ADR-256), dự tính cường hoá (ADR-257), xếp hạng bạn bè
             // (258).
             Map.entry(
@@ -5225,6 +5286,21 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .setOutcome(toProtoOutcome(result))
                 .build();
         send(ctx, Opcode.OPCODE_INVITE_PARTY_MEMBER_RESPONSE_VALUE, sequenceId, response.toByteArray());
+        long targetId = target.get().id();
+        if (result == PartyFacade.InviteResult.OK // ADR-286 — bạn bè bật tự nhận ⇒ vào nhóm luôn
+                && expansion
+                        .lot37()
+                        .lot38()
+                        .lot39()
+                        .lot40()
+                        .lot41()
+                        .lot42()
+                        .lot43()
+                        .lot44()
+                        .autoAcceptIfFriend(characterId, targetId)) {
+            List<Long> after = partyMemberIds(targetId);
+            membershipNotices().partyMembershipChanged(targetId, MembershipNotices.without(after, targetId), after);
+        }
     }
 
     private static final Map<PartyFacade.InviteResult, InvitePartyMemberOutcome> INVITE_PARTY_MEMBER_OUTCOME_MAPPING =

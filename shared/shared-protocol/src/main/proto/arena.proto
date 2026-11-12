@@ -215,3 +215,18 @@ message RemoveEnemyResponse {
   bool removed = 1;
   string name = 2;
 }
+
+// ADR-280 (2026-11-12) — lịch sử đấu tay đôi. Request: Client -> Server (OPCODE_GET_DUEL_HISTORY_REQUEST).
+message GetDuelHistoryRequest {}
+
+message DuelHistoryEntry {
+  string opponent_name = 1;
+  bool won = 2;
+  int32 rating_after = 3;
+  int64 at_epoch_seconds = 4;
+}
+
+// Response: Server -> Client (OPCODE_GET_DUEL_HISTORY_RESPONSE). 10 trận gần nhất, mới trước (chỉ các trận từ ADR-280).
+message GetDuelHistoryResponse {
+  repeated DuelHistoryEntry entries = 1;
+}

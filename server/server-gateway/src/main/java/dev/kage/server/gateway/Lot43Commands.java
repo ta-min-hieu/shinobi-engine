@@ -22,6 +22,11 @@ import dev.kage.shop.domain.ShopListing;
 /** Lớp lệnh lô 43 (ADR-271…) — MỘT thành phần của {@link Lot42Commands}. Gọi trên Virtual Thread. */
 record Lot43Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 44 (ADR-279…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot44Commands lot44() {
+        return new Lot44Commands(gateway, registry);
+    }
+
     /**
      * ADR-278 — chia đều {@code amount} cho đồng đội ĐANG online ở CÙNG World với người chia (không gồm người chia).
      * Phần dư ở lại người chia. OK ⇒ báo mỗi người nhận một dòng chat hệ thống.

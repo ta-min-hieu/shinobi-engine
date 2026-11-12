@@ -751,3 +751,18 @@ message GetPersonalRecordsResponse {
   int64 longest_kill_streak = 2;   // chuỗi hạ quái dài nhất không chết
   int64 current_kill_streak = 3;   // chuỗi hiện tại (RAM, mất khi server khởi động lại)
 }
+
+// ADR-281 (2026-11-12) — đếm người online. Request: Client -> Server (OPCODE_GET_ONLINE_COUNT_REQUEST).
+message GetOnlineCountRequest {}
+
+message FactionCount {
+  string faction = 1;  // tên enum Faction phía server (HOA, THUY…); NONE = chưa chọn linh căn
+  int32 count = 2;
+}
+
+// Response: Server -> Client (OPCODE_GET_ONLINE_COUNT_RESPONSE). Không lộ tên ai — chỉ con số.
+message GetOnlineCountResponse {
+  int32 total = 1;
+  repeated FactionCount by_faction = 2;
+  repeated int32 by_realm = 3;  // chỉ số i = cảnh giới thứ i (18 cấp mỗi cảnh giới như BreakthroughHooks; Lv1–18 là 0)
+}

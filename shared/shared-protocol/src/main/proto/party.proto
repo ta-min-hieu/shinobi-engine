@@ -424,3 +424,15 @@ message SplitPartyGoldResponse {
   int32 recipients = 3; // số người nhận
   int64 gold_after = 4; // vàng còn lại của người chia
 }
+
+// ADR-286 (2026-11-12) — tự nhận lời mời nhóm từ bạn bè. Command: Client -> Server (OPCODE_SET_PARTY_AUTO_ACCEPT_COMMAND).
+// Bật thì một người BẠN mời vào nhóm ⇒ server tự chấp nhận ngay (người không phải bạn vẫn là lời mời thường).
+message SetPartyAutoAcceptCommand {
+  bool query_only = 1;
+  bool enabled = 2;
+}
+
+// Response: Server -> Client (OPCODE_SET_PARTY_AUTO_ACCEPT_RESPONSE). Trạng thái sau khi đổi.
+message SetPartyAutoAcceptResponse {
+  bool enabled = 1;
+}

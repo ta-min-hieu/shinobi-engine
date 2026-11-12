@@ -29,7 +29,9 @@ public final class DisplaySettings {
          */
         ALLOW_INSPECT("display.allow_inspect"),
         /** ADR-174 — nhắc nghỉ ngơi sau 2 giờ chơi liên tục, rồi mỗi giờ. */
-        REST_REMINDER("display.rest_reminder");
+        REST_REMINDER("display.rest_reminder"),
+        /** ADR-285 — ẩn số sát thương người ngoài nhóm; mặc định TẮT (vẫn thấy hết như trước). */
+        HIDE_OTHERS_DAMAGE("display.hide_others_damage", false);
 
         private final String key;
         private final boolean defaultOn;

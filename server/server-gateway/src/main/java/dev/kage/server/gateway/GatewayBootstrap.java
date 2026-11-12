@@ -770,6 +770,8 @@ public final class GatewayBootstrap {
             ExpansionJobs expansion, GatewayFacades facades, ConnectedCharacterRegistry characterRegistry) {
         java.time.Clock clock = java.time.Clock.systemUTC();
         expansion.add(DailyReminder.job(new DailyReminder.Deps(facades, characterRegistry, clock)));
+        expansion.add(WeeklyReminder.job(new WeeklyReminder.Deps( // ADR-282
+                facades.progression().expansion().weeklyTasks(), characterRegistry, clock)));
         expansion.add(GuildEventReminder.job(new GuildEventReminder.Deps(
                 facades.progression()
                         .expansion()
@@ -807,7 +809,17 @@ public final class GatewayBootstrap {
                                         databaseBootstrap.expansion().wireMonsterInfoFacade(),
                                         databaseBootstrap.expansion().wireGuildEventFacade(),
                                         new Lot42Facades( // lô 42–43 lồng ở đây
-                                                databaseBootstrap.expansion().wirePartyGoldSplitFacade())))));
+                                                databaseBootstrap.expansion().wirePartyGoldSplitFacade(),
+                                                new Lot44Facades( // lô 44 lồng ở đây
+                                                        databaseBootstrap
+                                                                .expansion()
+                                                                .wireItemLookupFacade(),
+                                                        databaseBootstrap
+                                                                .expansion()
+                                                                .wireDuelHistoryFacade(),
+                                                        databaseBootstrap
+                                                                .expansion()
+                                                                .wirePartyAutoAcceptFacade()))))));
     }
 
     /** Facade lô 33 (ADR-191…) — tách khỏi {@link #expansionFacades} vì trần {@code MethodLength}. */

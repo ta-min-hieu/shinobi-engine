@@ -121,6 +121,8 @@ enum Opcode {
   OPCODE_GET_LOGIN_HISTORY_RESPONSE = 266;
   OPCODE_GET_PERSONAL_RECORDS_REQUEST = 267;  // ADR-240 (2026-11-08) — kỷ lục cá nhân
   OPCODE_GET_PERSONAL_RECORDS_RESPONSE = 268;
+  OPCODE_GET_ONLINE_COUNT_REQUEST = 269;  // ADR-281 (2026-11-12) — đếm người online
+  OPCODE_GET_ONLINE_COUNT_RESPONSE = 270;
 
   // --- Movement / World (300-399) ---
   OPCODE_MOVE_COMMAND = 300;
@@ -281,6 +283,8 @@ enum Opcode {
   OPCODE_GET_ENHANCE_PREVIEW_RESPONSE = 569;
   OPCODE_GET_BAG_VALUE_REQUEST = 570;  // ADR-274 (2026-11-08) — tổng giá trị túi đồ
   OPCODE_GET_BAG_VALUE_RESPONSE = 571;
+  OPCODE_LOOKUP_ITEM_REQUEST = 572;  // ADR-279 (2026-11-12) — tra cứu vật phẩm
+  OPCODE_LOOKUP_ITEM_RESPONSE = 573;
   // 511 để TRỐNG CÓ CHỦ Ý — dành sẵn cho ITEM_REMOVED_EVENT (ADR-035 Revisit Trigger #3, chỉ
   // thêm khi ĐO thấy việc hỏi lại toàn bộ túi sau mỗi hành động tốn thật). ĐỪNG cấp cho packet khác.
 
@@ -601,6 +605,8 @@ enum Opcode {
   OPCODE_START_PARTY_COUNTDOWN_RESPONSE = 1342;
   OPCODE_SPLIT_PARTY_GOLD_COMMAND = 1343;  // ADR-278 (2026-11-08) — chia vàng cho nhóm
   OPCODE_SPLIT_PARTY_GOLD_RESPONSE = 1344;
+  OPCODE_SET_PARTY_AUTO_ACCEPT_COMMAND = 1345;  // ADR-286 (2026-11-12) — tự nhận lời mời nhóm từ bạn bè
+  OPCODE_SET_PARTY_AUTO_ACCEPT_RESPONSE = 1346;
 
   // --- Trade (1400-1499) ---
   OPCODE_REQUEST_TRADE_COMMAND = 1400;
@@ -627,6 +633,8 @@ enum Opcode {
   // ADR-057 (Accepted 2026-10-18) — Bia Anh Danh. 1200/1201 đã thuộc GetPvpRating nên lấy số kế tiếp.
   OPCODE_GET_LEADERBOARD_REQUEST = 1202;
   OPCODE_GET_LEADERBOARD_RESPONSE = 1203;
+  OPCODE_GET_DUEL_HISTORY_REQUEST = 1204;  // ADR-280 (2026-11-12) — lịch sử đấu tay đôi
+  OPCODE_GET_DUEL_HISTORY_RESPONSE = 1205;
 
   // --- Dungeon (1500-1599) ---
   OPCODE_ENTER_DUNGEON_COMMAND = 1500;

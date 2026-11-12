@@ -60,6 +60,8 @@ final class ChatCoordinator implements WindowFlow {
     /** ADR-273 — biệt danh lệnh: viết lại dòng gõ vào trước mọi xử lý khác. */
     private java.util.function.UnaryOperator<String> lineRewriter = java.util.function.UnaryOperator.identity();
 
+    private java.util.function.Consumer<ChatController.ComposeResult.Send> outgoing = send -> {}; // ADR-284
+
     ChatCoordinator(ChatPanel panel, WorldCommandSender sender) {
         this.panel = panel;
         this.sender = sender;
@@ -71,6 +73,11 @@ final class ChatCoordinator implements WindowFlow {
         // khung chat coi như không tồn tại với người chơi lần đầu.
         controller.appendSystem(text("chat.hint.open"));
         refreshLines();
+    }
+
+    /** ADR-284 — nghe mọi tin ô nhập vừa gửi đi (sau khi qua lệnh gạch chéo). */
+    void onOutgoing(java.util.function.Consumer<ChatController.ComposeResult.Send> listener) {
+        this.outgoing = listener;
     }
 
     /** ADR-245 — tên nhân vật đang chơi, để tô sáng tin nhắc tên mình. Trả chính nó (gọi nối ngay sau khi dựng). */
@@ -280,8 +287,10 @@ final class ChatCoordinator implements WindowFlow {
         }
         ChatController.ComposeResult result = controller.compose(typed);
         switch (result) {
-            case ChatController.ComposeResult.Send send ->
+            case ChatController.ComposeResult.Send send -> {
                 sender.sendChatMessage(send.channel(), send.targetName(), send.body());
+                outgoing.accept(send); // ADR-284 — lịch sử tin riêng
+            }
             case ChatController.ComposeResult.Reject reject -> {
                 controller.appendSystem(text(reject.messageKey()));
                 refreshLines();

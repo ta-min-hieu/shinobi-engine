@@ -1,5 +1,6 @@
 package dev.kage.client.core.ui.hud;
 
+import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -45,6 +46,9 @@ public final class CombatHud implements HudWindow {
     private final HudActionButtons actions;
     private final HudQuestCard quest;
     private final HudBanners banners;
+    private final StringBuilder fpsText = new StringBuilder(); // ADR-283
+    private final Label fpsLabel;
+    private int lastFps = -1;
 
     /**
      * Bố cục theo ảnh Ninja School Online chủ dự án gửi (2026-08-09): cụm chỉ số góc trên-trái, mục
@@ -60,6 +64,7 @@ public final class CombatHud implements HudWindow {
         this.actions = new HudActionButtons(skin, i18n);
         this.quest = new HudQuestCard(skin, i18n);
         this.banners = new HudBanners(skin, i18n);
+        this.fpsLabel = new Label("", skin.statLabelStyle);
 
         // 6 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
         stage.addActor(anchored(buildPlayerCluster(), Align.topLeft));
@@ -68,6 +73,21 @@ public final class CombatHud implements HudWindow {
         stage.addActor(anchored(banners.duelGroup(), Align.left));
         stage.addActor(anchored(buildHintBar(), Align.bottom));
         stage.addActor(anchored(actions.build(skin), Align.bottomRight));
+        fpsLabel.setVisible(false); // ADR-283 — bật bằng /fps
+        stage.addActor(anchored(fpsCorner(), Align.bottomLeft));
+    }
+
+    /** ADR-283 — cụm nhãn FPS góc dưới trái. */
+    private Table fpsCorner() {
+        Table corner = new Table();
+        corner.add(fpsLabel);
+        return corner;
+    }
+
+    /** ADR-283 — hiện / ẩn số khung hình/giây. */
+    public void setFpsVisible(boolean visible) {
+        fpsLabel.setVisible(visible);
+        lastFps = -1;
     }
 
     /** Bọc một cụm vào {@link Table} phủ toàn màn hình, neo về góc {@code align}. */
@@ -340,6 +360,12 @@ public final class CombatHud implements HudWindow {
 
     @Override
     public void render(float deltaTime) {
+        if (fpsLabel.isVisible() && Gdx.graphics.getFramesPerSecond() != lastFps) {
+            lastFps = Gdx.graphics.getFramesPerSecond();
+            fpsText.setLength(0);
+            fpsText.append("FPS ").append(lastFps); // tái dùng bộ đệm — không cấp phát mỗi khung
+            fpsLabel.setText(fpsText);
+        }
         stage.act(deltaTime);
         stage.draw();
     }

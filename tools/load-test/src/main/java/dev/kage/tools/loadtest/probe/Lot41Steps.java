@@ -14,9 +14,11 @@ final class Lot41Steps {
     private static final long SECONDS_PER_MINUTE = 60L;
 
     private final Lot23Scenario.Asker asker;
+    private final Lot44Steps lot44;
 
     Lot41Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot44 = new Lot44Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -27,7 +29,7 @@ final class Lot41Steps {
             case "eventCancel" -> eventCancel(arg);
             case "enhancePreview" -> enhancePreview(arg);
             case "friendRank" -> friendRank();
-            default -> "bước không hiểu";
+            default -> lot44.step(verb, arg);
         };
     }
 

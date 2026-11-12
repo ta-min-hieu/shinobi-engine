@@ -75,6 +75,10 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
                 updated_at = EXCLUDED.updated_at
             """;
 
+    private static final String AUDIT_DUEL = """
+            INSERT INTO audit_log (character_id, action, detail_json, created_at) VALUES (?, 'DUEL_RESULT', ?, ?)
+            """;
+
     private final DataSource dataSource;
 
     public PostgresPvpRatingAdapter(DataSource dataSource) {
@@ -107,6 +111,9 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
             Timestamp now = Timestamp.from(Instant.now());
             upsert(connection, winnerCharacterId, new RatingDelta(result.newWinnerRating(), 1, 0), now);
             upsert(connection, loserCharacterId, new RatingDelta(result.newLoserRating(), 0, 1), now);
+            // ADR-280 — lịch sử đấu: một dòng audit mỗi bên, cùng giao dịch với Elo (không trận nào lệch sổ).
+            audit(connection, new DuelSide(winnerCharacterId, loserCharacterId, true, result.newWinnerRating()), now);
+            audit(connection, new DuelSide(loserCharacterId, winnerCharacterId, false, result.newLoserRating()), now);
             return result;
         });
     }
@@ -129,6 +136,19 @@ public final class PostgresPvpRatingAdapter implements PvpRatingPort {
         } catch (SQLException e) {
             throw new DatabaseAccessException("Lỗi khoá dòng pvp_rating để đọc-tính-ghi nguyên tử", e);
         }
+    }
+
+    /** Một bên của trận đấu, nhìn từ {@code characterId}. */
+    private record DuelSide(long characterId, long opponentId, boolean won, int ratingAfter) {}
+
+    private static void audit(Connection connection, DuelSide side, Timestamp at) {
+        JdbcOperations.update(
+                connection,
+                AUDIT_DUEL,
+                side.characterId(),
+                "{\"opponentId\":" + side.opponentId() + ",\"won\":" + side.won() + ",\"ratingAfter\":"
+                        + side.ratingAfter() + "}",
+                at);
     }
 
     /** Gộp tham số UPSERT — tránh vượt giới hạn 4 tham số/method (STATIC-ANALYSIS.md). */

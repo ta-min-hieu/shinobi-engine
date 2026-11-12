@@ -10,7 +10,8 @@ record Lot43Windows(
         CommandAliasCoordinator aliases,
         BagValueCoordinator bagValue,
         MailSearchCoordinator mailSearch,
-        FavoriteFriendsCoordinator favorites) {
+        FavoriteFriendsCoordinator favorites,
+        Lot44Windows lot44) {
 
     static Lot43Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot43Windows(
@@ -18,7 +19,8 @@ record Lot43Windows(
                 new CommandAliasCoordinator(feeds.chat()),
                 new BagValueCoordinator(sender, feeds.chat()),
                 new MailSearchCoordinator(sender, feeds.chat()),
-                new FavoriteFriendsCoordinator(feeds.chat()));
+                new FavoriteFriendsCoordinator(feeds.chat()),
+                Lot44Windows.create(sender, feeds)); // lô 44 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -28,6 +30,7 @@ record Lot43Windows(
         panels.register(bagValue);
         panels.register(mailSearch);
         panels.register(favorites);
+        lot44.registerInto(panels);
     }
 
     /** ADR-276 — khung bạn bè xếp bạn yêu thích lên đầu, vẽ lại mỗi khi danh sách ghim đổi. */

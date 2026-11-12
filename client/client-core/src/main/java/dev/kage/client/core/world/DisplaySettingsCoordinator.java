@@ -27,6 +27,7 @@ final class DisplaySettingsCoordinator implements WindowFlow {
             new java.util.EnumMap<>(DisplaySettings.Option.class);
 
     private final I18NBundle i18n = KageI18n.load();
+    private java.util.function.LongPredicate partyMember = id -> false; // ADR-285
 
     DisplaySettingsCoordinator(ReportPanel panel, DisplaySettings settings, ChatCoordinator chat) {
         this.panel = panel;
@@ -47,11 +48,17 @@ final class DisplaySettingsCoordinator implements WindowFlow {
         listener.accept(settings.isOn(option));
     }
 
+    /** ADR-285 — ai là thành viên nhóm (nối trước {@link #applyTo}). */
+    void usePartyMembers(java.util.function.LongPredicate members) {
+        this.partyMember = members;
+    }
+
     /** Nối công tắc vào từng lớp vẽ — mỗi lớp tự hỏi công tắc của mình mỗi khung. */
     void applyTo(
             RealmTitles titles, CombatFeedbackPresenter feedback, HorizonBackdrop backdrop, WeatherOverlay weather) {
         titles.useSwitch(settings.switchFor(DisplaySettings.Option.REALM_TITLES));
         feedback.useSwitch(settings.switchFor(DisplaySettings.Option.DAMAGE_NUMBERS));
+        feedback.useOthersFilter(settings.switchFor(DisplaySettings.Option.HIDE_OTHERS_DAMAGE), partyMember);
         backdrop.useSwitch(settings.switchFor(DisplaySettings.Option.PARALLAX));
         weather.useSwitch(settings.switchFor(DisplaySettings.Option.WEATHER));
     }

@@ -43,6 +43,8 @@ final class CombatFeedbackPresenter implements Disposable {
     private final SkillVfxRenderer skillVfx = new SkillVfxRenderer(VFX_TIER);
     private final FloatingCombatText floatingText;
     private BooleanSupplier damageNumbers = () -> true;
+    private BooleanSupplier hideOthers = () -> false; // ADR-285
+    private java.util.function.LongPredicate partyMember = id -> false; // ADR-285
     // Bundle RIÊNG đúng quy ước KageI18n (mỗi nơi tự nạp, không dùng chung instance) — cần cho nhãn
     // "Né!" của số damage bay lên.
     private final I18NBundle i18n = KageI18n.load();
@@ -69,7 +71,7 @@ final class CombatFeedbackPresenter implements Disposable {
     /** Đòn đánh thường — chỉ có số damage, không có hiệu ứng riêng. */
     void onAttackResult(AttackResultEvent event) {
         if (resolveAnchor(event.getTargetEntityId())) {
-            showNumber(event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
+            showNumber(event.getAttackerEntityId(), event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
         }
     }
 
@@ -77,7 +79,7 @@ final class CombatFeedbackPresenter implements Disposable {
     void onSkillResult(SkillResultEvent event) {
         if (resolveAnchor(event.getTargetEntityId())) {
             skillVfx.play(event.getSkillCode(), anchor.x, anchor.y, anchor.z);
-            showNumber(event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
+            showNumber(event.getAttackerEntityId(), event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
         }
     }
 
@@ -115,7 +117,10 @@ final class CombatFeedbackPresenter implements Disposable {
      * Màu phân biệt NGAY không cần đọc số: vàng = mình gây ra, đỏ = mình phải chịu, xám = né.
      * {@link #anchor} phải vừa được {@link #resolveAnchor} ghi.
      */
-    private void showNumber(long targetEntityId, int damage, boolean miss) {
+    private void showNumber(long attackerEntityId, long targetEntityId, int damage, boolean miss) {
+        if (hidesOthers(attackerEntityId, targetEntityId)) {
+            return; // ADR-285 — số của người ngoài nhóm
+        }
         if (miss) {
             floatingText.show(i18n.get("hud.combat.miss"), FloatingCombatText.MISS, anchor);
             return;
@@ -195,6 +200,23 @@ final class CombatFeedbackPresenter implements Disposable {
     /** ADR-143 — công tắc "chữ damage"; tắt thì số bay lên không vẽ (hiệu ứng skill vẫn vẽ). */
     void useSwitch(BooleanSupplier damageNumbersOn) {
         this.damageNumbers = damageNumbersOn;
+    }
+
+    /**
+     * ADR-285 — ẩn số sát thương của người ngoài nhóm: công tắc + "người này là phe mình" (mình đã tính sẵn; thành viên
+     * nhóm do bảng sát thương nhóm ADR-251 biết).
+     */
+    void useOthersFilter(BooleanSupplier hideOthersOn, java.util.function.LongPredicate partyMember) {
+        this.hideOthers = hideOthersOn;
+        this.partyMember = partyMember;
+    }
+
+    /** Đòn do người ngoài nhóm đánh lên thứ không phải mình, và công tắc đang bật. */
+    private boolean hidesOthers(long attackerEntityId, long targetEntityId) {
+        return hideOthers.getAsBoolean()
+                && attackerEntityId != localCharacterId
+                && targetEntityId != localCharacterId
+                && !partyMember.test(attackerEntityId);
     }
 
     @Override

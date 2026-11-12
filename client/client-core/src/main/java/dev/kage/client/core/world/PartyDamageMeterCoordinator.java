@@ -63,6 +63,11 @@ final class PartyDamageMeterCoordinator implements WindowFlow {
         totals[slot] += damage;
     }
 
+    /** ADR-285 — {@code characterId} là mình hoặc thành viên nhóm đang theo dõi. */
+    boolean isTracked(long characterId) {
+        return slotOf(characterId) >= 0;
+    }
+
     /** Tổng sát thương hiện tại của {@code characterId} (0 nếu không theo dõi). */
     long totalOf(long characterId) {
         int slot = slotOf(characterId);

@@ -310,6 +310,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-276](ADR-276-Favorite-Friends.md) | Bạn bè yêu thích: Preferences; ghim lên đầu, ★; cùng thứ tự cho vẽ và nút Xoá | ✅ Accepted (lô 43) |
 | [ADR-277](ADR-277-Mail-Draft.md) | Thư nháp: Preferences; lưu lúc đóng, điền lúc mở, xoá khi gửi OK | ✅ Accepted (lô 43) |
 | [ADR-278](ADR-278-Party-Gold-Split.md) | Chia vàng cho nhóm: 1343/1344; cùng World; một transaction + audit; khoá an toàn | ✅ Accepted (lô 43) |
+| [ADR-279](ADR-279-Item-Lookup.md) | Tra cứu vật phẩm: client tìm theo tên trong catalog; 572/573 giá cửa hàng + quái rơi; `/vatpham` | ✅ Accepted (lô 44) |
+| [ADR-280](ADR-280-Duel-History.md) | Lịch sử đấu tay đôi: audit `DUEL_RESULT` hai bên trong giao dịch Elo; 1204/1205; `/lichsudau` | ✅ Accepted (lô 44) |
+| [ADR-281](ADR-281-Online-Count.md) | Đếm người online: 269/270 tổng + linh căn + cảnh giới, không tên; `/online` | ✅ Accepted (lô 44) |
+| [ADR-282](ADR-282-Weekly-Reminder.md) | Nhắc nhiệm vụ tuần: ≤ 3 giờ trước reset tuần nhắc một lần người còn việc tuần chưa lĩnh | ✅ Accepted (lô 44) |
+| [ADR-283](ADR-283-Fps-Counter.md) | Bộ đếm FPS: nhãn góc HUD, Preferences; `/fps` (thuần client) | ✅ Accepted (lô 44) |
+| [ADR-284](ADR-284-Whisper-History.md) | Lịch sử tin riêng: RAM, 30 dòng/người; `/tinrieng` (thuần client) | ✅ Accepted (lô 44) |
+| [ADR-285](ADR-285-Hide-Others-Damage.md) | Ẩn số sát thương người ngoài nhóm: cài đặt hiển thị mặc định tắt (thuần client) | ✅ Accepted (lô 44) |
+| [ADR-286](ADR-286-Auto-Accept-Friend-Party.md) | Tự nhận lời mời nhóm từ bạn bè: V171 cột công tắc, server tự chấp nhận khi người mời là bạn; 1345/1346; `/tunhannhom` | ✅ Accepted (lô 44) |
 ---
 
 ## ADR cần tạo (chưa viết)

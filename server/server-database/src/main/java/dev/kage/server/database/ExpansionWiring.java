@@ -313,6 +313,24 @@ public final class ExpansionWiring {
                 new dev.kage.server.database.guild.PostgresGuildEventAdapter(dataSource));
     }
 
+    /** ADR-279 — tra cứu vật phẩm. */
+    public dev.kage.inventory.api.ItemLookupFacade wireItemLookupFacade() {
+        return new dev.kage.inventory.api.ItemLookupFacade(
+                new dev.kage.server.database.inventory.PostgresItemLookupAdapter(dataSource));
+    }
+
+    /** ADR-280 — lịch sử đấu tay đôi. */
+    public dev.kage.pvp.api.DuelHistoryFacade wireDuelHistoryFacade() {
+        return new dev.kage.pvp.api.DuelHistoryFacade(
+                new dev.kage.server.database.pvp.PostgresDuelHistoryAdapter(dataSource));
+    }
+
+    /** ADR-286 — tự nhận lời mời nhóm từ bạn bè. */
+    public dev.kage.party.api.PartyAutoAcceptFacade wirePartyAutoAcceptFacade() {
+        return new dev.kage.party.api.PartyAutoAcceptFacade(
+                new dev.kage.server.database.party.PostgresPartyAutoAcceptAdapter(dataSource));
+    }
+
     /** ADR-228 — danh mục nhiệm vụ. */
     public dev.kage.quest.api.QuestCatalogFacade wireQuestCatalogFacade() {
         return new dev.kage.quest.api.QuestCatalogFacade(
