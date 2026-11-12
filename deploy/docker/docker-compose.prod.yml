@@ -168,7 +168,7 @@ services:
       options: { max-size: "10m", max-file: "3" }
 
   prometheus:
-    image: prom/prometheus:v3.8.1
+    image: prom/prometheus:v3.16.0
     restart: unless-stopped
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
