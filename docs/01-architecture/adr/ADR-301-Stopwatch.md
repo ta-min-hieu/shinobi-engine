@@ -32,4 +32,4 @@
 
 1. ✅ Thi hành 2026-11-12 (lô 46): `StopwatchCoordinator`.
 2. ✅ Test: `Lot46ClientTest.stopwatchFormatsElapsedTime`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không chạy lệnh gạch chéo/không vẽ UI; phủ bằng test đơn vị + biên dịch, cần kiểm tay trên client thật.

@@ -17,9 +17,8 @@ final class TargetHudSync {
     private TargetHudSync() {}
 
     static void sync(CombatHudController combat, CombatHud hud, PositionComponent local) {
-        PickablePoint point = combat.targetPointPerFrame(); // ADR-299 — khoảng cách tới mục tiêu
-        hud.setTargetDistance(point == null ? -1 : meters(point.x() - local.x, point.y() - local.y));
         if (combat.hasCharacterTarget()) {
+            hud.setTargetDistance(-1); // ADR-299 — chỉ quái (CombatHudController đã chạm trần độ phức tạp PMD)
             hud.setCharacterTarget(
                     combat.characterTargetName(), combat.characterTargetHp(), combat.characterTargetMaxHp());
             return;
@@ -27,6 +26,7 @@ final class TargetHudSync {
         CombatHudController.MonsterState target = combat.targetState();
         if (target != null) {
             hud.setTarget(target.code(), target.hp(), target.maxHp());
+            hud.setTargetDistance(meters(target.x() - local.x, target.y() - local.y)); // ADR-299
         } else {
             hud.clearTarget();
         }

@@ -36,4 +36,4 @@ Client `/thich <tên>`.
 
 1. ✅ Thi hành 2026-11-12 (lô 46): `ProfileLikePort`/`Facade`, `PostgresProfileLikeAdapter`, `Lot46Commands.likeProfile`/`withLikes`, `ProfileLikeCoordinator`, `InspectCoordinator`.
 2. ✅ Test: `Lot46IntegrationTest.profileLikesOncePerDay`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-12: `likeProfile:BaoDo01` ⇒ OK thích=1; lần hai ⇒ ALREADY_TODAY thích=1; tự thích ⇒ SELF. Đã xoá lượt thích thử.

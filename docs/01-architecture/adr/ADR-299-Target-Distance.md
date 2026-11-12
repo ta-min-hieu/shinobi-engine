@@ -11,15 +11,18 @@
 
 ## Decision
 
-**D1 — Thuần client.** Khung mục tiêu thêm một dòng "N m" (làm tròn tới mét) — khoảng cách mặt phẳng giữa nhân vật và
-mục tiêu (quái hoặc nhân vật). Tra vị trí bằng khoá đã đóng hộp sẵn (`CombatHudController.targetPointPerFrame`) nên đường
-mỗi khung không cấp phát; chữ chỉ đổi khi số mét đổi.
+**D1 — Thuần client.** Khung mục tiêu thêm một dòng "N m" (làm tròn tới mét): khoảng cách mặt phẳng giữa nhân vật và
+quái đang nhắm, tra qua `CombatHudController.targetState()` (khoá đã đóng hộp sẵn, đường mỗi khung không cấp phát); chữ
+chỉ đổi khi số mét đổi.
+
+**D2 — Giới hạn:** mục tiêu là NHÂN VẬT (đối thủ đấu trường) chưa hiện khoảng cách — thêm đường tra vị trí nhân vật vào
+`CombatHudController` đẩy lớp đó qua trần độ phức tạp PMD (80). Muốn có phải tách lớp đó trước (refactor riêng, chưa làm).
 
 ## Technical Decisions
 
 | # | Quyết định | Trạng thái |
 |---|---|---|
-| 1 | Dòng khoảng cách trong `HudTargetFrame` | Accepted |
+| 1 | Dòng khoảng cách trong `HudTargetFrame` (chỉ mục tiêu là quái) | Accepted |
 
 ## ADR cần tạo
 
@@ -33,4 +36,4 @@ mỗi khung không cấp phát; chữ chỉ đổi khi số mét đổi.
 
 1. ✅ Thi hành 2026-11-12 (lô 46): `TargetHudSync`, `CombatHud.setTargetDistance`, `HudTargetFrame.setDistance`.
 2. ✅ Test: `Lot46ClientTest.distanceRoundsToMeters`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không chạy lệnh gạch chéo/không vẽ UI; phủ bằng test đơn vị + biên dịch, cần kiểm tay trên client thật.

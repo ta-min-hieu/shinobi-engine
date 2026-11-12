@@ -462,17 +462,6 @@ final class CombatHudController {
         return currentTargetKey == null ? null : monsters.get(currentTargetKey);
     }
 
-    /**
-     * ADR-299 — vị trí mục tiêu (quái hoặc nhân vật) tra bằng khoá đã đóng hộp sẵn: gọi MỖI KHUNG mà không cấp phát.
-     * {@code null} khi không nhắm ai / mục tiêu ngoài tầm theo dõi — cùng quy ước {@link #targetState()}.
-     */
-    PickablePoint targetPointPerFrame() {
-        if (currentTargetKey == null) {
-            return null;
-        }
-        return currentTargetId < 0L ? monsters.get(currentTargetKey) : characterPositions.get(currentTargetKey);
-    }
-
     /** Đổi mục tiêu — giữ {@link #currentTargetKey} khớp {@link #currentTargetId}, đóng hộp đúng một lần. */
     private void setCurrentTarget(long targetId) {
         currentTargetId = targetId;

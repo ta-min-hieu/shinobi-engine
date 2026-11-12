@@ -36,4 +36,4 @@ mới nhất. **V173** thêm chỉ mục một phần cho `BOSS_KILL`. Client `/
 
 1. ✅ Thi hành 2026-11-12 (lô 46): `BossKillLogPort`/`Facade`, `PostgresBossKillLogAdapter`, `BossKillHooks`, `Lot46Commands.bossKills`, `BossKillsCoordinator`.
 2. ✅ Test: `Lot46IntegrationTest.recordsAndReadsBossKills`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-12 (`bossKills`): `boss=0` — đúng kỳ vọng (chỉ ghi từ ADR này, chưa trận nào). Đường ghi + đọc phủ bởi `Lot46IntegrationTest` (Postgres thật).

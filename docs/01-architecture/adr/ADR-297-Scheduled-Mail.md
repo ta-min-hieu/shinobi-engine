@@ -39,4 +39,4 @@ server sập giữa chừng không gửi đôi. Gửi được hay không đều
 
 1. ✅ Thi hành 2026-11-12 (lô 46): `ScheduledMailPort`/`Facade`, `PostgresScheduledMailAdapter`, `ScheduledMailJob`, `Lot46Commands.scheduleMail`, `ScheduledMailCoordinator`.
 2. ✅ Test: `Lot46IntegrationTest.schedulesListsDueAndDeletes`, `Lot46ServerTest`, `Lot46ClientTest.parsesScheduledMail`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-12: `scheduleMail:1:BaoDo01` ⇒ OK chờ=1; `scheduleMail:0:…` ⇒ INVALID_DELAY. 46 giây sau giờ hẹn job đã gửi thư 34 (người gửi ĐạoHữu01, người nhận BaoDo01, "probe hẹn giờ") và xoá dòng chờ. Đã xoá thư thử, trả vàng (tem thư).

@@ -33,4 +33,4 @@ trên Virtual Thread (I/O chặn — đúng luật dùng VT) để khung hình k
 
 1. ✅ Thi hành 2026-11-12 (lô 46): `ScreenshotCoordinator`, `PhotoModeCoordinator.afterRender`.
 2. ✅ Test: `Lot46ClientTest.screenshotNameCarriesTimestamp`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không chạy lệnh gạch chéo/không vẽ UI; phủ bằng test đơn vị + biên dịch, cần kiểm tay trên client thật.

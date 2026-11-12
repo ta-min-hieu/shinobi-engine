@@ -33,4 +33,4 @@ chia cho 0, dài quá 120 ký tự hoặc lồng ngoặc quá 32 tầng ⇒ báo
 
 1. ✅ Thi hành 2026-11-12 (lô 46): `ArithmeticExpression`, `CalculatorCoordinator`.
 2. ✅ Test: `Lot46ClientTest.calculatorEvaluatesArithmetic`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không chạy lệnh gạch chéo/không vẽ UI; phủ bằng test đơn vị + biên dịch, cần kiểm tay trên client thật.

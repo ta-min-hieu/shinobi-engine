@@ -40,7 +40,8 @@ final class ArithmeticExpression {
         if (value.isEmpty() || parser.position != compact.length()) {
             return Optional.empty();
         }
-        return Optional.of(value.get().setScale(SCALE, RoundingMode.HALF_UP).stripTrailingZeros());
+        BigDecimal rounded = value.get().setScale(SCALE, RoundingMode.HALF_UP).stripTrailingZeros();
+        return Optional.of(rounded.scale() < 0 ? rounded.setScale(0) : rounded);
     }
 
     private Optional<BigDecimal> sum() {
