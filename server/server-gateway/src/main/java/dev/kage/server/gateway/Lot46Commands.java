@@ -20,6 +20,11 @@ import dev.kage.protocol.ScheduleMailResponse;
 /** Lớp lệnh lô 46 (ADR-295…) — MỘT thành phần của {@link Lot45Commands}. Gọi trên Virtual Thread. */
 record Lot46Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 47 (ADR-303…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot47Commands lot47() {
+        return new Lot47Commands(gateway, registry);
+    }
+
     /** Khớp {@code VARCHAR(64)} / {@code VARCHAR(1024)} của bảng thư. */
     static final int MAX_SUBJECT = 64;
 

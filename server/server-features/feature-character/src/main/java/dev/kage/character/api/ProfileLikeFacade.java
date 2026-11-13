@@ -8,6 +8,9 @@ import dev.kage.character.domain.ProfileLikePort;
 /** API thích hồ sơ (ADR-298): mỗi ngày (UTC) thích một người tối đa một lần; không tự thích mình. */
 public final class ProfileLikeFacade {
 
+    /** ADR-305 — số dòng bảng xếp hạng. */
+    public static final int TOP = 10;
+
     /** Kết quả thích. */
     public enum Outcome {
         OK,
@@ -27,6 +30,11 @@ public final class ProfileLikeFacade {
                 public int likesOf(long targetId) {
                     return 0;
                 }
+
+                @Override
+                public java.util.List<Ranked> top(int limit) {
+                    return java.util.List.of();
+                }
             },
             Clock.systemUTC());
 
@@ -45,6 +53,11 @@ public final class ProfileLikeFacade {
             return Outcome.SELF;
         }
         return port.like(likerId, targetId, LocalDate.now(clock)) ? Outcome.OK : Outcome.ALREADY_TODAY;
+    }
+
+    /** ADR-305 — top {@value #TOP} người được thích nhiều nhất. */
+    public java.util.List<ProfileLikePort.Ranked> top() {
+        return port.top(TOP);
     }
 
     /** Tổng lượt thích. */

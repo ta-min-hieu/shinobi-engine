@@ -51,7 +51,8 @@ final class CoordinatesCoordinator implements WindowFlow {
     private boolean onSlash(String line) {
         String[] parts = line.strip().split("\\s+", 2);
         String command = parts[0].toLowerCase(Locale.ROOT);
-        if (!"/toado".equals(command) && !"/coords".equals(command)) {
+        boolean share = "/chiasevitri".equals(command) || "/sharepos".equals(command); // ADR-310
+        if (!"/toado".equals(command) && !"/coords".equals(command) && !share) {
             return false;
         }
         if (position.isEmpty()) {
@@ -64,7 +65,9 @@ final class CoordinatesCoordinator implements WindowFlow {
                 roundedX(position.get().lastKnownX()),
                 KageI18n.textOrKey(i18n, zoneKey(zone.get())));
         String argument = parts.length > 1 ? parts[1].strip().toLowerCase(Locale.ROOT) : "";
-        if ("gui".equals(argument) || "gửi".equals(argument) || "send".equals(argument)) {
+        if (share) {
+            sender.sendChatMessage(dev.kage.protocol.ChatChannel.CHAT_CHANNEL_PARTY, "", text);
+        } else if ("gui".equals(argument) || "gửi".equals(argument) || "send".equals(argument)) {
             sender.sendChatMessage(chat.currentChannel(), "", text);
         } else {
             chat.showSystemNotice(text);

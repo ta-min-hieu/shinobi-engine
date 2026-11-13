@@ -802,6 +802,8 @@ public final class GatewayBootstrap {
                 .lot45()
                 .lot46();
         characterRegistry.bossKills.bind(lot46.bossKills()); // ADR-296
+        expansion.add(EventReminder.job(new EventReminder.Deps( // ADR-306
+                facades.progression().expansion().tournament(), characterRegistry, clock)));
         expansion.add(ScheduledMailJob.job(new ScheduledMailJob.Deps( // ADR-297
                 lot46.scheduledMail(),
                 facades.contentFacades().socialFacades().mailFacade(),

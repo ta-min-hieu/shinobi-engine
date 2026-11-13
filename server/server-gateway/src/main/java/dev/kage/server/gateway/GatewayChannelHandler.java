@@ -1268,6 +1268,42 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot44()
                                     .lookupItem(c))),
             Map.entry(
+                    Opcode.OPCODE_GET_BOSS_DAMAGE_RANKING_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetBossDamageRankingRequest.parser(),
+                            Opcode.OPCODE_GET_BOSS_DAMAGE_RANKING_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .bossDamageRanking())),
+            Map.entry(
+                    Opcode.OPCODE_GET_LIKE_RANKING_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetLikeRankingRequest.parser(),
+                            Opcode.OPCODE_GET_LIKE_RANKING_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .likeRanking())),
+            Map.entry(
                     Opcode.OPCODE_GET_BOSS_KILLS_REQUEST_VALUE,
                     storageCommand(
                             dev.kage.protocol.GetBossKillsRequest.parser(),
@@ -6696,13 +6732,23 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // GUILD/PARTY: broadcast cho MỌI thành viên đang online (gồm cả người gửi, cùng cách
             // AREA tự thấy tin của mình) — không cần AoI/tick thread, guild/party membership
             // không phải dữ liệu world-tick (feature-guild, feature-party/CLAUDE.md).
-            case GUILD ->
+            case GUILD -> {
                 broadcastToGroup(
                         ChatChannel.CHAT_CHANNEL_GUILD,
                         ctx,
                         guildFacade.listMembers(ctx.characterId()).stream()
                                 .map(m -> m.characterId())
                                 .toList());
+                guildFacade
+                        .findMyGuild(ctx.characterId()) // ADR-304 — giữ cho người đang vắng
+                        .ifPresent(guild -> worldGateway
+                                .registry()
+                                .guildChat
+                                .record(
+                                        guild.guildId(),
+                                        new GuildChatBacklog.Line(
+                                                ctx.senderName(), ctx.body(), java.time.Instant.now())));
+            }
             case PARTY ->
                 broadcastToGroup(
                         ChatChannel.CHAT_CHANNEL_PARTY,

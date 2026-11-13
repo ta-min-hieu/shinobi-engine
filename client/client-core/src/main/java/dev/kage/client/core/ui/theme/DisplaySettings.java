@@ -31,7 +31,11 @@ public final class DisplaySettings {
         /** ADR-174 — nhắc nghỉ ngơi sau 2 giờ chơi liên tục, rồi mỗi giờ. */
         REST_REMINDER("display.rest_reminder"),
         /** ADR-285 — ẩn số sát thương người ngoài nhóm; mặc định TẮT (vẫn thấy hết như trước). */
-        HIDE_OTHERS_DAMAGE("display.hide_others_damage", false);
+        HIDE_OTHERS_DAMAGE("display.hide_others_damage", false),
+        /** ADR-307 — chế độ mù màu đỏ-lục: số sát thương phải chịu đổi đỏ → xanh dương; mặc định TẮT. */
+        COLORBLIND("display.colorblind", false),
+        /** ADR-309 — ẩn nhãn trên đầu (danh hiệu cảnh giới) của người ngoài nhóm; mặc định TẮT. */
+        HIDE_OTHER_TITLES("display.hide_other_titles", false);
 
         private final String key;
         private final boolean defaultOn;

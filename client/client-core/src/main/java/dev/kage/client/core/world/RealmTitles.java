@@ -62,6 +62,8 @@ final class RealmTitles implements Disposable {
     private final Vector3 scratch = new Vector3();
     private WorldToScreen projector;
     private BooleanSupplier enabled = () -> true;
+    private BooleanSupplier hideOthers = () -> false; // ADR-309
+    private java.util.function.LongPredicate partyMember = id -> false; // ADR-309
     private boolean active;
     private float previousScaleX;
     private float previousScaleY;
@@ -73,6 +75,17 @@ final class RealmTitles implements Disposable {
     /** ADR-143 — công tắc "danh hiệu trên đầu" (kèm nhãn Ma Đầu); hỏi một lần mỗi khung ở {@link #begin}. */
     void useSwitch(BooleanSupplier titlesOn) {
         this.enabled = titlesOn;
+    }
+
+    /** ADR-309 — ẩn nhãn của người ngoài nhóm: công tắc + "người này cùng nhóm". */
+    void useOthersFilter(BooleanSupplier hideOthersOn, java.util.function.LongPredicate inParty) {
+        this.hideOthers = hideOthersOn;
+        this.partyMember = inParty;
+    }
+
+    /** Nhãn của {@code characterId} có bị ẩn không (công tắc bật và người đó ngoài nhóm). */
+    boolean hidesOther(long characterId) {
+        return hideOthers.getAsBoolean() && !partyMember.test(characterId);
     }
 
     void begin(WorldToScreen activeProjector) {

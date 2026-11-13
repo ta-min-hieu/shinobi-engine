@@ -334,6 +334,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-300](ADR-300-Screenshot-Key.md) | Chụp màn hình F12: F12 → PNG trong `~/KageScreenshots`, ghi trên Virtual Thread | ✅ Accepted (lô 46) |
 | [ADR-301](ADR-301-Stopwatch.md) | Đồng hồ bấm giờ: `/bamgio [xem]` | ✅ Accepted (lô 46) |
 | [ADR-302](ADR-302-Quick-Calculator.md) | Máy tính nhanh: Phân tích đệ quy xuống, `BigDecimal`; `/tinh` | ✅ Accepted (lô 46) |
+| [ADR-303](ADR-303-Boss-Damage-Ranking.md) | Xếp hạng sát thương boss: Tổng `BOSS_KILL` WORLD theo người; 420/421; `/topboss` | ✅ Accepted (lô 47) |
+| [ADR-304](ADR-304-Guild-Chat-Backlog.md) | Tin bang lúc vắng: Ring buffer RAM 50 tin/bang; phát lại tin sau mốc rời world | ✅ Accepted (lô 47) |
+| [ADR-305](ADR-305-Like-Ranking.md) | Xếp hạng lượt thích: Đếm `profile_like`; 273/274; `/topthich` | ✅ Accepted (lô 47) |
+| [ADR-306](ADR-306-Event-Reminder.md) | Báo trước sự kiện: Job 60 giây, 3 loại mốc, mỗi mốc một lần | ✅ Accepted (lô 47) |
+| [ADR-307](ADR-307-Colorblind-Mode.md) | Chế độ mù màu: Dòng cài đặt `COLORBLIND`: số sát thương phải chịu đổi xanh dương | ✅ Accepted (lô 47) |
+| [ADR-308](ADR-308-UI-Scale.md) | Thu phóng giao diện: `PanelHub.setUiScale` qua `ScreenViewport`; `/giaodien`; Preferences | ✅ Accepted (lô 47) |
+| [ADR-309](ADR-309-Hide-Other-Titles.md) | Ẩn tên người chơi khác: Dòng cài đặt `HIDE_OTHER_TITLES`, giữ đồng đội | ✅ Accepted (lô 47) |
+| [ADR-310](ADR-310-Share-Position-Party.md) | Chia sẻ vị trí vào nhóm: `/chiasevitri` gửi tọa độ vào kênh nhóm | ✅ Accepted (lô 47) |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -12,7 +12,8 @@ record Lot46Windows(
         ProfileLikeCoordinator likes,
         ScreenshotCoordinator screenshot,
         StopwatchCoordinator stopwatch,
-        CalculatorCoordinator calculator) {
+        CalculatorCoordinator calculator,
+        Lot47Windows lot47) {
 
     static Lot46Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot46Windows(
@@ -22,7 +23,8 @@ record Lot46Windows(
                 new ProfileLikeCoordinator(sender, feeds.chat()),
                 new ScreenshotCoordinator(feeds.chat()),
                 new StopwatchCoordinator(feeds.chat(), System::currentTimeMillis),
-                new CalculatorCoordinator(feeds.chat()));
+                new CalculatorCoordinator(feeds.chat()),
+                Lot47Windows.create(sender, feeds)); // lô 47 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -34,5 +36,6 @@ record Lot46Windows(
         panels.register(screenshot);
         panels.register(stopwatch);
         panels.register(calculator);
+        lot47.registerInto(panels);
     }
 }

@@ -18,6 +18,12 @@ public interface BossKillLogPort {
     /** Một dòng khi đọc lại. */
     record Entry(String bossCode, Kind kind, int rank, long damage, Instant at) {}
 
+    /** ADR-303 — một dòng bảng xếp hạng: tổng sát thương boss thế giới mọi thời của một người. */
+    record Ranked(String name, long totalDamage, int kills) {}
+
+    /** ADR-303 — top {@code limit} người theo tổng sát thương boss thế giới, cao trước. */
+    List<Ranked> topWorldDamage(int limit);
+
     /** Ghi một lượt (mọi người tham gia của một trận) trong một giao dịch. */
     void record(List<Kill> kills);
 

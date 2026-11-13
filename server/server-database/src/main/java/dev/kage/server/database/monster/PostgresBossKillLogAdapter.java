@@ -30,6 +30,16 @@ public final class PostgresBossKillLogAdapter implements BossKillLogPort {
              LIMIT ?
             """;
 
+    private static final String TOP_WORLD = """
+            SELECT COALESCE(c.name, '?') AS name, SUM((a.detail_json::jsonb ->> 'damage')::bigint) AS total, COUNT(*) AS kills
+              FROM audit_log a
+              LEFT JOIN character c ON c.id = a.character_id
+             WHERE a.action = 'BOSS_KILL' AND a.detail_json::jsonb ->> 'kind' = 'WORLD'
+             GROUP BY a.character_id, c.name
+             ORDER BY total DESC, name
+             LIMIT ?
+            """;
+
     private final DataSource dataSource;
 
     /** Dựng ở composition root. */
@@ -51,6 +61,15 @@ public final class PostgresBossKillLogAdapter implements BossKillLogPort {
                         kill.damage());
             }
         });
+    }
+
+    @Override
+    public List<Ranked> topWorldDamage(int limit) {
+        return JdbcOperations.query(
+                dataSource,
+                TOP_WORLD,
+                rs -> new Ranked(rs.getString("name"), rs.getLong("total"), rs.getInt("kills")),
+                limit);
     }
 
     @Override

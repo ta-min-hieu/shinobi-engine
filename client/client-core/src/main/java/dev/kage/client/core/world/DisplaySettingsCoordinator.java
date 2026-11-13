@@ -59,6 +59,8 @@ final class DisplaySettingsCoordinator implements WindowFlow {
         titles.useSwitch(settings.switchFor(DisplaySettings.Option.REALM_TITLES));
         feedback.useSwitch(settings.switchFor(DisplaySettings.Option.DAMAGE_NUMBERS));
         feedback.useOthersFilter(settings.switchFor(DisplaySettings.Option.HIDE_OTHERS_DAMAGE), partyMember);
+        feedback.useColorblind(settings.switchFor(DisplaySettings.Option.COLORBLIND)); // ADR-307
+        titles.useOthersFilter(settings.switchFor(DisplaySettings.Option.HIDE_OTHER_TITLES), partyMember); // ADR-309
         backdrop.useSwitch(settings.switchFor(DisplaySettings.Option.PARALLAX));
         weather.useSwitch(settings.switchFor(DisplaySettings.Option.WEATHER));
     }

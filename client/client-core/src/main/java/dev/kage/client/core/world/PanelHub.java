@@ -85,6 +85,19 @@ final class PanelHub implements Disposable {
         }
     }
 
+    /**
+     * ADR-308 — thu phóng mọi cửa sổ: viewport màn hình của từng cửa sổ đổi số đơn vị trên một pixel ({@code 1/scale}),
+     * rồi dựng lại khung theo kích thước cửa sổ hiện tại.
+     */
+    void setUiScale(float scale, int width, int height) {
+        for (HudWindow window : windows) {
+            if (window.stage().getViewport() instanceof com.badlogic.gdx.utils.viewport.ScreenViewport viewport) {
+                viewport.setUnitsPerPixel(1f / scale);
+            }
+        }
+        resize(width, height);
+    }
+
     /** Vẽ NGƯỢC thứ tự đăng ký — xem javadoc của lớp về lý do. */
     void render(float deltaTime) {
         for (int i = windows.size() - 1; i >= 0; i--) {

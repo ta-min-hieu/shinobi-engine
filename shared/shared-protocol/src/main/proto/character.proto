@@ -787,3 +787,16 @@ message LikeProfileResponse {
   string target_name = 2;
   int32 likes = 3;
 }
+
+// ADR-305 (2026-11-13) — xếp hạng lượt thích hồ sơ. Request: Client -> Server (OPCODE_GET_LIKE_RANKING_REQUEST).
+message GetLikeRankingRequest {}
+
+message LikeRank {
+  string name = 1;
+  int32 likes = 2;
+}
+
+// Response: Server -> Client (OPCODE_GET_LIKE_RANKING_RESPONSE). Top 10, nhiều trước.
+message GetLikeRankingResponse {
+  repeated LikeRank entries = 1;
+}

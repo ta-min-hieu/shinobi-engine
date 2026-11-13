@@ -278,3 +278,17 @@ message BossKillEntry {
 message GetBossKillsResponse {
   repeated BossKillEntry entries = 1;
 }
+
+// ADR-303 (2026-11-13) — xếp hạng sát thương boss thế giới mọi thời. Request: Client -> Server.
+message GetBossDamageRankingRequest {}
+
+message BossDamageRank {
+  string name = 1;
+  int64 total_damage = 2;
+  int32 kills = 3;
+}
+
+// Response: Server -> Client (OPCODE_GET_BOSS_DAMAGE_RANKING_RESPONSE). Top 10, cao trước (chỉ tính từ ADR-296).
+message GetBossDamageRankingResponse {
+  repeated BossDamageRank entries = 1;
+}

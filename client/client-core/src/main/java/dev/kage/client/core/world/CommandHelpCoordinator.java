@@ -81,6 +81,8 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.party",
                     List.of(
+                            "/chiasevitri",
+                            "/sharepos",
                             "/tunhannhom",
                             "/autoparty",
                             "/nhuongnhom",
@@ -222,6 +224,9 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.info",
                     List.of(
+                            "/topboss",
+                            "/topthich",
+                            "/toplikes",
                             "/vatpham",
                             "/item",
                             "/lichsudau",
@@ -253,6 +258,8 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.tools",
                     List.of(
+                            "/giaodien",
+                            "/uiscale",
                             "/fps",
                             "/combo",
                             "/bamgio",

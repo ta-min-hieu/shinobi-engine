@@ -10,6 +10,9 @@ public final class BossKillLogFacade {
     /** Số dòng trả về. */
     public static final int LIMIT = 20;
 
+    /** ADR-303 — số dòng bảng xếp hạng. */
+    public static final int TOP = 10;
+
     /** Không ghi, không có lịch sử (composition test). */
     public static final BossKillLogFacade DISABLED = new BossKillLogFacade(new BossKillLogPort() {
         @Override
@@ -19,6 +22,11 @@ public final class BossKillLogFacade {
 
         @Override
         public List<Entry> recent(long characterId, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<Ranked> topWorldDamage(int limit) {
             return List.of();
         }
     });
@@ -35,6 +43,11 @@ public final class BossKillLogFacade {
         if (!kills.isEmpty()) {
             port.record(kills);
         }
+    }
+
+    /** ADR-303 — top {@value #TOP} theo tổng sát thương boss thế giới. */
+    public List<BossKillLogPort.Ranked> topWorldDamage() {
+        return port.topWorldDamage(TOP);
     }
 
     /** Các lần hạ boss gần nhất của {@code characterId}. */

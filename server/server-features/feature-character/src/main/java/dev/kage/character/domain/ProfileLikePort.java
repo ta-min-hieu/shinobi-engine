@@ -8,6 +8,12 @@ public interface ProfileLikePort {
     /** Ghi một lượt thích; {@code false} nếu hôm nay đã thích người này rồi. */
     boolean like(long likerId, long targetId, LocalDate day);
 
+    /** ADR-305 — một dòng bảng xếp hạng lượt thích. */
+    record Ranked(String name, int likes) {}
+
+    /** ADR-305 — top {@code limit} người được thích nhiều nhất. */
+    java.util.List<Ranked> top(int limit);
+
     /** Tổng lượt thích {@code targetId} đã nhận. */
     int likesOf(long targetId);
 }

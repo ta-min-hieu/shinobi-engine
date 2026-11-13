@@ -47,6 +47,10 @@ final class CombatFeedbackPresenter implements Disposable {
     private java.util.function.LongPredicate partyMember = id -> false; // ADR-285
     private final ComboCounter combo = new ComboCounter(); // ADR-293
     private BooleanSupplier comboOn = () -> false; // ADR-293
+    private BooleanSupplier colorblind = () -> false; // ADR-307
+
+    /** ADR-307 — màu số sát thương PHẢI CHỊU ở chế độ mù màu: xanh dương, tách hẳn vàng của sát thương gây ra. */
+    private static final Color DAMAGE_TAKEN_COLORBLIND = Color.valueOf("4AA3FF");
     // Bundle RIÊNG đúng quy ước KageI18n (mỗi nơi tự nạp, không dùng chung instance) — cần cho nhãn
     // "Né!" của số damage bay lên.
     private final I18NBundle i18n = KageI18n.load();
@@ -127,8 +131,7 @@ final class CombatFeedbackPresenter implements Disposable {
             floatingText.show(i18n.get("hud.combat.miss"), FloatingCombatText.MISS, anchor);
             return;
         }
-        Color color =
-                targetEntityId == localCharacterId ? FloatingCombatText.DAMAGE_TAKEN : FloatingCombatText.DAMAGE_DEALT;
+        Color color = targetEntityId == localCharacterId ? takenColor() : FloatingCombatText.DAMAGE_DEALT;
         floatingText.show("-" + damage, color, anchor);
         if (attackerEntityId == localCharacterId && targetEntityId != localCharacterId) {
             countCombo();
@@ -141,6 +144,15 @@ final class CombatFeedbackPresenter implements Disposable {
         if (hits >= ComboCounter.SHOW_FROM && comboOn.getAsBoolean()) {
             showSelfText(KageI18n.formatOrKey(i18n, "combo.label", hits), FloatingCombatText.LEVEL_UP);
         }
+    }
+
+    private Color takenColor() {
+        return colorblind.getAsBoolean() ? DAMAGE_TAKEN_COLORBLIND : FloatingCombatText.DAMAGE_TAKEN;
+    }
+
+    /** ADR-307 — công tắc chế độ mù màu. */
+    void useColorblind(BooleanSupplier enabled) {
+        this.colorblind = enabled;
     }
 
     /** ADR-293 — công tắc chữ combo. */

@@ -67,6 +67,7 @@ record Lot45Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
      * mỗi mốc; vắng mặt qua trọn một mốc thì chỉ nhận mốc mới nhất.
      */
     void onEnteredWorld(long characterId) {
+        lot46().lot47().onEnteredWorld(characterId); // ADR-304 — tin bang lúc vắng
         gateway.characterFacade().findById(characterId).ifPresent(character -> {
             long milestone = milestone(character.createdAt(), Instant.now());
             if (milestone <= 0) {

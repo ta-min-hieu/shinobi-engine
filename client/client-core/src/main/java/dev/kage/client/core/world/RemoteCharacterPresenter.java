@@ -171,6 +171,9 @@ final class RemoteCharacterPresenter {
     /** ADR-140 — danh hiệu cảnh giới trên đầu mọi người đang thấy (giữa {@code begin}/{@code end} của titles). */
     void drawRealmTitles(RealmTitles titles) {
         for (LongMap.Entry<KEntity> entry : entities.entries()) {
+            if (titles.hidesOther(entry.key)) {
+                continue; // ADR-309
+            }
             PositionComponent position = POSITION.get(entry.value);
             titles.draw(position.x, position.y, levels.get(entry.key, 0), outlaws.containsKey(entry.key));
         }
