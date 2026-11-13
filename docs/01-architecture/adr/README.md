@@ -374,6 +374,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-340](ADR-340-Full-Health-Notice.md) | Báo hồi đầy máu: Dòng "Đã hồi đầy máu" sau khi bị thương; `/baodaymau` | ✅ Accepted (lô 51) |
 | [ADR-341](ADR-341-Double-Click-Use-Equip.md) | Nhấp đúp dùng/mặc đồ: Bấm tên = chọn, nhấp đúp = Dùng/Mặc | ✅ Accepted (lô 51) |
 | [ADR-342](ADR-342-Screen-Shake.md) | Rung màn hình khi trúng đòn: Đòn ≥ 10% máu tối đa ⇒ camera rung tắt dần; `/rung` | ✅ Accepted (lô 51) |
+| [ADR-343](ADR-343-Old-Names-Lookup.md) | Tra tên cũ người chơi: Đọc lịch sử Dịch Danh Phù theo tên hiện tại hoặc tên cũ; `/tencu` | ✅ Accepted (lô 52) |
+| [ADR-344](ADR-344-Guild-Tag.md) | Ký hiệu bang: `guild.tag` V178, hiện ở chat thế giới/giao dịch và khi soi; `/kyhieubang` | ✅ Accepted (lô 52) |
+| [ADR-345](ADR-345-Friend-Removed-Notice.md) | Báo khi bị xoá bạn: Event 1159 cho người bị xoá đang online, client làm mới danh sách | ✅ Accepted (lô 52) |
+| [ADR-346](ADR-346-Idle-Kick-Warning.md) | Cảnh báo sắp bị ngắt khi treo máy: Dòng báo ở mốc thời hạn − 1 phút trong `IdleKick` | ✅ Accepted (lô 52) |
+| [ADR-347](ADR-347-Chat-Log-Export.md) | Lưu chat ra file: Bộ đệm 500 tin, ghi `chatlogs/` cạnh game; `/luuchat` | ✅ Accepted (lô 52) |
+| [ADR-348](ADR-348-Caps-Calming.md) | Chống chữ hoa la hét: Hạ chữ thường tin toàn chữ hoa ≥ 5 chữ cái; `/chuhoa` | ✅ Accepted (lô 52) |
+| [ADR-349](ADR-349-Enhanced-Sell-Confirm.md) | Xác nhận bán đồ cường hoá: Món +1 trở lên phải bấm Bán lần hai trong 3 giây | ✅ Accepted (lô 52) |
+| [ADR-350](ADR-350-Critical-Hit-Numbers.md) | Số chí mạng nổi bật: Số chí mạng "-N!" to hơn, màu cam | ✅ Accepted (lô 52) |
 ---
 
 ## ADR cần tạo (chưa viết)
