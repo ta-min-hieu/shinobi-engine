@@ -33,4 +33,4 @@ lại lớp vẽ biểu cảm (`EmoteBubbles`, ADR-092; người ngoài tầm nh
 
 1. ✅ Thi hành 2026-11-13 (lô 48): `ChatBubbleCoordinator`, `ChatCoordinator.onIncoming`.
 2. ✅ Test: `Lot48ClientTest.bubbleTextIsTrimmed`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không vẽ UI/không chạy lệnh gạch chéo; phủ bằng biên dịch + test đơn vị, cần kiểm tay trên client thật.

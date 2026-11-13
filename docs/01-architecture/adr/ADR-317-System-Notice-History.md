@@ -33,4 +33,4 @@ thông báo bang (ADR-179).
 
 1. ✅ Thi hành 2026-11-13 (lô 48): `SystemNoticeHistoryCoordinator`, `ChatCoordinator.onIncoming`.
 2. ✅ Test: `Lot48ClientTest.systemHistoryKeepsNewestThirty`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không vẽ UI/không chạy lệnh gạch chéo; phủ bằng biên dịch + test đơn vị, cần kiểm tay trên client thật.

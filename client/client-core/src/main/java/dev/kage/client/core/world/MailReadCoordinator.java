@@ -23,7 +23,7 @@ final class MailReadCoordinator implements WindowFlow {
         if (frame.header().opcode() != Opcode.OPCODE_MARK_MAIL_READ_RESPONSE_VALUE) {
             return false;
         }
-        MarkMailReadResponse.parseFrom(frame.payload());
+        MarkMailReadResponse.parser().parseFrom(frame.payload()); // payload rác dừng ở đây, không kéo theo lệnh gửi lên
         sender.listMail();
         return true;
     }

@@ -36,4 +36,4 @@ không grep code lõi; chủ dự án chọn phương án thay "thêm dòng chat
 
 1. ✅ Thi hành 2026-11-13 (lô 48): `FriendPresenceCoordinator`, `FriendCoordinator.usePresenceNotice`.
 2. ✅ Test: biên dịch + kiểm tay (UI).
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không vẽ UI/không chạy lệnh gạch chéo; phủ bằng biên dịch + test đơn vị, cần kiểm tay trên client thật.

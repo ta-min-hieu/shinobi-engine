@@ -38,4 +38,4 @@ Client `/loichao` (xem), `/loichao <chữ>` (đặt), `/loichao xoa`.
 
 1. ✅ Thi hành 2026-11-13 (lô 48): `GuildWelcomePort`/`Facade`, `PostgresGuildWelcomeAdapter`, `GuildWelcomeHooks`, `Lot48Commands.setGuildWelcome`, `GuildWelcomeCoordinator`.
 2. ✅ Test: `Lot48ServerTest`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-13: `welcome:?` ⇒ rỗng; đặt "Chào mừng đạo hữu đến bang!" ⇒ OK; hỏi lại ⇒ đúng lời chào. Đường gửi lúc vào bang phủ bằng `Lot48ServerTest` (chưa có bước probe rời/vào bang). Đã trả lời chào về rỗng.

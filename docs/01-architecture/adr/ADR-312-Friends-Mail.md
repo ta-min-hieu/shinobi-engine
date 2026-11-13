@@ -36,4 +36,4 @@ dung, hộp đầy), không vàng không đồ; ai online được báo thư m�
 
 1. ✅ Thi hành 2026-11-13 (lô 48): `FriendMailQuotaPort`/`FriendMailFacade`, `PostgresFriendMailQuotaAdapter`, `Lot48Commands.sendFriendsMail`, `FriendsMailCoordinator`.
 2. ✅ Test: `Lot48IntegrationTest.countsFriendMailBatchesSinceDayStart`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-13: `friendsMail` ⇒ OK gửi=1 (BaoDo01); lần hai ⇒ DAILY_LIMIT. Đã xoá thư + audit thử, trả vàng.

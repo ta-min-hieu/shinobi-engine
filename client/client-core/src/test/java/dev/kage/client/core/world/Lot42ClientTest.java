@@ -30,7 +30,8 @@ class Lot42ClientTest {
 
         List<String[]> ping = CommandHelpCoordinator.matches("/ping", key -> key);
         assertThat(ping).hasSize(1);
-        assertThat(ping.getFirst()[1]).isEqualTo("/ping");
+        // lô 48 thêm /pinghud (ADR-316) — cùng chứa "/ping" nên cùng khớp, các lệnh khác vẫn không.
+        assertThat(ping.getFirst()[1].split(" ")).containsExactlyInAnyOrder("/ping", "/pinghud");
 
         List<String[]> byTitle =
                 CommandHelpCoordinator.matches("thu", key -> "help.group.mail".equals(key) ? "Thư" : key);

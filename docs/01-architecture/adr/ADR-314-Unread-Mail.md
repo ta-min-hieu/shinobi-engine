@@ -36,4 +36,4 @@ dấu ghim ADR-217); mở thư ⇒ gửi lệnh đánh dấu rồi hỏi lại d
 
 1. ✅ Thi hành 2026-11-13 (lô 48): `MailReadPort`/`Facade`, `PostgresMailReadAdapter`, `Lot48Commands.markRead`/`onEnteredWorld`, `MailController.UNREAD_MARK`, `MailReadCoordinator`.
 2. ✅ Test: `Lot48IntegrationTest.tracksUnreadMailAndMarksRead`, `Lot48ClientTest.unreadMailGetsMarkAndForwardStripsIt`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-13: BaoDo01 vào world ⇒ nhận "Bạn có 1 thư chưa đọc"; `markRead:37` ⇒ chưaĐọc=0. Migration V174 chạy trên DB dev: thư cũ đều đã đọc (0 thư chưa đọc trước khi gửi thử).
