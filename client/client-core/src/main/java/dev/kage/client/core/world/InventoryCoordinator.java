@@ -108,6 +108,9 @@ final class InventoryCoordinator implements WindowFlow {
      */
     private LongConsumer onSellRequested = itemId -> {};
 
+    /** ADR-349 — món đã cường hoá phải bấm Bán lần hai. */
+    private final SellConfirmGuard sellGuard = new SellConfirmGuard(System::currentTimeMillis, this::askSellConfirm);
+
     /**
      * Người chơi bấm Giao dịch — {@code WorldScreen} nối vào {@code TradeCoordinator}, cùng lý do
      * {@link #onSellRequested}: túi đồ chỉ biết {@code inventory_item.id}, còn phiên giao dịch và
@@ -311,7 +314,12 @@ final class InventoryCoordinator implements WindowFlow {
      * — túi đồ không có ô nhập số lượng, và bán nhầm cả chồng đồ là thứ không hoàn tác được.
      */
     private void onSellSelected() {
-        unlockedSelection().ifPresent(item -> onSellRequested.accept(item.itemId()));
+        unlockedSelection().filter(sellGuard::confirm).ifPresent(item -> onSellRequested.accept(item.itemId()));
+    }
+
+    /** ADR-349 — lời nhắc bấm Bán lần hai. */
+    private void askSellConfirm(InventoryController.Item item) {
+        panel.setStatus(KageI18n.formatOrKey(i18n, "sellconfirm.ask", item.enhanceLevel()));
     }
 
     /**

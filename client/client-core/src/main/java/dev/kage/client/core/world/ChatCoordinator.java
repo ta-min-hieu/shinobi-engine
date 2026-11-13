@@ -34,6 +34,7 @@ final class ChatCoordinator implements WindowFlow {
             java.time.format.DateTimeFormatter.ofPattern("dd/MM HH:mm");
 
     private final ChatController controller = new ChatController();
+    private java.util.function.UnaryOperator<ChatMessageEvent> eventRewriter = event -> event; // ADR-348
     private final ChatPanel panel;
     private final WorldCommandSender sender;
     private final I18NBundle i18n = KageI18n.load();
@@ -82,6 +83,11 @@ final class ChatCoordinator implements WindowFlow {
     /** ADR-315/317 — nghe mọi tin chat đến (sau bộ lọc chặn). */
     void onIncoming(java.util.function.Consumer<ChatMessageEvent> listener) {
         incoming.add(listener);
+    }
+
+    /** ADR-348 — đổi tin trước khi hiện (vd hạ chữ hoa la hét); mặc định giữ nguyên. */
+    void useEventRewriter(java.util.function.UnaryOperator<ChatMessageEvent> rewriter) {
+        this.eventRewriter = rewriter;
     }
 
     /** ADR-284 — nghe mọi tin ô nhập vừa gửi đi (sau khi qua lệnh gạch chéo). */
@@ -205,7 +211,7 @@ final class ChatCoordinator implements WindowFlow {
                     && (hiddenSender.test(event.getSenderId()) || hiddenBody.test(event.getBody()))) { // ADR-091, 249
                 return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
             }
-            controller.onMessage(withTitle(markLinked(markOffline(markAutoReply(event)))));
+            controller.onMessage(withTitle(markLinked(markOffline(markAutoReply(eventRewriter.apply(event))))));
             incoming.forEach(listener -> listener.accept(event)); // ADR-315/317
             if (mentions.mentions(event.getSenderName(), event.getBody())) { // ADR-245
                 controller.appendSystem(KageI18n.formatOrKey(i18n, "mention.notice", event.getSenderName()));
@@ -276,12 +282,14 @@ final class ChatCoordinator implements WindowFlow {
     private ChatMessageEvent withTitle(ChatMessageEvent event) {
         String titleKey = event.getSenderTitleKey();
         String title = titleKey.isEmpty() ? "" : text(titleKey);
-        if (title.isEmpty() || title.equals(titleKey)) {
-            return event; // textOrKey trả lại chính khoá khi bundle thiếu nó
-        }
-        return event.toBuilder()
-                .setSenderName("[" + title + "] " + event.getSenderName())
-                .build();
+        String tag = ChatController.sanitize(event.getSenderGuildTag()); // ADR-344 — ký hiệu bang
+        String prefix = (tag.isEmpty() ? "" : "<" + tag + "> ")
+                + (title.isEmpty() || title.equals(titleKey) ? "" : "[" + title + "] "); // khoá lạ ⇒ bỏ danh hiệu
+        return prefix.isEmpty()
+                ? event
+                : event.toBuilder()
+                        .setSenderName(prefix + event.getSenderName())
+                        .build();
     }
 
     /**

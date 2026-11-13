@@ -49,6 +49,12 @@ final class FloatingCombatText implements Disposable {
     /** Xanh lá sáng — LÊN CẤP. Màu duy nhất không dùng cho damage, để tin vui không lẫn với sát thương. */
     static final Color LEVEL_UP = Color.valueOf("7CFF7C");
 
+    /** ADR-350 — số chí mạng: cam đậm, to hơn. */
+    static final Color CRIT = Color.valueOf("FF8C1A");
+
+    /** ADR-350 — hệ số phóng chữ của số chí mạng. */
+    static final float CRIT_SCALE = 1.4f;
+
     /** ADR-331 — chữ "+N EXP" khi nhận kinh nghiệm. */
     static final Color EXP_GAIN = Color.valueOf("C9A2FF");
 
@@ -80,6 +86,11 @@ final class FloatingCombatText implements Disposable {
      *     {@link Vector3} tạm, không cần cấp phát mỗi lần trúng đòn (Điều 31).
      */
     void show(String text, Color color, Vector3 worldPosition) {
+        show(text, color, worldPosition, 1f);
+    }
+
+    /** ADR-350 — như {@link #show(String, Color, Vector3)} nhưng phóng chữ theo {@code scale}. */
+    void show(String text, Color color, Vector3 worldPosition, float scale) {
         Entry entry = pool[nextSlot];
         nextSlot = (nextSlot + 1) % pool.length;
         entry.text = text;
@@ -88,6 +99,7 @@ final class FloatingCombatText implements Disposable {
         entry.worldY = worldPosition.y;
         entry.worldZ = worldPosition.z;
         entry.elapsedSeconds = 0f;
+        entry.scale = scale;
         entry.alive = true;
     }
 
@@ -99,6 +111,8 @@ final class FloatingCombatText implements Disposable {
     void render(float deltaTime, WorldToScreen projector) {
         batch.setProjectionMatrix(screenProjection);
         boolean drawing = false;
+        float baseScaleX = font.getData().scaleX;
+        float baseScaleY = font.getData().scaleY;
         for (Entry entry : pool) {
             if (!entry.alive) {
                 continue;
@@ -118,6 +132,7 @@ final class FloatingCombatText implements Disposable {
 
             float alpha =
                     progress < FADE_START_RATIO ? 1f : 1f - ((progress - FADE_START_RATIO) / (1f - FADE_START_RATIO));
+            font.getData().setScale(baseScaleX * entry.scale, baseScaleY * entry.scale); // ADR-350
             layout.setText(font, entry.text);
             float x = scratch.x - (layout.width / 2f);
             float y = scratch.y + (RISE_PIXELS * progress);
@@ -129,6 +144,7 @@ final class FloatingCombatText implements Disposable {
             font.setColor(entry.color.r, entry.color.g, entry.color.b, alpha);
             font.draw(batch, entry.text, x, y);
         }
+        font.getData().setScale(baseScaleX, baseScaleY); // trả cỡ chữ — font dùng CHUNG với HUD
         if (drawing) {
             batch.end();
             font.setColor(Color.WHITE); // trả màu về mặc định — font dùng CHUNG với HUD
@@ -148,6 +164,7 @@ final class FloatingCombatText implements Disposable {
         private float worldY;
         private float worldZ;
         private float elapsedSeconds;
+        private float scale = 1f;
         private boolean alive;
     }
 }

@@ -142,6 +142,11 @@ final class InspectCoordinator implements WindowFlow {
         List<ReportPanel.Row> rows = new ArrayList<>();
         rows.add(new ReportPanel.Row(
                 KageI18n.formatOrKey(i18n, "inspect.likes", response.getLikes()), false)); // ADR-298
+        if (!response.getGuildTag().isBlank()) { // ADR-344
+            rows.add(new ReportPanel.Row(
+                    KageI18n.formatOrKey(i18n, "inspect.guild_tag", ChatController.sanitize(response.getGuildTag())),
+                    false));
+        }
         if (!response.getBio().isBlank()) { // ADR-218 — dòng giới thiệu tự viết của người được soi
             rows.add(new ReportPanel.Row(
                     KageI18n.formatOrKey(i18n, "inspect.bio", ChatController.sanitize(response.getBio())), false));

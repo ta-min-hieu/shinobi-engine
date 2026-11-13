@@ -61,6 +61,9 @@ final class CombatFeedbackPresenter implements Disposable {
     // lời gọi nên an toàn (Điều 31).
     private final Vector3 anchor = new Vector3();
 
+    /** ADR-350 — đòn đang hiện số là chí mạng (đặt ngay trước {@link #showNumber}, tránh thêm tham số thứ năm). */
+    private boolean nextIsCrit;
+
     /**
      * @param localPosition {@link PositionComponent} của CHÍNH người chơi — giữ tham chiếu thẳng
      *     (không copy) là đúng: entity người chơi tạo một lần và không bao giờ đổi component, nên
@@ -77,6 +80,7 @@ final class CombatFeedbackPresenter implements Disposable {
     /** Đòn đánh thường — chỉ có số damage, không có hiệu ứng riêng. */
     void onAttackResult(AttackResultEvent event) {
         if (resolveAnchor(event.getTargetEntityId())) {
+            nextIsCrit = event.getIsCrit(); // ADR-350
             showNumber(event.getAttackerEntityId(), event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
         }
     }
@@ -85,6 +89,7 @@ final class CombatFeedbackPresenter implements Disposable {
     void onSkillResult(SkillResultEvent event) {
         if (resolveAnchor(event.getTargetEntityId())) {
             skillVfx.play(event.getSkillCode(), anchor.x, anchor.y, anchor.z);
+            nextIsCrit = event.getIsCrit(); // ADR-350
             showNumber(event.getAttackerEntityId(), event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
         }
     }
@@ -132,7 +137,15 @@ final class CombatFeedbackPresenter implements Disposable {
             return;
         }
         Color color = targetEntityId == localCharacterId ? takenColor() : FloatingCombatText.DAMAGE_DEALT;
-        floatingText.show("-" + damage, color, anchor);
+        if (nextIsCrit) { // ADR-350 — chí mạng: to hơn, cam, có dấu "!"
+            floatingText.show(
+                    "-" + damage + "!",
+                    targetEntityId == localCharacterId ? color : FloatingCombatText.CRIT,
+                    anchor,
+                    FloatingCombatText.CRIT_SCALE);
+        } else {
+            floatingText.show("-" + damage, color, anchor);
+        }
         if (attackerEntityId == localCharacterId && targetEntityId != localCharacterId) {
             countCombo();
         }

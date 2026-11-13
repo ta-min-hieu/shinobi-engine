@@ -33,8 +33,12 @@ final class IdleKick {
 
     private static final Duration TIMEOUT = parse(System.getenv(ENV));
 
+    /** ADR-346 — báo trước bao lâu (chỉ khi thời hạn dài hơn gấp đôi khoảng này). */
+    static final Duration WARN_BEFORE = Duration.ofMinutes(1);
+
     private final Duration timeout;
     private volatile long lastActivityNanos = System.nanoTime();
+    private volatile boolean warned;
     private ScheduledFuture<?> check;
 
     IdleKick() {
@@ -61,12 +65,23 @@ final class IdleKick {
     void touch(int opcode) {
         if (opcode != Opcode.OPCODE_PING_VALUE) {
             lastActivityNanos = System.nanoTime();
+            warned = false;
         }
     }
 
     /** {@code true} nếu tới {@code nowNanos} đã im quá thời hạn (và tính năng đang bật). */
     boolean isIdle(long nowNanos) {
         return !timeout.isZero() && nowNanos - lastActivityNanos >= timeout.toNanos();
+    }
+
+    /**
+     * ADR-346 — {@code true} nếu tới {@code nowNanos} đã im tới mốc "còn {@link #WARN_BEFORE} nữa thì ngắt" mà chưa
+     * báo. Thời hạn ngắn hơn hai lần {@link #WARN_BEFORE} thì không báo trước (báo cũng như ngắt luôn).
+     */
+    boolean isWarnDue(long nowNanos) {
+        return !warned
+                && timeout.compareTo(WARN_BEFORE.multipliedBy(2)) >= 0
+                && nowNanos - lastActivityNanos >= timeout.minus(WARN_BEFORE).toNanos();
     }
 
     /** Bắt đầu kiểm theo nhịp; {@code inWorld} = đang có nhân vật trong world (màn chọn nhân vật không bị ngắt). */
@@ -89,17 +104,34 @@ final class IdleKick {
     // FutureReturnValueIgnored: ChannelFuture của close()/writeAndFlush() — lỗi đi qua pipeline Netty.
     @SuppressWarnings("FutureReturnValueIgnored")
     private void checkNow(ChannelHandlerContext ctx, BooleanSupplier inWorld) {
-        if (!ctx.channel().isActive() || !inWorld.getAsBoolean() || !isIdle(System.nanoTime())) {
+        long now = System.nanoTime();
+        if (!ctx.channel().isActive() || !inWorld.getAsBoolean()) {
             return;
         }
+        if (isIdle(now)) {
+            notice(
+                    ctx,
+                    "Treo máy quá " + timeout.toMinutes() + " phút — tự ngắt kết nối. / Idle for over "
+                            + timeout.toMinutes() + " minutes — disconnected.");
+            ctx.close();
+        } else if (isWarnDue(now)) {
+            warned = true; // ADR-346
+            notice(
+                    ctx,
+                    "Treo máy: còn khoảng 1 phút nữa sẽ tự ngắt kết nối — cử động để ở lại. / Idle: about one "
+                            + "minute until disconnect — move to stay.");
+        }
+    }
+
+    // FutureReturnValueIgnored: ChannelFuture của writeAndFlush() — lỗi đi qua pipeline Netty.
+    @SuppressWarnings("FutureReturnValueIgnored")
+    private static void notice(ChannelHandlerContext ctx, String body) {
         ChatMessageEvent notice = ChatMessageEvent.newBuilder()
                 .setChannel(ChatChannel.CHAT_CHANNEL_UNSPECIFIED)
                 .setSenderName("")
-                .setBody("Treo máy quá " + timeout.toMinutes() + " phút — tự ngắt kết nối. / Idle for over "
-                        + timeout.toMinutes() + " minutes — disconnected.")
+                .setBody(body)
                 .build();
         PacketHeader header = new PacketHeader(Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, ProtocolVersion.CURRENT, 0);
         ctx.writeAndFlush(new PacketCodec.Frame(header, notice.toByteArray()));
-        ctx.close();
     }
 }

@@ -1268,6 +1268,52 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot44()
                                     .lookupItem(c))),
             Map.entry(
+                    Opcode.OPCODE_GET_NAME_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetNameHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_NAME_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .nameHistory(c))),
+            Map.entry(
+                    Opcode.OPCODE_SET_GUILD_TAG_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetGuildTagCommand.parser(),
+                            Opcode.OPCODE_SET_GUILD_TAG_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .setGuildTag(id, c))),
+            Map.entry(
                     Opcode.OPCODE_SET_STATUS_MESSAGE_COMMAND_VALUE,
                     storageCommand(
                             dev.kage.protocol.SetStatusMessageCommand.parser(),
@@ -5186,6 +5232,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             RemoveFriendResponse response =
                     RemoveFriendResponse.newBuilder().setOutcome(outcome).build();
             send(ctx, Opcode.OPCODE_REMOVE_FRIEND_RESPONSE_VALUE, sequenceId, response.toByteArray());
+            if (result == FriendFacade.RemoveResult.OK) {
+                lot52().friendRemoved(characterId, target.get().id()); // ADR-345
+            }
         } catch (RuntimeException e) {
             LOG.error("Huỷ kết bạn thất bại", e);
             sendError(ctx, sequenceId, 500, "error.remove_friend_failed");
@@ -5262,6 +5311,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             LOG.error("Liệt kê danh sách bạn bè thất bại", e);
             sendError(ctx, sequenceId, 500, "error.list_friends_failed");
         }
+    }
+
+    /** Lớp lệnh lô 52 (ADR-343…). */
+    private Lot52Commands lot52() {
+        return expansion
+                .lot37()
+                .lot38()
+                .lot39()
+                .lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .lot49()
+                .lot50()
+                .lot51()
+                .lot52();
     }
 
     /** ADR-335 — lời nhắn trạng thái của các bạn bè. */
@@ -7166,6 +7236,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 .setSenderId(ctx.characterId())
                 .setSenderName(ctx.senderName())
                 .setSenderTitleKey(titleKeyOf(ctx.characterId()))
+                .setSenderGuildTag(lot52().chatTagOf(protoChannel, ctx.characterId())) // ADR-344
                 .setBody(ctx.body());
         if (ctx.linkedItem().getItemTemplateId() != 0L) {
             event.setLinkedItem(ctx.linkedItem()); // ADR-188 — chỉ gắn khi thật sự khoe (tin thường không thêm byte)

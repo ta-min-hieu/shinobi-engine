@@ -5,9 +5,10 @@ import dev.kage.chat.api.BulletinFacade;
 import dev.kage.friend.api.StatusMessageFacade;
 
 /** Facade lô 51 (ADR-335…) gom thành MỘT thành phần của {@link Lot50Facades}. Biểu quyết đuổi (ADR-338) ở RAM. */
-record Lot51Facades(StatusMessageFacade statusMessages, BulletinFacade bulletin, DeathLogFacade deathLog) {
+record Lot51Facades(
+        StatusMessageFacade statusMessages, BulletinFacade bulletin, DeathLogFacade deathLog, Lot52Facades lot52) {
 
     /** Composition không có các tính năng này (test). */
-    static final Lot51Facades DISABLED =
-            new Lot51Facades(StatusMessageFacade.DISABLED, BulletinFacade.DISABLED, DeathLogFacade.DISABLED);
+    static final Lot51Facades DISABLED = new Lot51Facades(
+            StatusMessageFacade.DISABLED, BulletinFacade.DISABLED, DeathLogFacade.DISABLED, Lot52Facades.DISABLED);
 }

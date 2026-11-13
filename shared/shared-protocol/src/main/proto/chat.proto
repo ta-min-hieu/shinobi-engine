@@ -86,6 +86,7 @@ message ChatMessageEvent {
   // ADR-187 — tin nhắn riêng gửi lúc mình offline, giao lúc vào game: thời điểm GỬI. 0 = tin thời gian thực.
   int64 sent_at_epoch_seconds = 7;
   LinkedItemView linked_item = 8; // ADR-188 — có khi người gửi khoe một món
+  string sender_guild_tag = 9;     // ADR-344 — ký hiệu bang người gửi (chỉ kênh thế giới / giao dịch); "" = không có
 }
 
 // ===== ADR-092 — biểu cảm. CHỈ THÊM. Phát cho mọi người đang nhìn thấy mình (AoI, gồm cả chính mình); client vẽ

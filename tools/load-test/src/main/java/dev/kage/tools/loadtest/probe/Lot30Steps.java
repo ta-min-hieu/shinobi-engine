@@ -133,7 +133,9 @@ final class Lot30Steps {
                             .append(r.getLevel())
                             .append(" lựcChiến=")
                             .append(r.getCombatPower())
-                            .append(" giớiThiệu='")
+                            .append(" bang='") // ADR-344
+                            .append(r.getGuildTag())
+                            .append("' giớiThiệu='")
                             .append(r.getBio())
                             .append('\'');
                     r.getEquipmentList().forEach(e -> line.append(" ô")

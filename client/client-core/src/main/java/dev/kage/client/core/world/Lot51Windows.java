@@ -12,7 +12,8 @@ record Lot51Windows(
         VoteKickCoordinator voteKick,
         ChatColorCoordinator chatColor,
         FullHealthCoordinator fullHealth,
-        ScreenShakeCoordinator screenShake) {
+        ScreenShakeCoordinator screenShake,
+        Lot52Windows lot52) {
 
     static Lot51Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot51Windows(
@@ -22,7 +23,8 @@ record Lot51Windows(
                 new VoteKickCoordinator(sender, feeds.chat()),
                 new ChatColorCoordinator(feeds.chat()),
                 new FullHealthCoordinator(feeds.chat()),
-                new ScreenShakeCoordinator(feeds.chat()));
+                new ScreenShakeCoordinator(feeds.chat()),
+                Lot52Windows.create(sender, feeds)); // lô 52 lồng ở đây
     }
 
     void registerInto(PanelHub panels) {
@@ -33,5 +35,6 @@ record Lot51Windows(
         panels.register(chatColor);
         panels.register(fullHealth);
         panels.register(screenShake);
+        lot52.registerInto(panels);
     }
 }

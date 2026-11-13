@@ -35,6 +35,11 @@ import dev.kage.protocol.VoteKickOutcome;
 /** Lớp lệnh lô 51 (ADR-335…) — MỘT thành phần của {@link Lot50Commands}. Gọi trên Virtual Thread. */
 record Lot51Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 52 (ADR-343…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot52Commands lot52() {
+        return new Lot52Commands(gateway, registry);
+    }
+
     /** ADR-335 — hỏi / đặt / xoá lời nhắn trạng thái của mình. */
     SetStatusMessageResponse setStatusMessage(long characterId, SetStatusMessageCommand command) {
         StatusMessageFacade statuses = facades().statusMessages();
