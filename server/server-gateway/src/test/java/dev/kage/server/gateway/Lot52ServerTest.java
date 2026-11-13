@@ -30,6 +30,14 @@ class Lot52ServerTest {
     }
 
     @Test
+    void rejectsUnsearchableNames() {
+        assertThat(Lot52Commands.searchableName("BaoDo01")).isTrue();
+        assertThat(Lot52Commands.searchableName("")).isFalse();
+        assertThat(Lot52Commands.searchableName("a\u0000b")).isFalse();
+        assertThat(Lot52Commands.searchableName("x".repeat(33))).isFalse();
+    }
+
+    @Test
     void noWarningForVeryShortTimeouts() {
         IdleKick kick = new IdleKick(Duration.ofMinutes(1));
         assertThat(kick.isWarnDue(System.nanoTime() + Duration.ofMinutes(5).toNanos()))

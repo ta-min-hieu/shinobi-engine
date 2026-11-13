@@ -15,7 +15,8 @@ final class SellConfirmGuard {
     private final LongSupplier clockMillis;
     private final Consumer<InventoryController.Item> ask;
     private long pendingItemId;
-    private long pendingAtMillis = Long.MIN_VALUE;
+    private long pendingAtMillis;
+    private boolean pending;
 
     /** {@code ask} hiện lời nhắc "bấm lần nữa" cho món đó. */
     SellConfirmGuard(LongSupplier clockMillis, Consumer<InventoryController.Item> ask) {
@@ -29,10 +30,11 @@ final class SellConfirmGuard {
             return true;
         }
         long now = clockMillis.getAsLong();
-        if (pendingItemId == item.itemId() && now - pendingAtMillis <= WINDOW_MILLIS) {
-            pendingAtMillis = Long.MIN_VALUE;
+        if (pending && pendingItemId == item.itemId() && now - pendingAtMillis <= WINDOW_MILLIS) {
+            pending = false;
             return true;
         }
+        pending = true;
         pendingItemId = item.itemId();
         pendingAtMillis = now;
         ask.accept(item);

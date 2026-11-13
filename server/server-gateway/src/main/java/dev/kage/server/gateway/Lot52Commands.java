@@ -22,9 +22,15 @@ import dev.kage.protocol.SetGuildTagResponse;
 /** Lớp lệnh lô 52 (ADR-343…) — MỘT thành phần của {@link Lot51Commands}. Gọi trên Virtual Thread. */
 record Lot52Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Tên dài hơn mức này chắc chắn không phải tên nhân vật (tên tối đa 16 ký tự). */
+    static final int MAX_NAME_LENGTH = 32;
+
     /** ADR-343 — tên cũ của người đang mang (hoặc từng mang) tên {@code name}. */
     GetNameHistoryResponse nameHistory(GetNameHistoryRequest request) {
         String name = request.getName().strip();
+        if (!searchableName(name)) {
+            return GetNameHistoryResponse.newBuilder().setFound(false).build();
+        }
         Optional<Character> found = gateway.characterFacade()
                 .findByName(name)
                 .or(() -> facades().nameHistory().characterWithOldName(name).flatMap(id -> gateway.characterFacade()
@@ -42,6 +48,13 @@ record Lot52Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
                     .setChangedAtEpochSeconds(entry.changedAt().getEpochSecond()));
         }
         return response.build();
+    }
+
+    /** Tên đáng tra: không rỗng, ≤ 32 ký tự, không ký tự điều khiển (NUL làm Postgres từ chối). Tĩnh để test. */
+    static boolean searchableName(String name) {
+        return !name.isEmpty()
+                && name.length() <= MAX_NAME_LENGTH
+                && name.chars().noneMatch(java.lang.Character::isISOControl);
     }
 
     /** ADR-344 — hỏi / đặt / xoá ký hiệu bang (chỉ bang chủ đặt). */

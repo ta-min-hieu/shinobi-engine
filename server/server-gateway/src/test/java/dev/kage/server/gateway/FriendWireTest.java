@@ -191,6 +191,10 @@ class FriendWireTest {
         assertThat(remove(bob, "Alice"))
                 .as("huỷ lần hai")
                 .isEqualTo(RemoveFriendOutcome.REMOVE_FRIEND_OUTCOME_NOT_FRIENDS);
+        assertThat(GatewayPipelineTest.readOutboundFrames(alice))
+                .as("ADR-345 — Alice (đang online) được báo vừa bị xoá khỏi danh sách bạn bè")
+                .extracting(frame -> frame.header().opcode())
+                .containsExactly(Opcode.OPCODE_FRIEND_REMOVED_EVENT_VALUE);
         assertThat(listFriends(alice).getFriendsList())
                 .extracting(friend -> friend.getName())
                 .containsExactly("Carol");
