@@ -165,17 +165,7 @@ record ExpansionWindows(
         lot48.pingHud().useHud(hud::setLatencyVisible); // ADR-316
         hud.useNearbyCount(lot48.lot49().nearby()::count); // ADR-325
         lot48.lot49().nearby().useHud(hud::setNearbyVisible);
-        Lot50Windows lot50 = lot48.lot49().lot50();
-        lot50.expGain().useSink(text -> feedback.showSelfText(text, FloatingCombatText.EXP_GAIN)); // ADR-331
-        hud.useSessionClock(lot50.sessionClock()::elapsedSeconds); // ADR-332
-        lot50.sessionClock().useHud(hud::setSessionClockVisible);
-        lot50.levelGoal().useHud(hud::setLevelGoal); // ADR-334
-        Lot53Windows lot53 = lot50.lot51().lot52().lot53();
-        hud.useResetCountdown(lot53.resetCountdown()::secondsToReset); // ADR-356
-        lot53.resetCountdown().useHud(hud::setResetCountdownVisible);
-        hud.useKeyHelp(lot53::keyHelpText); // ADR-357
-        feedback.useOthersVfxFilter(
-                displaySettings.settings().switchFor(DisplaySettings.Option.HIDE_OTHERS_VFX)); // ADR-358
+        wireLot50Display(lot48.lot49().lot50(), hud, feedback);
         hud.setMinimal(displaySettings
                 .settings()
                 .switchFor(DisplaySettings.Option.MINIMAL_HUD)
@@ -190,6 +180,21 @@ record ExpansionWindows(
                         .lot45()
                         .lot46()
                         .screenshot());
+    }
+
+    /** Lớp hiển thị lô 50–53: chữ +EXP, đồng hồ phiên, mục tiêu cấp, đếm ngược reset, bảng phím F1, giảm VFX. */
+    private void wireLot50Display(
+            Lot50Windows lot50, dev.kage.client.core.ui.hud.CombatHud hud, CombatFeedbackPresenter feedback) {
+        lot50.expGain().useSink(text -> feedback.showSelfText(text, FloatingCombatText.EXP_GAIN)); // ADR-331
+        hud.useSessionClock(lot50.sessionClock()::elapsedSeconds); // ADR-332
+        lot50.sessionClock().useHud(hud::setSessionClockVisible);
+        lot50.levelGoal().useHud(hud::setLevelGoal); // ADR-334
+        Lot53Windows lot53 = lot50.lot51().lot52().lot53();
+        hud.useResetCountdown(lot53.resetCountdown()::secondsToReset); // ADR-356
+        lot53.resetCountdown().useHud(hud::setResetCountdownVisible);
+        hud.useKeyHelp(lot53::keyHelpText); // ADR-357
+        feedback.useOthersVfxFilter(
+                displaySettings.settings().switchFor(DisplaySettings.Option.HIDE_OTHERS_VFX)); // ADR-358
     }
 
     /**
@@ -242,11 +247,17 @@ record ExpansionWindows(
         lot40.lot41().enhancePreview().useSelection(selectedId); // ADR-257 /dutinh
         lot40.lot41().lot42().coordinates().usePosition(lot34.autoWalk().target(), zoneMap::state); // ADR-270
         lot40.lot41().lot42().lot43().session().useLocalId(intents.localCharacterId()); // ADR-271 đếm quái hạ
-        Lot51Windows lot51 = lot49.lot50().lot51();
-        lot51.fullHealth().useLocalId(intents.localCharacterId()); // ADR-340
-        lot51.screenShake().useLocalId(intents.localCharacterId()); // ADR-342
-        lot51.lot52().lot53().mailArchive().useSelection(mail::selectedMailId); // ADR-354
+        useLot51Input(lot49.lot50().lot51(), intents.localCharacterId(), mail);
         return this;
+    }
+
+    /**
+     * Lô 51–53: id nhân vật cho báo đầy máu (ADR-340) / rung màn hình (ADR-342), thư đang chọn cho lưu trữ (ADR-354).
+     */
+    private static void useLot51Input(Lot51Windows lot51, long localId, MailCoordinator mail) {
+        lot51.fullHealth().useLocalId(localId);
+        lot51.screenShake().useLocalId(localId);
+        lot51.lot52().lot53().mailArchive().useSelection(mail::selectedMailId);
     }
 
     /** ADR-276 — khung bạn bè xếp bạn yêu thích lên đầu. */

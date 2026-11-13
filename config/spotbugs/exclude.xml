@@ -437,6 +437,13 @@
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
 
+    <!-- ScheduledMailFacade (ADR-297): id thư hẹn giờ trả về không cần dùng — ghi DB LÀ tác dụng phụ; spotbugs không
+         thấy được tác dụng của một lời gọi qua interface Port nên báo nhầm RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT. -->
+    <Match>
+        <Class name="dev.kage.mail.api.ScheduledMailFacade"/>
+        <Bug pattern="RV_RETURN_VALUE_IGNORED_NO_SIDE_EFFECT"/>
+    </Match>
+
     <!-- ShopPanel.stage() — lần thứ mười cùng một lý do (CombatHud, DialoguePanel, ChatPanel,
          PartyPanel, FriendPanel, GuildPanel, DuelPanel, FactionPanel, MailPanel ngay trên):
          WorldScreen phải đưa đúng instance Stage đó vào InputMultiplexer để đặt thứ tự nuốt input,

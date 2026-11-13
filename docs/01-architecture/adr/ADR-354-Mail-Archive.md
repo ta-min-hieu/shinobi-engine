@@ -35,4 +35,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 53): `MailArchivePort`/`Facade` (feature-mail), `PostgresMailArchiveAdapter`, sửa truy vấn `PostgresMailRepositoryAdapter`/`PostgresMailHousekeepingAdapter`, `Lot53Commands.archiveMail`/`listArchived`, `MailArchiveCoordinator`.
 2. ✅ Test: `Lot53IntegrationTest.archivedMailLeavesTheInbox`.
-3. LIVE354
+3. ✅ Kiểm sống gameProbe 2026-11-13: BaoDo01 gửi một thư cho ĐạoHữu01; `archiveMail` ⇒ ARCHIVED, `archivedMail` ⇒ 1; trả về ⇒ RESTORED, kho ⇒ 0. Đã xoá thư thử.

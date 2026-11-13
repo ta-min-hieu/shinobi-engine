@@ -33,4 +33,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 53): `PlayerLookupPort.topStreaks`, `PostgresPlayerLookupAdapter`, `Lot53Commands.streakRanking`, `PlayerLookupCoordinator`.
 2. ✅ Test: `Lot53IntegrationTest.ranksStreaksAndReferrers`.
-3. LIVE351
+3. ✅ Kiểm sống gameProbe 2026-11-13: sau khi hai nhân vật vào world trong ngày, `topStreak` ⇒ BaoDo01=1 ĐạoHữu01=1. Đã xoá dòng thử.
