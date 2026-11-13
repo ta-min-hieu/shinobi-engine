@@ -504,7 +504,7 @@ final class InventoryCoordinator implements WindowFlow {
                             ? KageI18n.formatOrKey(i18n, "item_lock.row", described) // ADR-159
                             : described));
         }
-        panel.setItems(itemRows, capacityText(all.size()), listNotice(all.size(), all.size() - shown));
+        panel.setItems(itemRows, capacityText(all.size()), itemText.listNotice(all.size(), all.size() - shown));
         refreshEquipment();
         refreshDetail();
     }
@@ -614,16 +614,6 @@ final class InventoryCoordinator implements WindowFlow {
 
     private String capacityText(int itemCount) {
         return format2("inventory.label.capacity", itemCount, controller.capacity());
-    }
-
-    /**
-     * Câu nói thêm dưới danh sách — cùng {@link MailCoordinator#listNotice}.
-     */
-    private String listNotice(int total, int hidden) {
-        if (total == 0) {
-            return text("inventory.empty");
-        }
-        return hidden <= 0 ? "" : format("inventory.list.truncated", hidden);
     }
 
     /** Bảng tra thay switch (trần CyclomaticComplexity của PMD từ khi có 9 ô). */

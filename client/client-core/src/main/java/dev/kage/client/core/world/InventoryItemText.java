@@ -62,6 +62,17 @@ final class InventoryItemText {
         this.nameOrFallback = nameOrFallback;
     }
 
+    /**
+     * Câu nói thêm dưới danh sách túi — cùng {@link MailCoordinator#listNotice}. Chuyển từ {@code InventoryCoordinator}
+     * (lô 49) vì lớp đó chạm trần độ phức tạp PMD.
+     */
+    String listNotice(int total, int hidden) {
+        if (total == 0) {
+            return KageI18n.textOrKey(i18n, "inventory.empty");
+        }
+        return hidden <= 0 ? "" : KageI18n.formatOrKey(i18n, "inventory.list.truncated", hidden);
+    }
+
     /** ADR-326 — cách biết một mẫu vừa nhặt (nhãn "mới"). */
     void useNewMark(java.util.function.LongPredicate newItem) {
         this.isNew = newItem;

@@ -506,20 +506,17 @@ public final class WorldScreen implements GameScreen {
         panels.register(reports.guildSkillPanel(), reports.guildSkills());
         panels.register(reports.spiritVeinPanel(), reports.spiritVeins());
         reports.community().registerInto(panels);
-        reports.community().expansion().useCombat(combatHudController); // ADR-124 thuần phục, ADR-243 máu thấp
-        // ADR-133 — nút pháp bảo trên HUD và phím 1 cùng gọi ArtifactCoordinator.use.
-        combatHud.setOnArtifactClicked(
-                intents.setOnArtifact(reports.community().expansion().artifact()::use));
-        // ADR-102 — cửa sổ bang chiến mở từ nút cửa sổ Bang; đang chiến thì click người chơi là nhắm họ.
-        GuildWarCoordinator guildWars = reports.community().guildWars();
+        ExpansionWindows expansion = reports.community().expansion(); // ADR-141 biển PvP, 143 cài đặt, 144 thời tiết
+        expansion.useCombat(combatHudController); // ADR-124 thuần phục, ADR-243 máu thấp
+        combatHud.setOnArtifactClicked(intents.setOnArtifact(expansion.artifact()::use)); // ADR-133
+        GuildWarCoordinator guildWars = reports.community().guildWars(); // ADR-102 bang chiến: nút Bang + click nhắm
         guild.useGuildAuction(reports.community().auctions()::open);
         guild.useGuildWar(guildWars::open);
-        ExpansionWindows expansion = reports.community().expansion(); // ADR-141 biển PvP, 143 cài đặt, 144 thời tiết
         expansion.wireDisplay(combatHud, realmTitles, combatFeedback, backdrop);
         expansion
                 .useLocalInput(inventory, intents, mail, quests)
                 .useFriends(friends)
-                .useCamera(models); // +ADR-323
+                .useCamera(models); // ADR-323
         duelTargeting.useGuildWar(
                 expansion.zoneMap().orInPvpZone(guildWars::isMyWarActive),
                 dev.kage.client.core.ui.theme.KageI18n.textOrKey(i18n, "guildwar.target"));
