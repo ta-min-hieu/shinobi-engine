@@ -55,6 +55,15 @@ final class HudBanners {
 
     private String shownDuelText;
 
+    private static final long GOOD_LATENCY_MS = 100L;
+    private static final long FAIR_LATENCY_MS = 250L;
+    private static final com.badlogic.gdx.graphics.Color GOOD_LATENCY_COLOR =
+            com.badlogic.gdx.graphics.Color.valueOf("7CFF7C");
+    private static final com.badlogic.gdx.graphics.Color FAIR_LATENCY_COLOR =
+            com.badlogic.gdx.graphics.Color.valueOf("FFD24A");
+    private static final com.badlogic.gdx.graphics.Color POOR_LATENCY_COLOR =
+            com.badlogic.gdx.graphics.Color.valueOf("FF5A4A");
+
     /** -1 = chưa nhận nhịp heartbeat nào, xem {@link #clearLatency()}. */
     private long shownLatencyMs = -1L;
 
@@ -126,6 +135,20 @@ final class HudBanners {
         }
         shownLatencyMs = roundTripMs;
         latencyLabel.setText(i18n.format("hud.latency", roundTripMs));
+        latencyLabel.setColor(latencyColor(roundTripMs)); // ADR-316
+    }
+
+    /** ADR-316 — xanh dưới 100 ms, vàng dưới 250 ms, đỏ từ 250 ms (cùng ngưỡng lệnh {@code /ping}). */
+    static com.badlogic.gdx.graphics.Color latencyColor(long roundTripMs) {
+        if (roundTripMs < GOOD_LATENCY_MS) {
+            return GOOD_LATENCY_COLOR;
+        }
+        return roundTripMs < FAIR_LATENCY_MS ? FAIR_LATENCY_COLOR : POOR_LATENCY_COLOR;
+    }
+
+    /** ADR-316 — ẩn / hiện nhãn độ trễ. */
+    void setLatencyVisible(boolean visible) {
+        latencyLabel.setVisible(visible);
     }
 
     void clearLatency() {

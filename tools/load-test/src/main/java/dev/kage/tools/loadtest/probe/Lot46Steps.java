@@ -57,7 +57,7 @@ final class Lot46Steps {
                                     dev.kage.protocol.LikeProfileResponse.parseFrom(p);
                             return r.getOutcome().name() + " thích=" + r.getLikes();
                         });
-            default -> lot47.step(verb);
+            default -> lot47.step(verb, arg);
         };
     }
 }

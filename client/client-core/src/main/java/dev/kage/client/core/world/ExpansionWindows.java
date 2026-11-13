@@ -153,6 +153,21 @@ record ExpansionWindows(
         lot39().lot40().lot41().lot42().lot43().lot44().fps().useHud(hud::setFpsVisible); // ADR-283
         feedback.useCombo(
                 lot39().lot40().lot41().lot42().lot43().lot44().lot45().combo()::enabled); // ADR-293
+        Lot48Windows lot48 = lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48();
+        lot48.pingHud().useHud(hud::setLatencyVisible); // ADR-316
+        hud.setMinimal(displaySettings
+                .settings()
+                .switchFor(DisplaySettings.Option.MINIMAL_HUD)
+                .getAsBoolean());
+        displaySettings.onChange(DisplaySettings.Option.MINIMAL_HUD, hud::setMinimal); // ADR-318
         lot39().photoMode() // ADR-300 — F12 chụp sau khi khung vẽ xong
                 .afterRender(lot39().lot40()
                         .lot41()
@@ -207,6 +222,17 @@ record ExpansionWindows(
     /** ADR-276 — khung bạn bè xếp bạn yêu thích lên đầu. */
     void useFriends(FriendCoordinator friends) {
         lot39().lot40().lot41().lot42().lot43().useFriends(friends);
+        lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .friendPresence()
+                .useIn(friends); // ADR-311
     }
 
     /** Nối HUD chiến đấu: mục tiêu cho thuần phục (ADR-124), máu cho cảnh báo máu thấp (ADR-243). */

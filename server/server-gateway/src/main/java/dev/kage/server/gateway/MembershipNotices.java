@@ -83,6 +83,9 @@ final class MembershipNotices {
             if (domain == Domain.GUILD && joined != actorId) {
                 sendGuild(joined, GuildChangeReason.GUILD_CHANGE_REASON_YOU_WERE_ACCEPTED, joined);
             }
+            if (domain == Domain.GUILD) {
+                registry.guildWelcome.onJoined(joined); // ADR-313
+            }
             tellOthers(
                     actorId,
                     joined,

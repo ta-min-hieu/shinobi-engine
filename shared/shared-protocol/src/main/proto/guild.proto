@@ -867,3 +867,24 @@ message GuildMemberOnlineEvent {
   int64 character_id = 1;
   string name = 2;
 }
+
+// ADR-313 (2026-11-13) — lời chào thành viên mới. Command: Client -> Server (OPCODE_SET_GUILD_WELCOME_COMMAND).
+// query_only = chỉ hỏi; message rỗng = xoá lời chào. Chỉ bang chủ / phó bang chủ được đặt.
+message SetGuildWelcomeCommand {
+  bool query_only = 1;
+  string message = 2;
+}
+
+enum SetGuildWelcomeOutcome {
+  SET_GUILD_WELCOME_OUTCOME_UNSPECIFIED = 0;
+  SET_GUILD_WELCOME_OUTCOME_OK = 1;
+  SET_GUILD_WELCOME_OUTCOME_NOT_IN_GUILD = 2;
+  SET_GUILD_WELCOME_OUTCOME_NOT_OFFICER = 3;
+  SET_GUILD_WELCOME_OUTCOME_INVALID_TEXT = 4;
+}
+
+// Response: Server -> Client (OPCODE_SET_GUILD_WELCOME_RESPONSE).
+message SetGuildWelcomeResponse {
+  SetGuildWelcomeOutcome outcome = 1;
+  string message = 2;
+}

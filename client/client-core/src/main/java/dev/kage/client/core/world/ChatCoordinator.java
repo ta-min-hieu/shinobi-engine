@@ -63,6 +63,9 @@ final class ChatCoordinator implements WindowFlow {
 
     private java.util.function.Consumer<ChatController.ComposeResult.Send> outgoing = send -> {}; // ADR-284
 
+    /** ADR-315/317 — ai cần nghe mọi tin chat đến (bong bóng chat, lịch sử thông báo). */
+    private final List<java.util.function.Consumer<ChatMessageEvent>> incoming = new ArrayList<>();
+
     ChatCoordinator(ChatPanel panel, WorldCommandSender sender) {
         this.panel = panel;
         this.sender = sender;
@@ -74,6 +77,11 @@ final class ChatCoordinator implements WindowFlow {
         // khung chat coi như không tồn tại với người chơi lần đầu.
         controller.appendSystem(text("chat.hint.open"));
         refreshLines();
+    }
+
+    /** ADR-315/317 — nghe mọi tin chat đến (sau bộ lọc chặn). */
+    void onIncoming(java.util.function.Consumer<ChatMessageEvent> listener) {
+        incoming.add(listener);
     }
 
     /** ADR-284 — nghe mọi tin ô nhập vừa gửi đi (sau khi qua lệnh gạch chéo). */
@@ -198,6 +206,7 @@ final class ChatCoordinator implements WindowFlow {
                 return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
             }
             controller.onMessage(withTitle(markLinked(markOffline(markAutoReply(event)))));
+            incoming.forEach(listener -> listener.accept(event)); // ADR-315/317
             if (mentions.mentions(event.getSenderName(), event.getBody())) { // ADR-245
                 controller.appendSystem(KageI18n.formatOrKey(i18n, "mention.notice", event.getSenderName()));
             }

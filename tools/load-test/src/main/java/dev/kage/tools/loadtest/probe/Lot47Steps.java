@@ -8,12 +8,14 @@ import dev.kage.protocol.Opcode;
 final class Lot47Steps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot48Steps lot48;
 
     Lot47Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot48 = new Lot48Steps(asker);
     }
 
-    String step(String verb) throws IOException {
+    String step(String verb, String arg) throws IOException {
         return switch (verb) {
             case "topBoss" ->
                 asker.ask(
@@ -36,7 +38,7 @@ final class Lot47Steps {
                             }
                             return out.toString();
                         });
-            default -> "bước không hiểu";
+            default -> lot48.step(verb, arg);
         };
     }
 }

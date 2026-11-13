@@ -342,6 +342,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-308](ADR-308-UI-Scale.md) | Thu phóng giao diện: `PanelHub.setUiScale` qua `ScreenViewport`; `/giaodien`; Preferences | ✅ Accepted (lô 47) |
 | [ADR-309](ADR-309-Hide-Other-Titles.md) | Ẩn tên người chơi khác: Dòng cài đặt `HIDE_OTHER_TITLES`, giữ đồng đội | ✅ Accepted (lô 47) |
 | [ADR-310](ADR-310-Share-Position-Party.md) | Chia sẻ vị trí vào nhóm: `/chiasevitri` gửi tọa độ vào kênh nhóm | ✅ Accepted (lô 47) |
+| [ADR-311](ADR-311-Friend-Presence-Chat-Line.md) | Báo bạn bè vào game (dòng chat + công tắc): Dòng chat kèm chữ nổi; `/baobanbe` | ✅ Accepted (lô 48) |
+| [ADR-312](ADR-312-Friends-Mail.md) | Thư gửi mọi bạn bè: Mỗi bạn một thư thường; 1 đợt/ngày qua audit; 925/926 | ✅ Accepted (lô 48) |
+| [ADR-313](ADR-313-Guild-Welcome.md) | Lời chào thành viên mới: Cột `welcome_message`; gửi chat + thư khi vào bang; 783/784; `/loichao` | ✅ Accepted (lô 48) |
+| [ADR-314](ADR-314-Unread-Mail.md) | Thư chưa đọc: Cột `read_at`; `MailView.unread`; 923/924; báo lúc vào world | ✅ Accepted (lô 48) |
+| [ADR-315](ADR-315-Chat-Bubbles.md) | Bong bóng chat trên đầu: Tin khu vực ⇒ chữ trên đầu qua `EmoteBubbles`; `/bongbong` | ✅ Accepted (lô 48) |
+| [ADR-316](ADR-316-Ping-Hud-Toggle.md) | Ping trên HUD (bật/tắt + màu): Màu theo ngưỡng `/ping`; `/pinghud` | ✅ Accepted (lô 48) |
+| [ADR-317](ADR-317-System-Notice-History.md) | Lịch sử thông báo hệ thống: Vòng 30 dòng hệ thống; `/lichsuthongbao` | ✅ Accepted (lô 48) |
+| [ADR-318](ADR-318-Minimal-Hud.md) | HUD tối giản: Dòng cài đặt `MINIMAL_HUD`: ẩn gợi ý phím + thẻ nhiệm vụ | ✅ Accepted (lô 48) |
 ---
 
 ## ADR cần tạo (chưa viết)

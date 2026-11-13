@@ -55,12 +55,25 @@ final class MailForwardCoordinator implements WindowFlow {
 
     /** Bản nháp chuyển tiếp: tiêu đề "Fwd: …" cắt vừa 64, nội dung cắt vừa 1024, không vàng. Tĩnh để test. */
     static MailController.Draft draft(String recipient, MailController.Mail mail) {
-        String subject = mail.subject().startsWith(PREFIX) ? mail.subject() : PREFIX + mail.subject();
+        String clean = stripMarks(mail.subject());
+        String subject = clean.startsWith(PREFIX) ? clean : PREFIX + clean;
         return new MailController.Draft(
                 recipient,
                 cut(subject, MailController.MAX_SUBJECT_LENGTH),
                 cut(mail.body(), MailController.MAX_BODY_LENGTH),
                 0L);
+    }
+
+    /** Bỏ dấu hiển thị (chưa đọc, ghim) khỏi tiêu đề. Tĩnh để test. */
+    static String stripMarks(String subject) {
+        String result = subject;
+        if (result.startsWith(MailController.UNREAD_MARK)) {
+            result = result.substring(MailController.UNREAD_MARK.length());
+        }
+        if (result.startsWith(MailController.PINNED_MARK)) {
+            result = result.substring(MailController.PINNED_MARK.length());
+        }
+        return result;
     }
 
     private static String cut(String text, int max) {

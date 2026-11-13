@@ -135,6 +135,9 @@ final class MailController {
     /** ADR-217 — dấu thư ghim đặt trước tiêu đề (ký tự ASCII: font tiếng Việt không có ký hiệu ghim). */
     static final String PINNED_MARK = "[*] ";
 
+    /** ADR-314 — đầu tiêu đề thư chưa đọc. */
+    static final String UNREAD_MARK = "(mới) ";
+
     /** Có thư mới đến trong lúc đang chơi mà chưa mở hòm thư xem — xem {@link #onNewMail}. */
     private boolean newMailPending;
 
@@ -171,7 +174,9 @@ final class MailController {
                 view.getMailId(),
                 view.getHasSender(),
                 view.getSenderId(),
-                (view.getPinned() ? PINNED_MARK : "") + ChatController.sanitize(view.getSubject()), // ADR-217
+                (view.getUnread() ? UNREAD_MARK : "") // ADR-314
+                        + (view.getPinned() ? PINNED_MARK : "")
+                        + ChatController.sanitize(view.getSubject()), // ADR-217
                 ChatController.sanitize(view.getBody()),
                 view.getGoldAmount(),
                 List.copyOf(attachments),

@@ -22,6 +22,11 @@ record Lot47Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
     private static final DateTimeFormatter TIME =
             DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneOffset.UTC);
 
+    /** Lớp lệnh lô 48 (ADR-311…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot48Commands lot48() {
+        return new Lot48Commands(gateway, registry);
+    }
+
     /** ADR-303 — top 10 tổng sát thương boss thế giới. */
     GetBossDamageRankingResponse bossDamageRanking() {
         GetBossDamageRankingResponse.Builder response = GetBossDamageRankingResponse.newBuilder();
@@ -48,6 +53,7 @@ record Lot47Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
      * Mỗi tin đi đúng kênh bang, tên người gửi giữ nguyên, nội dung kèm giờ (UTC).
      */
     void onEnteredWorld(long characterId) {
+        lot48().onEnteredWorld(characterId); // ADR-314 — báo thư chưa đọc
         Map<Long, Instant> lastLeft =
                 gateway.progression().expansion().lot33().lastOnline().lastOnlineOf(List.of(characterId));
         Instant after = lastLeft.get(characterId);

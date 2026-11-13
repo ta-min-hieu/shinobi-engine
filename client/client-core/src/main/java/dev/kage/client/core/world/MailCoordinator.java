@@ -275,6 +275,14 @@ final class MailCoordinator implements WindowFlow {
     }
 
     private void refreshSelected() {
+        controller // ADR-314 — mở một thư chưa đọc ⇒ báo server đã đọc (MailReadCoordinator hỏi lại danh sách)
+                .selected()
+                .filter(mail -> mail.subject().startsWith(MailController.UNREAD_MARK))
+                .ifPresent(mail -> sender.sendReadRequest(
+                        Opcode.OPCODE_MARK_MAIL_READ_COMMAND_VALUE,
+                        dev.kage.protocol.MarkMailReadCommand.newBuilder()
+                                .setMailId(mail.mailId())
+                                .build()));
         controller
                 .selected()
                 .ifPresentOrElse(

@@ -1268,6 +1268,63 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot44()
                                     .lookupItem(c))),
             Map.entry(
+                    Opcode.OPCODE_SEND_FRIENDS_MAIL_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SendFriendsMailCommand.parser(),
+                            Opcode.OPCODE_SEND_FRIENDS_MAIL_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .sendFriendsMail(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_SET_GUILD_WELCOME_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetGuildWelcomeCommand.parser(),
+                            Opcode.OPCODE_SET_GUILD_WELCOME_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .setGuildWelcome(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_MARK_MAIL_READ_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.MarkMailReadCommand.parser(),
+                            Opcode.OPCODE_MARK_MAIL_READ_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .markRead(id, c))),
+            Map.entry(
                     Opcode.OPCODE_GET_BOSS_DAMAGE_RANKING_REQUEST_VALUE,
                     storageCommand(
                             dev.kage.protocol.GetBossDamageRankingRequest.parser(),
@@ -6404,6 +6461,20 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         ListMailResponse.Builder responseBuilder = ListMailResponse.newBuilder();
         java.util.Set<Long> pinned =
                 expansion.lot36().facades().mailHousekeeping().pinned(characterId); // ADR-217
+        java.util.Set<Long> unread = expansion
+                .lot37()
+                .lot38()
+                .lot39()
+                .lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .unreadMailIds(characterId); // ADR-314
         for (MailFacade.MailView mail : pinnedFirst(mailFacade.listMail(characterId), pinned)) {
             MailView.Builder viewBuilder = MailView.newBuilder()
                     .setMailId(mail.mailId())
@@ -6413,7 +6484,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setBody(mail.body())
                     .setGoldAmount(mail.goldAmount())
                     .setClaimed(mail.claimed())
-                    .setPinned(pinned.contains(mail.mailId()));
+                    .setPinned(pinned.contains(mail.mailId()))
+                    .setUnread(unread.contains(mail.mailId()));
             for (MailFacade.AttachmentView attachment : mail.attachments()) {
                 viewBuilder.addAttachments(MailAttachmentView.newBuilder()
                         .setItemTemplateId(attachment.itemTemplateId())

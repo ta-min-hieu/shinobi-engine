@@ -74,6 +74,8 @@ final class FriendCoordinator implements WindowFlow {
     private final List<FriendPanel.FriendRow> friendRows = new ArrayList<>();
 
     private java.util.function.Predicate<String> favorite = name -> false; // ADR-276
+    private java.util.function.BooleanSupplier presenceOn = () -> true; // ADR-311
+    private java.util.function.Consumer<String> presenceLine = line -> {}; // ADR-311
 
     private final List<FriendPanel.RequestRow> requestRows = new ArrayList<>();
 
@@ -223,11 +225,21 @@ final class FriendCoordinator implements WindowFlow {
             return;
         }
         refreshRows();
+        if (!presenceOn.getAsBoolean()) {
+            return; // ADR-311 — người chơi đã tắt báo bạn bè
+        }
+        presenceLine.accept(i18n.format(online ? "friend.notice.online" : "friend.notice.offline", name.get()));
         // Tên người chơi khác đi thẳng vào chữ nổi — đã qua sanitize ở FriendController, nếu không
         // thì font UI im lặng nuốt mất ký tự và người chơi đọc được một cái tên cụt.
         feedback.showSelfText(
                 i18n.format(online ? "friend.notice.online" : "friend.notice.offline", name.get()),
                 online ? FloatingCombatText.LEVEL_UP : FloatingCombatText.MISS);
+    }
+
+    /** ADR-311 — công tắc báo bạn bè + nơi in dòng chat kèm theo chữ nổi. */
+    void usePresenceNotice(java.util.function.BooleanSupplier enabled, java.util.function.Consumer<String> chatLine) {
+        this.presenceOn = enabled;
+        this.presenceLine = chatLine;
     }
 
     private void onSendRequest(String typed) {

@@ -802,6 +802,11 @@ public final class GatewayBootstrap {
                 .lot45()
                 .lot46();
         characterRegistry.bossKills.bind(lot46.bossKills()); // ADR-296
+        characterRegistry.guildWelcome.bind(new GuildWelcomeHooks.Deps( // ADR-313
+                facades.contentFacades().socialFacades().guildFacade(),
+                lot46.lot48().guildWelcome(),
+                facades.contentFacades().socialFacades().mailFacade(),
+                characterRegistry));
         expansion.add(EventReminder.job(new EventReminder.Deps( // ADR-306
                 facades.progression().expansion().tournament(), characterRegistry, clock)));
         expansion.add(ScheduledMailJob.job(new ScheduledMailJob.Deps( // ADR-297
@@ -818,7 +823,11 @@ public final class GatewayBootstrap {
         dev.kage.server.database.Lot45Wiring wiring =
                 databaseBootstrap.expansion().lot45();
         return new Lot46Facades(
-                wiring.wireBossKillLogFacade(), wiring.wireScheduledMailFacade(), wiring.wireProfileLikeFacade());
+                wiring.wireBossKillLogFacade(),
+                wiring.wireScheduledMailFacade(),
+                wiring.wireProfileLikeFacade(),
+                new Lot48Facades( // lô 48 lồng ở đây
+                        wiring.wireFriendMailFacade(), wiring.wireGuildWelcomeFacade(), wiring.wireMailReadFacade()));
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */

@@ -47,6 +47,7 @@ public final class CombatHud implements HudWindow {
     private final HudQuestCard quest;
     private final HudBanners banners;
     private final StringBuilder fpsText = new StringBuilder(); // ADR-283
+    private final Table hintBar; // ADR-318
     private final Label fpsLabel;
     private int lastFps = -1;
 
@@ -71,7 +72,8 @@ public final class CombatHud implements HudWindow {
         stage.addActor(anchored(target.group(), Align.top));
         stage.addActor(anchored(banners.buildTopRightColumn(quest.group()), Align.topRight));
         stage.addActor(anchored(banners.duelGroup(), Align.left));
-        stage.addActor(anchored(buildHintBar(), Align.bottom));
+        this.hintBar = buildHintBar();
+        stage.addActor(anchored(hintBar, Align.bottom));
         stage.addActor(anchored(actions.build(skin), Align.bottomRight));
         fpsLabel.setVisible(false); // ADR-283 — bật bằng /fps
         stage.addActor(anchored(fpsCorner(), Align.bottomLeft));
@@ -82,6 +84,17 @@ public final class CombatHud implements HudWindow {
         Table corner = new Table();
         corner.add(fpsLabel);
         return corner;
+    }
+
+    /** ADR-316 — hiện / ẩn nhãn độ trễ mạng. */
+    public void setLatencyVisible(boolean visible) {
+        banners.setLatencyVisible(visible);
+    }
+
+    /** ADR-318 — HUD tối giản: ẩn thanh gợi ý phím và thẻ nhiệm vụ (máu, mục tiêu, nút chiêu vẫn hiện). */
+    public void setMinimal(boolean minimal) {
+        hintBar.setVisible(!minimal);
+        quest.setSuppressed(minimal);
     }
 
     /** ADR-283 — hiện / ẩn số khung hình/giây. */

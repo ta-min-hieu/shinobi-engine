@@ -33,6 +33,24 @@ public final class Lot45Wiring {
                 java.time.Clock.systemUTC());
     }
 
+    /** ADR-312 — giới hạn thư gửi mọi bạn bè. */
+    public dev.kage.mail.api.FriendMailFacade wireFriendMailFacade() {
+        return new dev.kage.mail.api.FriendMailFacade(
+                new dev.kage.server.database.mail.PostgresFriendMailQuotaAdapter(dataSource));
+    }
+
+    /** ADR-313 — lời chào thành viên mới. */
+    public dev.kage.guild.api.GuildWelcomeFacade wireGuildWelcomeFacade() {
+        return new dev.kage.guild.api.GuildWelcomeFacade(
+                new dev.kage.server.database.guild.PostgresGuildWelcomeAdapter(dataSource));
+    }
+
+    /** ADR-314 — thư chưa đọc. */
+    public dev.kage.mail.api.MailReadFacade wireMailReadFacade() {
+        return new dev.kage.mail.api.MailReadFacade(
+                new dev.kage.server.database.mail.PostgresMailReadAdapter(dataSource));
+    }
+
     /** ADR-288 — lịch sử mua cửa hàng NPC. */
     public dev.kage.shop.api.PurchaseHistoryFacade wirePurchaseHistoryFacade() {
         return new dev.kage.shop.api.PurchaseHistoryFacade(

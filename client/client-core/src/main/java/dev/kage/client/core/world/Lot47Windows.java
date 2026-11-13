@@ -6,11 +6,13 @@ package dev.kage.client.core.world;
  * {@link CoordinatesCoordinator}; tin bang lúc vắng (ADR-304) và báo trước sự kiện (ADR-306) chỉ ở server. MỘT thành
  * phần của {@link Lot46Windows}.
  */
-record Lot47Windows(BossDamageRankingCoordinator rankings, UiScaleCoordinator uiScale) {
+record Lot47Windows(BossDamageRankingCoordinator rankings, UiScaleCoordinator uiScale, Lot48Windows lot48) {
 
     static Lot47Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot47Windows(
-                new BossDamageRankingCoordinator(sender, feeds.chat()), new UiScaleCoordinator(feeds.chat()));
+                new BossDamageRankingCoordinator(sender, feeds.chat()),
+                new UiScaleCoordinator(feeds.chat()),
+                Lot48Windows.create(sender, feeds)); // lô 48 lồng ở đây
     }
 
     /** Đăng ký vào hub, rồi nối thu phóng giao diện vào chính hub đó. */
@@ -18,5 +20,6 @@ record Lot47Windows(BossDamageRankingCoordinator rankings, UiScaleCoordinator ui
         panels.register(rankings);
         panels.register(uiScale);
         uiScale.useHub(panels);
+        lot48.registerInto(panels);
     }
 }

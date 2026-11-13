@@ -35,7 +35,9 @@ public final class DisplaySettings {
         /** ADR-307 — chế độ mù màu đỏ-lục: số sát thương phải chịu đổi đỏ → xanh dương; mặc định TẮT. */
         COLORBLIND("display.colorblind", false),
         /** ADR-309 — ẩn nhãn trên đầu (danh hiệu cảnh giới) của người ngoài nhóm; mặc định TẮT. */
-        HIDE_OTHER_TITLES("display.hide_other_titles", false);
+        HIDE_OTHER_TITLES("display.hide_other_titles", false),
+        /** ADR-318 — HUD tối giản: ẩn thanh gợi ý phím và thẻ nhiệm vụ; mặc định TẮT. */
+        MINIMAL_HUD("display.minimal_hud", false);
 
         private final String key;
         private final boolean defaultOn;

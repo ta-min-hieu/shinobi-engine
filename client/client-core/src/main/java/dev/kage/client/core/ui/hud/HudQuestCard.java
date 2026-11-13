@@ -25,6 +25,8 @@ final class HudQuestCard {
     private final Label nameLabel;
     private final Label statusLabel;
     private final TextButton claimButton;
+    private boolean showing; // ADR-318
+    private boolean suppressed; // ADR-318
 
     private Runnable onClaimClicked;
 
@@ -63,10 +65,18 @@ final class HudQuestCard {
         nameLabel.setText(KageI18n.textOrKey(i18n, "quest.name." + questCode));
         statusLabel.setText(i18n.get(completed ? "quest.status.completed" : "quest.status.in_progress"));
         claimButton.setVisible(completed);
-        group.setVisible(true);
+        showing = true;
+        group.setVisible(!suppressed);
+    }
+
+    /** ADR-318 — HUD tối giản: ẩn thẻ dù đang có nhiệm vụ; tắt thì hiện lại nếu đang có. */
+    void setSuppressed(boolean hidden) {
+        suppressed = hidden;
+        group.setVisible(showing && !hidden);
     }
 
     void hide() {
+        showing = false;
         group.setVisible(false);
     }
 }

@@ -71,6 +71,7 @@ message MailView {
   repeated MailAttachmentView attachments = 7;
   bool claimed = 8;
   bool pinned = 9;  // ADR-217 — thư ghim; server trả thư ghim lên đầu danh sách
+  bool unread = 10; // ADR-314 — chưa mở đọc (mặc định false = đã đọc; thư có từ trước V174 coi như đã đọc)
 }
 
 message ListMailResponse {
@@ -230,4 +231,35 @@ enum ScheduleMailOutcome {
 message ScheduleMailResponse {
   ScheduleMailOutcome outcome = 1;
   int32 pending = 2;
+}
+
+// ADR-314 (2026-11-13) — đánh dấu đã đọc. Command: Client -> Server (OPCODE_MARK_MAIL_READ_COMMAND).
+message MarkMailReadCommand {
+  int64 mail_id = 1;
+}
+
+// Response: Server -> Client (OPCODE_MARK_MAIL_READ_RESPONSE). unread = số thư còn chưa đọc.
+message MarkMailReadResponse {
+  int64 mail_id = 1;
+  int32 unread = 2;
+}
+
+// ADR-312 (2026-11-13) — thư chữ gửi mọi bạn bè. Command: Client -> Server (OPCODE_SEND_FRIENDS_MAIL_COMMAND).
+message SendFriendsMailCommand {
+  string subject = 1;
+  string body = 2;
+}
+
+enum SendFriendsMailOutcome {
+  SEND_FRIENDS_MAIL_OUTCOME_UNSPECIFIED = 0;
+  SEND_FRIENDS_MAIL_OUTCOME_OK = 1;
+  SEND_FRIENDS_MAIL_OUTCOME_NO_FRIENDS = 2;
+  SEND_FRIENDS_MAIL_OUTCOME_DAILY_LIMIT = 3;
+  SEND_FRIENDS_MAIL_OUTCOME_INVALID_CONTENT = 4;
+}
+
+// Response: Server -> Client (OPCODE_SEND_FRIENDS_MAIL_RESPONSE).
+message SendFriendsMailResponse {
+  SendFriendsMailOutcome outcome = 1;
+  int32 recipients = 2;
 }
