@@ -382,6 +382,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-348](ADR-348-Caps-Calming.md) | Chống chữ hoa la hét: Hạ chữ thường tin toàn chữ hoa ≥ 5 chữ cái; `/chuhoa` | ✅ Accepted (lô 52) |
 | [ADR-349](ADR-349-Enhanced-Sell-Confirm.md) | Xác nhận bán đồ cường hoá: Món +1 trở lên phải bấm Bán lần hai trong 3 giây | ✅ Accepted (lô 52) |
 | [ADR-350](ADR-350-Critical-Hit-Numbers.md) | Số chí mạng nổi bật: Số chí mạng "-N!" to hơn, màu cam | ✅ Accepted (lô 52) |
+| [ADR-351](ADR-351-Login-Streak-Ranking.md) | Xếp hạng chuỗi đăng nhập: Top 10 chuỗi còn sống; `/topchuoi` | ✅ Accepted (lô 53) |
+| [ADR-352](ADR-352-Referral-Ranking.md) | Xếp hạng người giới thiệu: Top 10 theo lượt giới thiệu đã nhận quà; `/topgioithieu` | ✅ Accepted (lô 53) |
+| [ADR-353](ADR-353-Player-Search.md) | Tìm người chơi theo tên: Chuỗi con có thoát ký tự, 10 người; `/timnguoi` | ✅ Accepted (lô 53) |
+| [ADR-354](ADR-354-Mail-Archive.md) | Lưu trữ thư: `mail.archived_at` V179, ẩn khỏi hộp chính và xoá hàng loạt; `/luuthu`, `/thuluutru` | ✅ Accepted (lô 53) |
+| [ADR-355](ADR-355-Target-Health-Percent.md) | % máu mục tiêu: "hiện tại / tối đa (X%)" trong khung mục tiêu | ✅ Accepted (lô 53) |
+| [ADR-356](ADR-356-Reset-Countdown-Hud.md) | Đếm ngược reset trên HUD: Đếm tới 00:00 giờ Việt Nam, nhãn HUD; `/demreset` | ✅ Accepted (lô 53) |
+| [ADR-357](ADR-357-Key-Help-Overlay.md) | Bảng phím tắt F1: Giữ F1 hiện danh sách phím đang gán | ✅ Accepted (lô 53) |
+| [ADR-358](ADR-358-Reduce-Others-Vfx.md) | Giảm hiệu ứng kỹ năng người khác: Công tắc bỏ VFX kỹ năng không dính tới mình | ✅ Accepted (lô 53) |
 ---
 
 ## ADR cần tạo (chưa viết)
