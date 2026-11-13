@@ -6732,23 +6732,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             // GUILD/PARTY: broadcast cho MỌI thành viên đang online (gồm cả người gửi, cùng cách
             // AREA tự thấy tin của mình) — không cần AoI/tick thread, guild/party membership
             // không phải dữ liệu world-tick (feature-guild, feature-party/CLAUDE.md).
-            case GUILD -> {
-                broadcastToGroup(
-                        ChatChannel.CHAT_CHANNEL_GUILD,
-                        ctx,
-                        guildFacade.listMembers(ctx.characterId()).stream()
-                                .map(m -> m.characterId())
-                                .toList());
-                guildFacade
-                        .findMyGuild(ctx.characterId()) // ADR-304 — giữ cho người đang vắng
-                        .ifPresent(guild -> worldGateway
-                                .registry()
-                                .guildChat
-                                .record(
-                                        guild.guildId(),
-                                        new GuildChatBacklog.Line(
-                                                ctx.senderName(), ctx.body(), java.time.Instant.now())));
-            }
+            case GUILD -> routeGuildChat(ctx);
             case PARTY ->
                 broadcastToGroup(
                         ChatChannel.CHAT_CHANNEL_PARTY,
@@ -6761,6 +6745,22 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 broadcastToGroup(ChatChannel.CHAT_CHANNEL_SWORN, ctx, relations.swornMembersOf(ctx.characterId()));
             default -> throw new IllegalStateException("ChatChannel không xử lý: " + domainChannel);
         }
+    }
+
+    /** Kênh bang: phát cho mọi thành viên đang online, rồi giữ tin cho người đang vắng (ADR-304). */
+    private void routeGuildChat(ChatRouteContext ctx) {
+        broadcastToGroup(
+                ChatChannel.CHAT_CHANNEL_GUILD,
+                ctx,
+                guildFacade.listMembers(ctx.characterId()).stream()
+                        .map(m -> m.characterId())
+                        .toList());
+        guildFacade.findMyGuild(ctx.characterId()).ifPresent(guild -> worldGateway
+                .registry()
+                .guildChat
+                .record(
+                        guild.guildId(),
+                        new GuildChatBacklog.Line(ctx.senderName(), ctx.body(), java.time.Instant.now())));
     }
 
     /** ADR-062 D3 — danh hiệu đang đeo của người gửi, từ bộ nhớ (không DB mỗi tin chat). */

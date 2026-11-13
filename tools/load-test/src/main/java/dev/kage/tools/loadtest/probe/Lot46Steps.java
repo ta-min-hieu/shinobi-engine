@@ -6,14 +6,16 @@ import dev.kage.protocol.Opcode;
 
 /**
  * Bước lô 46: boss đã hạ (ADR-296) {@code bossKills}; thư hẹn giờ (ADR-297) {@code scheduleMail:<phút>:<tên>}; thích
- * hồ sơ (ADR-298) {@code likeProfile:<tên>}; lô 47 {@code topBoss}, {@code topLikes}. Nối sau {@link Lot45Steps}.
+ * hồ sơ (ADR-298) {@code likeProfile:<tên>}. Nối sau {@link Lot45Steps}.
  */
 final class Lot46Steps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot47Steps lot47;
 
     Lot46Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot47 = new Lot47Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -55,28 +57,7 @@ final class Lot46Steps {
                                     dev.kage.protocol.LikeProfileResponse.parseFrom(p);
                             return r.getOutcome().name() + " thích=" + r.getLikes();
                         });
-            case "topBoss" ->
-                asker.ask(
-                        Opcode.OPCODE_GET_BOSS_DAMAGE_RANKING_REQUEST_VALUE,
-                        dev.kage.protocol.GetBossDamageRankingRequest.getDefaultInstance(),
-                        Opcode.OPCODE_GET_BOSS_DAMAGE_RANKING_RESPONSE_VALUE,
-                        p -> "topBoss="
-                                + dev.kage.protocol.GetBossDamageRankingResponse.parseFrom(p)
-                                        .getEntriesCount());
-            case "topLikes" ->
-                asker.ask(
-                        Opcode.OPCODE_GET_LIKE_RANKING_REQUEST_VALUE,
-                        dev.kage.protocol.GetLikeRankingRequest.getDefaultInstance(),
-                        Opcode.OPCODE_GET_LIKE_RANKING_RESPONSE_VALUE,
-                        p -> {
-                            StringBuilder out = new StringBuilder("topThích=");
-                            for (dev.kage.protocol.LikeRank r : dev.kage.protocol.GetLikeRankingResponse.parseFrom(p)
-                                    .getEntriesList()) {
-                                out.append(' ').append(r.getName()).append(':').append(r.getLikes());
-                            }
-                            return out.toString();
-                        });
-            default -> "bước không hiểu";
+            default -> lot47.step(verb);
         };
     }
 }

@@ -334,7 +334,7 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-300](ADR-300-Screenshot-Key.md) | Chụp màn hình F12: F12 → PNG trong `~/KageScreenshots`, ghi trên Virtual Thread | ✅ Accepted (lô 46) |
 | [ADR-301](ADR-301-Stopwatch.md) | Đồng hồ bấm giờ: `/bamgio [xem]` | ✅ Accepted (lô 46) |
 | [ADR-302](ADR-302-Quick-Calculator.md) | Máy tính nhanh: Phân tích đệ quy xuống, `BigDecimal`; `/tinh` | ✅ Accepted (lô 46) |
-| [ADR-303](ADR-303-Boss-Damage-Ranking.md) | Xếp hạng sát thương boss: Tổng `BOSS_KILL` WORLD theo người; 420/421; `/topboss` | ✅ Accepted (lô 47) |
+| [ADR-303](ADR-303-Boss-Damage-Ranking.md) | Xếp hạng sát thương boss: Tổng từ `world_boss_damage` + số trận từ `BOSS_KILL`; 420/421; `/topboss` | ✅ Accepted (lô 47) |
 | [ADR-304](ADR-304-Guild-Chat-Backlog.md) | Tin bang lúc vắng: Ring buffer RAM 50 tin/bang; phát lại tin sau mốc rời world | ✅ Accepted (lô 47) |
 | [ADR-305](ADR-305-Like-Ranking.md) | Xếp hạng lượt thích: Đếm `profile_like`; 273/274; `/topthich` | ✅ Accepted (lô 47) |
 | [ADR-306](ADR-306-Event-Reminder.md) | Báo trước sự kiện: Job 60 giây, 3 loại mốc, mỗi mốc một lần | ✅ Accepted (lô 47) |

@@ -72,6 +72,9 @@ final class Lot47IntegrationTest {
                 new BossKillLogPort.Kill(strong, "demon_king", BossKillLogPort.Kind.WORLD, 1, 6_000_000L),
                 new BossKillLogPort.Kill(weak, "sample_boss", BossKillLogPort.Kind.DUNGEON, 0, 0L)));
 
+        execute("INSERT INTO world_boss_damage (character_id, total_damage) VALUES (?, 11000000)", strong);
+        execute("INSERT INTO world_boss_damage (character_id, total_damage) VALUES (?, 4000000)", weak);
+
         List<BossKillLogPort.Ranked> top = log.topWorldDamage(10);
         assertThat(top.getFirst().name()).isEqualTo("RkStrong");
         assertThat(top.getFirst().totalDamage()).isEqualTo(11_000_000L);
@@ -96,6 +99,16 @@ final class Lot47IntegrationTest {
         List<dev.kage.character.domain.ProfileLikePort.Ranked> top = adapter.top(10);
         assertThat(top.getFirst().name()).isEqualTo("LkStar");
         assertThat(top.getFirst().likes()).isEqualTo(2);
+    }
+
+    private static void execute(String sql, long id) {
+        try (java.sql.Connection connection = dataSource.getConnection();
+                java.sql.PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setLong(1, id);
+            statement.executeUpdate();
+        } catch (java.sql.SQLException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static long createFreshCharacter(String name) {

@@ -16,6 +16,10 @@ import dev.kage.protocol.wire.PacketCodec;
  */
 final class CoordinatesCoordinator implements WindowFlow {
 
+    private static final java.util.Set<String> COORDS_COMMANDS = java.util.Set.of("/toado", "/coords");
+    private static final java.util.Set<String> SHARE_COMMANDS = java.util.Set.of("/chiasevitri", "/sharepos");
+    private static final java.util.Set<String> SEND_WORDS = java.util.Set.of("gui", "gửi", "send");
+
     private final WorldCommandSender sender;
     private final ChatCoordinator chat;
     private final I18NBundle i18n = KageI18n.load();
@@ -51,8 +55,8 @@ final class CoordinatesCoordinator implements WindowFlow {
     private boolean onSlash(String line) {
         String[] parts = line.strip().split("\\s+", 2);
         String command = parts[0].toLowerCase(Locale.ROOT);
-        boolean share = "/chiasevitri".equals(command) || "/sharepos".equals(command); // ADR-310
-        if (!"/toado".equals(command) && !"/coords".equals(command) && !share) {
+        boolean share = SHARE_COMMANDS.contains(command); // ADR-310
+        if (!share && !COORDS_COMMANDS.contains(command)) {
             return false;
         }
         if (position.isEmpty()) {
@@ -65,14 +69,19 @@ final class CoordinatesCoordinator implements WindowFlow {
                 roundedX(position.get().lastKnownX()),
                 KageI18n.textOrKey(i18n, zoneKey(zone.get())));
         String argument = parts.length > 1 ? parts[1].strip().toLowerCase(Locale.ROOT) : "";
+        deliver(text, share, SEND_WORDS.contains(argument));
+        return true;
+    }
+
+    /** Kênh nhóm (ADR-310), kênh đang chọn ({@code gui}), hoặc chỉ mình thấy. */
+    private void deliver(String text, boolean share, boolean send) {
         if (share) {
             sender.sendChatMessage(dev.kage.protocol.ChatChannel.CHAT_CHANNEL_PARTY, "", text);
-        } else if ("gui".equals(argument) || "gửi".equals(argument) || "send".equals(argument)) {
+        } else if (send) {
             sender.sendChatMessage(chat.currentChannel(), "", text);
         } else {
             chat.showSystemNotice(text);
         }
-        return true;
     }
 
     @Override

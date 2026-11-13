@@ -30,13 +30,16 @@ public final class PostgresBossKillLogAdapter implements BossKillLogPort {
              LIMIT ?
             """;
 
+    // ADR-303 — tổng sát thương lấy từ sổ world_boss_damage (ADR-081, cộng dồn từ khi có boss thế giới — cùng nguồn với
+    // thẻ BOSS_DAMAGE của Bia Anh Danh); số trận đếm từ audit BOSS_KILL (chỉ có từ ADR-296).
     private static final String TOP_WORLD = """
-            SELECT COALESCE(c.name, '?') AS name, SUM((a.detail_json::jsonb ->> 'damage')::bigint) AS total, COUNT(*) AS kills
-              FROM audit_log a
-              LEFT JOIN character c ON c.id = a.character_id
-             WHERE a.action = 'BOSS_KILL' AND a.detail_json::jsonb ->> 'kind' = 'WORLD'
-             GROUP BY a.character_id, c.name
-             ORDER BY total DESC, name
+            SELECT COALESCE(c.name, '?') AS name, d.total_damage AS total,
+                   (SELECT COUNT(*) FROM audit_log a
+                     WHERE a.character_id = d.character_id AND a.action = 'BOSS_KILL'
+                       AND a.detail_json::jsonb ->> 'kind' = 'WORLD') AS kills
+              FROM world_boss_damage d
+              LEFT JOIN character c ON c.id = d.character_id
+             ORDER BY d.total_damage DESC, d.character_id
              LIMIT ?
             """;
 
