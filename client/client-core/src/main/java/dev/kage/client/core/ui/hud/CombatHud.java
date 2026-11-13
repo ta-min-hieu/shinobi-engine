@@ -50,6 +50,10 @@ public final class CombatHud implements HudWindow {
     private final Table hintBar; // ADR-318
     private final Label fpsLabel;
     private int lastFps = -1;
+    private final Label nearbyLabel; // ADR-325
+    private final StringBuilder nearbyText = new StringBuilder(); // ADR-325
+    private java.util.function.IntSupplier nearbyCount = () -> 0; // ADR-325
+    private int lastNearby = -1;
 
     /**
      * Bố cục theo ảnh Ninja School Online chủ dự án gửi (2026-08-09): cụm chỉ số góc trên-trái, mục
@@ -66,6 +70,7 @@ public final class CombatHud implements HudWindow {
         this.quest = new HudQuestCard(skin, i18n);
         this.banners = new HudBanners(skin, i18n);
         this.fpsLabel = new Label("", skin.statLabelStyle);
+        this.nearbyLabel = new Label("", skin.statLabelStyle);
 
         // 6 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
         stage.addActor(anchored(buildPlayerCluster(), Align.topLeft));
@@ -76,14 +81,27 @@ public final class CombatHud implements HudWindow {
         stage.addActor(anchored(hintBar, Align.bottom));
         stage.addActor(anchored(actions.build(skin), Align.bottomRight));
         fpsLabel.setVisible(false); // ADR-283 — bật bằng /fps
+        nearbyLabel.setVisible(false); // ADR-325 — bật bằng /xungquanh
         stage.addActor(anchored(fpsCorner(), Align.bottomLeft));
     }
 
     /** ADR-283 — cụm nhãn FPS góc dưới trái. */
     private Table fpsCorner() {
         Table corner = new Table();
-        corner.add(fpsLabel);
+        corner.add(nearbyLabel).left().row(); // ADR-325
+        corner.add(fpsLabel).left();
         return corner;
+    }
+
+    /** ADR-325 — nguồn số người chơi khác đang thấy (đọc mỗi khung, chỉ đổi chữ khi số đổi). */
+    public void useNearbyCount(java.util.function.IntSupplier count) {
+        this.nearbyCount = count;
+    }
+
+    /** ADR-325 — hiện / ẩn nhãn đếm người xung quanh. */
+    public void setNearbyVisible(boolean visible) {
+        nearbyLabel.setVisible(visible);
+        lastNearby = -1;
     }
 
     /** ADR-316 — hiện / ẩn nhãn độ trễ mạng. */
@@ -383,6 +401,12 @@ public final class CombatHud implements HudWindow {
             fpsText.setLength(0);
             fpsText.append("FPS ").append(lastFps); // tái dùng bộ đệm — không cấp phát mỗi khung
             fpsLabel.setText(fpsText);
+        }
+        if (nearbyLabel.isVisible() && nearbyCount.getAsInt() != lastNearby) {
+            lastNearby = nearbyCount.getAsInt();
+            nearbyText.setLength(0);
+            nearbyText.append(i18n.get("hud.nearby")).append(' ').append(lastNearby); // tái dùng bộ đệm
+            nearbyLabel.setText(nearbyText);
         }
         stage.act(deltaTime);
         stage.draw();

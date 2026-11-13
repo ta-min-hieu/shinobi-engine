@@ -25,6 +25,11 @@ import dev.kage.protocol.SetGuildWelcomeResponse;
 /** Lớp lệnh lô 48 (ADR-311…) — MỘT thành phần của {@link Lot47Commands}. Gọi trên Virtual Thread. */
 record Lot48Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 49 (ADR-319…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot49Commands lot49() {
+        return new Lot49Commands(gateway, registry);
+    }
+
     /**
      * ADR-312 — một thư chữ (không vàng, không đồ) tới MỌI bạn bè, {@code FriendMailFacade.DAILY_LIMIT} đợt mỗi ngày.
      * Mỗi người nhận một thư thường (đúng đường gửi thư, tem thư, kiểm nội dung); ai đang online được báo thư mới.

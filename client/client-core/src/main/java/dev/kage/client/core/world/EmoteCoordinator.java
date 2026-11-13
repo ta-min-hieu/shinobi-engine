@@ -25,6 +25,11 @@ final class EmoteCoordinator implements WindowFlow {
     @FunctionalInterface
     interface EmoteDisplay {
         void show(long characterId, String text);
+
+        /** ADR-325 — số người chơi khác đang thấy (mặc định 0 cho bản hiển thị không biết). */
+        default int visibleOthers() {
+            return 0;
+        }
     }
 
     /** Lệnh gõ → biểu cảm. Không dấu để gõ được trên mọi bộ gõ. */

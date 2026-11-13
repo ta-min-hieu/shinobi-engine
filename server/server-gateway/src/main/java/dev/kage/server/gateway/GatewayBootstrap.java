@@ -827,7 +827,13 @@ public final class GatewayBootstrap {
                 wiring.wireScheduledMailFacade(),
                 wiring.wireProfileLikeFacade(),
                 new Lot48Facades( // lô 48 lồng ở đây
-                        wiring.wireFriendMailFacade(), wiring.wireGuildWelcomeFacade(), wiring.wireMailReadFacade()));
+                        wiring.wireFriendMailFacade(),
+                        wiring.wireGuildWelcomeFacade(),
+                        wiring.wireMailReadFacade(),
+                        new Lot49Facades( // lô 49 lồng ở đây
+                                wiring.wireGuildMemberNoteFacade(),
+                                wiring.wireReferralFacade(),
+                                wiring.wireBreakthroughLogFacade())));
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */
@@ -1028,11 +1034,15 @@ public final class GatewayBootstrap {
                 BreakthroughHooks.listener(facades.characterFacade(), characterRegistry);
         CharacterLevelSync.LevelListener friends = // ADR-182
                 Lot31Commands.friendBreakthrough(facades, characterRegistry).listener();
+        CharacterLevelSync.LevelListener lot49 = // ADR-320 quà giới thiệu, ADR-322 lịch sử đột phá
+                (characterId, level) ->
+                        new Lot49Commands(facades, characterRegistry).onLevelReached(characterId, level);
         return (characterId, level) -> {
             mentorship.onLevelReached(characterId, level);
             costume.onLevelReached(characterId, level);
             breakthrough.onLevelReached(characterId, level);
             friends.onLevelReached(characterId, level);
+            lot49.onLevelReached(characterId, level);
         };
     }
 

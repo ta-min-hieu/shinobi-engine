@@ -19,7 +19,13 @@ final class BagSearchCoordinator implements WindowFlow {
     static final int MAX_RESULTS = 10;
 
     /** Một món trong túi đã có mô tả hiển thị. */
-    record Described(int slotIndex, int quantity, String text) {}
+    record Described(int slotIndex, int quantity, String text, long itemTemplateId) {
+
+        /** Không biết mẫu (test cũ, ADR-254). */
+        Described(int slotIndex, int quantity, String text) {
+            this(slotIndex, quantity, text, 0L);
+        }
+    }
 
     private final ChatCoordinator chat;
     private final I18NBundle i18n = KageI18n.load();

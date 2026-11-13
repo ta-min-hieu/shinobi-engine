@@ -1268,6 +1268,66 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot44()
                                     .lookupItem(c))),
             Map.entry(
+                    Opcode.OPCODE_SET_GUILD_MEMBER_NOTE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetGuildMemberNoteCommand.parser(),
+                            Opcode.OPCODE_SET_GUILD_MEMBER_NOTE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .setMemberNote(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_ENTER_REFERRAL_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.EnterReferralCommand.parser(),
+                            Opcode.OPCODE_ENTER_REFERRAL_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .enterReferral(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_BREAKTHROUGH_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetBreakthroughHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_BREAKTHROUGH_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .breakthroughHistory(id))),
+            Map.entry(
                     Opcode.OPCODE_SEND_FRIENDS_MAIL_COMMAND_VALUE,
                     storageCommand(
                             dev.kage.protocol.SendFriendsMailCommand.parser(),
@@ -3224,6 +3284,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setMaxHp(maxHp)
                     .build();
             send(ctx, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, request.sequenceId(), response.toByteArray());
+            if (result == InventoryFacade.EnhanceResult.SUCCESS) { // ADR-321 — báo toàn server khi lên ≥ +10
+                expansion
+                        .lot37()
+                        .lot38()
+                        .lot39()
+                        .lot40()
+                        .lot41()
+                        .lot42()
+                        .lot43()
+                        .lot44()
+                        .lot45()
+                        .lot46()
+                        .lot47()
+                        .lot48()
+                        .lot49()
+                        .announceEnhance(
+                                request.characterId(), request.command().getItemId());
+            }
         } finally {
             span.end();
         }

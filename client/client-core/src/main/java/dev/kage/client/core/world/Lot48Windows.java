@@ -12,7 +12,8 @@ record Lot48Windows(
         MailReadCoordinator mailRead,
         ChatBubbleCoordinator bubbles,
         PingHudCoordinator pingHud,
-        SystemNoticeHistoryCoordinator systemLog) {
+        SystemNoticeHistoryCoordinator systemLog,
+        Lot49Windows lot49) {
 
     static Lot48Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot48Windows(
@@ -22,7 +23,8 @@ record Lot48Windows(
                 new MailReadCoordinator(sender),
                 new ChatBubbleCoordinator(feeds.chat(), feeds.emoteDisplay()),
                 new PingHudCoordinator(feeds.chat()),
-                new SystemNoticeHistoryCoordinator(feeds.chat()));
+                new SystemNoticeHistoryCoordinator(feeds.chat()),
+                Lot49Windows.create(sender, feeds)); // lô 49 lồng ở đây
     }
 
     /** Đăng ký vào hub. */
@@ -34,5 +36,6 @@ record Lot48Windows(
         panels.register(bubbles);
         panels.register(pingHud);
         panels.register(systemLog);
+        lot49.registerInto(panels);
     }
 }

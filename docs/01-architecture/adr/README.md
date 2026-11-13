@@ -350,6 +350,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-316](ADR-316-Ping-Hud-Toggle.md) | Ping trên HUD (bật/tắt + màu): Màu theo ngưỡng `/ping`; `/pinghud` | ✅ Accepted (lô 48) |
 | [ADR-317](ADR-317-System-Notice-History.md) | Lịch sử thông báo hệ thống: Vòng 30 dòng hệ thống; `/lichsuthongbao` | ✅ Accepted (lô 48) |
 | [ADR-318](ADR-318-Minimal-Hud.md) | HUD tối giản: Dòng cài đặt `MINIMAL_HUD`: ẩn gợi ý phím + thẻ nhiệm vụ | ✅ Accepted (lô 48) |
+| [ADR-319](ADR-319-Guild-Member-Notes.md) | Ghi chú thành viên bang: Cột `officer_note`; chỉ cấp quản lý; 785/786; `/ghichubang` | ✅ Accepted (lô 49) |
+| [ADR-320](ADR-320-Referral-Code.md) | Mã giới thiệu bạn: Mã = tên; bảng `referral`; quà một lần ở cấp 10; 275/276 | ✅ Accepted (lô 49) |
+| [ADR-321](ADR-321-High-Enhance-Announcement.md) | Báo toàn server khi cường hoá cao: Cường hoá ≥ +10 ⇒ chat toàn server kèm `linked_item` | ✅ Accepted (lô 49) |
+| [ADR-322](ADR-322-Breakthrough-History.md) | Lịch sử đột phá cảnh giới: Audit `BREAKTHROUGH` khi mở cảnh giới; 277/278; `/dotpha` | ✅ Accepted (lô 49) |
+| [ADR-323](ADR-323-Camera-Zoom.md) | Thu phóng camera: Lăn chuột ⇒ `camera.zoom` [0,7; 1,5]; Preferences | ✅ Accepted (lô 49) |
+| [ADR-324](ADR-324-Bag-Filter.md) | Lọc túi theo loại: `/loctui` theo catalog: trang bị / dùng được / khác | ✅ Accepted (lô 49) |
+| [ADR-325](ADR-325-Nearby-Count.md) | Đếm người xung quanh: Nhãn HUD từ bản đồ người đang thấy; `/xungquanh` | ✅ Accepted (lô 49) |
+| [ADR-326](ADR-326-New-Item-Badge.md) | Nhãn "mới" cho đồ vừa nhặt: Tiền tố "(mới) " theo mẫu tới khi mở túi | ✅ Accepted (lô 49) |
 ---
 
 ## ADR cần tạo (chưa viết)

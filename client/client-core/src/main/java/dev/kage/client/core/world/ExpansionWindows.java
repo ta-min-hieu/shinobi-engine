@@ -163,6 +163,8 @@ record ExpansionWindows(
                 .lot47()
                 .lot48();
         lot48.pingHud().useHud(hud::setLatencyVisible); // ADR-316
+        hud.useNearbyCount(lot48.lot49().nearby()::count); // ADR-325
+        lot48.lot49().nearby().useHud(hud::setNearbyVisible);
         hud.setMinimal(displaySettings
                 .settings()
                 .switchFor(DisplaySettings.Option.MINIMAL_HUD)
@@ -186,6 +188,19 @@ record ExpansionWindows(
     ExpansionWindows useLocalInput(
             InventoryCoordinator inventory, LocalIntentSender intents, MailCoordinator mail, QuestCoordinator quests) {
         Supplier<Optional<Long>> selectedId = () -> inventory.selectedItem().map(InventoryController.Item::itemId);
+        Lot49Windows lot49 = lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .lot49();
+        lot49.bagFilter().useItems(inventory::describedItems); // ADR-324
+        lot49.newItems().useBag(inventory::isOpen); // ADR-326
+        inventory.useNewMark(lot49.newItems()::isNew);
         lot39().lot40()
                 .lot41()
                 .lot42()
@@ -220,7 +235,7 @@ record ExpansionWindows(
     }
 
     /** ADR-276 — khung bạn bè xếp bạn yêu thích lên đầu. */
-    void useFriends(FriendCoordinator friends) {
+    ExpansionWindows useFriends(FriendCoordinator friends) {
         lot39().lot40().lot41().lot42().lot43().useFriends(friends);
         lot39().lot40()
                 .lot41()
@@ -233,6 +248,23 @@ record ExpansionWindows(
                 .lot48()
                 .friendPresence()
                 .useIn(friends); // ADR-311
+        return this;
+    }
+
+    /** ADR-323 — nối thu phóng camera vào camera thế giới 3D. */
+    void useCamera(WorldModelRenderer models) {
+        lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .lot49()
+                .cameraZoom()
+                .useCamera(models::setZoom);
     }
 
     /** Nối HUD chiến đấu: mục tiêu cho thuần phục (ADR-124), máu cho cảnh báo máu thấp (ADR-243). */

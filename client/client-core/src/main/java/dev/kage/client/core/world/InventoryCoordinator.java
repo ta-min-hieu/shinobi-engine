@@ -597,12 +597,17 @@ final class InventoryCoordinator implements WindowFlow {
                 .orElse("");
     }
 
+    /** ADR-326 — nhãn "mới" cho mẫu vừa nhặt. */
+    void useNewMark(java.util.function.LongPredicate newItem) {
+        itemText.useNewMark(newItem);
+    }
+
     /** ADR-254 — mọi món trong túi kèm mô tả đang hiện (tìm bằng {@code /timdo}). */
     List<BagSearchCoordinator.Described> describedItems() {
         List<BagSearchCoordinator.Described> described = new ArrayList<>();
         for (InventoryController.Item item : controller.items()) {
-            described.add(
-                    new BagSearchCoordinator.Described(item.slotIndex(), item.quantity(), itemText.describe(item)));
+            described.add(new BagSearchCoordinator.Described(
+                    item.slotIndex(), item.quantity(), itemText.describe(item), item.itemTemplateId()));
         }
         return described;
     }

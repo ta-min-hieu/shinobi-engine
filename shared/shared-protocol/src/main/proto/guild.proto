@@ -888,3 +888,31 @@ message SetGuildWelcomeResponse {
   SetGuildWelcomeOutcome outcome = 1;
   string message = 2;
 }
+
+// ADR-319 (2026-11-13) — ghi chú thành viên bang (chỉ bang chủ / phó). Command: Client -> Server.
+// query_only = chỉ đọc mọi ghi chú; note rỗng = xoá ghi chú của member_name.
+message SetGuildMemberNoteCommand {
+  bool query_only = 1;
+  string member_name = 2;
+  string note = 3;
+}
+
+enum SetGuildMemberNoteOutcome {
+  SET_GUILD_MEMBER_NOTE_OUTCOME_UNSPECIFIED = 0;
+  SET_GUILD_MEMBER_NOTE_OUTCOME_OK = 1;
+  SET_GUILD_MEMBER_NOTE_OUTCOME_NOT_IN_GUILD = 2;
+  SET_GUILD_MEMBER_NOTE_OUTCOME_NOT_OFFICER = 3;
+  SET_GUILD_MEMBER_NOTE_OUTCOME_NOT_MEMBER = 4;
+  SET_GUILD_MEMBER_NOTE_OUTCOME_INVALID_TEXT = 5;
+}
+
+message GuildMemberNote {
+  string name = 1;
+  string note = 2;
+}
+
+// Response: Server -> Client (OPCODE_SET_GUILD_MEMBER_NOTE_RESPONSE). notes = mọi ghi chú khác rỗng (sau lệnh).
+message SetGuildMemberNoteResponse {
+  SetGuildMemberNoteOutcome outcome = 1;
+  repeated GuildMemberNote notes = 2;
+}

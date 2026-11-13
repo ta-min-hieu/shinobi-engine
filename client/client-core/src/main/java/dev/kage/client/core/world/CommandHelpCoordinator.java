@@ -61,6 +61,8 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.friend",
                     List.of(
+                            "/magioithieu",
+                            "/referral",
                             "/baobanbe",
                             "/friendnotice",
                             "/thubanbe",
@@ -110,6 +112,8 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.guild",
                     List.of(
+                            "/ghichubang",
+                            "/membernote",
                             "/loichao",
                             "/guildwelcome",
                             "/conghien",
@@ -157,6 +161,8 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.bag",
                     List.of(
+                            "/loctui",
+                            "/bagfilter",
                             "/timdo",
                             "/find",
                             "/tach",
@@ -234,6 +240,10 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.info",
                     List.of(
+                            "/dotpha",
+                            "/breakthroughs",
+                            "/xungquanh",
+                            "/nearby",
                             "/topboss",
                             "/topthich",
                             "/toplikes",

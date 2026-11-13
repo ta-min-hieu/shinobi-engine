@@ -251,6 +251,12 @@ public final class WorldModelRenderer implements Disposable {
         return enabled;
     }
 
+    /** ADR-323 — hệ số thu phóng camera (nhỏ = gần); người gọi đã kẹp trong khoảng cho phép. */
+    public void setZoom(float zoom) {
+        camera.zoom = zoom;
+        applyLockedAngle();
+    }
+
     public void resize(float viewportWidthUnits, float viewportHeightUnits) {
         camera.viewportWidth = viewportWidthUnits;
         camera.viewportHeight = viewportHeightUnits;

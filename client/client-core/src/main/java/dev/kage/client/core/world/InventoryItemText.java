@@ -53,9 +53,19 @@ final class InventoryItemText {
      *     catalog hoặc id lạ — lúc đó KHÔNG hiện chỉ số nào thay vì hiện "ATK +0" (Điều 24)
      * @param nameOrFallback tên đã dịch, hoặc dạng số khi chưa có catalog
      */
+    /** ADR-326 — đầu tên món vừa nhặt (cùng chữ với dấu thư chưa đọc). */
+    static final String NEW_MARK = "(mới) ";
+
+    private java.util.function.LongPredicate isNew = id -> false; // ADR-326
+
     InventoryItemText(LongFunction<ItemCatalogEntry> catalogLookup, LongFunction<String> nameOrFallback) {
         this.catalogLookup = catalogLookup;
         this.nameOrFallback = nameOrFallback;
+    }
+
+    /** ADR-326 — cách biết một mẫu vừa nhặt (nhãn "mới"). */
+    void useNewMark(java.util.function.LongPredicate newItem) {
+        this.isNew = newItem;
     }
 
     /** ADR-199 — bật so sánh với món đang mặc. */
@@ -64,7 +74,8 @@ final class InventoryItemText {
     }
 
     String describe(InventoryController.Item item) {
-        StringBuilder builder = new StringBuilder(nameOrFallback.apply(item.itemTemplateId()));
+        StringBuilder builder = new StringBuilder(isNew.test(item.itemTemplateId()) ? NEW_MARK : ""); // ADR-326
+        builder.append(nameOrFallback.apply(item.itemTemplateId()));
         if (item.quantity() > 1) {
             builder.append(' ').append(format("inventory.label.quantity", item.quantity()));
         }

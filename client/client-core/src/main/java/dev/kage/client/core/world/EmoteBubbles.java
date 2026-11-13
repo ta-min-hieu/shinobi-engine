@@ -20,6 +20,11 @@ final class EmoteBubbles implements EmoteCoordinator.EmoteDisplay {
     }
 
     @Override
+    public int visibleOthers() {
+        return others.size();
+    }
+
+    @Override
     public void show(long characterId, String text) {
         if (characterId == localCharacterId) {
             feedback.showSelfText(text, FloatingCombatText.EMOTE);
