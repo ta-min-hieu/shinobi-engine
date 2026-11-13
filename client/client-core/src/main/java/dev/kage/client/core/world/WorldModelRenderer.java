@@ -272,7 +272,7 @@ public final class WorldModelRenderer implements Disposable {
             return;
         }
         float remaining = 1f - (float) elapsed / shakeNanos;
-        float phase = elapsed / (float) NANOS_PER_SECOND * SHAKE_FREQUENCY;
+        float phase = elapsed / NANOS_PER_SECOND * SHAKE_FREQUENCY;
         camera.position.x += (float) Math.sin(phase) * shakeAmplitude * remaining;
         camera.position.y += (float) Math.cos(phase * SHAKE_Y_RATIO) * shakeAmplitude * remaining;
     }

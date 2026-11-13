@@ -30,7 +30,8 @@ public final class PostgresNameHistoryAdapter implements NameHistoryPort {
         return JdbcOperations.query(
                 dataSource,
                 HISTORY,
-                rs -> new Entry(rs.getString("old_name"), rs.getTimestamp("changed_at").toInstant()),
+                rs -> new Entry(
+                        rs.getString("old_name"), rs.getTimestamp("changed_at").toInstant()),
                 characterId);
     }
 
