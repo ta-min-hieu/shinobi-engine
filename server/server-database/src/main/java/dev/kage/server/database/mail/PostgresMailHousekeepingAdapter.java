@@ -19,7 +19,7 @@ public final class PostgresMailHousekeepingAdapter implements MailHousekeepingPo
 
     private static final String FINISHED = """
             SELECT m.id FROM mail m
-             WHERE m.recipient_id = ? AND NOT m.pinned
+             WHERE m.recipient_id = ? AND NOT m.pinned AND m.archived_at IS NULL
                AND (m.claimed_at IS NOT NULL
                     OR (m.gold_amount = 0 AND NOT EXISTS (SELECT 1 FROM mail_item mi WHERE mi.mail_id = m.id)))
              FOR UPDATE OF m

@@ -25,6 +25,11 @@ record Lot52Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
     /** Tên dài hơn mức này chắc chắn không phải tên nhân vật (tên tối đa 16 ký tự). */
     static final int MAX_NAME_LENGTH = 32;
 
+    /** Lớp lệnh lô 53 (ADR-351…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot53Commands lot53() {
+        return new Lot53Commands(gateway, registry);
+    }
+
     /** ADR-343 — tên cũ của người đang mang (hoặc từng mang) tên {@code name}. */
     GetNameHistoryResponse nameHistory(GetNameHistoryRequest request) {
         String name = request.getName().strip();

@@ -263,3 +263,38 @@ message SendFriendsMailResponse {
   SendFriendsMailOutcome outcome = 1;
   int32 recipients = 2;
 }
+
+// ADR-354 (2026-11-13) — lưu trữ thư. Command: Client -> Server (OPCODE_ARCHIVE_MAIL_COMMAND). archive = false để trả
+// thư về hộp chính. Thư lưu trữ không hiện ở danh sách thư chính và không bị xoá hàng loạt.
+message ArchiveMailCommand {
+  int64 mail_id = 1;
+  bool archive = 2;
+}
+
+enum ArchiveMailOutcome {
+  ARCHIVE_MAIL_OUTCOME_UNSPECIFIED = 0;
+  ARCHIVE_MAIL_OUTCOME_ARCHIVED = 1;
+  ARCHIVE_MAIL_OUTCOME_RESTORED = 2;
+  ARCHIVE_MAIL_OUTCOME_NOT_FOUND = 3;
+}
+
+// Response: Server -> Client (OPCODE_ARCHIVE_MAIL_RESPONSE).
+message ArchiveMailResponse {
+  ArchiveMailOutcome outcome = 1;
+  int64 mail_id = 2;
+}
+
+// Request: Client -> Server (OPCODE_LIST_ARCHIVED_MAIL_REQUEST).
+message ListArchivedMailRequest {}
+
+message ArchivedMail {
+  int64 mail_id = 1;
+  string sender_name = 2; // "" = thư hệ thống
+  string subject = 3;
+  int64 sent_at_epoch_seconds = 4;
+}
+
+// Response: Server -> Client (OPCODE_LIST_ARCHIVED_MAIL_RESPONSE). Mới trước.
+message ListArchivedMailResponse {
+  repeated ArchivedMail mails = 1;
+}

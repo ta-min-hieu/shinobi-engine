@@ -25,6 +25,10 @@ import dev.kage.client.core.ui.theme.KageSkin;
 public final class CombatHud implements HudWindow {
 
     private static final float BADGE_SIZE = 52f;
+
+    /** ADR-357 — bề rộng bảng phím tắt (pixel). */
+    private static final float KEY_HELP_WIDTH = 520f;
+
     /**
      * Ô gợi ý phím. 46 → 52 (2026-10-01, song ngữ): "Chọn/Chuột" đã sát viền ở 46, "Target/Mouse"
      * thì tràn — đo bằng {@code HudButtonLabelFitTest}.
@@ -55,6 +59,9 @@ public final class CombatHud implements HudWindow {
     private java.util.function.IntSupplier nearbyCount = () -> 0; // ADR-325
     private int lastNearby = -1;
     private final HudInfoLines infoLines; // ADR-332, ADR-334
+    private final Table keyHelp = new Table(); // ADR-357
+    private final Label keyHelpLabel;
+    private java.util.function.Supplier<String> keyHelpText = () -> "";
 
     /**
      * Bố cục theo ảnh Ninja School Online chủ dự án gửi (2026-08-09): cụm chỉ số góc trên-trái, mục
@@ -73,6 +80,7 @@ public final class CombatHud implements HudWindow {
         this.fpsLabel = new Label("", skin.statLabelStyle);
         this.nearbyLabel = new Label("", skin.statLabelStyle);
         this.infoLines = new HudInfoLines(skin, i18n);
+        this.keyHelpLabel = new Label("", skin.labelStyle);
 
         // 6 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
         stage.addActor(anchored(buildPlayerCluster(), Align.topLeft));
@@ -85,6 +93,22 @@ public final class CombatHud implements HudWindow {
         fpsLabel.setVisible(false); // ADR-283 — bật bằng /fps
         nearbyLabel.setVisible(false); // ADR-325 — bật bằng /xungquanh
         stage.addActor(anchored(fpsCorner(), Align.bottomLeft));
+        keyHelpLabel.setWrap(true);
+        keyHelp.setBackground(skin.panel);
+        keyHelp.add(keyHelpLabel).width(KEY_HELP_WIDTH).pad(10f);
+        keyHelp.setVisible(false); // ADR-357 — giữ F1 mới hiện
+        stage.addActor(anchored(keyHelp, Align.center));
+    }
+
+    /** ADR-357 — giữ F1: hiện bảng phím tắt; chữ chỉ dựng lúc vừa nhấn, không mỗi khung. */
+    private void updateKeyHelp() {
+        boolean held = Gdx.input != null && Gdx.input.isKeyPressed(com.badlogic.gdx.Input.Keys.F1);
+        if (held != keyHelp.isVisible()) {
+            if (held) {
+                keyHelpLabel.setText(keyHelpText.get());
+            }
+            keyHelp.setVisible(held);
+        }
     }
 
     /** ADR-283 — cụm nhãn FPS góc dưới trái. */
@@ -115,6 +139,21 @@ public final class CombatHud implements HudWindow {
     /** ADR-332 — hiện / ẩn đồng hồ phiên chơi. */
     public void setSessionClockVisible(boolean visible) {
         infoLines.setClockVisible(visible);
+    }
+
+    /** ADR-356 — nguồn số giây tới reset ngày. */
+    public void useResetCountdown(java.util.function.LongSupplier seconds) {
+        infoLines.useResetCountdown(seconds);
+    }
+
+    /** ADR-356 — hiện / ẩn đếm ngược reset. */
+    public void setResetCountdownVisible(boolean visible) {
+        infoLines.setResetVisible(visible);
+    }
+
+    /** ADR-357 — nguồn chữ bảng phím tắt (chỉ dựng khi vừa nhấn F1). */
+    public void useKeyHelp(java.util.function.Supplier<String> text) {
+        this.keyHelpText = text;
     }
 
     /** ADR-334 — dòng mục tiêu cấp độ đã dịch; rỗng = ẩn. */
@@ -427,6 +466,7 @@ public final class CombatHud implements HudWindow {
             nearbyLabel.setText(nearbyText);
         }
         infoLines.update(); // ADR-332
+        updateKeyHelp(); // ADR-357
         stage.act(deltaTime);
         stage.draw();
     }

@@ -37,7 +37,9 @@ public final class DisplaySettings {
         /** ADR-309 — ẩn nhãn trên đầu (danh hiệu cảnh giới) của người ngoài nhóm; mặc định TẮT. */
         HIDE_OTHER_TITLES("display.hide_other_titles", false),
         /** ADR-318 — HUD tối giản: ẩn thanh gợi ý phím và thẻ nhiệm vụ; mặc định TẮT. */
-        MINIMAL_HUD("display.minimal_hud", false);
+        MINIMAL_HUD("display.minimal_hud", false),
+        /** ADR-358 — giảm hiệu ứng: ẩn VFX kỹ năng giữa những người khác (không dính tới mình); mặc định TẮT. */
+        HIDE_OTHERS_VFX("display.hide_others_vfx", false);
 
         private final String key;
         private final boolean defaultOn;

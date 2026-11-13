@@ -61,6 +61,9 @@ final class CombatFeedbackPresenter implements Disposable {
     // lời gọi nên an toàn (Điều 31).
     private final Vector3 anchor = new Vector3();
 
+    /** ADR-358 — công tắc "giảm hiệu ứng người khác"; mặc định tắt (vẽ hết). */
+    private java.util.function.BooleanSupplier hideOthersVfx = () -> false;
+
     /** ADR-350 — đòn đang hiện số là chí mạng (đặt ngay trước {@link #showNumber}, tránh thêm tham số thứ năm). */
     private boolean nextIsCrit;
 
@@ -77,6 +80,15 @@ final class CombatFeedbackPresenter implements Disposable {
         this.floatingText = new FloatingCombatText(font);
     }
 
+    /** ADR-358 — nối công tắc giảm hiệu ứng kỹ năng của người khác. */
+    void useOthersVfxFilter(java.util.function.BooleanSupplier hide) {
+        this.hideOthersVfx = hide;
+    }
+
+    private boolean involvesMe(long attackerEntityId, long targetEntityId) {
+        return attackerEntityId == localCharacterId || targetEntityId == localCharacterId;
+    }
+
     /** Đòn đánh thường — chỉ có số damage, không có hiệu ứng riêng. */
     void onAttackResult(AttackResultEvent event) {
         if (resolveAnchor(event.getTargetEntityId())) {
@@ -88,7 +100,9 @@ final class CombatFeedbackPresenter implements Disposable {
     /** Skill — hiệu ứng phát tại mục tiêu, kèm số damage như đòn thường. */
     void onSkillResult(SkillResultEvent event) {
         if (resolveAnchor(event.getTargetEntityId())) {
-            skillVfx.play(event.getSkillCode(), anchor.x, anchor.y, anchor.z);
+            if (!hideOthersVfx.getAsBoolean() || involvesMe(event.getAttackerEntityId(), event.getTargetEntityId())) {
+                skillVfx.play(event.getSkillCode(), anchor.x, anchor.y, anchor.z); // ADR-358
+            }
             nextIsCrit = event.getIsCrit(); // ADR-350
             showNumber(event.getAttackerEntityId(), event.getTargetEntityId(), event.getDamage(), event.getIsMiss());
         }

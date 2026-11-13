@@ -883,3 +883,48 @@ message GetNameHistoryResponse {
   string current_name = 2;
   repeated OldName old_names = 3; // mới trước
 }
+
+// ===== Lô 53 (Accepted 2026-11-13, chủ dự án chọn). CHỈ THÊM. =====
+
+// ADR-351 (2026-11-13) — xếp hạng chuỗi đăng nhập. Request: Client -> Server (OPCODE_GET_STREAK_RANKING_REQUEST).
+message GetStreakRankingRequest {}
+
+message StreakRank {
+  string name = 1;
+  int32 streak = 2;
+}
+
+// Response: Server -> Client (OPCODE_GET_STREAK_RANKING_RESPONSE). Top 10 chuỗi CÒN SỐNG (vào hôm nay hoặc hôm qua).
+message GetStreakRankingResponse {
+  repeated StreakRank entries = 1;
+}
+
+// ADR-352 (2026-11-13) — xếp hạng người giới thiệu. Request: Client -> Server (OPCODE_GET_REFERRAL_RANKING_REQUEST).
+message GetReferralRankingRequest {}
+
+message ReferralRank {
+  string name = 1;
+  int32 count = 2; // số người được giới thiệu đã đạt cấp nhận quà
+}
+
+// Response: Server -> Client (OPCODE_GET_REFERRAL_RANKING_RESPONSE). Top 10.
+message GetReferralRankingResponse {
+  repeated ReferralRank entries = 1;
+}
+
+// ADR-353 (2026-11-13) — tìm người chơi theo tên. Request: Client -> Server (OPCODE_SEARCH_PLAYERS_REQUEST).
+// query ≥ 2 ký tự; khớp chuỗi con, không phân biệt hoa thường.
+message SearchPlayersRequest {
+  string query = 1;
+}
+
+message PlayerHit {
+  string name = 1;
+  int32 level = 2;
+  bool online = 3;
+}
+
+// Response: Server -> Client (OPCODE_SEARCH_PLAYERS_RESPONSE). Tối đa 10 người; rỗng khi query không hợp lệ.
+message SearchPlayersResponse {
+  repeated PlayerHit players = 1;
+}

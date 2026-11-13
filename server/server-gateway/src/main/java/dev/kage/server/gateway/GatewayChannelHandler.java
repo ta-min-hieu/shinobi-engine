@@ -1268,6 +1268,126 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot44()
                                     .lookupItem(c))),
             Map.entry(
+                    Opcode.OPCODE_GET_STREAK_RANKING_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetStreakRankingRequest.parser(),
+                            Opcode.OPCODE_GET_STREAK_RANKING_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .streakRanking())),
+            Map.entry(
+                    Opcode.OPCODE_GET_REFERRAL_RANKING_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetReferralRankingRequest.parser(),
+                            Opcode.OPCODE_GET_REFERRAL_RANKING_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .referralRanking())),
+            Map.entry(
+                    Opcode.OPCODE_SEARCH_PLAYERS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SearchPlayersRequest.parser(),
+                            Opcode.OPCODE_SEARCH_PLAYERS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .searchPlayers(c))),
+            Map.entry(
+                    Opcode.OPCODE_ARCHIVE_MAIL_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ArchiveMailCommand.parser(),
+                            Opcode.OPCODE_ARCHIVE_MAIL_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .archiveMail(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_LIST_ARCHIVED_MAIL_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListArchivedMailRequest.parser(),
+                            Opcode.OPCODE_LIST_ARCHIVED_MAIL_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .listArchived(id))),
+            Map.entry(
                     Opcode.OPCODE_GET_NAME_HISTORY_REQUEST_VALUE,
                     storageCommand(
                             dev.kage.protocol.GetNameHistoryRequest.parser(),

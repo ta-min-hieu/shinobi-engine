@@ -11,7 +11,8 @@ record Lot52Windows(
         GuildTagCoordinator guildTag,
         FriendRemovedCoordinator friendRemoved,
         ChatLogExportCoordinator chatLog,
-        CapsCalmCoordinator capsCalm) {
+        CapsCalmCoordinator capsCalm,
+        Lot53Windows lot53) {
 
     static Lot52Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot52Windows(
@@ -19,7 +20,8 @@ record Lot52Windows(
                 new GuildTagCoordinator(sender, feeds.chat()),
                 new FriendRemovedCoordinator(sender, feeds.chat()),
                 new ChatLogExportCoordinator(feeds.chat()),
-                new CapsCalmCoordinator(feeds.chat()));
+                new CapsCalmCoordinator(feeds.chat()),
+                Lot53Windows.create(sender, feeds)); // lô 53 lồng ở đây
     }
 
     void registerInto(PanelHub panels) {
@@ -28,5 +30,6 @@ record Lot52Windows(
         panels.register(friendRemoved);
         panels.register(chatLog);
         panels.register(capsCalm);
+        lot53.registerInto(panels);
     }
 }

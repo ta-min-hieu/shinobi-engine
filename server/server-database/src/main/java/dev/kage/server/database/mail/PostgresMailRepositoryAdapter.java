@@ -54,7 +54,7 @@ public final class PostgresMailRepositoryAdapter implements MailRepositoryPort {
 
     private static final String LIST_BY_RECIPIENT = """
             SELECT id, sender_id, recipient_id, subject, body, gold_amount, claimed_at, created_at
-              FROM mail WHERE recipient_id = ? ORDER BY created_at DESC
+              FROM mail WHERE recipient_id = ? AND archived_at IS NULL ORDER BY created_at DESC
             """;
 
     private static final String FIND_ATTACHMENTS_BY_MAIL = """

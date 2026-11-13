@@ -22,17 +22,24 @@ final class HudInfoLines {
     private final Table group = new Table();
     private final Label clockLabel;
     private final Label goalLabel;
+    private final Label resetLabel; // ADR-356
     private final StringBuilder clockText = new StringBuilder();
+    private final StringBuilder resetText = new StringBuilder();
     private LongSupplier sessionSeconds = () -> 0L;
+    private LongSupplier secondsToReset = () -> 0L;
     private long shownSeconds = -1L;
+    private long shownReset = -1L;
 
     HudInfoLines(KageSkin skin, I18NBundle i18n) {
         this.i18n = i18n;
         this.clockLabel = new Label("", skin.statLabelStyle);
         this.goalLabel = new Label("", skin.statLabelStyle);
+        this.resetLabel = new Label("", skin.statLabelStyle);
         clockLabel.setVisible(false);
         goalLabel.setVisible(false);
+        resetLabel.setVisible(false);
         group.add(goalLabel).left().row();
+        group.add(resetLabel).left().row();
         group.add(clockLabel).left().row();
     }
 
@@ -50,6 +57,16 @@ final class HudInfoLines {
         shownSeconds = -1L;
     }
 
+    void useResetCountdown(LongSupplier seconds) {
+        this.secondsToReset = seconds;
+        shownReset = -1L;
+    }
+
+    void setResetVisible(boolean visible) {
+        resetLabel.setVisible(visible);
+        shownReset = -1L;
+    }
+
     void setGoal(String text) {
         goalLabel.setText(text);
         goalLabel.setVisible(!text.isEmpty());
@@ -57,6 +74,7 @@ final class HudInfoLines {
 
     /** Mỗi khung: chỉ dựng lại chữ khi số giây đổi. */
     void update() {
+        updateReset();
         if (!clockLabel.isVisible()) {
             return;
         }
@@ -69,6 +87,22 @@ final class HudInfoLines {
         clockText.append(i18n.get("hud.session_clock")).append(' ');
         appendClock(clockText, seconds);
         clockLabel.setText(clockText);
+    }
+
+    /** ADR-356 — đếm ngược tới reset ngày; cùng khuôn đồng hồ phiên (không cấp phát). */
+    private void updateReset() {
+        if (!resetLabel.isVisible()) {
+            return;
+        }
+        long seconds = Math.max(0L, secondsToReset.getAsLong());
+        if (seconds == shownReset) {
+            return;
+        }
+        shownReset = seconds;
+        resetText.setLength(0);
+        resetText.append(i18n.get("hud.reset_countdown")).append(' ');
+        appendClock(resetText, seconds);
+        resetLabel.setText(resetText);
     }
 
     /** {@code H:MM:SS} vào bộ đệm có sẵn (không tạo chuỗi). Tĩnh để test. */

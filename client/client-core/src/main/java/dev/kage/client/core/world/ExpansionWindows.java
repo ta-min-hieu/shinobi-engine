@@ -170,6 +170,12 @@ record ExpansionWindows(
         hud.useSessionClock(lot50.sessionClock()::elapsedSeconds); // ADR-332
         lot50.sessionClock().useHud(hud::setSessionClockVisible);
         lot50.levelGoal().useHud(hud::setLevelGoal); // ADR-334
+        Lot53Windows lot53 = lot50.lot51().lot52().lot53();
+        hud.useResetCountdown(lot53.resetCountdown()::secondsToReset); // ADR-356
+        lot53.resetCountdown().useHud(hud::setResetCountdownVisible);
+        hud.useKeyHelp(lot53::keyHelpText); // ADR-357
+        feedback.useOthersVfxFilter(
+                displaySettings.settings().switchFor(DisplaySettings.Option.HIDE_OTHERS_VFX)); // ADR-358
         hud.setMinimal(displaySettings
                 .settings()
                 .switchFor(DisplaySettings.Option.MINIMAL_HUD)
@@ -239,6 +245,7 @@ record ExpansionWindows(
         Lot51Windows lot51 = lot49.lot50().lot51();
         lot51.fullHealth().useLocalId(intents.localCharacterId()); // ADR-340
         lot51.screenShake().useLocalId(intents.localCharacterId()); // ADR-342
+        lot51.lot52().lot53().mailArchive().useSelection(mail::selectedMailId); // ADR-354
         return this;
     }
 

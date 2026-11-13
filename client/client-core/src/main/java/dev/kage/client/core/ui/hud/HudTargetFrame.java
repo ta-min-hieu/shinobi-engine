@@ -65,7 +65,13 @@ final class HudTargetFrame {
         shownHp = current;
         shownMaxHp = max;
         hpBar.setValues(current, max);
-        hpLabel.setText(current + " / " + max);
+        hpLabel.setText(hpText(current, max));
+    }
+
+    /** ADR-355 — "hiện tại / tối đa (X%)"; chỉ gọi khi số đổi (UI.md §9). Tĩnh để test. */
+    static String hpText(int current, int max) {
+        int percent = max > 0 ? (int) Math.clamp(current * 100L / max, 0L, 100L) : 0;
+        return current + " / " + max + " (" + percent + "%)";
     }
 
     /** Xem {@link CombatHud#setCharacterTarget}. */
@@ -87,7 +93,7 @@ final class HudTargetFrame {
         hpBar.setVisible(maxKnown);
         if (maxKnown) {
             hpBar.setValues(current, max);
-            hpLabel.setText(current + " / " + max);
+            hpLabel.setText(hpText(current, max));
         } else if (current >= 0) {
             hpLabel.setText(KageI18n.formatOrKey(i18n, "hud.target.hp_partial", String.valueOf(current)));
         } else {

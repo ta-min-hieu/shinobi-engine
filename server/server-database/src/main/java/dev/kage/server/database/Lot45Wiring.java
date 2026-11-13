@@ -117,6 +117,18 @@ public final class Lot45Wiring {
                 new dev.kage.server.database.guild.PostgresGuildTagAdapter(dataSource));
     }
 
+    /** ADR-351/352/353 — xếp hạng chuỗi đăng nhập, người giới thiệu, tìm người chơi. */
+    public dev.kage.character.api.PlayerLookupFacade wirePlayerLookupFacade() {
+        return new dev.kage.character.api.PlayerLookupFacade(
+                new dev.kage.server.database.character.PostgresPlayerLookupAdapter(dataSource));
+    }
+
+    /** ADR-354 — lưu trữ thư. */
+    public dev.kage.mail.api.MailArchiveFacade wireMailArchiveFacade() {
+        return new dev.kage.mail.api.MailArchiveFacade(
+                new dev.kage.server.database.mail.PostgresMailArchiveAdapter(dataSource));
+    }
+
     /** ADR-288 — lịch sử mua cửa hàng NPC. */
     public dev.kage.shop.api.PurchaseHistoryFacade wirePurchaseHistoryFacade() {
         return new dev.kage.shop.api.PurchaseHistoryFacade(
