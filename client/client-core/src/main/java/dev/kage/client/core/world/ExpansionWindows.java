@@ -165,6 +165,11 @@ record ExpansionWindows(
         lot48.pingHud().useHud(hud::setLatencyVisible); // ADR-316
         hud.useNearbyCount(lot48.lot49().nearby()::count); // ADR-325
         lot48.lot49().nearby().useHud(hud::setNearbyVisible);
+        Lot50Windows lot50 = lot48.lot49().lot50();
+        lot50.expGain().useSink(text -> feedback.showSelfText(text, FloatingCombatText.EXP_GAIN)); // ADR-331
+        hud.useSessionClock(lot50.sessionClock()::elapsedSeconds); // ADR-332
+        lot50.sessionClock().useHud(hud::setSessionClockVisible);
+        lot50.levelGoal().useHud(hud::setLevelGoal); // ADR-334
         hud.setMinimal(displaySettings
                 .settings()
                 .switchFor(DisplaySettings.Option.MINIMAL_HUD)

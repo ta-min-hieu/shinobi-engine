@@ -430,6 +430,13 @@
         <Bug pattern="EI_EXPOSE_REP"/>
     </Match>
 
+    <!-- CameraZoomCoordinator.stage() (ADR-323) — cùng lý do các panel ngay trên: PanelHub phải đưa đúng
+         instance Stage (rỗng, chỉ để nhận lăn chuột) vào InputMultiplexer. -->
+    <Match>
+        <Class name="dev.kage.client.core.world.CameraZoomCoordinator"/>
+        <Bug pattern="EI_EXPOSE_REP"/>
+    </Match>
+
     <!-- ShopPanel.stage() — lần thứ mười cùng một lý do (CombatHud, DialoguePanel, ChatPanel,
          PartyPanel, FriendPanel, GuildPanel, DuelPanel, FactionPanel, MailPanel ngay trên):
          WorldScreen phải đưa đúng instance Stage đó vào InputMultiplexer để đặt thứ tự nuốt input,

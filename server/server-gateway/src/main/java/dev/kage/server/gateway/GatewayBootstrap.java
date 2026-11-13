@@ -801,12 +801,7 @@ public final class GatewayBootstrap {
                 .lot44()
                 .lot45()
                 .lot46();
-        characterRegistry.bossKills.bind(lot46.bossKills()); // ADR-296
-        characterRegistry.guildWelcome.bind(new GuildWelcomeHooks.Deps( // ADR-313
-                facades.contentFacades().socialFacades().guildFacade(),
-                lot46.lot48().guildWelcome(),
-                facades.contentFacades().socialFacades().mailFacade(),
-                characterRegistry));
+        bindLot46Hooks(lot46, facades, characterRegistry);
         expansion.add(EventReminder.job(new EventReminder.Deps( // ADR-306
                 facades.progression().expansion().tournament(), characterRegistry, clock)));
         expansion.add(ScheduledMailJob.job(new ScheduledMailJob.Deps( // ADR-297
@@ -816,6 +811,18 @@ public final class GatewayBootstrap {
                 facades.contentFacades().socialFacades().friendFacade(),
                 characterRegistry,
                 clock)));
+    }
+
+    /** Hook registry của lô 46 trở đi: boss đã hạ (ADR-296), lời chào bang (ADR-313), người vừa chơi cùng (ADR-329). */
+    private static void bindLot46Hooks(
+            Lot46Facades lot46, GatewayFacades facades, ConnectedCharacterRegistry characterRegistry) {
+        characterRegistry.bossKills.bind(lot46.bossKills());
+        characterRegistry.guildWelcome.bind(new GuildWelcomeHooks.Deps(
+                facades.contentFacades().socialFacades().guildFacade(),
+                lot46.lot48().guildWelcome(),
+                facades.contentFacades().socialFacades().mailFacade(),
+                characterRegistry));
+        characterRegistry.recentPlayers.bind(lot46.lot48().lot49().lot50().recentPlayers());
     }
 
     /** Facade lô 46 (ADR-295…) — tách ra cho gọn khối lồng nhau. */
@@ -833,7 +840,11 @@ public final class GatewayBootstrap {
                         new Lot49Facades( // lô 49 lồng ở đây
                                 wiring.wireGuildMemberNoteFacade(),
                                 wiring.wireReferralFacade(),
-                                wiring.wireBreakthroughLogFacade())));
+                                wiring.wireBreakthroughLogFacade(),
+                                new Lot50Facades( // lô 50 lồng ở đây
+                                        wiring.wireLoginStreakFacade(),
+                                        wiring.wireRecentPlayerFacade(),
+                                        wiring.wireInspectNoticeFacade()))));
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */

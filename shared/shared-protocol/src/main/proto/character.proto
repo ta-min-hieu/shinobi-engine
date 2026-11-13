@@ -838,3 +838,27 @@ message BreakthroughEntry {
 message GetBreakthroughHistoryResponse {
   repeated BreakthroughEntry entries = 1;
 }
+
+// ===== Lô 50 (Accepted 2026-11-13, chủ dự án chọn). CHỈ THÊM. =====
+
+// ADR-327 (2026-11-13) — chuỗi đăng nhập liên tiếp. Request: Client -> Server (OPCODE_GET_LOGIN_STREAK_REQUEST).
+message GetLoginStreakRequest {}
+
+// Response: Server -> Client (OPCODE_GET_LOGIN_STREAK_RESPONSE). current = 0 khi chuỗi đã đứt (quá một ngày không vào).
+message GetLoginStreakResponse {
+  int32 current = 1;
+  int32 best = 2;
+  int32 next_reward_day = 3;  // mốc thưởng kế tiếp (ngày thứ mấy của chuỗi)
+  int64 next_reward_gold = 4; // linh thạch ở mốc đó
+}
+
+// ADR-330 (2026-11-13) — báo khi bị soi trang bị. Command: Client -> Server (OPCODE_SET_INSPECT_NOTICE_COMMAND).
+message SetInspectNoticeCommand {
+  bool query_only = 1;
+  bool enabled = 2;
+}
+
+// Response: Server -> Client (OPCODE_SET_INSPECT_NOTICE_RESPONSE). Trạng thái sau khi đổi.
+message SetInspectNoticeResponse {
+  bool enabled = 1;
+}

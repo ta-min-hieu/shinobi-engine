@@ -436,3 +436,18 @@ message SetPartyAutoAcceptCommand {
 message SetPartyAutoAcceptResponse {
   bool enabled = 1;
 }
+
+// ADR-329 (2026-11-13) — người vừa chơi cùng. Request: Client -> Server (OPCODE_GET_RECENT_PLAYERS_REQUEST).
+message GetRecentPlayersRequest {}
+
+message RecentPlayer {
+  string name = 1;
+  int32 level = 2;
+  bool online = 3;
+  int64 met_at_epoch_seconds = 4;
+}
+
+// Response: Server -> Client (OPCODE_GET_RECENT_PLAYERS_RESPONSE). Mới trước, tối đa 10 người.
+message GetRecentPlayersResponse {
+  repeated RecentPlayer players = 1;
+}

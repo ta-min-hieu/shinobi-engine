@@ -358,6 +358,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-324](ADR-324-Bag-Filter.md) | Lọc túi theo loại: `/loctui` theo catalog: trang bị / dùng được / khác | ✅ Accepted (lô 49) |
 | [ADR-325](ADR-325-Nearby-Count.md) | Đếm người xung quanh: Nhãn HUD từ bản đồ người đang thấy; `/xungquanh` | ✅ Accepted (lô 49) |
 | [ADR-326](ADR-326-New-Item-Badge.md) | Nhãn "mới" cho đồ vừa nhặt: Tiền tố "(mới) " theo mẫu tới khi mở túi | ✅ Accepted (lô 49) |
+| [ADR-327](ADR-327-Login-Streak.md) | Chuỗi đăng nhập liên tiếp: Bảng `login_streak` V176, mốc 3 / bội 7 ngày tặng linh thạch qua thư; `/chuoi` | ✅ Accepted (lô 50) |
+| [ADR-328](ADR-328-New-Network-Login-Warning.md) | Cảnh báo đăng nhập từ vùng mạng lạ: So IP che với 50 lần trước, khác hết ⇒ cảnh báo lúc vào world; không opcode | ✅ Accepted (lô 50) |
+| [ADR-329](ADR-329-Recent-Players.md) | Người vừa chơi cùng: Bảng `recent_player` V176 ghi lúc vào nhóm, giữ 10; `/vuachoi` | ✅ Accepted (lô 50) |
+| [ADR-330](ADR-330-Inspect-Notice.md) | Báo khi bị soi trang bị: Dòng báo cho người bị soi đang online; công tắc V176; `/baosoi` | ✅ Accepted (lô 50) |
+| [ADR-331](ADR-331-Floating-Exp-Gain.md) | Chữ +EXP khi nhận kinh nghiệm: Hiệu `total_exp` giữa hai event ⇒ chữ bay; `/chuexp` | ✅ Accepted (lô 50) |
+| [ADR-332](ADR-332-Session-Clock-Hud.md) | Đồng hồ phiên chơi trên HUD: Nhãn H:MM:SS góc dưới trái, không cấp phát; `/dongho` | ✅ Accepted (lô 50) |
+| [ADR-333](ADR-333-Hide-Chat-Key.md) | Phím ẩn/hiện khung chat: Binding `anchat` mặc định S, khung chat không vẽ khi ẩn | ✅ Accepted (lô 50) |
+| [ADR-334](ADR-334-Level-Goal.md) | Mục tiêu cấp độ: HUD "còn K cấp, X% cấp này" từ số server; `/muctieu` | ✅ Accepted (lô 50) |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -43,6 +43,11 @@ record Lot49Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
     private static final Logger LOG = LoggerFactory.getLogger(Lot49Commands.class);
     private static final String REFERRAL_SUBJECT = "Quà giới thiệu / Referral gift";
 
+    /** Lớp lệnh lô 50 (ADR-327…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot50Commands lot50() {
+        return new Lot50Commands(gateway, registry);
+    }
+
     /** ADR-319 — đọc mọi ghi chú, hoặc đặt / xoá ghi chú cho một thành viên (chỉ bang chủ, phó bang chủ). */
     SetGuildMemberNoteResponse setMemberNote(long characterId, SetGuildMemberNoteCommand command) {
         Optional<GuildFacade.MyGuildView> mine = guilds().findMyGuild(characterId);

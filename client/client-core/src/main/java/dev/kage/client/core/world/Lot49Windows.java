@@ -12,7 +12,8 @@ record Lot49Windows(
         CameraZoomCoordinator cameraZoom,
         BagFilterCoordinator bagFilter,
         NearbyCountCoordinator nearby,
-        NewItemsCoordinator newItems) {
+        NewItemsCoordinator newItems,
+        Lot50Windows lot50) {
 
     static Lot49Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot49Windows(
@@ -22,7 +23,8 @@ record Lot49Windows(
                 new CameraZoomCoordinator(),
                 new BagFilterCoordinator(feeds.chat(), feeds.itemCatalog()),
                 new NearbyCountCoordinator(feeds.chat(), feeds.emoteDisplay()),
-                new NewItemsCoordinator());
+                new NewItemsCoordinator(),
+                Lot50Windows.create(sender, feeds)); // lô 50 lồng ở đây
     }
 
     /** Đăng ký vào hub — thu phóng camera đăng ký CUỐI để mọi bảng nhận lăn chuột trước nó. */
@@ -33,6 +35,7 @@ record Lot49Windows(
         panels.register(bagFilter);
         panels.register(nearby);
         panels.register(newItems);
+        lot50.registerInto(panels);
         panels.register(cameraZoom);
     }
 }

@@ -85,6 +85,8 @@ final class MembershipNotices {
             }
             if (domain == Domain.GUILD) {
                 registry.guildWelcome.onJoined(joined); // ADR-313
+            } else {
+                registry.recentPlayers.onJoined(joined, afterSet); // ADR-329
             }
             tellOthers(
                     actorId,

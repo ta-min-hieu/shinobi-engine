@@ -49,6 +49,9 @@ final class FloatingCombatText implements Disposable {
     /** Xanh lá sáng — LÊN CẤP. Màu duy nhất không dùng cho damage, để tin vui không lẫn với sát thương. */
     static final Color LEVEL_UP = Color.valueOf("7CFF7C");
 
+    /** ADR-331 — chữ "+N EXP" khi nhận kinh nghiệm. */
+    static final Color EXP_GAIN = Color.valueOf("C9A2FF");
+
     /** Biểu cảm (ADR-092) — xanh trời, khác hẳn số sát thương. */
     static final Color EMOTE = Color.valueOf("9FD7FF");
 

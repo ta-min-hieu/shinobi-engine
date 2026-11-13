@@ -44,7 +44,9 @@ public final class KeyBindings {
         JUMP("nhay", Keys.W),
         USE_SKILL("kynang", Keys.ENTER),
         USE_ARTIFACT("phapbao", Keys.NUM_1),
-        ATTACK("danh", Keys.Z);
+        ATTACK("danh", Keys.Z),
+        /** ADR-333 — ẩn / hiện khung chat. */
+        HIDE_CHAT("anchat", Keys.S);
 
         private final String id;
         private final int defaultKey;

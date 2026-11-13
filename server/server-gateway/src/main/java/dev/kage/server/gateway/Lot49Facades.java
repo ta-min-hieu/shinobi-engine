@@ -5,9 +5,16 @@ import dev.kage.character.api.ReferralFacade;
 import dev.kage.guild.api.GuildMemberNoteFacade;
 
 /** Facade lô 49 (ADR-319…) gom thành MỘT thành phần của {@link Lot48Facades}. */
-record Lot49Facades(GuildMemberNoteFacade memberNotes, ReferralFacade referral, BreakthroughLogFacade breakthroughs) {
+record Lot49Facades(
+        GuildMemberNoteFacade memberNotes,
+        ReferralFacade referral,
+        BreakthroughLogFacade breakthroughs,
+        Lot50Facades lot50) {
 
     /** Composition không có các tính năng này (test). */
-    static final Lot49Facades DISABLED =
-            new Lot49Facades(GuildMemberNoteFacade.DISABLED, ReferralFacade.DISABLED, BreakthroughLogFacade.DISABLED);
+    static final Lot49Facades DISABLED = new Lot49Facades(
+            GuildMemberNoteFacade.DISABLED,
+            ReferralFacade.DISABLED,
+            BreakthroughLogFacade.DISABLED,
+            Lot50Facades.DISABLED);
 }

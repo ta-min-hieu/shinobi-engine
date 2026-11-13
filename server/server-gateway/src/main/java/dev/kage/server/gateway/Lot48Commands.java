@@ -133,8 +133,9 @@ record Lot48Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
         return facades().mailRead().unreadIds(characterId);
     }
 
-    /** ADR-314 — vào world: còn thư chưa đọc thì báo một dòng. */
+    /** ADR-314 — vào world: còn thư chưa đọc thì báo một dòng (kèm việc vào world của lô 50). */
     void onEnteredWorld(long characterId) {
+        lot49().lot50().onEnteredWorld(characterId); // ADR-327 chuỗi đăng nhập, ADR-328 mạng lạ
         int unread = facades().mailRead().unreadIds(characterId).size();
         if (unread > 0) {
             registry.sendToCharacterIfOnline(

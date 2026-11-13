@@ -240,6 +240,18 @@ final class CommandHelpCoordinator implements WindowFlow {
             new Group(
                     "help.group.info",
                     List.of(
+                            "/chuoi",
+                            "/streak",
+                            "/vuachoi",
+                            "/recent",
+                            "/baosoi",
+                            "/inspectnotice",
+                            "/chuexp",
+                            "/expgain",
+                            "/dongho",
+                            "/clock",
+                            "/muctieu",
+                            "/goal",
                             "/dotpha",
                             "/breakthroughs",
                             "/xungquanh",

@@ -54,6 +54,7 @@ public final class CombatHud implements HudWindow {
     private final StringBuilder nearbyText = new StringBuilder(); // ADR-325
     private java.util.function.IntSupplier nearbyCount = () -> 0; // ADR-325
     private int lastNearby = -1;
+    private final HudInfoLines infoLines; // ADR-332, ADR-334
 
     /**
      * Bố cục theo ảnh Ninja School Online chủ dự án gửi (2026-08-09): cụm chỉ số góc trên-trái, mục
@@ -71,6 +72,7 @@ public final class CombatHud implements HudWindow {
         this.banners = new HudBanners(skin, i18n);
         this.fpsLabel = new Label("", skin.statLabelStyle);
         this.nearbyLabel = new Label("", skin.statLabelStyle);
+        this.infoLines = new HudInfoLines(skin, i18n);
 
         // 6 Table độc lập cùng setFillParent(true) — mỗi cụm neo một góc, không có lưới chung.
         stage.addActor(anchored(buildPlayerCluster(), Align.topLeft));
@@ -88,6 +90,7 @@ public final class CombatHud implements HudWindow {
     /** ADR-283 — cụm nhãn FPS góc dưới trái. */
     private Table fpsCorner() {
         Table corner = new Table();
+        corner.add(infoLines.group()).left().row(); // ADR-332, ADR-334
         corner.add(nearbyLabel).left().row(); // ADR-325
         corner.add(fpsLabel).left();
         return corner;
@@ -102,6 +105,21 @@ public final class CombatHud implements HudWindow {
     public void setNearbyVisible(boolean visible) {
         nearbyLabel.setVisible(visible);
         lastNearby = -1;
+    }
+
+    /** ADR-332 — nguồn số giây đã chơi trong phiên (đọc mỗi khung, chỉ đổi chữ khi sang giây mới). */
+    public void useSessionClock(java.util.function.LongSupplier seconds) {
+        infoLines.useSessionSeconds(seconds);
+    }
+
+    /** ADR-332 — hiện / ẩn đồng hồ phiên chơi. */
+    public void setSessionClockVisible(boolean visible) {
+        infoLines.setClockVisible(visible);
+    }
+
+    /** ADR-334 — dòng mục tiêu cấp độ đã dịch; rỗng = ẩn. */
+    public void setLevelGoal(String text) {
+        infoLines.setGoal(text);
     }
 
     /** ADR-316 — hiện / ẩn nhãn độ trễ mạng. */
@@ -408,6 +426,7 @@ public final class CombatHud implements HudWindow {
             nearbyText.append(i18n.get("hud.nearby")).append(' ').append(lastNearby); // tái dùng bộ đệm
             nearbyLabel.setText(nearbyText);
         }
+        infoLines.update(); // ADR-332
         stage.act(deltaTime);
         stage.draw();
     }

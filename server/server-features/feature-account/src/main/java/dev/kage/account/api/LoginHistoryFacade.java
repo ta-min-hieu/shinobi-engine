@@ -73,6 +73,25 @@ public final class LoginHistoryFacade {
         port.record(accountId, mask(address), at, KEPT);
     }
 
+    /**
+     * ADR-328 — lần đăng nhập mới nhất đến từ vùng mạng (IP đã che) chưa từng thấy trong {@value #KEPT} lần trước đó.
+     * Lần đăng nhập đầu tiên của tài khoản, hoặc IP không rõ ({@code "?"}), KHÔNG tính là lạ.
+     */
+    public boolean latestIsNewNetwork(long accountId) {
+        return isNewNetwork(port.recent(accountId, KEPT));
+    }
+
+    /** {@code entries} mới trước. Tĩnh để test. */
+    public static boolean isNewNetwork(List<LoginHistoryPort.Entry> entries) {
+        if (entries.size() < 2) {
+            return false;
+        }
+        String latest = entries.get(0).maskedIp();
+        return !"?".equals(latest)
+                && entries.subList(1, entries.size()).stream()
+                        .noneMatch(entry -> entry.maskedIp().equals(latest));
+    }
+
     /** {@value #SHOWN} lần gần nhất, mới trước. */
     public List<LoginHistoryPort.Entry> recent(long accountId) {
         return port.recent(accountId, SHOWN);

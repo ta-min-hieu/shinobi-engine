@@ -127,6 +127,9 @@ public final class ChatPanel implements HudWindow {
     /** Giây kể từ dòng chat gần nhất. Bắt đầu ở "đã lâu lắm rồi" nên khung rỗng không tự hiện. */
     private float sinceLastLine = Float.MAX_VALUE;
 
+    /** ADR-333 — ẩn bằng phím {@code anchat}. */
+    private boolean hidden;
+
     private Runnable onChannelToggle;
 
     /** Xem {@link #setCanOpen}. Mặc định LUÔN cho mở, để lớp này tự chạy được trong test/preview. */
@@ -232,6 +235,12 @@ public final class ChatPanel implements HudWindow {
         stage.addListener(new InputListener() {
             @Override
             public boolean keyUp(InputEvent event, int keycode) {
+                if (keycode == KeyBindings.shared().keyOf(KeyBindings.Binding.HIDE_CHAT)
+                        && !isComposing()
+                        && canOpen.getAsBoolean()) {
+                    hidden = !hidden; // ADR-333
+                    return true;
+                }
                 if (keycode != KeyBindings.shared().resolve(OPEN_KEY) || isComposing() || !canOpen.getAsBoolean()) {
                     return false;
                 }
@@ -388,6 +397,16 @@ public final class ChatPanel implements HudWindow {
         pinnedLabel.setVisible(!line.isEmpty());
     }
 
+    /** ADR-333 — khung chat đang bị ẩn bằng phím (vẫn hiện khi đang gõ). */
+    public boolean isHidden() {
+        return hidden;
+    }
+
+    /** ADR-333 — ẩn / hiện khung chat. */
+    public void setHidden(boolean hide) {
+        this.hidden = hide;
+    }
+
     /** ADR-292 — đổi số giây rảnh trước khi khung tự mờ rồi ẩn; {@code 0} = luôn hiện. */
     public void setIdleHideSeconds(float seconds) {
         this.idleHideSeconds = Math.max(0f, seconds);
@@ -450,7 +469,9 @@ public final class ChatPanel implements HudWindow {
             panel.setVisible(false);
         }
         stage.act(deltaTime);
-        stage.draw();
+        if (!hidden || isComposing()) { // ADR-333 — ẩn thì không vẽ, trừ khi đang gõ
+            stage.draw();
+        }
     }
 
     /**

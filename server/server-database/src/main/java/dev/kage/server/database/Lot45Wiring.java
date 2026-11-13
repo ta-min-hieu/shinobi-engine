@@ -69,6 +69,24 @@ public final class Lot45Wiring {
                 new dev.kage.server.database.character.PostgresBreakthroughLogAdapter(dataSource));
     }
 
+    /** ADR-327 — chuỗi đăng nhập liên tiếp. */
+    public dev.kage.character.api.LoginStreakFacade wireLoginStreakFacade() {
+        return new dev.kage.character.api.LoginStreakFacade(
+                new dev.kage.server.database.character.PostgresLoginStreakAdapter(dataSource));
+    }
+
+    /** ADR-329 — người vừa chơi cùng. */
+    public dev.kage.party.api.RecentPlayerFacade wireRecentPlayerFacade() {
+        return new dev.kage.party.api.RecentPlayerFacade(
+                new dev.kage.server.database.party.PostgresRecentPlayerAdapter(dataSource));
+    }
+
+    /** ADR-330 — báo khi bị soi trang bị. */
+    public dev.kage.character.api.InspectNoticeFacade wireInspectNoticeFacade() {
+        return new dev.kage.character.api.InspectNoticeFacade(
+                new dev.kage.server.database.character.PostgresInspectNoticeAdapter(dataSource));
+    }
+
     /** ADR-288 — lịch sử mua cửa hàng NPC. */
     public dev.kage.shop.api.PurchaseHistoryFacade wirePurchaseHistoryFacade() {
         return new dev.kage.shop.api.PurchaseHistoryFacade(

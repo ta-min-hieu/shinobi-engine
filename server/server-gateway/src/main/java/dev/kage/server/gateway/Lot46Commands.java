@@ -112,6 +112,12 @@ record Lot46Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
                 .orElse(inspected);
     }
 
+    /** ADR-330 — kèm lượt thích, rồi báo người bị soi (nếu họ bật báo). */
+    dev.kage.protocol.InspectCharacterResponse withLikesAndNotice(
+            long viewerId, dev.kage.protocol.InspectCharacterResponse inspected) {
+        return lot47().lot48().lot49().lot50().notifyInspected(viewerId, withLikes(inspected));
+    }
+
     private Lot46Facades facades() {
         return gateway.progression()
                 .expansion()
