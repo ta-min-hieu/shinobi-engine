@@ -35,4 +35,4 @@ kênh nhóm.
 
 1. ✅ Thi hành 2026-11-13 (lô 47): `CoordinatesCoordinator`.
 2. ✅ Test: biên dịch + kiểm tay (UI).
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không vẽ UI/không chạy lệnh gạch chéo; phủ bằng biên dịch + test đơn vị, cần kiểm tay trên client thật.

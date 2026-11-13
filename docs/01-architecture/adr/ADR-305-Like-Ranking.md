@@ -35,4 +35,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 47): `ProfileLikePort.top`, `Lot47Commands.likeRanking`, `BossDamageRankingCoordinator`.
 2. ✅ Test: `Lot47IntegrationTest.ranksProfileLikes`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-13 (`topLikes`): danh sách rỗng — đúng dữ liệu dev (`profile_like` đã dọn sau kiểm sống ADR-298). Truy vấn phủ bởi `Lot47IntegrationTest.ranksProfileLikes`.

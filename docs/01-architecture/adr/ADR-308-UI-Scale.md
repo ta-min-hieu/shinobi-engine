@@ -33,4 +33,4 @@ mọi bảng) đổi `ScreenViewport.unitsPerPixel = 1/scale` rồi dựng lại
 
 1. ✅ Thi hành 2026-11-13 (lô 47): `UiScaleCoordinator`, `PanelHub.setUiScale`.
 2. ✅ Test: `Lot47ClientTest.parsesUiScalePercent`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không vẽ UI/không chạy lệnh gạch chéo; phủ bằng biên dịch + test đơn vị, cần kiểm tay trên client thật.

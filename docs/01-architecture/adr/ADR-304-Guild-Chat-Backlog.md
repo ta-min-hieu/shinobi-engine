@@ -36,4 +36,4 @@ world (nhân vật mới) ⇒ không gửi. Không opcode mới (dùng `ChatMess
 
 1. ✅ Thi hành 2026-11-13 (lô 47): `GuildChatBacklog`, `Lot47Commands.onEnteredWorld`/`replay`, nhánh GUILD trong `GatewayChannelHandler`.
 2. ✅ Test: `Lot47ServerTest.backlogKeepsNewestFiftyAndFiltersByTime`, `replayCarriesGuildChannelAndTime`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-13: BaoDo01 vào rồi rời world; ĐạoHữu01 chat kênh bang "probe tin bang lúc vắng"; BaoDo01 vào lại ⇒ nhận `CHAT_MESSAGE_EVENT channel=GUILD name=ĐạoHữu01 body='[13:25 UTC] probe tin bang lúc vắng'`.

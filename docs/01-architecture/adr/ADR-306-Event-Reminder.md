@@ -33,4 +33,4 @@ ngữ, mỗi mốc một lần (nhớ mốc đã báo theo loại). Mốc báo: 
 
 1. ✅ Thi hành 2026-11-13 (lô 47): `EventReminder`, `GatewayBootstrap.addReminders`.
 2. ✅ Test: `Lot47ServerTest.eventReminderWindowAndMinutes`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Chạy theo giờ thật (mốc luận võ/reset) nên probe không ép được; phủ bằng `Lot47ServerTest.eventReminderWindowAndMinutes` (cửa sổ 5 phút, làm tròn phút, nội dung song ngữ).

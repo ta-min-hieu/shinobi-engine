@@ -40,4 +40,4 @@ kills}}` **420/421**. Client `/topboss`.
 
 1. ✅ Thi hành 2026-11-13 (lô 47): `BossKillLogPort.topWorldDamage`, `Lot47Commands.bossDamageRanking`, `BossDamageRankingCoordinator`.
 2. ✅ Test: `Lot47IntegrationTest.ranksWorldBossDamageAcrossKills`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-13 (`topBoss`): `topBoss=0` — đúng dữ liệu dev (`world_boss_damage` đang rỗng). Truy vấn phủ bởi `Lot47IntegrationTest.ranksWorldBossDamageAcrossKills` (Postgres thật).
