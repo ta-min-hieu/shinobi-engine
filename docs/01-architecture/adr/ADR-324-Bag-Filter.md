@@ -35,4 +35,4 @@ thêm nút trên khung túi (lớp túi đồ đã chạm trần độ phức t�
 
 1. ✅ Thi hành 2026-11-13 (lô 49): `BagFilterCoordinator`, `BagSearchCoordinator.Described.itemTemplateId`.
 2. ✅ Test: `Lot49ClientTest.bagFilterClassifiesByCatalog`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không vẽ UI/không chạy lệnh gạch chéo; phủ bằng biên dịch + test đơn vị, cần kiểm tay trên client thật.

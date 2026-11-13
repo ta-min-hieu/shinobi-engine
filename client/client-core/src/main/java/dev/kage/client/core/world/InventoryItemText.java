@@ -24,6 +24,9 @@ import dev.kage.protocol.ItemCatalogEntry;
  */
 final class InventoryItemText {
 
+    /** ADR-326 — đầu tên món vừa nhặt (cùng chữ với dấu thư chưa đọc). */
+    static final String NEW_MARK = "(mới) ";
+
     /** ADR-199 — khoá i18n của bốn chỉ số so sánh, cùng thứ tự với {@link #effectiveStats}. */
     private static final String[] STAT_KEYS = {
         "compare.stat.atk", "compare.stat.def", "compare.stat.res", "compare.stat.hp"
@@ -32,6 +35,7 @@ final class InventoryItemText {
     private final I18NBundle i18n = KageI18n.load();
     private final LongFunction<ItemCatalogEntry> catalogLookup;
     private final LongFunction<String> nameOrFallback;
+    private java.util.function.LongPredicate isNew = id -> false; // ADR-326
     private Comparison comparison = Comparison.NONE;
 
     /**
@@ -53,11 +57,6 @@ final class InventoryItemText {
      *     catalog hoặc id lạ — lúc đó KHÔNG hiện chỉ số nào thay vì hiện "ATK +0" (Điều 24)
      * @param nameOrFallback tên đã dịch, hoặc dạng số khi chưa có catalog
      */
-    /** ADR-326 — đầu tên món vừa nhặt (cùng chữ với dấu thư chưa đọc). */
-    static final String NEW_MARK = "(mới) ";
-
-    private java.util.function.LongPredicate isNew = id -> false; // ADR-326
-
     InventoryItemText(LongFunction<ItemCatalogEntry> catalogLookup, LongFunction<String> nameOrFallback) {
         this.catalogLookup = catalogLookup;
         this.nameOrFallback = nameOrFallback;

@@ -33,4 +33,4 @@ không có chữ hiển thị tên món). Việc phụ: lỗi dừng ở đây, 
 
 1. ✅ Thi hành 2026-11-13 (lô 49): `Lot49Commands.announceEnhance`/`enhanceNotice`, nhánh cường hoá trong `GatewayChannelHandler`.
 2. ✅ Test: `Lot49ServerTest.enhanceNoticeCarriesLinkedItem`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Cần một lần cường hoá thật lên ≥ +10 (tỉ lệ thấp, tốn vàng) — chưa ép được bằng probe; nội dung dòng báo + món kèm phủ bằng `Lot49ServerTest.enhanceNoticeCarriesLinkedItem`.

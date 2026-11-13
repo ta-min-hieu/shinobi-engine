@@ -33,4 +33,4 @@ thanh cuộn thì bảng nhận trước. Góc camera khoá (ADR-031) không đ�
 
 1. ✅ Thi hành 2026-11-13 (lô 49): `CameraZoomCoordinator`, `WorldModelRenderer.setZoom`, `ExpansionWindows.useCamera`.
 2. ✅ Test: `Lot49ClientTest.cameraZoomStepsAndClamps`.
-3. ⏳ Kiểm sống gameProbe.
+3. ⏳ Thuần client — probe headless không vẽ UI/không chạy lệnh gạch chéo; phủ bằng biên dịch + test đơn vị, cần kiểm tay trên client thật.

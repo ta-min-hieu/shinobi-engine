@@ -36,4 +36,4 @@ GuildMemberNote{name, note}}` **785/786** — mọi trả lời kèm toàn bộ 
 
 1. ✅ Thi hành 2026-11-13 (lô 49): `GuildMemberNotePort`/`Facade`, `PostgresGuildMemberNoteAdapter`, `Lot49Commands.setMemberNote`, `GuildMemberNoteCoordinator`.
 2. ✅ Test: `Lot49IntegrationTest.memberNoteOnlyForMembers`, `Lot49ServerTest.validatesMemberNote`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-13 (ĐạoHữu01 = bang chủ): `memberNote:?` ⇒ OK rỗng; ghi "đánh boss giỏi" cho BaoDo01 ⇒ OK kèm ghi chú; ghi cho PhuTanThu (ngoài bang) ⇒ NOT_MEMBER. Đã xoá ghi chú thử.

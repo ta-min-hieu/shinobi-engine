@@ -3284,26 +3284,30 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     .setMaxHp(maxHp)
                     .build();
             send(ctx, Opcode.OPCODE_ENHANCE_ITEM_RESPONSE_VALUE, request.sequenceId(), response.toByteArray());
-            if (result == InventoryFacade.EnhanceResult.SUCCESS) { // ADR-321 — báo toàn server khi lên ≥ +10
-                expansion
-                        .lot37()
-                        .lot38()
-                        .lot39()
-                        .lot40()
-                        .lot41()
-                        .lot42()
-                        .lot43()
-                        .lot44()
-                        .lot45()
-                        .lot46()
-                        .lot47()
-                        .lot48()
-                        .lot49()
-                        .announceEnhance(
-                                request.characterId(), request.command().getItemId());
-            }
+            announceHighEnhance(request.characterId(), request.command().getItemId(), result); // ADR-321
         } finally {
             span.end();
+        }
+    }
+
+    /** ADR-321 — cường hoá thành công lên ≥ +10 thì báo toàn server (việc phụ, sau khi đã trả kết quả). */
+    private void announceHighEnhance(long characterId, long itemId, InventoryFacade.EnhanceResult result) {
+        if (result == InventoryFacade.EnhanceResult.SUCCESS) {
+            expansion
+                    .lot37()
+                    .lot38()
+                    .lot39()
+                    .lot40()
+                    .lot41()
+                    .lot42()
+                    .lot43()
+                    .lot44()
+                    .lot45()
+                    .lot46()
+                    .lot47()
+                    .lot48()
+                    .lot49()
+                    .announceEnhance(characterId, itemId);
         }
     }
 

@@ -35,4 +35,4 @@ at_epoch_seconds}}` **277/278**. Client `/dotpha` (hoặc `/breakthroughs`).
 
 1. ✅ Thi hành 2026-11-13 (lô 49): `BreakthroughLogPort`/`Facade`, `PostgresBreakthroughLogAdapter`, `Lot49Commands.breakthroughHistory`/`onLevelReached`, `BreakthroughHistoryCoordinator`.
 2. ✅ Test: `Lot49IntegrationTest.recordsBreakthroughsOldestFirst`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-13 (`breakthroughs`): danh sách rỗng — đúng kỳ vọng (chỉ ghi từ ADR này). Đường ghi phủ bằng `Lot49IntegrationTest.recordsBreakthroughsOldestFirst`.

@@ -38,4 +38,4 @@ reward_level}` **275/276**. Client `/magioithieu [tên]`.
 
 1. ✅ Thi hành 2026-11-13 (lô 49): `ReferralPort`/`Facade`, `PostgresReferralAdapter`, `Lot49Commands.enterReferral`/`onLevelReached`, `ReferralCoordinator`.
 2. ✅ Test: `Lot49IntegrationTest.referralRegistersOnceAndRewardsOnce`, `Lot49ServerTest.referralKeysDifferPerRecipient`.
-3. ⏳ Kiểm sống gameProbe.
+3. ✅ Kiểm sống gameProbe 2026-11-13: `referral:?` ⇒ MY_CODE mã=ĐạoHữu01; ĐạoHữu01 (cấp 20) nhập ⇒ LEVEL_TOO_HIGH; BaoDo01 (cấp 2) nhập ĐạoHữu01 ⇒ OK, lần hai ⇒ ALREADY_REFERRED; PhuTanThu (cùng tài khoản ĐạoHữu01) ⇒ SAME_ACCOUNT. Đường chốt quà ở cấp 10 phủ bằng `Lot49IntegrationTest`. Đã xoá dòng giới thiệu thử.
