@@ -35,4 +35,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 51): `DeathLogPort`/`Facade`, `PostgresDeathLogAdapter`, `DeathLogHooks` (nối trong `ConnectedCharacterRegistry`), `Lot51Commands.deathHistory`, `DeathHistoryCoordinator`.
 2. ✅ Test: `Lot51IntegrationTest.deathLogNewestFirst`, `Lot51ServerTest.deathLogRemembersMonsterCodes`.
-3. LIVE337
+3. ⏳ Kiểm sống gameProbe 2026-11-13: `deaths` ⇒ tửVong=0 (opcode, quyền, đường đọc chạy thật); chưa gây được một lần chết qua probe — đường ghi phủ bằng `Lot51IntegrationTest.deathLogNewestFirst` và `Lot51ServerTest.deathLogRemembersMonsterCodes`.

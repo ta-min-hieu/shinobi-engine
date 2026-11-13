@@ -35,4 +35,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 51): `PartyVoteKicks`, `Lot51Commands.startVoteKick`/`castVoteKick`, `VoteKickCoordinator`.
 2. ✅ Test: `Lot51ServerTest.neededIsMoreThanHalf`/`votePassesWithMajorityOnce`/`voteExpires`.
-3. LIVE338
+3. ✅ Kiểm sống gameProbe 2026-11-13 (hai probe): ĐạoHữu01 (thành viên) bầu đuổi BaoDo01 (trưởng nhóm) ⇒ TARGET_IS_LEADER; `castVote` khi chưa có cuộc bầu ⇒ NO_VOTE; BaoDo01 bầu đuổi ĐạoHữu01 trong nhóm hai người ⇒ PASSED 1/1, ĐạoHữu01 nhận `PartyChangedEvent` bị đuổi. Đã mời lại vào nhóm, trả vai trò như cũ.

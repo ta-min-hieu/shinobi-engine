@@ -35,4 +35,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 51): `BulletinPort`/`Facade` (feature-chat), `PostgresBulletinAdapter`, `Lot51Commands.postBulletin`/`listBulletin`, `BulletinCoordinator`.
 2. ✅ Test: `Lot51IntegrationTest.bulletinOnePostPerCharacterNewestFirst`.
-3. LIVE336
+3. ✅ Kiểm sống gameProbe 2026-11-13: đăng "Cần mua kunai giá tốt" ⇒ OK; đăng lại ngay ⇒ TOO_SOON; `bulletinList` ⇒ [ĐạoHữu01: Cần mua kunai giá tốt]. Đã xoá tin thử.

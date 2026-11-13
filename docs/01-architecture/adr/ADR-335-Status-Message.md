@@ -35,4 +35,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 51): `StatusMessagePort`/`Facade` (feature-friend), `PostgresStatusMessageAdapter`, `Lot51Commands.setStatusMessage`/`statusesOf`, `GatewayChannelHandler.friendStatuses`, `StatusMessageCoordinator`, `FriendController.displayNameOf`.
 2. ✅ Test: `Lot51IntegrationTest.statusMessagesSetReadAndClear`, `Lot51ServerTest.validatesText`, `Lot51ClientTest.friendNameShowsStatus`.
-3. LIVE335
+3. ✅ Kiểm sống gameProbe 2026-11-13: `status:?` ⇒ ''; đặt "Bế quan luyện đan" ⇒ OK; `listFriends` của BaoDo01 ⇒ ĐạoHữu01 status='Bế quan luyện đan'. Đã xoá dòng thử.
