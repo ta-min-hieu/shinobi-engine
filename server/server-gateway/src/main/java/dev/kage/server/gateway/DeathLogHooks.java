@@ -64,12 +64,13 @@ final class DeathLogHooks {
             return;
         }
         String monster = killerEntityId < 0L ? monsterCode(killerEntityId) : "";
-        writers.execute(() -> write(bound.get(), victimId, killerEntityId, monster, Math.round(x)));
+        DeathLogPort.Entry draft = new DeathLogPort.Entry("", monster, Math.round(x), java.time.Instant.now());
+        writers.execute(() -> write(bound.get(), victimId, killerEntityId, draft));
     }
 
     // PMD AvoidCatchingGenericException: việc phụ chạy trên Virtual Thread riêng — lỗi dừng ở đây.
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
-    private static void write(Deps bound, long victimId, long killerEntityId, String monster, int x) {
+    private static void write(Deps bound, long victimId, long killerEntityId, DeathLogPort.Entry draft) {
         try {
             String killer = killerEntityId > 0L && killerEntityId != victimId
                     ? bound.characters()
@@ -77,7 +78,7 @@ final class DeathLogHooks {
                             .map(Character::name)
                             .orElse("")
                     : "";
-            bound.log().record(victimId, new DeathLogPort.Entry(killer, monster, x, java.time.Instant.now()));
+            bound.log().record(victimId, new DeathLogPort.Entry(killer, draft.monsterCode(), draft.x(), draft.at()));
         } catch (RuntimeException e) {
             LOG.warn("Ghi lịch sử tử vong lỗi: victim={}", victimId, e);
         }

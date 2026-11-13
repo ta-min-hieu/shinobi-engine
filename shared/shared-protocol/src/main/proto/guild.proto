@@ -916,3 +916,25 @@ message SetGuildMemberNoteResponse {
   SetGuildMemberNoteOutcome outcome = 1;
   repeated GuildMemberNote notes = 2;
 }
+
+// ADR-344 (2026-11-13) — ký hiệu bang. Command: Client -> Server (OPCODE_SET_GUILD_TAG_COMMAND). query_only = chỉ hỏi;
+// tag rỗng = xoá. 2–4 chữ cái/chữ số, không trùng bang khác (không phân biệt hoa thường); chỉ bang chủ đặt.
+message SetGuildTagCommand {
+  bool query_only = 1;
+  string tag = 2;
+}
+
+enum SetGuildTagOutcome {
+  SET_GUILD_TAG_OUTCOME_UNSPECIFIED = 0;
+  SET_GUILD_TAG_OUTCOME_OK = 1;
+  SET_GUILD_TAG_OUTCOME_NOT_IN_GUILD = 2;
+  SET_GUILD_TAG_OUTCOME_NOT_LEADER = 3;
+  SET_GUILD_TAG_OUTCOME_INVALID = 4;
+  SET_GUILD_TAG_OUTCOME_TAKEN = 5;
+}
+
+// Response: Server -> Client (OPCODE_SET_GUILD_TAG_RESPONSE). tag = ký hiệu hiện tại.
+message SetGuildTagResponse {
+  SetGuildTagOutcome outcome = 1;
+  string tag = 2;
+}
