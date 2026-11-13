@@ -35,4 +35,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 52): `GuildTagPort`/`Facade`, `PostgresGuildTagAdapter`, `Lot52Commands.setGuildTag`/`chatTagOf`/`withGuildTag`, `GatewayChannelHandler.chatEvent`, `GuildTagCoordinator`, `ChatCoordinator.withTitle`, `InspectCoordinator`.
 2. ✅ Test: `Lot52IntegrationTest.guildTagUniqueAndReadableByMember`, `Lot52ServerTest.validatesGuildTag`.
-3. LIVE344
+3. ✅ Kiểm sống gameProbe 2026-11-13: `guildTag:?` ⇒ ''; `X` ⇒ INVALID; `KAGE` ⇒ OK; soi ĐạoHữu01 ⇒ bang='KAGE'; BaoDo01 (cùng bang) chat thế giới ⇒ `sender_guild_tag='KAGE'`. Đã xoá ký hiệu thử.

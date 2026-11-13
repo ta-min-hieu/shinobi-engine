@@ -33,4 +33,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 52): `Lot52Commands.friendRemoved` (gọi từ `handleRemoveFriendBlocking`), `FriendRemovedCoordinator`.
 2. ✅ Test: đường xoá bạn giữ nguyên test sẵn có; phần báo kiểm sống.
-3. LIVE345
+3. ⏳ Chưa kiểm sống (cần xoá rồi kết bạn lại một cặp có sẵn); phủ bằng `FriendWireTest.shouldStopPresenceEvents_onceTheFriendshipIsRemoved` — người bị xoá đang online nhận đúng một gói 1159.

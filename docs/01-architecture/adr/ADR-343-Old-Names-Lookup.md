@@ -35,4 +35,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 52): `NameHistoryPort`/`Facade`, `PostgresNameHistoryAdapter`, `Lot52Commands.nameHistory`, `NameHistoryCoordinator`.
 2. ✅ Test: `Lot52IntegrationTest.nameHistoryNewestFirstAndByOldName`.
-3. LIVE343
+3. ✅ Kiểm sống gameProbe 2026-11-13: `oldNames:ĐạoHữu01` ⇒ thấy, 1 tên cũ; tra theo tên cũ `TanThu01` ⇒ hiện tại ĐạoHữu01; tên không có ⇒ found=false.

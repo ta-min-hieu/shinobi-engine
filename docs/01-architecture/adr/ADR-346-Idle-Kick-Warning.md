@@ -33,4 +33,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 52): `IdleKick.isWarnDue`/`checkNow`/`notice`.
 2. ✅ Test: `Lot52ServerTest.warnsOnceAMinuteBeforeKick`/`noWarningForVeryShortTimeouts`.
-3. LIVE346
+3. ⏳ Chưa kiểm sống (cần treo 29 phút với cấu hình mặc định); phủ bằng `Lot52ServerTest.warnsOnceAMinuteBeforeKick`.
