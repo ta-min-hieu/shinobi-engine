@@ -605,7 +605,6 @@ message InspectCharacterResponse {
   repeated InspectedEquipment equipment = 6;
   string bio = 7;  // ADR-218 — dòng giới thiệu tự viết ("" = chưa viết)
   int32 likes = 8;  // ADR-298 — tổng lượt thích hồ sơ
-  string guild_tag = 9;  // ADR-344 — ký hiệu bang của người bị soi ("" = không có)
 }
 
 // Command: Client -> Server (OPCODE_SET_INSPECT_PRIVACY_COMMAND = 251). hidden = true ⇒ người khác không soi được mình.
@@ -862,24 +861,4 @@ message SetInspectNoticeCommand {
 // Response: Server -> Client (OPCODE_SET_INSPECT_NOTICE_RESPONSE). Trạng thái sau khi đổi.
 message SetInspectNoticeResponse {
   bool enabled = 1;
-}
-
-// ===== Lô 52 (Accepted 2026-11-13, chủ dự án chọn). CHỈ THÊM. =====
-
-// ADR-343 (2026-11-13) — tra tên cũ. Request: Client -> Server (OPCODE_GET_NAME_HISTORY_REQUEST). name = tên hiện tại
-// HOẶC một tên cũ.
-message GetNameHistoryRequest {
-  string name = 1;
-}
-
-message OldName {
-  string name = 1;
-  int64 changed_at_epoch_seconds = 2;
-}
-
-// Response: Server -> Client (OPCODE_GET_NAME_HISTORY_RESPONSE). found = false khi không có ai mang / từng mang tên đó.
-message GetNameHistoryResponse {
-  bool found = 1;
-  string current_name = 2;
-  repeated OldName old_names = 3; // mới trước
 }

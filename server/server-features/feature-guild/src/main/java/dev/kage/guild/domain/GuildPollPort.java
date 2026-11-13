@@ -13,7 +13,14 @@ public interface GuildPollPort {
      * @param votes số phiếu theo đúng thứ tự {@code options}
      * @param myVote lựa chọn của người hỏi (0-based); -1 nếu chưa bỏ phiếu
      */
-    record Poll(long id, String question, List<String> options, List<Integer> votes, Instant closesAt, int myVote) {}
+    record Poll(long id, String question, List<String> options, List<Integer> votes, Instant closesAt, int myVote) {
+
+        /** Sao chép bất biến hai danh sách (bản ghi không lộ dữ liệu sửa được). */
+        public Poll {
+            options = List.copyOf(options);
+            votes = List.copyOf(votes);
+        }
+    }
 
     /** Kết quả tạo. */
     enum CreateOutcome {

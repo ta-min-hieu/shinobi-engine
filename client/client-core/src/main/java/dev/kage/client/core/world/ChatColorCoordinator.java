@@ -60,7 +60,7 @@ final class ChatColorCoordinator implements WindowFlow {
     }
 
     private boolean onSlash(String line) {
-        String[] words = line.strip().split("\\s+");
+        String[] words = line.strip().split("\\s+", 3);
         String command = words[0].toLowerCase(Locale.ROOT);
         if (!"/maukenh".equals(command) && !"/chatcolor".equals(command)) {
             return false;
