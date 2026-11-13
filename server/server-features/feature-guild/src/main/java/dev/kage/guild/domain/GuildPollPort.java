@@ -39,7 +39,13 @@ public interface GuildPollPort {
     }
 
     /** Một cuộc mới cần tạo (câu hỏi / lựa chọn đã kiểm và cắt khoảng trắng). */
-    record Draft(long characterId, String question, List<String> options, Instant closesAt, Instant now) {}
+    record Draft(long characterId, String question, List<String> options, Instant closesAt, Instant now) {
+
+        /** Sao chép bất biến danh sách lựa chọn. */
+        public Draft {
+            options = List.copyOf(options);
+        }
+    }
 
     /** Bang chủ / phó tạo cuộc mới (đóng cuộc đang mở nếu có). */
     CreateOutcome create(Draft draft);

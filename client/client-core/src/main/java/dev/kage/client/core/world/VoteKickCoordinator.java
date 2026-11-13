@@ -37,29 +37,35 @@ final class VoteKickCoordinator implements WindowFlow {
         String command = words[0].toLowerCase(Locale.ROOT);
         String arg = words.length > 1 ? words[1].strip() : "";
         if ("/duoi".equals(command) || "/votekick".equals(command)) {
-            if (arg.isEmpty()) {
-                chat.showSystemNotice(KageI18n.textOrKey(i18n, "votekick.usage"));
-                return true;
-            }
-            sender.sendReadRequest(
-                    Opcode.OPCODE_START_VOTE_KICK_COMMAND_VALUE,
-                    StartVoteKickCommand.newBuilder().setTargetName(arg).build());
+            start(arg);
             return true;
         }
-        if (!"/bophieu".equals(command) && !"/vote".equals(command)) {
-            return false;
+        if ("/bophieu".equals(command) || "/vote".equals(command)) {
+            cast(MentionWatch.fold(arg));
+            return true;
         }
-        String folded = MentionWatch.fold(arg);
-        if (!"co".equals(folded) && !"yes".equals(folded) && !"khong".equals(folded) && !"no".equals(folded)) {
+        return false;
+    }
+
+    private void start(String targetName) {
+        if (targetName.isEmpty()) {
             chat.showSystemNotice(KageI18n.textOrKey(i18n, "votekick.usage"));
-            return true;
+            return;
+        }
+        sender.sendReadRequest(
+                Opcode.OPCODE_START_VOTE_KICK_COMMAND_VALUE,
+                StartVoteKickCommand.newBuilder().setTargetName(targetName).build());
+    }
+
+    private void cast(String folded) {
+        boolean yes = "co".equals(folded) || "yes".equals(folded);
+        if (!yes && !"khong".equals(folded) && !"no".equals(folded)) {
+            chat.showSystemNotice(KageI18n.textOrKey(i18n, "votekick.usage"));
+            return;
         }
         sender.sendReadRequest(
                 Opcode.OPCODE_CAST_VOTE_KICK_COMMAND_VALUE,
-                CastVoteKickCommand.newBuilder()
-                        .setYes("co".equals(folded) || "yes".equals(folded))
-                        .build());
-        return true;
+                CastVoteKickCommand.newBuilder().setYes(yes).build());
     }
 
     @Override

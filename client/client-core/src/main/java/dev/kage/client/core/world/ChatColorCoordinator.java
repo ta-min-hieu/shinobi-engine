@@ -53,9 +53,9 @@ final class ChatColorCoordinator implements WindowFlow {
         this.preferences = Gdx.app == null
                 ? Optional.empty()
                 : Optional.of(Gdx.app.getPreferences(GdxPreferencesLanguageStore.PREFERENCES_NAME));
-        preferences.ifPresent(
-                prefs -> CHANNELS.forEach((name, kind) -> parseColor(prefs.getString(PREF_PREFIX + name, ""))
-                        .ifPresent(hex -> chat.panel().setLineColor(kind, Optional.of(Color.valueOf(hex))))));
+        preferences.ifPresent(prefs -> CHANNELS.forEach((name, kind) -> parseColor(
+                        java.util.Objects.requireNonNullElse(prefs.getString(PREF_PREFIX + name, ""), ""))
+                .ifPresent(hex -> chat.panel().setLineColor(kind, Optional.of(Color.valueOf(hex))))));
         chat.addSlashCommands(this::onSlash);
     }
 
