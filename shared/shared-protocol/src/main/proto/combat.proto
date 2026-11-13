@@ -292,3 +292,18 @@ message BossDamageRank {
 message GetBossDamageRankingResponse {
   repeated BossDamageRank entries = 1;
 }
+
+// ADR-337 (2026-11-13) — lịch sử tử vong. Request: Client -> Server (OPCODE_GET_DEATH_HISTORY_REQUEST).
+message GetDeathHistoryRequest {}
+
+message DeathEntry {
+  string killer_name = 1;   // người chơi hạ mình ("" nếu là quái)
+  string monster_code = 2;  // quái hạ mình ("" nếu là người chơi hoặc không rõ)
+  int32 x = 3;              // hoành độ lúc chết (làm tròn)
+  int64 at_epoch_seconds = 4;
+}
+
+// Response: Server -> Client (OPCODE_GET_DEATH_HISTORY_RESPONSE). Mới trước, tối đa 10 lần.
+message GetDeathHistoryResponse {
+  repeated DeathEntry entries = 1;
+}

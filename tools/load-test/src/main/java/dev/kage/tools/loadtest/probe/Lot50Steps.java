@@ -11,9 +11,11 @@ import dev.kage.protocol.Opcode;
 final class Lot50Steps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot51Steps lot51;
 
     Lot50Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot51 = new Lot51Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -54,7 +56,7 @@ final class Lot50Steps {
                             }
                             return out.toString();
                         });
-            default -> "bước không hiểu";
+            default -> lot51.step(verb, arg);
         };
     }
 }

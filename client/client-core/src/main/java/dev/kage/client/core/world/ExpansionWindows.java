@@ -236,6 +236,9 @@ record ExpansionWindows(
         lot40.lot41().enhancePreview().useSelection(selectedId); // ADR-257 /dutinh
         lot40.lot41().lot42().coordinates().usePosition(lot34.autoWalk().target(), zoneMap::state); // ADR-270
         lot40.lot41().lot42().lot43().session().useLocalId(intents.localCharacterId()); // ADR-271 đếm quái hạ
+        Lot51Windows lot51 = lot49.lot50().lot51();
+        lot51.fullHealth().useLocalId(intents.localCharacterId()); // ADR-340
+        lot51.screenShake().useLocalId(intents.localCharacterId()); // ADR-342
         return this;
     }
 
@@ -256,7 +259,7 @@ record ExpansionWindows(
         return this;
     }
 
-    /** ADR-323 — nối thu phóng camera vào camera thế giới 3D. */
+    /** ADR-323 / ADR-342 — nối thu phóng và rung camera vào camera thế giới 3D. */
     void useCamera(WorldModelRenderer models) {
         lot39().lot40()
                 .lot41()
@@ -270,6 +273,20 @@ record ExpansionWindows(
                 .lot49()
                 .cameraZoom()
                 .useCamera(models::setZoom);
+        lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .lot49()
+                .lot50()
+                .lot51()
+                .screenShake()
+                .useCamera(models::shake); // ADR-342
     }
 
     /** Nối HUD chiến đấu: mục tiêu cho thuần phục (ADR-124), máu cho cảnh báo máu thấp (ADR-243). */
@@ -277,6 +294,20 @@ record ExpansionWindows(
         taming.useTarget(combat::currentTargetId);
         lot39().lowHealth().useHealth(combat);
         lot39().lot40().lot41().monsterInfo().useTarget(combat); // ADR-255 /xemquai
+        lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .lot49()
+                .lot50()
+                .lot51()
+                .screenShake()
+                .useMaxHp(combat::playerMaxHp); // ADR-342
     }
 
     /** Luồng lô 39 (ADR-239…) — cho {@code WorldScreen} vẽ cảnh báo máu thấp / ẩn HUD. */

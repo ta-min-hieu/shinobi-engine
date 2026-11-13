@@ -101,6 +101,7 @@ message FriendView {
   bool dao_lu = 5;     // ADR-094 — người này là đạo lữ của mình
   string note = 6;     // ADR-173 — ghi chú RIÊNG của mình về người bạn này ("" = không có)
   int64 last_online_epoch_seconds = 7; // ADR-192 — lần cuối rời world; 0 = đang online hoặc chưa từng có mốc
+  string status_message = 8; // ADR-335 — lời nhắn trạng thái người bạn tự đặt ("" = không có)
 }
 
 message ListFriendsResponse {
@@ -477,4 +478,23 @@ message FriendRankEntry {
 // Response: Server -> Client (OPCODE_GET_FRIEND_RANKING_RESPONSE). Mình + bạn bè, Lực Chiến giảm dần (bộ đệm 60 giây).
 message GetFriendRankingResponse {
   repeated FriendRankEntry entries = 1;
+}
+
+// ADR-335 (2026-11-13) — lời nhắn trạng thái. Command: Client -> Server (OPCODE_SET_STATUS_MESSAGE_COMMAND).
+// query_only = chỉ hỏi; message rỗng = xoá. Tối đa 60 ký tự, qua bộ lọc từ cấm.
+message SetStatusMessageCommand {
+  bool query_only = 1;
+  string message = 2;
+}
+
+enum SetStatusMessageOutcome {
+  SET_STATUS_MESSAGE_OUTCOME_UNSPECIFIED = 0;
+  SET_STATUS_MESSAGE_OUTCOME_OK = 1;
+  SET_STATUS_MESSAGE_OUTCOME_INVALID_TEXT = 2;
+}
+
+// Response: Server -> Client (OPCODE_SET_STATUS_MESSAGE_RESPONSE). message = lời nhắn hiện tại.
+message SetStatusMessageResponse {
+  SetStatusMessageOutcome outcome = 1;
+  string message = 2;
 }

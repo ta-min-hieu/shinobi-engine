@@ -167,7 +167,14 @@ public final class WorldModelRenderer implements Disposable {
      */
     private static final float CLIP_TRANSITION_SECONDS = 0.15f;
 
+    private static final float NANOS_PER_SECOND = 1_000_000_000f;
+    private static final float SHAKE_FREQUENCY = 60f;
+    private static final float SHAKE_Y_RATIO = 1.3f;
+
     private final OrthographicCamera camera;
+    private float shakeAmplitude; // ADR-342
+    private long shakeStartNanos;
+    private long shakeNanos;
     private final ModelBatch outlineBatch;
     private final ModelBatch bodyBatch;
 
@@ -249,6 +256,25 @@ public final class WorldModelRenderer implements Disposable {
     /** True khi có model thật để vẽ; false thì gọi phải tự vẽ hình thay thế. */
     public boolean isEnabled() {
         return enabled;
+    }
+
+    /** ADR-342 — rung camera {@code seconds} giây với biên độ {@code amplitude} đơn vị thế giới (giảm dần). */
+    public void shake(float amplitude, float seconds) {
+        shakeAmplitude = amplitude;
+        shakeStartNanos = System.nanoTime();
+        shakeNanos = (long) (seconds * NANOS_PER_SECOND);
+    }
+
+    /** Lệch camera theo hình sin tắt dần — không cấp phát. */
+    private void applyShake(long nowNanos) {
+        long elapsed = nowNanos - shakeStartNanos;
+        if (shakeNanos <= 0L || elapsed >= shakeNanos) {
+            return;
+        }
+        float remaining = 1f - (float) elapsed / shakeNanos;
+        float phase = elapsed / (float) NANOS_PER_SECOND * SHAKE_FREQUENCY;
+        camera.position.x += (float) Math.sin(phase) * shakeAmplitude * remaining;
+        camera.position.y += (float) Math.cos(phase * SHAKE_Y_RATIO) * shakeAmplitude * remaining;
     }
 
     /** ADR-323 — hệ số thu phóng camera (nhỏ = gần); người gọi đã kẹp trong khoảng cho phép. */
@@ -588,6 +614,7 @@ public final class WorldModelRenderer implements Disposable {
     public void follow(float x, float y) {
         target.set(x, y, 0f);
         camera.position.set(target).mulAdd(camera.direction, -CAMERA_DISTANCE);
+        applyShake(System.nanoTime());
         camera.update();
     }
 

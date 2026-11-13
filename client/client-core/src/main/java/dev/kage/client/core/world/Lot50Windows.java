@@ -11,7 +11,8 @@ record Lot50Windows(
         InspectNoticeCoordinator inspectNotice,
         ExpGainCoordinator expGain,
         SessionClockCoordinator sessionClock,
-        LevelGoalCoordinator levelGoal) {
+        LevelGoalCoordinator levelGoal,
+        Lot51Windows lot51) {
 
     static Lot50Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot50Windows(
@@ -20,7 +21,8 @@ record Lot50Windows(
                 new InspectNoticeCoordinator(sender, feeds.chat()),
                 new ExpGainCoordinator(feeds.chat()),
                 new SessionClockCoordinator(feeds.chat(), System::currentTimeMillis),
-                new LevelGoalCoordinator(feeds.chat()));
+                new LevelGoalCoordinator(feeds.chat()),
+                Lot51Windows.create(sender, feeds)); // lô 51 lồng ở đây
     }
 
     void registerInto(PanelHub panels) {
@@ -30,5 +32,6 @@ record Lot50Windows(
         panels.register(expGain);
         panels.register(sessionClock);
         panels.register(levelGoal);
+        lot51.registerInto(panels);
     }
 }

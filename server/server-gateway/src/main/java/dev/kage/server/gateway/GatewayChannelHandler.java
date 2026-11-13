@@ -1268,6 +1268,138 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot44()
                                     .lookupItem(c))),
             Map.entry(
+                    Opcode.OPCODE_SET_STATUS_MESSAGE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetStatusMessageCommand.parser(),
+                            Opcode.OPCODE_SET_STATUS_MESSAGE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .setStatusMessage(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_POST_BULLETIN_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.PostBulletinCommand.parser(),
+                            Opcode.OPCODE_POST_BULLETIN_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .postBulletin(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_LIST_BULLETIN_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.ListBulletinRequest.parser(),
+                            Opcode.OPCODE_LIST_BULLETIN_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .listBulletin())),
+            Map.entry(
+                    Opcode.OPCODE_GET_DEATH_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetDeathHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_DEATH_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .deathHistory(id))),
+            Map.entry(
+                    Opcode.OPCODE_START_VOTE_KICK_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.StartVoteKickCommand.parser(),
+                            Opcode.OPCODE_START_VOTE_KICK_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .startVoteKick(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_CAST_VOTE_KICK_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.CastVoteKickCommand.parser(),
+                            Opcode.OPCODE_CAST_VOTE_KICK_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .castVoteKick(id, c))),
+            Map.entry(
                     Opcode.OPCODE_GET_LOGIN_STREAK_REQUEST_VALUE,
                     storageCommand(
                             dev.kage.protocol.GetLoginStreakRequest.parser(),
@@ -5104,6 +5236,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             List<Long> friendIds = friendFacade.listFriends(characterId);
             Map<Long, java.time.Instant> lastOnline =
                     expansion.lot33().facades().lastOnline().lastOnlineOf(friendIds);
+            Map<Long, String> statuses = friendStatuses(friendIds); // ADR-335
             for (long friendId : friendIds) {
                 // findByName/findById chạm DB mỗi bạn — chấp nhận N+1 ở quy mô danh sách bạn bè MVP
                 // (vài chục), không phải đường nóng mỗi tick (khác AoI/combat).
@@ -5117,6 +5250,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         .setDaoLu(friendId == daoLuPartner)
                         .setNote(notes.getOrDefault(friendId, ""))
                         .setLastOnlineEpochSeconds(lastOnlineSeconds(lastOnline, friendId))
+                        .setStatusMessage(statuses.getOrDefault(friendId, ""))
                         .build());
             }
             send(
@@ -5128,6 +5262,27 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
             LOG.error("Liệt kê danh sách bạn bè thất bại", e);
             sendError(ctx, sequenceId, 500, "error.list_friends_failed");
         }
+    }
+
+    /** ADR-335 — lời nhắn trạng thái của các bạn bè. */
+    private Map<Long, String> friendStatuses(List<Long> friendIds) {
+        return expansion
+                .lot37()
+                .lot38()
+                .lot39()
+                .lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .lot49()
+                .lot50()
+                .lot51()
+                .statusesOf(friendIds);
     }
 
     private void handleListPendingFriendRequestsRequest(ChannelHandlerContext ctx, PacketHeader header, byte[] payload)

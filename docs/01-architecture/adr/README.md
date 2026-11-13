@@ -366,6 +366,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-332](ADR-332-Session-Clock-Hud.md) | Đồng hồ phiên chơi trên HUD: Nhãn H:MM:SS góc dưới trái, không cấp phát; `/dongho` | ✅ Accepted (lô 50) |
 | [ADR-333](ADR-333-Hide-Chat-Key.md) | Phím ẩn/hiện khung chat: Binding `anchat` mặc định S, khung chat không vẽ khi ẩn | ✅ Accepted (lô 50) |
 | [ADR-334](ADR-334-Level-Goal.md) | Mục tiêu cấp độ: HUD "còn K cấp, X% cấp này" từ số server; `/muctieu` | ✅ Accepted (lô 50) |
+| [ADR-335](ADR-335-Status-Message.md) | Lời nhắn trạng thái: Bảng `status_message` V177, hiện cạnh tên trong danh sách bạn; `/trangthai` | ✅ Accepted (lô 51) |
+| [ADR-336](ADR-336-Bulletin-Board.md) | Bảng rao vặt: Bảng `bulletin_post` V177, một tin/người sống 24 giờ; `/raovat` | ✅ Accepted (lô 51) |
+| [ADR-337](ADR-337-Death-History.md) | Lịch sử tử vong: Audit `DEATH` (người hạ / mã quái / x), 10 lần gần nhất; `/tuvong` | ✅ Accepted (lô 51) |
+| [ADR-338](ADR-338-Party-Vote-Kick.md) | Biểu quyết đuổi khỏi nhóm: Quá nửa đồng ý trong 60 giây, trạng thái RAM; `/duoi`, `/bophieu` | ✅ Accepted (lô 51) |
+| [ADR-339](ADR-339-Chat-Channel-Colors.md) | Màu riêng cho kênh chat: Ghi đè màu theo 6 loại dòng, lưu máy; `/maukenh` | ✅ Accepted (lô 51) |
+| [ADR-340](ADR-340-Full-Health-Notice.md) | Báo hồi đầy máu: Dòng "Đã hồi đầy máu" sau khi bị thương; `/baodaymau` | ✅ Accepted (lô 51) |
+| [ADR-341](ADR-341-Double-Click-Use-Equip.md) | Nhấp đúp dùng/mặc đồ: Bấm tên = chọn, nhấp đúp = Dùng/Mặc | ✅ Accepted (lô 51) |
+| [ADR-342](ADR-342-Screen-Shake.md) | Rung màn hình khi trúng đòn: Đòn ≥ 10% máu tối đa ⇒ camera rung tắt dần; `/rung` | ✅ Accepted (lô 51) |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -240,3 +240,37 @@ message RollDiceResponse {
   int32 value = 2;
   int32 max = 3;
 }
+
+// ADR-336 (2026-11-13) — bảng rao vặt. Command: Client -> Server (OPCODE_POST_BULLETIN_COMMAND).
+// Mỗi nhân vật MỘT tin, sống 24 giờ; đăng tin mới thay tin cũ; body rỗng = gỡ tin của mình.
+message PostBulletinCommand {
+  string body = 1;
+}
+
+enum PostBulletinOutcome {
+  POST_BULLETIN_OUTCOME_UNSPECIFIED = 0;
+  POST_BULLETIN_OUTCOME_OK = 1;
+  POST_BULLETIN_OUTCOME_REMOVED = 2;
+  POST_BULLETIN_OUTCOME_INVALID_TEXT = 3;
+  POST_BULLETIN_OUTCOME_TOO_SOON = 4; // đăng lại quá nhanh (dưới 1 phút)
+}
+
+// Response: Server -> Client (OPCODE_POST_BULLETIN_RESPONSE).
+message PostBulletinResponse {
+  PostBulletinOutcome outcome = 1;
+}
+
+// Request: Client -> Server (OPCODE_LIST_BULLETIN_REQUEST).
+message ListBulletinRequest {}
+
+message BulletinPost {
+  string name = 1;
+  string body = 2;
+  int64 posted_at_epoch_seconds = 3;
+  bool online = 4;
+}
+
+// Response: Server -> Client (OPCODE_LIST_BULLETIN_RESPONSE). Mới trước, tối đa 20 tin còn hạn.
+message ListBulletinResponse {
+  repeated BulletinPost posts = 1;
+}

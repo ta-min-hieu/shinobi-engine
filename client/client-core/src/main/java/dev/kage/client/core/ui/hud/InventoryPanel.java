@@ -528,6 +528,15 @@ public final class InventoryPanel implements HudWindow {
                 .padBottom(ROW_PAD_PX);
         Label label = rowLabel(row.displayText());
         label.setEllipsis(true);
+        label.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float x, float y) {
+                emit(listeners.onSelect, row.itemId()); // bấm vào tên = chọn
+                if (getTapCount() >= 2) {
+                    firePrimaryAction(); // ADR-341 — nhấp đúp = Dùng / Mặc
+                }
+            }
+        });
         lists.items().add(label).growX().minWidth(0f).left().padRight(6f).padBottom(ROW_PAD_PX);
         lists.items()
                 .add(actionButton("inventory.action.select", () -> emit(listeners.onSelect, row.itemId())))

@@ -32,6 +32,11 @@ record Lot50Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
     private static final Logger LOG = LoggerFactory.getLogger(Lot50Commands.class);
     private static final String STREAK_SUBJECT = "Quà chuỗi đăng nhập / Login streak gift";
 
+    /** Lớp lệnh lô 51 (ADR-335…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot51Commands lot51() {
+        return new Lot51Commands(gateway, registry);
+    }
+
     /** ADR-327 — chuỗi hiện tại, dài nhất và mốc thưởng kế tiếp. */
     GetLoginStreakResponse loginStreak(long characterId) {
         LoginStreakFacade.Status status = facades().loginStreak().status(characterId, today());

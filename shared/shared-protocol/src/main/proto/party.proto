@@ -451,3 +451,53 @@ message RecentPlayer {
 message GetRecentPlayersResponse {
   repeated RecentPlayer players = 1;
 }
+
+// ADR-338 (2026-11-13) — biểu quyết đuổi khỏi nhóm. Command: Client -> Server (OPCODE_START_VOTE_KICK_COMMAND).
+// Người khởi xướng tính là một phiếu đồng ý. Quá nửa số người được bầu (mọi thành viên trừ người bị đuổi) đồng ý
+// trong 60 giây ⇒ người đó rời nhóm. Không đuổi được trưởng nhóm.
+message StartVoteKickCommand {
+  string target_name = 1;
+}
+
+enum VoteKickOutcome {
+  VOTE_KICK_OUTCOME_UNSPECIFIED = 0;
+  VOTE_KICK_OUTCOME_STARTED = 1;
+  VOTE_KICK_OUTCOME_COUNTED = 2;
+  VOTE_KICK_OUTCOME_PASSED = 3;
+  VOTE_KICK_OUTCOME_NOT_IN_PARTY = 4;
+  VOTE_KICK_OUTCOME_TARGET_NOT_MEMBER = 5;
+  VOTE_KICK_OUTCOME_TARGET_IS_LEADER = 6;
+  VOTE_KICK_OUTCOME_SELF = 7;
+  VOTE_KICK_OUTCOME_ALREADY_RUNNING = 8;
+  VOTE_KICK_OUTCOME_NO_VOTE = 9;
+  VOTE_KICK_OUTCOME_ALREADY_VOTED = 10;
+}
+
+// Response: Server -> Client (OPCODE_START_VOTE_KICK_RESPONSE).
+message StartVoteKickResponse {
+  VoteKickOutcome outcome = 1;
+  int32 yes = 2;
+  int32 needed = 3;
+}
+
+// Event: Server -> các thành viên (OPCODE_VOTE_KICK_EVENT) — có cuộc bầu mới, hoặc cuộc bầu vừa thông qua.
+message VoteKickEvent {
+  string target_name = 1;
+  string initiator_name = 2;
+  int32 yes = 3;
+  int32 needed = 4;
+  int32 seconds_left = 5;
+  bool passed = 6;
+}
+
+// Command: Client -> Server (OPCODE_CAST_VOTE_KICK_COMMAND). yes = đồng ý đuổi.
+message CastVoteKickCommand {
+  bool yes = 1;
+}
+
+// Response: Server -> Client (OPCODE_CAST_VOTE_KICK_RESPONSE).
+message CastVoteKickResponse {
+  VoteKickOutcome outcome = 1;
+  int32 yes = 2;
+  int32 needed = 3;
+}

@@ -125,11 +125,13 @@ final class FriendController {
         friends.sort(Comparator.comparing(Friend::online).reversed().thenComparing(Friend::displayName));
     }
 
-    /** Tên hiển thị: tên, kèm ghi chú riêng trong ngoặc nếu có (ADR-173). */
+    /** Tên hiển thị: tên, kèm ghi chú riêng trong ngoặc (ADR-173) và lời nhắn trạng thái của bạn (ADR-335). */
     static String displayNameOf(FriendView view) {
         String name = ChatController.sanitize(view.getName());
         String note = ChatController.sanitize(view.getNote());
-        return note.isBlank() ? name : name + " (" + note + ")";
+        String status = ChatController.sanitize(view.getStatusMessage());
+        String shown = note.isBlank() ? name : name + " (" + note + ")";
+        return status.isBlank() ? shown : shown + " — " + status;
     }
 
     /** Toàn bộ lời mời đang chờ — cùng quy ước "thay thế trọn gói" như {@link #onFriendList}. */

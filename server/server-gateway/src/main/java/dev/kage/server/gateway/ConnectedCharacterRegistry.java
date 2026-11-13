@@ -166,6 +166,8 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     final GuildChatBacklog guildChat = new GuildChatBacklog(); // ADR-304
     final GuildWelcomeHooks guildWelcome = new GuildWelcomeHooks(); // ADR-313
     final RecentPlayerHooks recentPlayers = new RecentPlayerHooks(); // ADR-329
+    final DeathLogHooks deathLog = new DeathLogHooks(); // ADR-337
+    final PartyVoteKicks voteKicks = new PartyVoteKicks(); // ADR-338
 
     /** ADR-125 — luận võ đại hội: nhịp điều khiển giải + kết quả trận đấu trường; nối sau khi DB đã dựng. */
     final TournamentHooks tournament = new TournamentHooks();
@@ -465,6 +467,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     @Override
     public void onMonsterSpawned(long targetCharacterId, WorldOutboundSink.MonsterSnapshot monster) {
+        deathLog.rememberMonster(monster.monsterId(), monster.monsterCode()); // ADR-337
         ChannelHandlerContext ctx = contextsByCharacterId.get(targetCharacterId);
         if (ctx == null) {
             return;
@@ -682,6 +685,10 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         enemies.onCharacterDefeated(defeatedCharacterId, killerEntityId, killingIntent.inPvpZone(victimAt)); // ADR-194
         deathRecap.onDefeated(defeatedCharacterId, killerEntityId, this); // ADR-195
         records.onDefeated(defeatedCharacterId); // ADR-240
+        deathLog.onDefeated(
+                defeatedCharacterId,
+                killerEntityId,
+                victimAt.map(PositionSnapshot::x).orElse(0f)); // ADR-337
     }
 
     @Override

@@ -813,7 +813,9 @@ public final class GatewayBootstrap {
                 clock)));
     }
 
-    /** Hook registry của lô 46 trở đi: boss đã hạ (ADR-296), lời chào bang (ADR-313), người vừa chơi cùng (ADR-329). */
+    /**
+     * Hook registry lô 46+: boss đã hạ (ADR-296), lời chào bang (ADR-313), vừa chơi cùng (ADR-329), tử vong (ADR-337).
+     */
     private static void bindLot46Hooks(
             Lot46Facades lot46, GatewayFacades facades, ConnectedCharacterRegistry characterRegistry) {
         characterRegistry.bossKills.bind(lot46.bossKills());
@@ -823,6 +825,8 @@ public final class GatewayBootstrap {
                 facades.contentFacades().socialFacades().mailFacade(),
                 characterRegistry));
         characterRegistry.recentPlayers.bind(lot46.lot48().lot49().lot50().recentPlayers());
+        characterRegistry.deathLog.bind(new DeathLogHooks.Deps( // ADR-337
+                lot46.lot48().lot49().lot50().lot51().deathLog(), facades.characterFacade()));
     }
 
     /** Facade lô 46 (ADR-295…) — tách ra cho gọn khối lồng nhau. */
@@ -844,7 +848,11 @@ public final class GatewayBootstrap {
                                 new Lot50Facades( // lô 50 lồng ở đây
                                         wiring.wireLoginStreakFacade(),
                                         wiring.wireRecentPlayerFacade(),
-                                        wiring.wireInspectNoticeFacade()))));
+                                        wiring.wireInspectNoticeFacade(),
+                                        new Lot51Facades( // lô 51 lồng ở đây
+                                                wiring.wireStatusMessageFacade(),
+                                                wiring.wireBulletinFacade(),
+                                                wiring.wireDeathLogFacade())))));
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */

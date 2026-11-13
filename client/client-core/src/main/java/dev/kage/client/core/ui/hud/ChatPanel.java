@@ -130,6 +130,9 @@ public final class ChatPanel implements HudWindow {
     /** ADR-333 — ẩn bằng phím {@code anchat}. */
     private boolean hidden;
 
+    /** ADR-339 — màu riêng người chơi đặt cho từng loại dòng. */
+    private final java.util.EnumMap<LineKind, Color> lineColors = new java.util.EnumMap<>(LineKind.class);
+
     private Runnable onChannelToggle;
 
     /** Xem {@link #setCanOpen}. Mặc định LUÔN cho mở, để lớp này tự chạy được trong test/preview. */
@@ -436,7 +439,22 @@ public final class ChatPanel implements HudWindow {
         MENTION
     }
 
-    private static Color colorOf(LineKind kind) {
+    /** ADR-339 — đặt màu riêng cho một loại dòng; rỗng = trả về màu mặc định. Áp từ lần vẽ danh sách kế tiếp. */
+    public void setLineColor(LineKind kind, java.util.Optional<Color> color) {
+        if (color.isPresent()) {
+            lineColors.put(kind, new Color(color.get()));
+        } else {
+            lineColors.remove(kind);
+        }
+    }
+
+    private Color colorOf(LineKind kind) {
+        Color custom = lineColors.get(kind);
+        return custom != null ? custom : defaultColorOf(kind);
+    }
+
+    /** Màu mặc định của từng loại dòng. */
+    public static Color defaultColorOf(LineKind kind) {
         return switch (kind) {
             case AREA -> AREA_COLOR;
             case PRIVATE -> PRIVATE_COLOR;
