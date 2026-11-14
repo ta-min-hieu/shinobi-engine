@@ -55,6 +55,7 @@ final class ChatCoordinator implements WindowFlow {
 
     private Predicate<String> hiddenBody = body -> false; // ADR-249
     private Predicate<ChatMessageEvent> hiddenEvent = event -> false; // ADR-397
+    private java.util.function.BooleanSupplier hideSystem = () -> false; // ADR-419
 
     /** ADR-268 — định dạng giờ trước mỗi dòng (giờ máy người chơi). */
     private static final java.time.format.DateTimeFormatter LINE_TIME =
@@ -86,6 +87,16 @@ final class ChatCoordinator implements WindowFlow {
     /** ADR-315/317 — nghe mọi tin chat đến (sau bộ lọc chặn). */
     void onIncoming(java.util.function.Consumer<ChatMessageEvent> listener) {
         incoming.add(listener);
+    }
+
+    /** ADR-419 — công tắc ẩn dòng hệ thống server gửi (không ảnh hưởng dòng do lệnh của chính máy này in ra). */
+    void useHideSystem(java.util.function.BooleanSupplier hide) {
+        this.hideSystem = hide;
+    }
+
+    /** ADR-420 — bật / tắt gộp tin trùng (vẽ lại ngay). */
+    void setCollapseRepeats(boolean collapse) {
+        controller.setCollapseRepeats(collapse);
     }
 
     /** ADR-397 — thêm một điều kiện ẩn tin (nối HOẶC với điều kiện đã có). */
@@ -222,6 +233,9 @@ final class ChatCoordinator implements WindowFlow {
                             || hiddenBody.test(event.getBody())
                             || hiddenEvent.test(event))) { // ADR-091, 249, 397
                 return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
+            }
+            if (event.getSenderId() == 0L && event.getSenderName().isEmpty() && hideSystem.getAsBoolean()) {
+                return true; // ADR-419 — đang ẩn dòng hệ thống từ server
             }
             controller.onMessage(withTitle(markLinked(markOffline(markAutoReply(eventRewriter.apply(event))))));
             incoming.forEach(listener -> listener.accept(event)); // ADR-315/317

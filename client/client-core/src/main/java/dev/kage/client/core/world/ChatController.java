@@ -72,6 +72,12 @@ final class ChatController {
 
     private final Deque<Line> lines = new ArrayDeque<>();
 
+    /** ADR-420 — gộp tin trùng liên tiếp của cùng người, cùng kênh. */
+    private boolean collapseRepeats;
+
+    private String lastRawBody = "";
+    private int repeatCount;
+
     private ChatChannel channel = DEFAULT_CHANNEL;
 
     /**
@@ -218,7 +224,37 @@ final class ChatController {
         if (hiddenChannels.contains(event.getChannel())) {
             return; // ADR-222/229 — kênh đã tắt hiển thị
         }
-        append(new Line(event.getChannel(), sanitize(event.getSenderName()), sanitize(event.getBody())));
+        Line line = new Line(event.getChannel(), sanitize(event.getSenderName()), sanitize(event.getBody()));
+        if (collapseRepeats && isRepeat(line)) {
+            repeatCount++;
+            lines.removeLast();
+            lines.addLast(new Line(line.channel(), line.senderName(), repeated(line.body(), repeatCount)));
+            return;
+        }
+        lastRawBody = line.body();
+        repeatCount = 1;
+        append(line);
+    }
+
+    /** ADR-420 — bật / tắt gộp tin trùng. */
+    void setCollapseRepeats(boolean collapse) {
+        this.collapseRepeats = collapse;
+        repeatCount = 0;
+    }
+
+    private boolean isRepeat(Line line) {
+        Line last = lines.peekLast();
+        return last != null
+                && repeatCount > 0
+                && !line.senderName().isEmpty()
+                && last.channel() == line.channel()
+                && last.senderName().equals(line.senderName())
+                && lastRawBody.equals(line.body());
+    }
+
+    /** {@code nội dung (xN)}. Tĩnh để test. */
+    static String repeated(String body, int count) {
+        return body + " (x" + count + ")";
     }
 
     /** ADR-222/229 — bật / tắt hiển thị một kênh (dòng hệ thống không bao giờ bị ẩn). */
@@ -243,6 +279,7 @@ final class ChatController {
      * @param text chữ đã dịch sẵn (khoá i18n tra ở lớp widget, chỗ có bundle)
      */
     void appendSystem(String text) {
+        repeatCount = 0; // dòng hệ thống chen giữa ⇒ không gộp qua nó (ADR-420)
         append(new Line(ChatChannel.CHAT_CHANNEL_UNSPECIFIED, "", sanitize(text)));
     }
 

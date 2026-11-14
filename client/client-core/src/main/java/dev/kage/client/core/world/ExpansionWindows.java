@@ -352,6 +352,41 @@ record ExpansionWindows(
                 .lot58()
                 .chatView()
                 .useFriends(friends::isFriendName);
+        ChatTidyCoordinator tidy = lot39().lot40() // ADR-421 — bong bóng chỉ bạn bè / người cùng nhóm
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .lot49()
+                .lot50()
+                .lot51()
+                .lot52()
+                .lot53()
+                .lot54()
+                .lot55()
+                .lot56()
+                .lot57()
+                .lot58()
+                .lot59()
+                .lot60()
+                .lot61()
+                .tidy();
+        tidy.useRelations(friends::isFriendName, lot39().lot40().damageMeter()::isTracked);
+        lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .bubbles()
+                .useAudience(tidy::bubbleAllowed);
     }
 
     /** ADR-323 / ADR-342 — nối thu phóng và rung camera vào camera thế giới 3D. */

@@ -1020,3 +1020,12 @@ message GetCharacterAgeResponse {
   int64 created_epoch_seconds = 3;
   int32 days = 4; // số ngày trọn kể từ lúc tạo
 }
+
+// ADR-417 (2026-11-14) — tân thủ hôm nay (ngày giờ Việt Nam). Request: Client -> Server.
+message GetNewPlayersRequest {}
+
+// Response: Server -> Client (OPCODE_GET_NEW_PLAYERS_RESPONSE).
+message GetNewPlayersResponse {
+  int32 count = 1;
+  repeated string newest = 2; // tối đa 5 tên, mới nhất trước
+}

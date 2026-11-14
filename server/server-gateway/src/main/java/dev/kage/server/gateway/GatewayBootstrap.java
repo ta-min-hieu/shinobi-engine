@@ -885,7 +885,9 @@ public final class GatewayBootstrap {
                                 wiring.wireLifetimeRankingFacade(),
                                 wiring.wireGuildDirectoryFacade(),
                                 new Lot59Facades( // lô 59 lồng ở đây
-                                        wiring.wireMailReceiptFacade(), wiring.wireWhisperPrivacyFacade()))));
+                                        wiring.wireMailReceiptFacade(),
+                                        wiring.wireWhisperPrivacyFacade(),
+                                        new Lot61Facades(wiring.wireNewPlayersFacade())))));
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */

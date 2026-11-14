@@ -177,6 +177,12 @@ public final class Lot45Wiring {
                 new dev.kage.server.database.friend.PostgresWhisperPrivacyAdapter(dataSource));
     }
 
+    /** ADR-417 — tân thủ hôm nay. */
+    public dev.kage.character.api.NewPlayersFacade wireNewPlayersFacade() {
+        return new dev.kage.character.api.NewPlayersFacade(
+                new dev.kage.server.database.character.PostgresNewPlayersAdapter(dataSource));
+    }
+
     /** ADR-288 — lịch sử mua cửa hàng NPC. */
     public dev.kage.shop.api.PurchaseHistoryFacade wirePurchaseHistoryFacade() {
         return new dev.kage.shop.api.PurchaseHistoryFacade(

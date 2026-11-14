@@ -530,3 +530,16 @@ message GetMutualFriendsResponse {
   string target_name = 2;
   repeated string names = 3; // bạn chung, theo tên
 }
+
+// ADR-416 (2026-11-14) — bạn bè đã vắng ≥ 7 ngày. Request: Client -> Server (OPCODE_GET_ABSENT_FRIENDS_REQUEST).
+message GetAbsentFriendsRequest {}
+
+message AbsentFriend {
+  string name = 1;
+  int32 days = 2; // số ngày trọn kể từ lần rời world gần nhất
+}
+
+// Response: Server -> Client (OPCODE_GET_ABSENT_FRIENDS_RESPONSE). Vắng lâu nhất trước.
+message GetAbsentFriendsResponse {
+  repeated AbsentFriend entries = 1;
+}

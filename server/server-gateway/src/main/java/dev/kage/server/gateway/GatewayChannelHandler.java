@@ -1620,6 +1620,70 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot60()
                                     .characterAge(id, c))),
             Map.entry(
+                    Opcode.OPCODE_GET_ABSENT_FRIENDS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetAbsentFriendsRequest.parser(),
+                            Opcode.OPCODE_GET_ABSENT_FRIENDS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .lot60()
+                                    .lot61()
+                                    .absentFriends(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_NEW_PLAYERS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetNewPlayersRequest.parser(),
+                            Opcode.OPCODE_GET_NEW_PLAYERS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .lot60()
+                                    .lot61()
+                                    .newPlayers())),
+            Map.entry(
                     Opcode.OPCODE_OFFICER_CHAT_COMMAND_VALUE,
                     storageCommand(
                             dev.kage.protocol.OfficerChatCommand.parser(),

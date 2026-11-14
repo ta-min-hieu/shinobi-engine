@@ -38,6 +38,11 @@ record Lot60Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
     private static final java.time.format.DateTimeFormatter TIME =
             java.time.format.DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneOffset.UTC);
 
+    /** Lớp lệnh lô 61 (ADR-415…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot61Commands lot61() {
+        return new Lot61Commands(gateway, registry);
+    }
+
     /** ADR-407 — {@code senderId} có được gửi thư cho {@code recipientId} không (bạn bè luôn được). */
     boolean mayMail(long senderId, long recipientId) {
         if (MAIL_MIN_LEVEL <= 0) {

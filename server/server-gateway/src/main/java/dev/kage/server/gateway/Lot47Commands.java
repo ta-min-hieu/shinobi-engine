@@ -54,6 +54,7 @@ record Lot47Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
      */
     void onEnteredWorld(long characterId) {
         lot48().onEnteredWorld(characterId); // ADR-314 — báo thư chưa đọc
+        new Lot61Commands(gateway, registry).onEnteredWorld(characterId); // ADR-415/418 — tóm tắt online, hộp thư
         Map<Long, Instant> lastLeft =
                 gateway.progression().expansion().lot33().lastOnline().lastOnlineOf(List.of(characterId));
         Instant after = lastLeft.get(characterId);

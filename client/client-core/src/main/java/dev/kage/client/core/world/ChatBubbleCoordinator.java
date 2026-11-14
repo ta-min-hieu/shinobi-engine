@@ -27,6 +27,7 @@ final class ChatBubbleCoordinator implements WindowFlow {
     private final Optional<Preferences> preferences;
     private final EmoteCoordinator.EmoteDisplay display;
     private boolean enabled;
+    private java.util.function.Predicate<dev.kage.protocol.ChatMessageEvent> audience = event -> true; // ADR-421
 
     ChatBubbleCoordinator(ChatCoordinator chat, EmoteCoordinator.EmoteDisplay display) {
         this.chat = chat;
@@ -40,6 +41,11 @@ final class ChatBubbleCoordinator implements WindowFlow {
         chat.addSlashCommands(this::onSlash);
     }
 
+    /** ADR-421 — ai được hiện bong bóng (mặc định: mọi người). */
+    void useAudience(java.util.function.Predicate<dev.kage.protocol.ChatMessageEvent> shown) {
+        this.audience = shown;
+    }
+
     /** Công tắc đang bật không. */
     boolean enabled() {
         return enabled;
@@ -48,7 +54,8 @@ final class ChatBubbleCoordinator implements WindowFlow {
     private void onIncoming(dev.kage.protocol.ChatMessageEvent event) {
         if (enabled
                 && event.getSenderId() != 0L
-                && event.getChannel() == dev.kage.protocol.ChatChannel.CHAT_CHANNEL_AREA) {
+                && event.getChannel() == dev.kage.protocol.ChatChannel.CHAT_CHANNEL_AREA
+                && audience.test(event)) {
             display.show(event.getSenderId(), bubbleText(event.getBody()));
         }
     }
