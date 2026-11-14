@@ -409,18 +409,14 @@ final class ChatCoordinator implements WindowFlow {
         panel.setLines(renderedLines, lineKinds);
     }
 
-    /** Màu dòng: nhắc tên mình (ADR-245) > tin bạn bè ở kênh công khai (ADR-364) > màu kênh. */
+    /** Màu dòng — thứ tự ưu tiên ở {@link ChatLineKinds}. */
     private ChatPanel.LineKind lineKind(ChatController.Line line) {
-        if (!line.senderName().isEmpty() && isOwnName(bareName(line.senderName()))) {
-            return ChatPanel.LineKind.SELF; // ADR-436 — tin của chính mình
-        }
-        if (mentions.mentions(line.senderName(), line.body()) || highlighted.test(line.body())) {
-            return ChatPanel.LineKind.MENTION; // ADR-245, ADR-429 — từ khoá theo dõi dùng chung màu nhắc tên
-        }
-        if (line.channel() != ChatChannel.CHAT_CHANNEL_PRIVATE && isFriend.test(bareName(line.senderName()))) {
-            return ChatPanel.LineKind.FRIEND;
-        }
-        return kindOf(line.channel());
+        String sender = bareName(line.senderName());
+        return ChatLineKinds.classify(
+                isOwnName(sender), // tên rỗng (hệ thống) không bao giờ khớp
+                mentions.mentions(line.senderName(), line.body()) || highlighted.test(line.body()),
+                line.channel() != ChatChannel.CHAT_CHANNEL_PRIVATE && isFriend.test(sender),
+                kindOf(line.channel()));
     }
 
     /** Tên người gửi bỏ tiền tố ký hiệu bang / danh hiệu (tên nhân vật không có khoảng trắng). Tĩnh để test. */

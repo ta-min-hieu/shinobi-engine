@@ -35,22 +35,7 @@ final class Lot63Steps {
                             }
                             return out.toString().strip();
                         });
-            case "onlineWeek" ->
-                asker.ask(
-                        Opcode.OPCODE_GET_ONLINE_WEEK_REQUEST_VALUE,
-                        dev.kage.protocol.GetOnlineWeekRequest.getDefaultInstance(),
-                        Opcode.OPCODE_GET_ONLINE_WEEK_RESPONSE_VALUE,
-                        p -> {
-                            StringBuilder out = new StringBuilder("ngày=");
-                            for (dev.kage.protocol.OnlineDay d : dev.kage.protocol.GetOnlineWeekResponse.parseFrom(p)
-                                    .getDaysList()) {
-                                out.append(java.time.LocalDate.ofEpochDay(d.getDayEpochDays()))
-                                        .append(':')
-                                        .append(d.getSeconds())
-                                        .append(' ');
-                            }
-                            return out.toString().strip();
-                        });
+            case "onlineWeek" -> onlineWeek();
             case "topIntimacy" ->
                 asker.ask(
                         Opcode.OPCODE_GET_INTIMACY_RANKING_REQUEST_VALUE,
@@ -72,5 +57,23 @@ final class Lot63Steps {
                         });
             default -> "bước không hiểu";
         };
+    }
+
+    private String onlineWeek() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_ONLINE_WEEK_REQUEST_VALUE,
+                dev.kage.protocol.GetOnlineWeekRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_ONLINE_WEEK_RESPONSE_VALUE,
+                p -> {
+                    StringBuilder out = new StringBuilder("ngày=");
+                    for (dev.kage.protocol.OnlineDay d :
+                            dev.kage.protocol.GetOnlineWeekResponse.parseFrom(p).getDaysList()) {
+                        out.append(java.time.LocalDate.ofEpochDay(d.getDayEpochDays()))
+                                .append(':')
+                                .append(d.getSeconds())
+                                .append(' ');
+                    }
+                    return out.toString().strip();
+                });
     }
 }

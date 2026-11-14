@@ -102,21 +102,31 @@ final class RankingMoreCoordinator implements WindowFlow {
         }
     }
 
-    /** Một dòng 7 ngày: {@code dd/MM N phút, …} cũ trước. Tĩnh để test. */
-    static String describeWeek(I18NBundle i18n, GetOnlineWeekResponse response) {
-        StringBuilder days = new StringBuilder();
+    private static String describeWeek(I18NBundle i18n, GetOnlineWeekResponse response) {
+        return KageI18n.formatOrKey(i18n, "onlineweek.line", totalMinutes(response), dayList(response));
+    }
+
+    /** Tổng phút của cả 7 ngày. Tĩnh để test. */
+    static int totalMinutes(GetOnlineWeekResponse response) {
         int total = 0;
+        for (OnlineDay day : response.getDaysList()) {
+            total += day.getSeconds() / SECONDS_PER_MINUTE;
+        }
+        return total;
+    }
+
+    /** {@code dd/MM N', …} cũ trước. Tĩnh để test. */
+    static String dayList(GetOnlineWeekResponse response) {
+        StringBuilder days = new StringBuilder();
         for (OnlineDay day : response.getDaysList()) {
             if (!days.isEmpty()) {
                 days.append(", ");
             }
-            int minutes = day.getSeconds() / SECONDS_PER_MINUTE;
-            total += minutes;
             days.append(DAY.format(LocalDate.ofEpochDay(day.getDayEpochDays())))
                     .append(' ')
-                    .append(minutes)
+                    .append(day.getSeconds() / SECONDS_PER_MINUTE)
                     .append('\'');
         }
-        return KageI18n.formatOrKey(i18n, "onlineweek.line", total, days.toString());
+        return days.toString();
     }
 }

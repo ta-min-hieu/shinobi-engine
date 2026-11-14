@@ -462,6 +462,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-428](ADR-428-Short-Channel-Tags.md) | Tên kênh rút gọn: `/kenhngan` tên kênh viết tắt | ✅ Accepted (lô 62) |
 | [ADR-429](ADR-429-Chat-Watch-Words.md) | Tô sáng từ khoá theo dõi: `/theodoitu` tô sáng tin có từ khoá | ✅ Accepted (lô 62) |
 | [ADR-430](ADR-430-Streamer-Mode.md) | Chế độ streamer: `/streamer` giấu tên người lạ trong chat | ✅ Accepted (lô 62) |
+| [ADR-431](ADR-431-Diligence-Ranking.md) | Xếp hạng chăm chỉ hôm nay: Top 10 online lâu nhất hôm nay; `/topchamchi`, 1214/1215 | ✅ Accepted (lô 63) |
+| [ADR-432](ADR-432-Online-Week.md) | Thời gian online 7 ngày: Phút online 7 ngày; `/online7`, 1216/1217 | ✅ Accepted (lô 63) |
+| [ADR-433](ADR-433-Guild-Breakthrough-Notice.md) | Báo bang khi đồng môn đột phá: Dòng kênh bang khi đồng môn lên cảnh giới mới; không opcode | ✅ Accepted (lô 63) |
+| [ADR-434](ADR-434-Intimacy-Ranking.md) | Xếp hạng thân mật: Top 10 cặp bạn thân mật; `/topthanmat`, 1218/1219 | ✅ Accepted (lô 63) |
+| [ADR-435](ADR-435-Skill-Ready-Notice.md) | Báo kỹ năng sẵn sàng: Chữ bay khi hết hồi chiêu; `/baokynang` | ✅ Accepted (lô 63) |
+| [ADR-436](ADR-436-Own-Name-Chat-Color.md) | Màu tên mình trong chat: Màu riêng cho tin của mình; `/mautenminh` | ✅ Accepted (lô 63) |
+| [ADR-437](ADR-437-Reminder-HUD-Line.md) | Hẹn giờ nhắc trên HUD: Dòng HUD đếm tới lời nhắc gần nhất | ✅ Accepted (lô 63) |
+| [ADR-438](ADR-438-Toggle-Info-HUD-Lines.md) | Ẩn/hiện mọi dòng HUD phụ: Một lệnh ẩn/hiện cả cụm dòng HUD phụ; `/hudphu` | ✅ Accepted (lô 63) |
 ---
 
 ## ADR cần tạo (chưa viết)

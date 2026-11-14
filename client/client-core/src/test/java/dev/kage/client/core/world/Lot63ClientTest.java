@@ -7,7 +7,6 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.GetOnlineWeekResponse;
 import dev.kage.protocol.OnlineDay;
 
@@ -24,8 +23,8 @@ class Lot63ClientTest {
                         .setDayEpochDays(LocalDate.parse("2033-03-03").toEpochDay())
                         .setSeconds(3600))
                 .build();
-        String line = RankingMoreCoordinator.describeWeek(KageI18n.load(), response);
-        assertThat(line).contains("62").contains("02/03 2'").contains("03/03 60'");
+        assertThat(RankingMoreCoordinator.totalMinutes(response)).isEqualTo(62);
+        assertThat(RankingMoreCoordinator.dayList(response)).isEqualTo("02/03 2', 03/03 60'");
     }
 
     @Test
