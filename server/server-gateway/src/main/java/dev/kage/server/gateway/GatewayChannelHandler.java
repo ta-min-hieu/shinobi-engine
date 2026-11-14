@@ -7357,17 +7357,6 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         if (refusesStrangerMail(ctx, sequenceId, characterId, recipient.get().id())) {
             return;
         }
-        if (!lot60().mayMail(characterId, recipient.get().id())) { // ADR-407
-            send(
-                    ctx,
-                    Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE,
-                    sequenceId,
-                    SendMailResponse.newBuilder()
-                            .setOutcome(SendMailOutcome.SEND_MAIL_OUTCOME_LEVEL_TOO_LOW)
-                            .build()
-                            .toByteArray());
-            return;
-        }
         List<MailFacade.AttachmentRequest> attachments = command.getAttachmentsList().stream()
                 .map(a -> new MailFacade.AttachmentRequest(a.getItemTemplateId(), a.getQuantity(), a.getEnhanceLevel()))
                 .toList();
@@ -7410,19 +7399,21 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
      * @return {@code true} nếu đã từ chối (caller dừng lại)
      */
     private boolean refusesStrangerMail(ChannelHandlerContext ctx, int sequenceId, long senderId, long recipientId) {
-        if (!expansion.lot35().facades().strangerMail().refuses(recipientId, senderId, sender -> friendFacade
+        SendMailOutcome refusal;
+        if (expansion.lot35().facades().strangerMail().refuses(recipientId, senderId, sender -> friendFacade
                 .listFriends(recipientId)
                 .contains(sender))) {
+            refusal = SendMailOutcome.SEND_MAIL_OUTCOME_STRANGER_MAIL_BLOCKED;
+        } else if (!lot60().mayMail(senderId, recipientId)) {
+            refusal = SendMailOutcome.SEND_MAIL_OUTCOME_LEVEL_TOO_LOW; // ADR-407 — cấp tối thiểu gửi thư cho người lạ
+        } else {
             return false;
         }
         send(
                 ctx,
                 Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE,
                 sequenceId,
-                SendMailResponse.newBuilder()
-                        .setOutcome(SendMailOutcome.SEND_MAIL_OUTCOME_STRANGER_MAIL_BLOCKED)
-                        .build()
-                        .toByteArray());
+                SendMailResponse.newBuilder().setOutcome(refusal).build().toByteArray());
         return true;
     }
 

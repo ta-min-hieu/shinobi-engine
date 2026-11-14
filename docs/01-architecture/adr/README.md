@@ -438,6 +438,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-404](ADR-404-Repeat-Last-Command.md) | Lặp lại lệnh vừa gõ: `/.` chạy lại lệnh gần nhất | ✅ Accepted (lô 59) |
 | [ADR-405](ADR-405-Combat-Timer.md) | Đồng hồ giao chiến: HUD "Giao chiến" khi đang đánh; `/giaochien` | ✅ Accepted (lô 59) |
 | [ADR-406](ADR-406-Clock-Format.md) | Giờ dạng 12h/24h: `/dinhdanggio 12|24` | ✅ Accepted (lô 59) |
+| [ADR-407](ADR-407-Mail-Minimum-Level.md) | Cấp tối thiểu gửi thư: Dưới cấp 5 không gửi thư cho người lạ; outcome 11 | ✅ Accepted (lô 60) |
+| [ADR-408](ADR-408-World-Chat-History.md) | Lịch sử chat thế giới: Phát lại 20 tin thế giới; `/lichsuthegioi`, 822/823 | ✅ Accepted (lô 60) |
+| [ADR-409](ADR-409-Mutual-Friends.md) | Bạn chung: Bạn chung với một người; `/banchung`, 1162/1163 | ✅ Accepted (lô 60) |
+| [ADR-410](ADR-410-Character-Age.md) | Tuổi nhân vật: Ngày tạo + số ngày tuổi; `/tuoi`, 1208/1209 | ✅ Accepted (lô 60) |
+| [ADR-411](ADR-411-Next-Event-Hud.md) | Sự kiện kế tiếp trên HUD: `/sukienhud` đếm ngược sự kiện gần nhất | ✅ Accepted (lô 60) |
+| [ADR-412](ADR-412-Unread-Mail-Hud.md) | Thư chưa đọc trên HUD: `/thuhud` số thư chưa đọc | ✅ Accepted (lô 60) |
+| [ADR-413](ADR-413-Dps-Hud.md) | DPS trên HUD: `/dpshud` DPS trận hiện tại | ✅ Accepted (lô 60) |
+| [ADR-414](ADR-414-Session-Gold-Hud.md) | Linh thạch phiên trên HUD: `/vanghud` linh thạch kiếm trong phiên | ✅ Accepted (lô 60) |
 ---
 
 ## ADR cần tạo (chưa viết)

@@ -81,7 +81,8 @@ record Lot60Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
         if (target.isEmpty()) {
             return GetMutualFriendsResponse.newBuilder().setFound(false).build();
         }
-        var friends = gateway.contentFacades().socialFacades().friendFacade();
+        dev.kage.friend.api.FriendFacade friends =
+                gateway.contentFacades().socialFacades().friendFacade();
         Set<Long> mine = new HashSet<>(friends.listFriends(characterId));
         List<String> names = new ArrayList<>();
         for (long id : friends.listFriends(target.get().id())) {
