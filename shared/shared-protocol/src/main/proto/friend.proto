@@ -543,3 +543,26 @@ message AbsentFriend {
 message GetAbsentFriendsResponse {
   repeated AbsentFriend entries = 1;
 }
+
+// ADR-425 (2026-11-14) — câu chào khi vào game. Command: Client -> Server. message rỗng + query_only = false ⇒ xoá.
+message SetLoginGreetingCommand {
+  string message = 1;
+  bool query_only = 2;
+}
+
+// Response: Server -> Client (OPCODE_SET_LOGIN_GREETING_RESPONSE).
+message SetLoginGreetingResponse {
+  bool accepted = 1; // false = câu không hợp lệ (quá dài / từ cấm)
+  string message = 2; // câu đang đặt SAU lệnh
+}
+
+// ADR-426 (2026-11-14) — bật/tắt báo khi cừu nhân vào game. Command: Client -> Server.
+message SetEnemyAlertCommand {
+  bool enabled = 1;
+  bool query_only = 2;
+}
+
+// Response: Server -> Client (OPCODE_SET_ENEMY_ALERT_RESPONSE).
+message SetEnemyAlertResponse {
+  bool enabled = 1;
+}

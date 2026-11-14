@@ -63,6 +63,12 @@ record Lot61Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
         } catch (RuntimeException e) {
             LOG.warn("Không gửi được tóm tắt vào world: characterId={}", characterId, e);
         }
+        lot62().onEnteredWorld(characterId); // ADR-425/426 — câu chào, báo cừu nhân
+    }
+
+    /** Lớp lệnh lô 62 (ADR-423…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot62Commands lot62() {
+        return new Lot62Commands(gateway, registry);
     }
 
     /** ADR-418 — đã tới ngưỡng nhắc chưa. Tĩnh để test. */

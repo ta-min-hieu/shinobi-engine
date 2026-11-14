@@ -225,6 +225,8 @@ record ExpansionWindows(
                 .lot60()
                 .hudStats()
                 .useHud((line, value) -> hud.addCounterLine(line.prefixKey, value, line.clock));
+        ChatLensCoordinator lens = lot58.lot59().lot60().lot61().lot62().lens(); // ADR-427 — tin mới khi ẩn chat
+        lens.useHud(hud.addCounterLine("hud.unseen_chat", lens::unseenCount, false));
     }
 
     /**
@@ -381,6 +383,31 @@ record ExpansionWindows(
                 .lot61()
                 .tidy();
         tidy.useRelations(friends::isFriendName, lot39().lot40().damageMeter()::isTracked);
+        lot39().lot40() // ADR-430 — chế độ streamer giữ tên bạn bè
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .lot49()
+                .lot50()
+                .lot51()
+                .lot52()
+                .lot53()
+                .lot54()
+                .lot55()
+                .lot56()
+                .lot57()
+                .lot58()
+                .lot59()
+                .lot60()
+                .lot61()
+                .lot62()
+                .lens()
+                .useFriends(friends::isFriendName);
         lot39().lot40()
                 .lot41()
                 .lot42()

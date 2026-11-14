@@ -183,6 +183,24 @@ public final class Lot45Wiring {
                 new dev.kage.server.database.character.PostgresNewPlayersAdapter(dataSource));
     }
 
+    /** ADR-423 — lịch sử tên bang. */
+    public dev.kage.guild.api.GuildNameHistoryFacade wireGuildNameHistoryFacade() {
+        return new dev.kage.guild.api.GuildNameHistoryFacade(
+                new dev.kage.server.database.guild.PostgresGuildNameHistoryAdapter(dataSource));
+    }
+
+    /** ADR-425 — câu chào khi vào game. */
+    public dev.kage.friend.api.LoginGreetingFacade wireLoginGreetingFacade() {
+        return new dev.kage.friend.api.LoginGreetingFacade(
+                new dev.kage.server.database.friend.PostgresLoginGreetingAdapter(dataSource));
+    }
+
+    /** ADR-426 — báo cừu nhân online. */
+    public dev.kage.pvp.api.EnemyAlertFacade wireEnemyAlertFacade() {
+        return new dev.kage.pvp.api.EnemyAlertFacade(
+                new dev.kage.server.database.pvp.PostgresEnemyAlertAdapter(dataSource));
+    }
+
     /** ADR-288 — lịch sử mua cửa hàng NPC. */
     public dev.kage.shop.api.PurchaseHistoryFacade wirePurchaseHistoryFacade() {
         return new dev.kage.shop.api.PurchaseHistoryFacade(

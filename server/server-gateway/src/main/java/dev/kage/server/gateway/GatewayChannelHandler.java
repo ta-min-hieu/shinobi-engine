@@ -1684,6 +1684,138 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot61()
                                     .newPlayers())),
             Map.entry(
+                    Opcode.OPCODE_GET_GUILD_NAME_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetGuildNameHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_GUILD_NAME_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .lot60()
+                                    .lot61()
+                                    .lot62()
+                                    .guildNameHistory(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_INVITE_ONLINE_FRIENDS_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.InviteOnlineFriendsCommand.parser(),
+                            Opcode.OPCODE_INVITE_ONLINE_FRIENDS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .lot60()
+                                    .lot61()
+                                    .lot62()
+                                    .inviteOnlineFriends(id))),
+            Map.entry(
+                    Opcode.OPCODE_SET_LOGIN_GREETING_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetLoginGreetingCommand.parser(),
+                            Opcode.OPCODE_SET_LOGIN_GREETING_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .lot60()
+                                    .lot61()
+                                    .lot62()
+                                    .setLoginGreeting(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_SET_ENEMY_ALERT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetEnemyAlertCommand.parser(),
+                            Opcode.OPCODE_SET_ENEMY_ALERT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .lot60()
+                                    .lot61()
+                                    .lot62()
+                                    .setEnemyAlert(id, c))),
+            Map.entry(
                     Opcode.OPCODE_OFFICER_CHAT_COMMAND_VALUE,
                     storageCommand(
                             dev.kage.protocol.OfficerChatCommand.parser(),
@@ -2686,7 +2818,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     storageCommand(
                             dev.kage.protocol.RenameGuildCommand.parser(),
                             Opcode.OPCODE_RENAME_GUILD_RESPONSE_VALUE,
-                            (h, id, c) -> h.expansion.lot30().guildRename().rename(id, c))),
+                            (h, id, c) -> {
+                                Lot62Commands lot62 = h.lot60().lot61().lot62(); // ADR-423 — nhớ tên cũ
+                                return lot62.rememberRename(
+                                        lot62.myGuild(id),
+                                        h.expansion.lot30().guildRename().rename(id, c));
+                            })),
             // Lô 30 — ghi chú bạn bè (ADR-173); hiện kèm tên trong danh sách bạn.
             Map.entry(
                     Opcode.OPCODE_SET_FRIEND_NOTE_COMMAND_VALUE,

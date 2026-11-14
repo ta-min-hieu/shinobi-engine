@@ -522,3 +522,12 @@ message SendPartyMailResponse {
   SendPartyMailOutcome outcome = 1;
   int32 recipients = 2;
 }
+
+// ADR-424 (2026-11-14) — mời mọi bạn bè đang online vào nhóm (chưa có nhóm thì lập nhóm). Command: Client -> Server.
+message InviteOnlineFriendsCommand {}
+
+// Response: Server -> Client (OPCODE_INVITE_ONLINE_FRIENDS_RESPONSE).
+message InviteOnlineFriendsResponse {
+  bool not_leader = 1; // đang ở nhóm người khác làm trưởng
+  int32 invited = 2;   // số lời mời đã gửi
+}

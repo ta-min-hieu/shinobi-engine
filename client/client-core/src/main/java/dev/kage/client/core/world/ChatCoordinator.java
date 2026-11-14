@@ -62,6 +62,8 @@ final class ChatCoordinator implements WindowFlow {
             java.time.format.DateTimeFormatter.ofPattern("HH:mm");
 
     private boolean timestamps; // ADR-268
+    private boolean shortChannels; // ADR-428
+    private Predicate<String> highlighted = body -> false; // ADR-429
 
     /** ADR-273 — biệt danh lệnh: viết lại dòng gõ vào trước mọi xử lý khác. */
     private java.util.function.UnaryOperator<String> lineRewriter = java.util.function.UnaryOperator.identity();
@@ -95,6 +97,18 @@ final class ChatCoordinator implements WindowFlow {
             return event.getSenderName().isEmpty() && hideSystem.getAsBoolean();
         }
         return hiddenSender.test(event.getSenderId()) || hiddenBody.test(event.getBody()) || hiddenEvent.test(event);
+    }
+
+    /** ADR-428 — tên kênh rút gọn ({@code [TG]}…) thay tên đầy đủ (vẽ lại ngay). */
+    void setShortChannels(boolean enabled) {
+        this.shortChannels = enabled;
+        refreshLines();
+    }
+
+    /** ADR-429 — tin có nội dung khớp {@code match} được tô màu nổi bật (vẽ lại ngay). */
+    void useHighlight(Predicate<String> match) {
+        this.highlighted = match;
+        refreshLines();
     }
 
     /** ADR-419 — công tắc ẩn dòng hệ thống server gửi (không ảnh hưởng dòng do lệnh của chính máy này in ra). */
@@ -397,8 +411,8 @@ final class ChatCoordinator implements WindowFlow {
 
     /** Màu dòng: nhắc tên mình (ADR-245) > tin bạn bè ở kênh công khai (ADR-364) > màu kênh. */
     private ChatPanel.LineKind lineKind(ChatController.Line line) {
-        if (mentions.mentions(line.senderName(), line.body())) {
-            return ChatPanel.LineKind.MENTION;
+        if (mentions.mentions(line.senderName(), line.body()) || highlighted.test(line.body())) {
+            return ChatPanel.LineKind.MENTION; // ADR-245, ADR-429 — từ khoá theo dõi dùng chung màu nhắc tên
         }
         if (line.channel() != ChatChannel.CHAT_CHANNEL_PRIVATE && isFriend.test(bareName(line.senderName()))) {
             return ChatPanel.LineKind.FRIEND;
@@ -426,7 +440,8 @@ final class ChatCoordinator implements WindowFlow {
         if (line.senderName().isEmpty()) {
             return time + line.body();
         }
-        return time + "[" + text(channelNameKey(line.channel())) + "] " + line.senderName() + ": " + line.body();
+        String channelKey = channelNameKey(line.channel()) + (shortChannels ? ".short" : ""); // ADR-428
+        return time + "[" + text(channelKey) + "] " + line.senderName() + ": " + line.body();
     }
 
     /** ADR-268 — {@code [HH:mm] } của một dòng. Tĩnh để test. */

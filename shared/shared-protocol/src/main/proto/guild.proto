@@ -1014,3 +1014,21 @@ message GetGuildChatHistoryResponse {
   bool in_guild = 1;
   int32 count = 2;
 }
+
+// ADR-423 (2026-11-14) — lịch sử tên bang. Request: Client -> Server. guild_name rỗng = bang của mình; nhận cả tên cũ.
+message GetGuildNameHistoryRequest {
+  string guild_name = 1;
+}
+
+message GuildRename {
+  string old_name = 1;
+  string new_name = 2;
+  int64 at_epoch_seconds = 3;
+}
+
+// Response: Server -> Client (OPCODE_GET_GUILD_NAME_HISTORY_RESPONSE). Cũ trước.
+message GetGuildNameHistoryResponse {
+  bool found = 1;
+  string current_name = 2;
+  repeated GuildRename renames = 3;
+}
