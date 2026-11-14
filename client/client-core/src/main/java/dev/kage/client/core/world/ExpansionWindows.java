@@ -383,7 +383,23 @@ record ExpansionWindows(
                 .lot61()
                 .tidy();
         tidy.useRelations(friends::isFriendName, lot39().lot40().damageMeter()::isTracked);
-        lot39().lot40() // ADR-430 — chế độ streamer giữ tên bạn bè
+        useLot62Friends(friends);
+        lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .bubbles()
+                .useAudience(tidy::bubbleAllowed);
+    }
+
+    /** ADR-430 — chế độ streamer giữ tên bạn bè. */
+    private void useLot62Friends(FriendCoordinator friends) {
+        lot39().lot40()
                 .lot41()
                 .lot42()
                 .lot43()
@@ -408,17 +424,6 @@ record ExpansionWindows(
                 .lot62()
                 .lens()
                 .useFriends(friends::isFriendName);
-        lot39().lot40()
-                .lot41()
-                .lot42()
-                .lot43()
-                .lot44()
-                .lot45()
-                .lot46()
-                .lot47()
-                .lot48()
-                .bubbles()
-                .useAudience(tidy::bubbleAllowed);
     }
 
     /** ADR-323 / ADR-342 — nối thu phóng và rung camera vào camera thế giới 3D. */

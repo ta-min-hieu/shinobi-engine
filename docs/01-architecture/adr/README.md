@@ -454,6 +454,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-420](ADR-420-Collapse-Repeated-Messages.md) | Gộp tin trùng lặp: Tin lặp liên tiếp gộp "(xN)"; `/gopchat` | ✅ Accepted (lô 61) |
 | [ADR-421](ADR-421-Friend-Only-Chat-Bubbles.md) | Ẩn bong bóng chat người lạ: `/bongbongban` bong bóng chỉ bạn bè/nhóm | ✅ Accepted (lô 61) |
 | [ADR-422](ADR-422-Quick-Phrases.md) | Câu nói nhanh: `/caunhanh` lưu, `/cn` gửi câu nói nhanh | ✅ Accepted (lô 61) |
+| [ADR-423](ADR-423-Guild-Name-History.md) | Lịch sử tên bang: Tên cũ của bang (V184); `/lichsutenbang`, 1212/1213 | ✅ Accepted (lô 62) |
+| [ADR-424](ADR-424-Invite-Online-Friends.md) | Mời bạn online vào nhóm: Mời mọi bạn online vào nhóm; `/moibanbe`, 1356/1357 | ✅ Accepted (lô 62) |
+| [ADR-425](ADR-425-Login-Greeting.md) | Câu chào khi vào game: Câu chào gửi bạn bè lúc vào game (V184); `/cauchao` | ✅ Accepted (lô 62) |
+| [ADR-426](ADR-426-Enemy-Login-Alert.md) | Báo cừu nhân online: Báo khi cừu nhân vào game (V184); `/baocuunhan` | ✅ Accepted (lô 62) |
+| [ADR-427](ADR-427-Unseen-Chat-Counter.md) | Đếm tin mới khi ẩn chat: HUD "Chat: tin mới N" khi ẩn chat | ✅ Accepted (lô 62) |
+| [ADR-428](ADR-428-Short-Channel-Tags.md) | Tên kênh rút gọn: `/kenhngan` tên kênh viết tắt | ✅ Accepted (lô 62) |
+| [ADR-429](ADR-429-Chat-Watch-Words.md) | Tô sáng từ khoá theo dõi: `/theodoitu` tô sáng tin có từ khoá | ✅ Accepted (lô 62) |
+| [ADR-430](ADR-430-Streamer-Mode.md) | Chế độ streamer: `/streamer` giấu tên người lạ trong chat | ✅ Accepted (lô 62) |
 ---
 
 ## ADR cần tạo (chưa viết)

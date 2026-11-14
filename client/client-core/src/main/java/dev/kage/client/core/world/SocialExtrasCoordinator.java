@@ -34,49 +34,59 @@ final class SocialExtrasCoordinator implements WindowFlow {
     private final WorldCommandSender sender;
     private final ChatCoordinator chat;
     private final I18NBundle i18n = KageI18n.load();
+    private final java.util.Map<String, java.util.function.Consumer<String>> handlers;
 
     SocialExtrasCoordinator(WorldCommandSender sender, ChatCoordinator chat) {
         this.sender = sender;
         this.chat = chat;
+        this.handlers = buildHandlers();
         chat.addSlashCommands(this::onSlash);
     }
 
     private boolean onSlash(String line) {
         String[] words = line.strip().split("\\s+", 2);
-        String command = words[0].toLowerCase(Locale.ROOT);
-        String arg = words.length > 1 ? words[1].strip() : "";
-        switch (command) {
-            case "/lichsutenbang", "/guildnames" ->
-                sender.sendReadRequest(
-                        Opcode.OPCODE_GET_GUILD_NAME_HISTORY_REQUEST_VALUE,
-                        GetGuildNameHistoryRequest.newBuilder()
-                                .setGuildName(arg)
-                                .build());
-            case "/moibanbe", "/invitefriends" ->
-                sender.sendReadRequest(
-                        Opcode.OPCODE_INVITE_ONLINE_FRIENDS_COMMAND_VALUE,
-                        InviteOnlineFriendsCommand.getDefaultInstance());
-            case "/cauchao", "/greeting" ->
-                sender.sendReadRequest(
-                        Opcode.OPCODE_SET_LOGIN_GREETING_COMMAND_VALUE,
-                        SetLoginGreetingCommand.newBuilder()
-                                .setQueryOnly(arg.isEmpty())
-                                .setMessage(isClear(arg) ? "" : arg)
-                                .build());
-            case "/baocuunhan", "/enemyalert" -> {
-                String mode = arg.toLowerCase(Locale.ROOT);
-                sender.sendReadRequest(
-                        Opcode.OPCODE_SET_ENEMY_ALERT_COMMAND_VALUE,
-                        SetEnemyAlertCommand.newBuilder()
-                                .setEnabled("bat".equals(mode) || "on".equals(mode))
-                                .setQueryOnly(mode.isEmpty())
-                                .build());
-            }
-            default -> {
-                return false;
-            }
+        java.util.function.Consumer<String> handler = handlers.get(words[0].toLowerCase(Locale.ROOT));
+        if (handler == null) {
+            return false;
         }
+        handler.accept(words.length > 1 ? words[1].strip() : "");
         return true;
+    }
+
+    private java.util.Map<String, java.util.function.Consumer<String>> buildHandlers() {
+        java.util.function.Consumer<String> names = arg -> sender.sendReadRequest(
+                Opcode.OPCODE_GET_GUILD_NAME_HISTORY_REQUEST_VALUE,
+                GetGuildNameHistoryRequest.newBuilder().setGuildName(arg).build());
+        java.util.function.Consumer<String> invite = arg -> sender.sendReadRequest(
+                Opcode.OPCODE_INVITE_ONLINE_FRIENDS_COMMAND_VALUE, InviteOnlineFriendsCommand.getDefaultInstance());
+        java.util.function.Consumer<String> alert = arg -> sendEnemyAlert(arg.toLowerCase(Locale.ROOT));
+        return java.util.Map.of(
+                "/lichsutenbang", names,
+                "/guildnames", names,
+                "/moibanbe", invite,
+                "/invitefriends", invite,
+                "/cauchao", this::sendGreeting,
+                "/greeting", this::sendGreeting,
+                "/baocuunhan", alert,
+                "/enemyalert", alert);
+    }
+
+    private void sendGreeting(String arg) {
+        sender.sendReadRequest(
+                Opcode.OPCODE_SET_LOGIN_GREETING_COMMAND_VALUE,
+                SetLoginGreetingCommand.newBuilder()
+                        .setQueryOnly(arg.isEmpty())
+                        .setMessage(isClear(arg) ? "" : arg)
+                        .build());
+    }
+
+    private void sendEnemyAlert(String mode) {
+        sender.sendReadRequest(
+                Opcode.OPCODE_SET_ENEMY_ALERT_COMMAND_VALUE,
+                SetEnemyAlertCommand.newBuilder()
+                        .setEnabled("bat".equals(mode) || "on".equals(mode))
+                        .setQueryOnly(mode.isEmpty())
+                        .build());
     }
 
     /** {@code xoa}/{@code clear} ⇒ xoá câu chào. Tĩnh để test. */
