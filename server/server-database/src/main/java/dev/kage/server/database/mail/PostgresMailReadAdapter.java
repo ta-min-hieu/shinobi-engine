@@ -15,6 +15,7 @@ public final class PostgresMailReadAdapter implements MailReadPort {
             UPDATE mail SET read_at = COALESCE(read_at, now()) WHERE id = ? AND recipient_id = ?
             """;
     private static final String UNREAD = "SELECT id FROM mail WHERE recipient_id = ? AND read_at IS NULL";
+    private static final String MARK_ALL = "UPDATE mail SET read_at = now() WHERE recipient_id = ? AND read_at IS NULL";
 
     private final DataSource dataSource;
 
@@ -26,6 +27,11 @@ public final class PostgresMailReadAdapter implements MailReadPort {
     @Override
     public boolean markRead(long mailId, long recipientId) {
         return JdbcOperations.update(dataSource, MARK, mailId, recipientId) == 1;
+    }
+
+    @Override
+    public int markAllRead(long recipientId) {
+        return JdbcOperations.update(dataSource, MARK_ALL, recipientId);
     }
 
     @Override

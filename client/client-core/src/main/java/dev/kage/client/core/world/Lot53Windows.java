@@ -7,13 +7,17 @@ package dev.kage.client.core.world;
  * Lot52Windows}.
  */
 record Lot53Windows(
-        PlayerLookupCoordinator lookup, MailArchiveCoordinator mailArchive, ResetCountdownCoordinator resetCountdown) {
+        PlayerLookupCoordinator lookup,
+        MailArchiveCoordinator mailArchive,
+        ResetCountdownCoordinator resetCountdown,
+        Lot54Windows lot54) {
 
     static Lot53Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot53Windows(
                 new PlayerLookupCoordinator(sender, feeds.chat()),
                 new MailArchiveCoordinator(sender, feeds.chat()),
-                new ResetCountdownCoordinator(feeds.chat(), System::currentTimeMillis));
+                new ResetCountdownCoordinator(feeds.chat(), System::currentTimeMillis),
+                Lot54Windows.create(sender, feeds)); // lô 54 lồng ở đây
     }
 
     /** ADR-357 — chữ bảng phím tắt (giữ F1): danh sách phím đang gán, dịch sẵn. */
@@ -28,5 +32,6 @@ record Lot53Windows(
         panels.register(lookup);
         panels.register(mailArchive);
         panels.register(resetCountdown);
+        lot54.registerInto(panels);
     }
 }

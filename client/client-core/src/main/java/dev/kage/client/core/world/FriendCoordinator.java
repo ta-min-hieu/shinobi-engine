@@ -391,4 +391,9 @@ final class FriendCoordinator implements WindowFlow {
         panel.close();
         refreshRows();
     }
+
+    /** ADR-364 — tên này là bạn bè của mình không (theo danh sách đang giữ). */
+    boolean isFriendName(String name) {
+        return controller.hasFriendNamed(name);
+    }
 }

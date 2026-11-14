@@ -39,6 +39,12 @@ import dev.kage.client.core.ui.theme.KageSkin;
  */
 public final class ChatPanel implements HudWindow {
 
+    /** ADR-363 — số dòng hiện mặc định (như trước khi có lệnh đổi). */
+    public static final int DEFAULT_VISIBLE_LINES = 6;
+
+    /** ADR-363 — ít nhất bấy nhiêu dòng. */
+    public static final int MIN_VISIBLE_LINES = 4;
+
     /**
      * Phím mở ô nhập. Nằm ở đây chứ không ở {@code GameAction} vì đây KHÔNG phải ý định gameplay —
      * cùng lập luận với ESC của {@link DialoguePanel}: không gửi gói nào, không đổi trạng thái thế
@@ -110,6 +116,9 @@ public final class ChatPanel implements HudWindow {
     /** ADR-245 — tin nhắc tên mình: xanh lơ sáng, khác hẳn mọi kênh. */
     private static final Color MENTION_COLOR = Color.valueOf("5FE7FF");
 
+    /** ADR-364 — tin của bạn bè. */
+    private static final Color FRIEND_COLOR = Color.valueOf("B6F27A");
+
     private final Stage stage;
     private final Table panel;
     private final List<Label> lineLabels = new ArrayList<>();
@@ -130,6 +139,9 @@ public final class ChatPanel implements HudWindow {
     /** ADR-333 — ẩn bằng phím {@code anchat}. */
     private boolean hidden;
 
+    /** ADR-363 — bảng chứa các nhãn đang hiện. */
+    private final Table logTable;
+
     /** ADR-339 — màu riêng người chơi đặt cho từng loại dòng. */
     private final java.util.EnumMap<LineKind, Color> lineColors = new java.util.EnumMap<>(LineKind.class);
 
@@ -148,7 +160,9 @@ public final class ChatPanel implements HudWindow {
         this.stage = new Stage(new ScreenViewport(), new SpriteBatch());
 
         this.pinnedLabel = pinnedLabel(skin);
-        Table log = buildLog(skin, maxLines);
+        this.logTable = buildLog(skin, maxLines);
+        Table log = logTable;
+        setVisibleLines(DEFAULT_VISIBLE_LINES); // ADR-363
 
         this.channelButton = new TextButton("", skin.buttonStyle);
         this.input = new TextField("", skin.textFieldStyle);
@@ -190,6 +204,23 @@ public final class ChatPanel implements HudWindow {
                 }
             }
         });
+    }
+
+    /**
+     * ADR-363 — số dòng nhật ký HIỆN (kẹp trong [{@value #MIN_VISIBLE_LINES}, số nhãn dựng sẵn]). Dòng mới nhất luôn ở
+     * đáy, nên chỉ cần đưa {@code n} nhãn cuối vào bảng — {@link #setLines} không đổi.
+     */
+    public void setVisibleLines(int lines) {
+        int shown = Math.clamp(lines, Math.min(MIN_VISIBLE_LINES, lineLabels.size()), lineLabels.size());
+        logTable.clearChildren();
+        for (int index = lineLabels.size() - shown; index < lineLabels.size(); index++) {
+            logTable.add(lineLabels.get(index))
+                    .width(PANEL_WIDTH_PX)
+                    .growX()
+                    .left()
+                    .row();
+        }
+        logTable.invalidateHierarchy();
     }
 
     /** Dựng SẴN {@code maxLines} nhãn nhật ký (tái dùng, không tạo actor mỗi lần có tin). */
@@ -436,7 +467,9 @@ public final class ChatPanel implements HudWindow {
         /** ADR-152 — loa thế giới (Truyền Âm Phù). */
         BROADCAST,
         /** ADR-245 — tin có nhắc tên mình. */
-        MENTION
+        MENTION,
+        /** ADR-364 — tin của một người bạn (kênh công khai). */
+        FRIEND
     }
 
     /** ADR-339 — đặt màu riêng cho một loại dòng; rỗng = trả về màu mặc định. Áp từ lần vẽ danh sách kế tiếp. */
@@ -462,6 +495,7 @@ public final class ChatPanel implements HudWindow {
             case WORLD -> WORLD_COLOR;
             case BROADCAST -> BROADCAST_COLOR;
             case MENTION -> MENTION_COLOR;
+            case FRIEND -> FRIEND_COLOR;
         };
     }
 

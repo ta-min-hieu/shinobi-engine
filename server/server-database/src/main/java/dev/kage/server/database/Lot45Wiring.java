@@ -129,6 +129,12 @@ public final class Lot45Wiring {
                 new dev.kage.server.database.mail.PostgresMailArchiveAdapter(dataSource));
     }
 
+    /** ADR-360/361/362 — ai thích mình, lịch sử bị soi, chỉ bạn bè được soi. */
+    public dev.kage.character.api.ProfileVisitFacade wireProfileVisitFacade() {
+        return new dev.kage.character.api.ProfileVisitFacade(
+                new dev.kage.server.database.character.PostgresProfileVisitAdapter(dataSource));
+    }
+
     /** ADR-288 — lịch sử mua cửa hàng NPC. */
     public dev.kage.shop.api.PurchaseHistoryFacade wirePurchaseHistoryFacade() {
         return new dev.kage.shop.api.PurchaseHistoryFacade(

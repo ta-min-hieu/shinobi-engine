@@ -10,4 +10,7 @@ public interface MailReadPort {
 
     /** Id các thư CHƯA đọc của người nhận. */
     Set<Long> unreadIds(long recipientId);
+
+    /** ADR-359 — đánh dấu mọi thư chưa đọc của người nhận là đã đọc; trả số thư vừa đổi. */
+    int markAllRead(long recipientId);
 }

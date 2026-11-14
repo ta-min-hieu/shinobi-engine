@@ -46,8 +46,11 @@ final class ChatController {
      * tới ~11 hàng chữ và đẩy khung chat cao gần nửa màn hình ở 720p (thấy thật trên ảnh chụp
      * {@code runHudPreview} đầu tiên). Khung neo góc trái-dưới và nở LÊN TRÊN, nên chiều cao của nó
      * là thứ ăn vào tầm nhìn thế giới chứ không phải vào HUD.
+     *
+     * <p>ADR-363 (2026-11-14): nhật ký giữ tới 12 dòng; khung vẫn HIỆN 6 theo mặc định
+     * ({@code ChatPanel.DEFAULT_VISIBLE_LINES}), người chơi tự chọn 4–12 bằng {@code /dongchat}.
      */
-    static final int MAX_LINES = 6;
+    static final int MAX_LINES = 12;
 
     /** Tiền tố tin nhắn riêng: {@code /w <tên> <nội dung>}. */
     private static final String PRIVATE_PREFIX = "/w ";

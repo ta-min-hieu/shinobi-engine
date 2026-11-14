@@ -174,6 +174,16 @@ final class FriendController {
         return lastOnline.getOrDefault(characterId, 0L);
     }
 
+    /** ADR-364 — người tên {@code name} có trong danh sách bạn đang giữ không. */
+    boolean hasFriendNamed(String name) {
+        for (Friend friend : friends) {
+            if (friend.name().equals(name)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Danh sách bạn bè, online trước — xem {@link #onFriendList} về thứ tự. */
     List<Friend> friends() {
         return List.copyOf(friends);

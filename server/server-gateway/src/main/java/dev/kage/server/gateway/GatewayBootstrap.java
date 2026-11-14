@@ -858,7 +858,9 @@ public final class GatewayBootstrap {
                                                         wiring.wireGuildTagFacade(),
                                                         new Lot53Facades( // lô 53 lồng ở đây
                                                                 wiring.wirePlayerLookupFacade(),
-                                                                wiring.wireMailArchiveFacade())))))));
+                                                                wiring.wireMailArchiveFacade(),
+                                                                new Lot54Facades( // lô 54 lồng ở đây
+                                                                        wiring.wireProfileVisitFacade()))))))));
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */

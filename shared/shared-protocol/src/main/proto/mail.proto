@@ -298,3 +298,11 @@ message ArchivedMail {
 message ListArchivedMailResponse {
   repeated ArchivedMail mails = 1;
 }
+
+// ADR-359 (2026-11-14) — đánh dấu tất cả thư đã đọc. Command: Client -> Server (OPCODE_MARK_ALL_MAIL_READ_COMMAND).
+message MarkAllMailReadCommand {}
+
+// Response: Server -> Client (OPCODE_MARK_ALL_MAIL_READ_RESPONSE). marked = số thư vừa chuyển sang đã đọc.
+message MarkAllMailReadResponse {
+  int32 marked = 1;
+}

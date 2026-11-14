@@ -112,11 +112,13 @@ record Lot46Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
                 .orElse(inspected);
     }
 
-    /** ADR-330 / ADR-344 — kèm lượt thích và ký hiệu bang, rồi báo người bị soi (nếu họ bật báo). */
+    /** ADR-362 lọc chỉ-bạn-bè + ADR-361 ghi lịch sử; ADR-330 / ADR-344 lượt thích, ký hiệu bang, báo người bị soi. */
     dev.kage.protocol.InspectCharacterResponse withLikesAndNotice(
             long viewerId, dev.kage.protocol.InspectCharacterResponse inspected) {
         Lot50Commands lot50 = lot47().lot48().lot49().lot50();
-        return lot50.notifyInspected(viewerId, lot50.lot51().lot52().withGuildTag(withLikes(inspected))); // ADR-344
+        dev.kage.protocol.InspectCharacterResponse visible =
+                lot50.lot51().lot52().lot53().lot54().guardInspect(viewerId, inspected);
+        return lot50.notifyInspected(viewerId, lot50.lot51().lot52().withGuildTag(withLikes(visible))); // ADR-344
     }
 
     private Lot46Facades facades() {

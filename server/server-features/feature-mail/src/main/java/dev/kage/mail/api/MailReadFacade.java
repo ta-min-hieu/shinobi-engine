@@ -18,6 +18,11 @@ public final class MailReadFacade {
         public Set<Long> unreadIds(long recipientId) {
             return Set.of();
         }
+
+        @Override
+        public int markAllRead(long recipientId) {
+            return 0;
+        }
     });
 
     private final MailReadPort port;
@@ -30,6 +35,11 @@ public final class MailReadFacade {
     /** Đánh dấu đã đọc. */
     public boolean markRead(long mailId, long recipientId) {
         return port.markRead(mailId, recipientId);
+    }
+
+    /** ADR-359 — đánh dấu tất cả đã đọc; trả số thư vừa đổi. */
+    public int markAllRead(long recipientId) {
+        return port.markAllRead(recipientId);
     }
 
     /** Id các thư chưa đọc. */

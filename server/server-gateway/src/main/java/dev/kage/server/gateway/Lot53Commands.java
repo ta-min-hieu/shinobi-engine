@@ -22,6 +22,11 @@ import dev.kage.quest.domain.DailyReset;
 /** Lớp lệnh lô 53 (ADR-351…) — MỘT thành phần của {@link Lot52Commands}. Gọi trên Virtual Thread. */
 record Lot53Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 54 (ADR-359…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot54Commands lot54() {
+        return new Lot54Commands(gateway, registry);
+    }
+
     /** ADR-351 — top 10 chuỗi đăng nhập còn sống. */
     GetStreakRankingResponse streakRanking() {
         GetStreakRankingResponse.Builder response = GetStreakRankingResponse.newBuilder();

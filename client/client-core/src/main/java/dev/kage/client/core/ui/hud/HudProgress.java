@@ -68,6 +68,12 @@ final class HudProgress {
             return;
         }
         expBar.setValues(expIntoLevel, expForNextLevel);
-        expLabel.setText(expIntoLevel + " / " + expForNextLevel);
+        expLabel.setText(expText(expIntoLevel, expForNextLevel));
+    }
+
+    /** ADR-366 — "đã đi / cần (X%)"; chỉ gọi khi số đổi (UI.md §9). Tĩnh để test. */
+    static String expText(long expIntoLevel, long expForNextLevel) {
+        long percent = Math.clamp(expIntoLevel * 100L / expForNextLevel, 0L, 100L);
+        return expIntoLevel + " / " + expForNextLevel + " (" + percent + "%)";
     }
 }

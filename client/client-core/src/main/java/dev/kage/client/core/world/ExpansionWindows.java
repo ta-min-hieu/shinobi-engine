@@ -274,6 +274,23 @@ record ExpansionWindows(
                 .lot48()
                 .friendPresence()
                 .useIn(friends); // ADR-311
+        lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .lot49()
+                .lot50()
+                .lot51()
+                .lot52()
+                .lot53()
+                .lot54()
+                .chatLines()
+                .useFriends(friends::isFriendName); // ADR-364
         return this;
     }
 

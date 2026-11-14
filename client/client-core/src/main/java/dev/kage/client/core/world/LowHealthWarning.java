@@ -24,6 +24,8 @@ final class LowHealthWarning {
     private static final float ALPHA_RANGE = 0.35f;
     private static final float BORDER_FRACTION = 0.04f;
     private static final float HALF = 0.5f;
+    private static final float DEATH_VEIL_GRAY = 0.12f;
+    private static final float DEATH_VEIL_ALPHA = 0.55f;
 
     private final ChatCoordinator chat;
     private final I18NBundle i18n = KageI18n.load();
@@ -31,6 +33,8 @@ final class LowHealthWarning {
     private final Matrix4 screenProjection = new Matrix4();
     private java.util.Optional<CombatHudController> health = java.util.Optional.empty();
     private boolean low;
+    private boolean dead; // ADR-365
+    private final Color veil = new Color(DEATH_VEIL_GRAY, DEATH_VEIL_GRAY, DEATH_VEIL_GRAY, DEATH_VEIL_ALPHA);
     private boolean warned;
     private float clock;
 
@@ -50,6 +54,7 @@ final class LowHealthWarning {
 
     /** Mỗi khung — cập nhật trạng thái; vừa tụt dưới ngưỡng lần đầu thì nhắc một dòng. */
     void update(int hp, int maxHp, float delta) {
+        dead = hp <= 0 && maxHp > 0; // ADR-365
         low = isLow(hp, maxHp);
         clock += delta;
         if (low && !warned) {
@@ -65,6 +70,10 @@ final class LowHealthWarning {
         if (health.isPresent()) { // không lambda: khung hình không cấp phát
             CombatHudController combat = health.get();
             update(combat.playerHp(), combat.playerMaxHp(), Gdx.graphics.getDeltaTime());
+        }
+        if (dead) { // ADR-365 — bị hạ: phủ xám cả màn hình tới khi hồi sinh
+            drawDeathVeil(shapeRenderer, width, height);
+            return;
         }
         if (!low) {
             return;
@@ -83,6 +92,25 @@ final class LowHealthWarning {
         shapeRenderer.rect(0f, height - border, width, border);
         shapeRenderer.rect(0f, border, border, height - 2 * border);
         shapeRenderer.rect(width - border, border, border, height - 2 * border);
+        shapeRenderer.end();
+        Gdx.gl.glDisable(GL20.GL_BLEND);
+    }
+
+    /** ADR-365 — đang bị hạ (máu 0) theo lần cập nhật gần nhất. */
+    boolean isDead() {
+        return dead;
+    }
+
+    /** ADR-365 — lớp xám mờ phủ cả màn hình; màu và ma trận dựng sẵn, không cấp phát. */
+    private void drawDeathVeil(ShapeRenderer shapeRenderer, int width, int height) {
+        screenProjection.setToOrtho2D(0f, 0f, width, height);
+        Gdx.gl.glDisable(GL20.GL_DEPTH_TEST);
+        Gdx.gl.glEnable(GL20.GL_BLEND);
+        Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
+        shapeRenderer.setProjectionMatrix(screenProjection);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(veil);
+        shapeRenderer.rect(0f, 0f, width, height);
         shapeRenderer.end();
         Gdx.gl.glDisable(GL20.GL_BLEND);
     }

@@ -28,7 +28,8 @@ final class ChatColorCoordinator implements WindowFlow {
             "rieng", ChatPanel.LineKind.PRIVATE,
             "hethong", ChatPanel.LineKind.SYSTEM,
             "loa", ChatPanel.LineKind.BROADCAST,
-            "nhacten", ChatPanel.LineKind.MENTION);
+            "nhacten", ChatPanel.LineKind.MENTION,
+            "banbe", ChatPanel.LineKind.FRIEND);
 
     /** Bảng màu có tên. */
     static final Map<String, String> NAMED = Map.of(

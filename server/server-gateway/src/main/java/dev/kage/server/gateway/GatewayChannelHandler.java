@@ -1268,6 +1268,106 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot44()
                                     .lookupItem(c))),
             Map.entry(
+                    Opcode.OPCODE_MARK_ALL_MAIL_READ_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.MarkAllMailReadCommand.parser(),
+                            Opcode.OPCODE_MARK_ALL_MAIL_READ_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .markAllMailRead(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_PROFILE_LIKERS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetProfileLikersRequest.parser(),
+                            Opcode.OPCODE_GET_PROFILE_LIKERS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .profileLikers(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_INSPECT_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetInspectHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_INSPECT_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .inspectHistory(id))),
+            Map.entry(
+                    Opcode.OPCODE_SET_INSPECT_FRIENDS_ONLY_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetInspectFriendsOnlyCommand.parser(),
+                            Opcode.OPCODE_SET_INSPECT_FRIENDS_ONLY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .setInspectFriendsOnly(id, c))),
+            Map.entry(
                     Opcode.OPCODE_GET_STREAK_RANKING_REQUEST_VALUE,
                     storageCommand(
                             dev.kage.protocol.GetStreakRankingRequest.parser(),

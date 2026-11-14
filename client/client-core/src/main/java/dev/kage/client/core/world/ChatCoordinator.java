@@ -35,6 +35,7 @@ final class ChatCoordinator implements WindowFlow {
 
     private final ChatController controller = new ChatController();
     private java.util.function.UnaryOperator<ChatMessageEvent> eventRewriter = event -> event; // ADR-348
+    private java.util.function.Predicate<String> isFriend = name -> false; // ADR-364
     private final ChatPanel panel;
     private final WorldCommandSender sender;
     private final I18NBundle i18n = KageI18n.load();
@@ -349,12 +350,31 @@ final class ChatCoordinator implements WindowFlow {
         lineKinds.clear();
         for (ChatController.Line line : controller.lines()) {
             renderedLines.add(render(line));
-            lineKinds.add(
-                    mentions.mentions(line.senderName(), line.body())
-                            ? ChatPanel.LineKind.MENTION
-                            : kindOf(line.channel()));
+            lineKinds.add(lineKind(line));
         }
         panel.setLines(renderedLines, lineKinds);
+    }
+
+    /** Màu dòng: nhắc tên mình (ADR-245) > tin bạn bè ở kênh công khai (ADR-364) > màu kênh. */
+    private ChatPanel.LineKind lineKind(ChatController.Line line) {
+        if (mentions.mentions(line.senderName(), line.body())) {
+            return ChatPanel.LineKind.MENTION;
+        }
+        if (line.channel() != ChatChannel.CHAT_CHANNEL_PRIVATE && isFriend.test(bareName(line.senderName()))) {
+            return ChatPanel.LineKind.FRIEND;
+        }
+        return kindOf(line.channel());
+    }
+
+    /** Tên người gửi bỏ tiền tố ký hiệu bang / danh hiệu (tên nhân vật không có khoảng trắng). Tĩnh để test. */
+    static String bareName(String senderName) {
+        return senderName.substring(senderName.lastIndexOf(' ') + 1);
+    }
+
+    /** ADR-364 — nối danh sách bạn bè để tô màu tin của họ. */
+    void useFriendNames(java.util.function.Predicate<String> friendNamed) {
+        this.isFriend = friendNamed;
+        refreshLines();
     }
 
     /**
