@@ -148,6 +148,8 @@ public final class ChatPanel implements HudWindow {
     /** ADR-333 — ẩn bằng phím {@code anchat}. */
     private boolean hidden;
 
+    private java.util.function.BooleanSupplier autoHide = () -> false;
+
     /** ADR-363 — bảng chứa các nhãn đang hiện. */
     private final Table logTable;
 
@@ -528,6 +530,11 @@ public final class ChatPanel implements HudWindow {
         return hidden;
     }
 
+    /** ADR-444 — điều kiện ẩn tạm thêm (vd đang giao chiến), đọc mỗi khung; đang gõ thì vẫn hiện. */
+    public void useAutoHide(java.util.function.BooleanSupplier hide) {
+        this.autoHide = hide;
+    }
+
     /** ADR-333 — ẩn / hiện khung chat. */
     public void setHidden(boolean hide) {
         this.hidden = hide;
@@ -616,7 +623,7 @@ public final class ChatPanel implements HudWindow {
             panel.setVisible(false);
         }
         stage.act(deltaTime);
-        if (!hidden || isComposing()) { // ADR-333 — ẩn thì không vẽ, trừ khi đang gõ
+        if ((!hidden && !autoHide.getAsBoolean()) || isComposing()) { // ADR-333/444 — ẩn thì không vẽ, trừ khi gõ
             stage.draw();
         }
     }

@@ -229,6 +229,15 @@ record ExpansionWindows(
         ChatLensCoordinator lens = lot58.lot59().lot60().lot61().lot62().lens(); // ADR-427 — tin mới khi ẩn chat
         lens.useHud(hud.addCounterLine("hud.unseen_chat", lens::unseenCount, false));
         wireLot63Display(lot58.lot59().lot60().lot61().lot62().lot63(), hud, feedback);
+        wireLot64Display(lot58.lot59().lot60().lot61().lot62().lot63().lot64(), hud, timer);
+    }
+
+    /** Lớp hiển thị lô 64: ẩn chat khi giao chiến (ADR-444), dòng HUD ô túi trống (ADR-445). */
+    private void wireLot64Display(
+            Lot64Windows lot64, dev.kage.client.core.ui.hud.CombatHud hud, CombatTimerCoordinator timer) {
+        lot64.quiet().useCombatSeconds(timer::seconds);
+        BagSpaceWarningCoordinator bag = lot39().bagSpace();
+        hud.addCounterLine("hud.bag_free", bag::freeSlots, false).accept(true);
     }
 
     /** Lớp hiển thị lô 63: kỹ năng sẵn sàng (ADR-435), nhắc việc trên HUD (ADR-437), ẩn cụm dòng phụ (ADR-438). */

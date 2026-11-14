@@ -213,6 +213,24 @@ public final class Lot45Wiring {
                 new dev.kage.server.database.friend.PostgresIntimacyRankingAdapter(dataSource));
     }
 
+    /** ADR-439/440 — xếp hạng linh thú và cường hoá. */
+    public dev.kage.inventory.api.GearRankingFacade wireGearRankingFacade() {
+        return new dev.kage.inventory.api.GearRankingFacade(
+                new dev.kage.server.database.inventory.PostgresGearRankingAdapter(dataSource));
+    }
+
+    /** ADR-441 — xếp hạng nhiệm vụ. */
+    public dev.kage.quest.api.QuestRankingFacade wireQuestRankingFacade() {
+        return new dev.kage.quest.api.QuestRankingFacade(
+                new dev.kage.server.database.quest.PostgresQuestRankingAdapter(dataSource));
+    }
+
+    /** ADR-442 — xếp hạng hạ boss. */
+    public dev.kage.monster.api.BossKillRankingFacade wireBossKillRankingFacade() {
+        return new dev.kage.monster.api.BossKillRankingFacade(
+                new dev.kage.server.database.monster.PostgresBossKillRankingAdapter(dataSource));
+    }
+
     /** ADR-288 — lịch sử mua cửa hàng NPC. */
     public dev.kage.shop.api.PurchaseHistoryFacade wirePurchaseHistoryFacade() {
         return new dev.kage.shop.api.PurchaseHistoryFacade(

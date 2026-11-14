@@ -493,6 +493,12 @@ final class ChatCoordinator implements WindowFlow {
         return new ChatHistory(controller.lines());
     }
 
+    /** ADR-443 — {@code /xoachat}: bỏ mọi dòng đang hiện (chỉ máy mình). */
+    void clearLines() {
+        controller.restoreLines(List.of());
+        refreshLines();
+    }
+
     /** Nhận nhật ký từ màn world cũ — thay dòng gợi ý mặc định của màn mới. Rỗng thì không đổi gì. */
     void restoreHistory(ChatHistory history) {
         if (history.lines().isEmpty()) {

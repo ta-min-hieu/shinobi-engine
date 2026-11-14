@@ -17,12 +17,20 @@ final class BagSpaceWarningCoordinator implements WindowFlow {
 
     static final int WARN_FREE_SLOTS = 2;
 
+    private static final long UNKNOWN = -1L;
+
     private final ChatCoordinator chat;
     private final I18NBundle i18n = KageI18n.load();
     private boolean warned;
+    private long shownFree = UNKNOWN;
 
     BagSpaceWarningCoordinator(ChatCoordinator chat) {
         this.chat = chat;
+    }
+
+    /** ADR-445 — số ô trống lần đọc túi gần nhất cho dòng HUD; chưa biết ⇒ -1 (dòng để trống). */
+    long freeSlots() {
+        return shownFree;
     }
 
     /** Số ô trống; sức chứa chưa biết (0) ⇒ {@link Integer#MAX_VALUE} (không cảnh báo). Tĩnh để test. */
@@ -37,6 +45,7 @@ final class BagSpaceWarningCoordinator implements WindowFlow {
         }
         ListInventoryResponse response = ListInventoryResponse.parseFrom(frame.payload());
         int free = freeSlots(response.getItemsCount(), response.getCapacity());
+        shownFree = free == Integer.MAX_VALUE ? UNKNOWN : free;
         if (free > WARN_FREE_SLOTS) {
             warned = false;
         } else if (!warned) {

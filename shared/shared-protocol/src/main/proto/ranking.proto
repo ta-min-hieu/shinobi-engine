@@ -51,3 +51,33 @@ message GetLeaderboardResponse {
   int64 own_value = 4;
   int64 computed_at_epoch_ms = 5;
 }
+
+// ADR-439…442 (2026-11-14, lô 64) — bốn bảng xếp hạng "sưu tầm": linh thú, cường hoá, nhiệm vụ, hạ boss. Một dòng chung.
+message ScoreEntry {
+  string name = 1;  // tên nhân vật
+  int64 value = 2;  // cấp linh thú / cấp cường hoá cao nhất / số nhiệm vụ / số lần hạ boss
+}
+
+// ADR-439 — top 10 linh thú cấp cao nhất (mỗi nhân vật tính con cao nhất). Request: Client -> Server.
+message GetPetRankingRequest {}
+message GetPetRankingResponse {
+  repeated ScoreEntry entries = 1;
+}
+
+// ADR-440 — top 10 món cường hoá cao nhất trong túi/đang mặc (mỗi nhân vật một dòng). Request: Client -> Server.
+message GetEnhanceRankingRequest {}
+message GetEnhanceRankingResponse {
+  repeated ScoreEntry entries = 1;
+}
+
+// ADR-441 — top 10 số nhiệm vụ đã hoàn thành (COMPLETED + CLAIMED). Request: Client -> Server.
+message GetQuestRankingRequest {}
+message GetQuestRankingResponse {
+  repeated ScoreEntry entries = 1;
+}
+
+// ADR-442 — top 10 số lần hạ boss (audit BOSS_KILL, ADR-296). Request: Client -> Server.
+message GetBossKillRankingRequest {}
+message GetBossKillRankingResponse {
+  repeated ScoreEntry entries = 1;
+}

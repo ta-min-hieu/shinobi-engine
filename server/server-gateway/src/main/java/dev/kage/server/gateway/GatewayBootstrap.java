@@ -895,7 +895,14 @@ public final class GatewayBootstrap {
                                                         wiring.wireEnemyAlertFacade(),
                                                         new Lot63Facades( // lô 63 lồng ở đây
                                                                 wiring.wireOnlineStatsFacade(),
-                                                                wiring.wireIntimacyRankingFacade())))))));
+                                                                wiring.wireIntimacyRankingFacade(),
+                                                                lot64Facades(wiring))))))));
+    }
+
+    /** Facade lô 64 (ADR-439…) — tách ra cho khỏi lồng quá sâu. */
+    private static Lot64Facades lot64Facades(dev.kage.server.database.Lot45Wiring wiring) {
+        return new Lot64Facades(
+                wiring.wireGearRankingFacade(), wiring.wireQuestRankingFacade(), wiring.wireBossKillRankingFacade());
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */

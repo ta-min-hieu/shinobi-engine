@@ -29,6 +29,11 @@ record Lot63Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
 
     private static final Logger LOG = LoggerFactory.getLogger(Lot63Commands.class);
 
+    /** Lớp lệnh lô 64 (ADR-439…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot64Commands lot64() {
+        return new Lot64Commands(gateway, registry);
+    }
+
     /** ADR-431 — top 10 giây online đã lưu của hôm nay (giờ Việt Nam). */
     GetDiligenceRankingResponse diligenceRanking() {
         LocalDate today = LocalDate.ofInstant(Instant.now(), NewPlayersFacade.DAY_ZONE);
