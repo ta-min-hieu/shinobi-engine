@@ -21,6 +21,8 @@ final class ReminderTimerCoordinator implements WindowFlow {
     static final int MAX_TIMERS = 5;
     static final int MAX_MINUTES = 600;
     private static final float SECONDS_PER_MINUTE = 60f;
+    private static final long MILLIS_PER_MINUTE = 60_000L;
+    private static final long MILLIS_PER_SECOND = 1_000L;
 
     /** Một lời nhắc đã hẹn. */
     record Parsed(int minutes, String text) {}
@@ -29,6 +31,7 @@ final class ReminderTimerCoordinator implements WindowFlow {
     private final I18NBundle i18n = KageI18n.load();
     private final List<Timer.Task> tasks = new ArrayList<>();
     private final List<String> labels = new ArrayList<>();
+    private final List<Long> dueAtMillis = new ArrayList<>(); // ADR-437 — giờ đến hạn từng lời nhắc
 
     ReminderTimerCoordinator(ChatCoordinator chat) {
         this.chat = chat;
@@ -60,6 +63,7 @@ final class ReminderTimerCoordinator implements WindowFlow {
             tasks.forEach(Timer.Task::cancel);
             tasks.clear();
             labels.clear();
+            dueAtMillis.clear();
             chat.showSystemNotice(KageI18n.textOrKey(i18n, "remind.cleared"));
         } else {
             schedule(argument);
@@ -87,6 +91,7 @@ final class ReminderTimerCoordinator implements WindowFlow {
                         if (index >= 0) {
                             tasks.remove(index);
                             labels.remove(index);
+                            dueAtMillis.remove(index);
                         }
                         chat.showSystemNotice(KageI18n.formatOrKey(i18n, "remind.fire", text));
                     }
@@ -94,8 +99,23 @@ final class ReminderTimerCoordinator implements WindowFlow {
                 parsed.get().minutes() * SECONDS_PER_MINUTE);
         tasks.add(holder[0]);
         labels.add(text);
+        dueAtMillis.add(System.currentTimeMillis() + parsed.get().minutes() * MILLIS_PER_MINUTE);
         chat.showSystemNotice(
                 KageI18n.formatOrKey(i18n, "remind.set", parsed.get().minutes(), text));
+    }
+
+    /** ADR-437 — số giây tới lời nhắc gần nhất lúc {@code nowMillis}; không có ⇒ -1. */
+    long secondsToNext(long nowMillis) {
+        return secondsToNext(dueAtMillis, nowMillis);
+    }
+
+    /** Giây tới mốc sớm nhất (âm ⇒ 0); danh sách rỗng ⇒ -1. Tĩnh để test. */
+    static long secondsToNext(List<Long> due, long nowMillis) {
+        long next = Long.MAX_VALUE;
+        for (long at : due) {
+            next = Math.min(next, at);
+        }
+        return next == Long.MAX_VALUE ? -1L : Math.max(0L, (next - nowMillis) / MILLIS_PER_SECOND);
     }
 
     private void list() {

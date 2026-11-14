@@ -1029,3 +1029,29 @@ message GetNewPlayersResponse {
   int32 count = 1;
   repeated string newest = 2; // tối đa 5 tên, mới nhất trước
 }
+
+// ADR-431 (2026-11-14) — xếp hạng chăm chỉ hôm nay (giây online đã lưu, ngày giờ Việt Nam). Request: Client -> Server.
+message GetDiligenceRankingRequest {}
+
+message DiligenceRank {
+  string name = 1;
+  int32 seconds = 2;
+}
+
+// Response: Server -> Client (OPCODE_GET_DILIGENCE_RANKING_RESPONSE). Top 10, nhiều trước.
+message GetDiligenceRankingResponse {
+  repeated DiligenceRank entries = 1;
+}
+
+// ADR-432 (2026-11-14) — thời gian online 7 ngày của chính mình. Request: Client -> Server.
+message GetOnlineWeekRequest {}
+
+message OnlineDay {
+  int64 day_epoch_days = 1; // LocalDate.toEpochDay()
+  int32 seconds = 2;
+}
+
+// Response: Server -> Client (OPCODE_GET_ONLINE_WEEK_RESPONSE). Đủ 7 ngày, cũ trước; hôm nay gồm cả phiên đang chơi.
+message GetOnlineWeekResponse {
+  repeated OnlineDay days = 1;
+}

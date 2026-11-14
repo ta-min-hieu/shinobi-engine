@@ -566,3 +566,17 @@ message SetEnemyAlertCommand {
 message SetEnemyAlertResponse {
   bool enabled = 1;
 }
+
+// ADR-434 (2026-11-14) — xếp hạng thân mật. Request: Client -> Server (OPCODE_GET_INTIMACY_RANKING_REQUEST).
+message GetIntimacyRankingRequest {}
+
+message IntimacyPair {
+  string first_name = 1;
+  string second_name = 2;
+  int32 intimacy = 3;
+}
+
+// Response: Server -> Client (OPCODE_GET_INTIMACY_RANKING_RESPONSE). Top 10 cặp, thân nhất trước.
+message GetIntimacyRankingResponse {
+  repeated IntimacyPair pairs = 1;
+}

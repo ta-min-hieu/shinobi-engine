@@ -122,6 +122,8 @@ public final class ChatPanel implements HudWindow {
     /** ADR-364 — tin của bạn bè. */
     private static final Color FRIEND_COLOR = Color.valueOf("B6F27A");
 
+    private static final Color SELF_COLOR = Color.valueOf("8FE3FF"); // ADR-436 — tin của chính mình
+
     private final Stage stage;
     private final Table panel;
     private final List<Label> lineLabels = new ArrayList<>();
@@ -559,7 +561,9 @@ public final class ChatPanel implements HudWindow {
         /** ADR-245 — tin có nhắc tên mình. */
         MENTION,
         /** ADR-364 — tin của một người bạn (kênh công khai). */
-        FRIEND
+        FRIEND,
+        /** ADR-436 — tin của chính mình. */
+        SELF
     }
 
     /** ADR-339 — đặt màu riêng cho một loại dòng; rỗng = trả về màu mặc định. Áp từ lần vẽ danh sách kế tiếp. */
@@ -586,6 +590,7 @@ public final class ChatPanel implements HudWindow {
             case BROADCAST -> BROADCAST_COLOR;
             case MENTION -> MENTION_COLOR;
             case FRIEND -> FRIEND_COLOR;
+            case SELF -> SELF_COLOR;
         };
     }
 

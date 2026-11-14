@@ -411,6 +411,9 @@ final class ChatCoordinator implements WindowFlow {
 
     /** Màu dòng: nhắc tên mình (ADR-245) > tin bạn bè ở kênh công khai (ADR-364) > màu kênh. */
     private ChatPanel.LineKind lineKind(ChatController.Line line) {
+        if (!line.senderName().isEmpty() && isOwnName(bareName(line.senderName()))) {
+            return ChatPanel.LineKind.SELF; // ADR-436 — tin của chính mình
+        }
         if (mentions.mentions(line.senderName(), line.body()) || highlighted.test(line.body())) {
             return ChatPanel.LineKind.MENTION; // ADR-245, ADR-429 — từ khoá theo dõi dùng chung màu nhắc tên
         }

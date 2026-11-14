@@ -201,7 +201,7 @@ record ExpansionWindows(
         lot55.hudExtras().useHud(hud::setLocalClockVisible, hud::setKillCountVisible);
         lot55.lot56().goldGain().useSink(text -> feedback.showSelfText(text, FloatingCombatText.GOLD_GAIN)); // ADR-379
         wireLot57Display(lot55.lot56().lot57(), hud, feedback);
-        wireLot58Display(lot55.lot56().lot57().lot58(), hud);
+        wireLot58Display(lot55.lot56().lot57().lot58(), hud, feedback);
     }
 
     /** Lớp hiển thị lô 57: rút gọn số sát thương (ADR-387), chữ bay tin riêng khi ẩn chat / ping cao (ADR-389/390). */
@@ -213,7 +213,8 @@ record ExpansionWindows(
     }
 
     /** Lớp hiển thị lô 58: toạ độ trên HUD (ADR-396), công tắc ẩn nhãn mình (ADR-398). */
-    private void wireLot58Display(Lot58Windows lot58, dev.kage.client.core.ui.hud.CombatHud hud) {
+    private void wireLot58Display(
+            Lot58Windows lot58, dev.kage.client.core.ui.hud.CombatHud hud, CombatFeedbackPresenter feedback) {
         lot58.chatView().useDisplaySettings(displaySettings.settings());
         lot58.chatView()
                 .useCoordsHud(
@@ -227,6 +228,19 @@ record ExpansionWindows(
                 .useHud((line, value) -> hud.addCounterLine(line.prefixKey, value, line.clock));
         ChatLensCoordinator lens = lot58.lot59().lot60().lot61().lot62().lens(); // ADR-427 — tin mới khi ẩn chat
         lens.useHud(hud.addCounterLine("hud.unseen_chat", lens::unseenCount, false));
+        wireLot63Display(lot58.lot59().lot60().lot61().lot62().lot63(), hud, feedback);
+    }
+
+    /** Lớp hiển thị lô 63: kỹ năng sẵn sàng (ADR-435), nhắc việc trên HUD (ADR-437), ẩn cụm dòng phụ (ADR-438). */
+    private void wireLot63Display(
+            Lot63Windows lot63, dev.kage.client.core.ui.hud.CombatHud hud, CombatFeedbackPresenter feedback) {
+        HudPolishCoordinator polish = lot63.polish();
+        polish.useSink(text -> feedback.showSelfText(text, FloatingCombatText.LEVEL_UP));
+        hud.useSkillReadyListener(polish::onSkillReady);
+        ReminderTimerCoordinator reminders = lot39().lot40().lot41().reminders();
+        hud.addCounterLine("hud.next_reminder", () -> reminders.secondsToNext(System.currentTimeMillis()), true)
+                .accept(true);
+        polish.useInfoLines(hud::setInfoLinesVisible);
     }
 
     /**

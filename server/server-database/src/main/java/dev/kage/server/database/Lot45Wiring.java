@@ -201,6 +201,18 @@ public final class Lot45Wiring {
                 new dev.kage.server.database.pvp.PostgresEnemyAlertAdapter(dataSource));
     }
 
+    /** ADR-431/432 — thống kê online (chăm chỉ hôm nay, 7 ngày). */
+    public dev.kage.checkin.api.OnlineStatsFacade wireOnlineStatsFacade() {
+        return new dev.kage.checkin.api.OnlineStatsFacade(
+                new dev.kage.server.database.checkin.PostgresOnlineStatsAdapter(dataSource));
+    }
+
+    /** ADR-434 — xếp hạng thân mật. */
+    public dev.kage.friend.api.IntimacyRankingFacade wireIntimacyRankingFacade() {
+        return new dev.kage.friend.api.IntimacyRankingFacade(
+                new dev.kage.server.database.friend.PostgresIntimacyRankingAdapter(dataSource));
+    }
+
     /** ADR-288 — lịch sử mua cửa hàng NPC. */
     public dev.kage.shop.api.PurchaseHistoryFacade wirePurchaseHistoryFacade() {
         return new dev.kage.shop.api.PurchaseHistoryFacade(

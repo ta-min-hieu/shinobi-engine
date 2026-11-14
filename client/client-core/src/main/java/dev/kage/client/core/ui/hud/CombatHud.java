@@ -51,6 +51,8 @@ public final class CombatHud implements HudWindow {
     private final HudQuestCard quest;
     private final HudBanners banners;
     private java.util.function.LongConsumer latencyListener = roundTripMs -> {}; // ADR-390
+    private Runnable skillReadyListener = () -> {}; // ADR-435
+    private boolean skillWasReady = true;
     private final StringBuilder fpsText = new StringBuilder(); // ADR-283
     private final Table hintBar; // ADR-318
     private final Label fpsLabel;
@@ -383,7 +385,21 @@ public final class CombatHud implements HudWindow {
     }
 
     public void setSkillReady(boolean ready) {
+        if (ready && !skillWasReady) {
+            skillReadyListener.run(); // ADR-435 — vừa hết hồi chiêu
+        }
+        skillWasReady = ready;
         actions.setSkillReady(ready);
+    }
+
+    /** ADR-435 — nghe lúc kỹ năng vừa chuyển sang sẵn sàng. */
+    public void useSkillReadyListener(Runnable listener) {
+        this.skillReadyListener = listener;
+    }
+
+    /** ADR-438 — ẩn/hiện cả cụm dòng số nhỏ góc dưới trái (giữ nguyên công tắc riêng từng dòng). */
+    public void setInfoLinesVisible(boolean visible) {
+        infoLines.group().setVisible(visible);
     }
 
     /**

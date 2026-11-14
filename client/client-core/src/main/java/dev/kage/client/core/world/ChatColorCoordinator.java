@@ -29,7 +29,8 @@ final class ChatColorCoordinator implements WindowFlow {
             "hethong", ChatPanel.LineKind.SYSTEM,
             "loa", ChatPanel.LineKind.BROADCAST,
             "nhacten", ChatPanel.LineKind.MENTION,
-            "banbe", ChatPanel.LineKind.FRIEND);
+            "banbe", ChatPanel.LineKind.FRIEND,
+            "minh", ChatPanel.LineKind.SELF); // ADR-436
 
     /** Bảng màu có tên. */
     static final Map<String, String> NAMED = Map.of(

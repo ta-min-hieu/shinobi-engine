@@ -32,6 +32,11 @@ record Lot62Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
 
     private static final Logger LOG = LoggerFactory.getLogger(Lot62Commands.class);
 
+    /** Lớp lệnh lô 63 (ADR-431…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot63Commands lot63() {
+        return new Lot63Commands(gateway, registry);
+    }
+
     /** ADR-423 — tên bang hiện tại của người gọi (trước khi đổi tên). */
     Optional<GuildFacade.MyGuildView> myGuild(long characterId) {
         return guilds().findMyGuild(characterId);

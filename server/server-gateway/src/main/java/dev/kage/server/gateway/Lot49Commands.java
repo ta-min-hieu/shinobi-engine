@@ -160,6 +160,7 @@ record Lot49Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
         } catch (RuntimeException e) {
             LOG.warn("Việc phụ lô 49 khi lên cấp lỗi: characterId={}, level={}", characterId, level, e);
         }
+        new Lot63Commands(gateway, registry).onLevelReached(characterId, level); // ADR-433 — báo bang đột phá
     }
 
     private void rewardReferral(long referredId, long referrerId) {
