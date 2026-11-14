@@ -33,4 +33,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 55): `Lot55Commands.officerChat`, `OfficerChatCoordinator` (bộ đổi tin nối tiếp `ChatCoordinator.useEventRewriter`).
 2. ✅ Test: đường quyền dùng `GuildFacade.MyGuildView` sẵn có; kiểm sống.
-3. LIVE367
+3. ✅ Kiểm sống gameProbe 2026-11-14: ĐạoHữu01 (bang chủ) `officerChat` ⇒ OK và nhận tin kênh bang; BaoDo01 (thành viên thường, đang online) KHÔNG nhận tin đó; BaoDo01 gửi ⇒ NOT_OFFICER.

@@ -43,9 +43,19 @@ record Lot55Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
             return officer(OfficerChatOutcome.OFFICER_CHAT_OUTCOME_NOT_OFFICER);
         }
         String body = ChatMessage.singleLine(command.getBody()).strip();
-        if (body.isEmpty() || body.length() > MAX_OFFICER_BODY || ProfanityFilter.containsBannedWord(body)) {
+        if (!validOfficerBody(body)) {
             return officer(OfficerChatOutcome.OFFICER_CHAT_OUTCOME_INVALID_TEXT);
         }
+        broadcastToOfficers(characterId, body);
+        return officer(OfficerChatOutcome.OFFICER_CHAT_OUTCOME_OK);
+    }
+
+    /** Không rỗng, ≤ {@value #MAX_OFFICER_BODY} ký tự, không từ cấm. Tĩnh để test. */
+    static boolean validOfficerBody(String body) {
+        return !body.isEmpty() && body.length() <= MAX_OFFICER_BODY && !ProfanityFilter.containsBannedWord(body);
+    }
+
+    private void broadcastToOfficers(long characterId, String body) {
         String sender = gateway.characterFacade()
                 .findById(characterId)
                 .map(Character::name)
@@ -64,7 +74,6 @@ record Lot55Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
                         member.characterId(), Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE, 0, event);
             }
         }
-        return officer(OfficerChatOutcome.OFFICER_CHAT_OUTCOME_OK);
     }
 
     private static OfficerChatResponse officer(OfficerChatOutcome outcome) {

@@ -33,4 +33,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 55): `StrangerWhisperLimiter`, `Lot55Commands.mayWhisper`, `GatewayChannelHandler.resolvePrivateTarget`.
 2. ✅ Test: `Lot55ServerTest.limitsDistinctStrangersPerWindow`.
-3. LIVE369
+3. ⏳ Chưa kiểm sống: dữ liệu thử chỉ có 3 nhân vật lạ, không đủ 6 để chạm ngưỡng; phủ bằng `Lot55ServerTest.limitsDistinctStrangersPerWindow` (ngưỡng, nhắn lại người cũ, người gửi khác, hết cửa sổ).

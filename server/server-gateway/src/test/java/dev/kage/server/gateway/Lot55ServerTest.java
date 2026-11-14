@@ -25,6 +25,13 @@ class Lot55ServerTest {
     }
 
     @Test
+    void validatesOfficerBody() {
+        assertThat(Lot55Commands.validOfficerBody("họp bang tối nay")).isTrue();
+        assertThat(Lot55Commands.validOfficerBody("")).isFalse();
+        assertThat(Lot55Commands.validOfficerBody("x".repeat(201))).isFalse();
+    }
+
+    @Test
     void parsesMinLevel() {
         assertThat(Lot55Commands.parseMinLevel(null)).isEqualTo(Lot55Commands.DEFAULT_WORLD_CHAT_MIN_LEVEL);
         assertThat(Lot55Commands.parseMinLevel(" 0 ")).isZero();

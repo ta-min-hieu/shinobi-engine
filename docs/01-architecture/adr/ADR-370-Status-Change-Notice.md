@@ -33,4 +33,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 55): `Lot55Commands.notifyStatusChanged`/`statusLine` (gọi từ `Lot51Commands.setStatusMessage`).
 2. ✅ Test: `Lot55ServerTest.statusLineNamesFriend`.
-3. LIVE370
+3. ✅ Kiểm sống gameProbe 2026-11-14: BaoDo01 đang online; ĐạoHữu01 đặt lời nhắn ⇒ BaoDo01 nhận "ĐạoHữu01 đổi lời nhắn: …"; xoá lời nhắn ⇒ không báo. Đã xoá lời nhắn thử.

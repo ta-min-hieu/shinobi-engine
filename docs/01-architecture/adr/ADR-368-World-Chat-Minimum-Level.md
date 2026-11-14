@@ -35,4 +35,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 55): `Lot55Commands.mayChatPublicly`/`parseMinLevel`, `GatewayChannelHandler.isChannelMembershipValid`, `ChatController` (câu báo).
 2. ✅ Test: `Lot55ServerTest.parsesMinLevel`, `Lot55ClientTest.newOutcomesHaveMessages`.
-3. LIVE368
+3. ✅ Kiểm sống gameProbe 2026-11-14 (cấu hình mặc định 5): BaoDo01 (cấp 2) chat kênh thế giới ⇒ `SEND_CHAT_MESSAGE_OUTCOME_LEVEL_TOO_LOW`.
