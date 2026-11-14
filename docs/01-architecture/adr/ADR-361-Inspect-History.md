@@ -33,4 +33,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 54): `ProfileVisitPort.recordInspect`/`inspectHistory`, `Lot54Commands.guardInspect`/`inspectHistory` (gọi từ `Lot46Commands.withLikesAndNotice`), `ProfileVisitsCoordinator`.
 2. ✅ Test: `Lot54IntegrationTest.inspectLogKeepsNewestAndFriendsOnlyToggles`.
-3. LIVE361
+3. ✅ Kiểm sống gameProbe 2026-11-14: BaoDo01 soi ĐạoHữu01 lúc ĐạoHữu01 offline; ĐạoHữu01 vào `inspectedBy` ⇒ BaoDo01; lần soi bị HIDDEN (người lạ) KHÔNG ghi. Đã xoá dòng thử.

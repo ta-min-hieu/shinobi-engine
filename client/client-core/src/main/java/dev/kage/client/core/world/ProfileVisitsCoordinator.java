@@ -5,9 +5,11 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import java.util.Map;
 
 import com.badlogic.gdx.utils.I18NBundle;
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.google.protobuf.Message;
 
 import dev.kage.client.core.ui.theme.KageI18n;
 import dev.kage.protocol.GetInspectHistoryRequest;
@@ -43,24 +45,33 @@ final class ProfileVisitsCoordinator implements WindowFlow {
         chat.addSlashCommands(this::onSlash);
     }
 
+    /** Lệnh chỉ cần gửi một yêu cầu rỗng: tên lệnh ⇒ (opcode, gói). */
+    private static final Map<String, Map.Entry<Integer, Message>> SIMPLE_REQUESTS = Map.of(
+            "/dochetthu",
+            Map.entry(Opcode.OPCODE_MARK_ALL_MAIL_READ_COMMAND_VALUE, MarkAllMailReadCommand.getDefaultInstance()),
+            "/readall",
+            Map.entry(Opcode.OPCODE_MARK_ALL_MAIL_READ_COMMAND_VALUE, MarkAllMailReadCommand.getDefaultInstance()),
+            "/aithich",
+            Map.entry(Opcode.OPCODE_GET_PROFILE_LIKERS_REQUEST_VALUE, GetProfileLikersRequest.getDefaultInstance()),
+            "/likers",
+            Map.entry(Opcode.OPCODE_GET_PROFILE_LIKERS_REQUEST_VALUE, GetProfileLikersRequest.getDefaultInstance()),
+            "/aisoi",
+            Map.entry(Opcode.OPCODE_GET_INSPECT_HISTORY_REQUEST_VALUE, GetInspectHistoryRequest.getDefaultInstance()),
+            "/inspectedby",
+            Map.entry(Opcode.OPCODE_GET_INSPECT_HISTORY_REQUEST_VALUE, GetInspectHistoryRequest.getDefaultInstance()));
+
     private boolean onSlash(String line) {
         String[] words = line.strip().split("\\s+", 2);
         String command = words[0].toLowerCase(Locale.ROOT);
-        switch (command) {
-            case "/dochetthu", "/readall" ->
-                sender.sendReadRequest(
-                        Opcode.OPCODE_MARK_ALL_MAIL_READ_COMMAND_VALUE, MarkAllMailReadCommand.getDefaultInstance());
-            case "/aithich", "/likers" ->
-                sender.sendReadRequest(
-                        Opcode.OPCODE_GET_PROFILE_LIKERS_REQUEST_VALUE, GetProfileLikersRequest.getDefaultInstance());
-            case "/aisoi", "/inspectedby" ->
-                sender.sendReadRequest(
-                        Opcode.OPCODE_GET_INSPECT_HISTORY_REQUEST_VALUE, GetInspectHistoryRequest.getDefaultInstance());
-            case "/chobanbesoi", "/friendsinspect" -> friendsOnly(words.length > 1 ? words[1].strip() : "");
-            default -> {
-                return false;
-            }
+        if ("/chobanbesoi".equals(command) || "/friendsinspect".equals(command)) {
+            friendsOnly(words.length > 1 ? words[1].strip() : "");
+            return true;
         }
+        Map.Entry<Integer, Message> request = SIMPLE_REQUESTS.get(command);
+        if (request == null) {
+            return false;
+        }
+        sender.sendReadRequest(request.getKey(), request.getValue());
         return true;
     }
 

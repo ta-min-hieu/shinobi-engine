@@ -33,4 +33,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 54): `ProfileVisitPort.recentLikers`, `PostgresProfileVisitAdapter`, `Lot54Commands.profileLikers`, `ProfileVisitsCoordinator`.
 2. ✅ Test: `Lot54IntegrationTest.likersNewestDayFirst`.
-3. LIVE360
+3. ✅ Kiểm sống gameProbe 2026-11-14: thêm một lượt thích thử BaoDo01 → ĐạoHữu01; `likers` ⇒ tổng=1 BaoDo01. Đã xoá lượt thử.

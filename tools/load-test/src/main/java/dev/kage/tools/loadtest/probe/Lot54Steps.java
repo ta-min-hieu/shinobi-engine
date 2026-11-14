@@ -26,34 +26,8 @@ final class Lot54Steps {
                         p -> "đãĐọc="
                                 + dev.kage.protocol.MarkAllMailReadResponse.parseFrom(p)
                                         .getMarked());
-            case "likers" ->
-                asker.ask(
-                        Opcode.OPCODE_GET_PROFILE_LIKERS_REQUEST_VALUE,
-                        dev.kage.protocol.GetProfileLikersRequest.getDefaultInstance(),
-                        Opcode.OPCODE_GET_PROFILE_LIKERS_RESPONSE_VALUE,
-                        p -> {
-                            dev.kage.protocol.GetProfileLikersResponse r =
-                                    dev.kage.protocol.GetProfileLikersResponse.parseFrom(p);
-                            StringBuilder out = new StringBuilder("tổng=").append(r.getTotal());
-                            for (dev.kage.protocol.ProfileLiker liker : r.getLikersList()) {
-                                out.append(' ').append(liker.getName());
-                            }
-                            return out.toString();
-                        });
-            case "inspectedBy" ->
-                asker.ask(
-                        Opcode.OPCODE_GET_INSPECT_HISTORY_REQUEST_VALUE,
-                        dev.kage.protocol.GetInspectHistoryRequest.getDefaultInstance(),
-                        Opcode.OPCODE_GET_INSPECT_HISTORY_RESPONSE_VALUE,
-                        p -> {
-                            StringBuilder out = new StringBuilder("bịSoi");
-                            for (dev.kage.protocol.InspectVisit visit :
-                                    dev.kage.protocol.GetInspectHistoryResponse.parseFrom(p)
-                                            .getVisitsList()) {
-                                out.append(' ').append(visit.getViewerName());
-                            }
-                            return out.toString();
-                        });
+            case "likers" -> likers();
+            case "inspectedBy" -> inspectedBy();
             case "friendsOnly" ->
                 asker.ask(
                         Opcode.OPCODE_SET_INSPECT_FRIENDS_ONLY_COMMAND_VALUE,
@@ -67,5 +41,36 @@ final class Lot54Steps {
                                         .getEnabled());
             default -> "bước không hiểu";
         };
+    }
+
+    private String likers() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_PROFILE_LIKERS_REQUEST_VALUE,
+                dev.kage.protocol.GetProfileLikersRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_PROFILE_LIKERS_RESPONSE_VALUE,
+                p -> {
+                    dev.kage.protocol.GetProfileLikersResponse r =
+                            dev.kage.protocol.GetProfileLikersResponse.parseFrom(p);
+                    StringBuilder out = new StringBuilder("tổng=").append(r.getTotal());
+                    for (dev.kage.protocol.ProfileLiker liker : r.getLikersList()) {
+                        out.append(' ').append(liker.getName());
+                    }
+                    return out.toString();
+                });
+    }
+
+    private String inspectedBy() throws IOException {
+        return asker.ask(
+                Opcode.OPCODE_GET_INSPECT_HISTORY_REQUEST_VALUE,
+                dev.kage.protocol.GetInspectHistoryRequest.getDefaultInstance(),
+                Opcode.OPCODE_GET_INSPECT_HISTORY_RESPONSE_VALUE,
+                p -> {
+                    StringBuilder out = new StringBuilder("bịSoi");
+                    for (dev.kage.protocol.InspectVisit visit : dev.kage.protocol.GetInspectHistoryResponse.parseFrom(p)
+                            .getVisitsList()) {
+                        out.append(' ').append(visit.getViewerName());
+                    }
+                    return out.toString();
+                });
     }
 }

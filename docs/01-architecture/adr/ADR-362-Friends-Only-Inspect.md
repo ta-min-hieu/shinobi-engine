@@ -35,4 +35,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 54): `ProfileVisitPort.friendsOnly`/`setFriendsOnly`, `Lot54Commands.guardInspect`/`setInspectFriendsOnly`, `ProfileVisitsCoordinator`.
 2. ✅ Test: `Lot54IntegrationTest.inspectLogKeepsNewestAndFriendsOnlyToggles`.
-3. LIVE362
+3. ✅ Kiểm sống gameProbe 2026-11-14: `friendsOnly:on` ⇒ true; PhuTanThu (không phải bạn) soi ĐạoHữu01 ⇒ HIDDEN; BaoDo01 (bạn) soi ⇒ OK; `off` ⇒ false.

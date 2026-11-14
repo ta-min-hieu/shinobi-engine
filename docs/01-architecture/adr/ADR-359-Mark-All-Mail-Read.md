@@ -33,4 +33,4 @@
 
 1. ✅ Thi hành 2026-11-13 (lô 54): `MailReadPort.markAllRead`, `MailReadFacade.markAllRead`, `PostgresMailReadAdapter`, `Lot54Commands.markAllMailRead`, `ProfileVisitsCoordinator`.
 2. ✅ Test: `Lot54IntegrationTest.markAllReadCountsOnlyUnread`.
-3. LIVE359
+3. ✅ Kiểm sống gameProbe 2026-11-14: `readAllMail` ⇒ đãĐọc=2, lần hai ⇒ 0. Đã trả thư có sẵn về trạng thái chưa đọc và xoá thư thử.
