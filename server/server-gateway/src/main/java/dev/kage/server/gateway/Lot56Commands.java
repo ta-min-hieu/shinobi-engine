@@ -20,6 +20,11 @@ import dev.kage.protocol.SendPartyMailResponse;
 /** Lớp lệnh lô 56 (ADR-375…) — MỘT thành phần của {@link Lot55Commands}. Gọi trên Virtual Thread. */
 record Lot56Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 57 (ADR-383…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot57Commands lot57() {
+        return new Lot57Commands(gateway, registry);
+    }
+
     /** ADR-375 — tiêu đề thư nhóm tối đa (bằng thư thường). */
     static final int MAX_SUBJECT = 64;
 

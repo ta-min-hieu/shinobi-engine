@@ -147,6 +147,12 @@ public final class Lot45Wiring {
                 new dev.kage.server.database.character.PostgresPvpStatsAdapter(dataSource));
     }
 
+    /** ADR-383 — chế độ ẩn với bạn bè. */
+    public dev.kage.friend.api.InvisibleModeFacade wireInvisibleModeFacade() {
+        return new dev.kage.friend.api.InvisibleModeFacade(
+                new dev.kage.server.database.friend.PostgresInvisibleModeAdapter(dataSource));
+    }
+
     /** ADR-288 — lịch sử mua cửa hàng NPC. */
     public dev.kage.shop.api.PurchaseHistoryFacade wirePurchaseHistoryFacade() {
         return new dev.kage.shop.api.PurchaseHistoryFacade(

@@ -11,9 +11,11 @@ import dev.kage.protocol.Opcode;
 final class Lot56Steps {
 
     private final Lot23Scenario.Asker asker;
+    private final Lot57Steps lot57;
 
     Lot56Steps(Lot23Scenario.Asker asker) {
         this.asker = asker;
+        this.lot57 = new Lot57Steps(asker);
     }
 
     String step(String verb, String arg) throws IOException {
@@ -40,7 +42,7 @@ final class Lot56Steps {
                                     dev.kage.protocol.GetPersonalStatsResponse.parseFrom(p);
                             return "hạ=" + r.getPlayerKills() + " bịHạ=" + r.getDeathsByPlayer();
                         });
-            default -> "bước không hiểu";
+            default -> lot57.step(verb, arg);
         };
     }
 

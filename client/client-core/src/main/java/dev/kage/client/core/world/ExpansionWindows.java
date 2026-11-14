@@ -200,6 +200,15 @@ record ExpansionWindows(
         hud.useKillCount(lot39().lot40().lot41().lot42().lot43().session()::kills); // ADR-374
         lot55.hudExtras().useHud(hud::setLocalClockVisible, hud::setKillCountVisible);
         lot55.lot56().goldGain().useSink(text -> feedback.showSelfText(text, FloatingCombatText.GOLD_GAIN)); // ADR-379
+        wireLot57Display(lot55.lot56().lot57(), hud, feedback);
+    }
+
+    /** Lớp hiển thị lô 57: rút gọn số sát thương (ADR-387), chữ bay tin riêng khi ẩn chat / ping cao (ADR-389/390). */
+    private static void wireLot57Display(
+            Lot57Windows lot57, dev.kage.client.core.ui.hud.CombatHud hud, CombatFeedbackPresenter feedback) {
+        feedback.useCompactNumbers(lot57.compactDamage()::enabled);
+        lot57.alerts().useSink(text -> feedback.showSelfText(text, FloatingCombatText.EMOTE));
+        hud.useLatencyListener(lot57.alerts()::onLatency);
     }
 
     /**

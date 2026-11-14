@@ -22,6 +22,11 @@ public final class PostgresProfileLikeAdapter implements ProfileLikePort {
              GROUP BY c.id, c.name ORDER BY likes DESC, c.name LIMIT ?
             """;
 
+    private static final String TOP_SINCE = """
+            SELECT c.name, COUNT(*) AS likes FROM profile_like p JOIN character c ON c.id = p.target_id
+             WHERE p.liked_on >= ? GROUP BY c.id, c.name ORDER BY likes DESC, c.name LIMIT ?
+            """;
+
     private final DataSource dataSource;
 
     /** Dựng ở composition root. */
@@ -37,6 +42,16 @@ public final class PostgresProfileLikeAdapter implements ProfileLikePort {
     @Override
     public java.util.List<Ranked> top(int limit) {
         return JdbcOperations.query(dataSource, TOP, rs -> new Ranked(rs.getString("name"), rs.getInt("likes")), limit);
+    }
+
+    @Override
+    public java.util.List<Ranked> topSince(LocalDate from, int limit) {
+        return JdbcOperations.query(
+                dataSource,
+                TOP_SINCE,
+                rs -> new Ranked(rs.getString("name"), rs.getInt("likes")),
+                Date.valueOf(from),
+                limit);
     }
 
     @Override

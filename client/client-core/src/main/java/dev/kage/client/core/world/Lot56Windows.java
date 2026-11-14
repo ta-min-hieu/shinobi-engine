@@ -9,14 +9,16 @@ record Lot56Windows(
         PartyMailCoordinator partyMail,
         GoldGainCoordinator goldGain,
         ChatCompletionCoordinator completion,
-        ChatToolsCoordinator chatTools) {
+        ChatToolsCoordinator chatTools,
+        Lot57Windows lot57) {
 
     static Lot56Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot56Windows(
                 new PartyMailCoordinator(sender, feeds.chat()),
                 new GoldGainCoordinator(feeds.chat()),
                 new ChatCompletionCoordinator(feeds.chat()),
-                new ChatToolsCoordinator(feeds.chat()));
+                new ChatToolsCoordinator(feeds.chat()),
+                Lot57Windows.create(sender, feeds)); // lô 57 lồng ở đây
     }
 
     void registerInto(PanelHub panels) {
@@ -24,5 +26,6 @@ record Lot56Windows(
         panels.register(goldGain);
         panels.register(completion);
         panels.register(chatTools);
+        lot57.registerInto(panels);
     }
 }

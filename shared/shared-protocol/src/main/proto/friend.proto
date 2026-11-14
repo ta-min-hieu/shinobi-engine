@@ -507,3 +507,14 @@ message FriendRemovedEvent {
   int64 character_id = 1;
   string name = 2;
 }
+
+// ADR-383 (2026-11-14) — chế độ ẩn: bạn bè thấy mình như đang offline. Command: Client -> Server.
+message SetInvisibleCommand {
+  bool enabled = 1;
+  bool query_only = 2; // true = chỉ hỏi trạng thái, bỏ qua enabled
+}
+
+// Response: Server -> Client (OPCODE_SET_INVISIBLE_RESPONSE).
+message SetInvisibleResponse {
+  bool enabled = 1; // trạng thái SAU lệnh
+}

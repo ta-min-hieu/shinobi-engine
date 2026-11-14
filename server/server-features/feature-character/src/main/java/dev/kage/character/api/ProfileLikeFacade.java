@@ -11,6 +11,9 @@ public final class ProfileLikeFacade {
     /** ADR-305 — số dòng bảng xếp hạng. */
     public static final int TOP = 10;
 
+    /** ADR-384 — số ngày của "tuần" xếp hạng (trượt, gồm hôm nay). */
+    public static final int WEEK_DAYS = 7;
+
     /** Kết quả thích. */
     public enum Outcome {
         OK,
@@ -33,6 +36,11 @@ public final class ProfileLikeFacade {
 
                 @Override
                 public java.util.List<Ranked> top(int limit) {
+                    return java.util.List.of();
+                }
+
+                @Override
+                public java.util.List<Ranked> topSince(LocalDate from, int limit) {
                     return java.util.List.of();
                 }
             },
@@ -58,6 +66,11 @@ public final class ProfileLikeFacade {
     /** ADR-305 — top {@value #TOP} người được thích nhiều nhất. */
     public java.util.List<ProfileLikePort.Ranked> top() {
         return port.top(TOP);
+    }
+
+    /** ADR-384 — top {@value #TOP} theo lượt thích {@value #WEEK_DAYS} ngày gần nhất (gồm hôm nay). */
+    public java.util.List<ProfileLikePort.Ranked> topThisWeek() {
+        return port.topSince(LocalDate.now(clock).minusDays(WEEK_DAYS - 1L), TOP);
     }
 
     /** Tổng lượt thích. */

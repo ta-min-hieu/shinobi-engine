@@ -958,3 +958,18 @@ enum OfficerChatOutcome {
 message OfficerChatResponse {
   OfficerChatOutcome outcome = 1;
 }
+
+// ADR-385 (2026-11-14) — xếp hạng cấp trong bang. Request: Client -> Server (OPCODE_GET_GUILD_LEVEL_RANKING_REQUEST).
+message GetGuildLevelRankingRequest {}
+
+message GuildLevelRank {
+  string name = 1;
+  int32 level = 2;
+  bool online = 3;
+}
+
+// Response: Server -> Client (OPCODE_GET_GUILD_LEVEL_RANKING_RESPONSE). Mọi thành viên, cấp cao trước.
+message GetGuildLevelRankingResponse {
+  bool in_guild = 1; // false = chưa vào bang (entries rỗng)
+  repeated GuildLevelRank entries = 2;
+}

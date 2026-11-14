@@ -50,6 +50,7 @@ public final class CombatHud implements HudWindow {
     private final HudActionButtons actions;
     private final HudQuestCard quest;
     private final HudBanners banners;
+    private java.util.function.LongConsumer latencyListener = roundTripMs -> {}; // ADR-390
     private final StringBuilder fpsText = new StringBuilder(); // ADR-283
     private final Table hintBar; // ADR-318
     private final Label fpsLabel;
@@ -118,6 +119,11 @@ public final class CombatHud implements HudWindow {
         corner.add(nearbyLabel).left().row(); // ADR-325
         corner.add(fpsLabel).left();
         return corner;
+    }
+
+    /** ADR-390 — nghe mỗi nhịp đo độ trễ (cảnh báo ping cao). */
+    public void useLatencyListener(java.util.function.LongConsumer listener) {
+        this.latencyListener = listener;
     }
 
     /** ADR-325 — nguồn số người chơi khác đang thấy (đọc mỗi khung, chỉ đổi chữ khi số đổi). */
@@ -292,6 +298,7 @@ public final class CombatHud implements HudWindow {
      */
     public void setLatency(long roundTripMs) {
         banners.setLatency(roundTripMs);
+        latencyListener.accept(roundTripMs); // ADR-390
     }
 
     /** Quay về "chưa biết" — rời màn hình/mất kết nối, xem {@code ConnectionCoordinator#reset}. */

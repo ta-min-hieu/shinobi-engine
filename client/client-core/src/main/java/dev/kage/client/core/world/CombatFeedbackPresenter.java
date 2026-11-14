@@ -48,6 +48,7 @@ final class CombatFeedbackPresenter implements Disposable {
     private final ComboCounter combo = new ComboCounter(); // ADR-293
     private BooleanSupplier comboOn = () -> false; // ADR-293
     private BooleanSupplier colorblind = () -> false; // ADR-307
+    private BooleanSupplier compactNumbers = () -> false; // ADR-387
 
     /** ADR-307 — màu số sát thương PHẢI CHỊU ở chế độ mù màu: xanh dương, tách hẳn vàng của sát thương gây ra. */
     private static final Color DAMAGE_TAKEN_COLORBLIND = Color.valueOf("4AA3FF");
@@ -151,14 +152,15 @@ final class CombatFeedbackPresenter implements Disposable {
             return;
         }
         Color color = targetEntityId == localCharacterId ? takenColor() : FloatingCombatText.DAMAGE_DEALT;
+        String amount = compactNumbers.getAsBoolean() ? CompactNumber.format(damage) : Integer.toString(damage);
         if (nextIsCrit) { // ADR-350 — chí mạng: to hơn, cam, có dấu "!"
             floatingText.show(
-                    "-" + damage + "!",
+                    "-" + amount + "!",
                     targetEntityId == localCharacterId ? color : FloatingCombatText.CRIT,
                     anchor,
                     FloatingCombatText.CRIT_SCALE);
         } else {
-            floatingText.show("-" + damage, color, anchor);
+            floatingText.show("-" + amount, color, anchor); // ADR-387 — có thể rút gọn "1.2k"
         }
         if (attackerEntityId == localCharacterId && targetEntityId != localCharacterId) {
             countCombo();
@@ -175,6 +177,11 @@ final class CombatFeedbackPresenter implements Disposable {
 
     private Color takenColor() {
         return colorblind.getAsBoolean() ? DAMAGE_TAKEN_COLORBLIND : FloatingCombatText.DAMAGE_TAKEN;
+    }
+
+    /** ADR-387 — công tắc rút gọn số sát thương. */
+    void useCompactNumbers(BooleanSupplier enabled) {
+        this.compactNumbers = enabled;
     }
 
     /** ADR-307 — công tắc chế độ mù màu. */

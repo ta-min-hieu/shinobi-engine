@@ -14,6 +14,9 @@ public interface ProfileLikePort {
     /** ADR-305 — top {@code limit} người được thích nhiều nhất. */
     java.util.List<Ranked> top(int limit);
 
+    /** ADR-384 — top {@code limit} theo lượt thích nhận từ ngày {@code from} (gồm cả ngày đó) trở đi. */
+    java.util.List<Ranked> topSince(LocalDate from, int limit);
+
     /** Tổng lượt thích {@code targetId} đã nhận. */
     int likesOf(long targetId);
 }

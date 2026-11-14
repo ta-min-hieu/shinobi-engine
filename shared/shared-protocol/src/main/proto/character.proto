@@ -792,7 +792,9 @@ message LikeProfileResponse {
 }
 
 // ADR-305 (2026-11-13) — xếp hạng lượt thích hồ sơ. Request: Client -> Server (OPCODE_GET_LIKE_RANKING_REQUEST).
-message GetLikeRankingRequest {}
+message GetLikeRankingRequest {
+  bool weekly = 1; // ADR-384 — true = chỉ đếm lượt thích 7 ngày gần nhất
+}
 
 message LikeRank {
   string name = 1;
@@ -802,6 +804,7 @@ message LikeRank {
 // Response: Server -> Client (OPCODE_GET_LIKE_RANKING_RESPONSE). Top 10, nhiều trước.
 message GetLikeRankingResponse {
   repeated LikeRank entries = 1;
+  bool weekly = 2; // ADR-384 — nhắc lại yêu cầu, để client ghi đúng tiêu đề
 }
 
 // ADR-320 (2026-11-13) — nhập mã giới thiệu (mã = tên nhân vật người giới thiệu). Command: Client -> Server.

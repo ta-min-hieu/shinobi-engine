@@ -1323,6 +1323,62 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot56()
                                     .peakOnline())),
             Map.entry(
+                    Opcode.OPCODE_SET_INVISIBLE_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetInvisibleCommand.parser(),
+                            Opcode.OPCODE_SET_INVISIBLE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .setInvisible(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_GUILD_LEVEL_RANKING_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetGuildLevelRankingRequest.parser(),
+                            Opcode.OPCODE_GET_GUILD_LEVEL_RANKING_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .guildLevelRanking(id))),
+            Map.entry(
                     Opcode.OPCODE_OFFICER_CHAT_COMMAND_VALUE,
                     storageCommand(
                             dev.kage.protocol.OfficerChatCommand.parser(),
@@ -1949,19 +2005,24 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     storageCommand(
                             dev.kage.protocol.GetLikeRankingRequest.parser(),
                             Opcode.OPCODE_GET_LIKE_RANKING_RESPONSE_VALUE,
-                            (h, id, c) -> h.expansion
-                                    .lot37()
-                                    .lot38()
-                                    .lot39()
-                                    .lot40()
-                                    .lot41()
-                                    .lot42()
-                                    .lot43()
-                                    .lot44()
-                                    .lot45()
-                                    .lot46()
-                                    .lot47()
-                                    .likeRanking())),
+                            (h, id, c) -> h.lot57() // ADR-384 — weekly ⇒ 7 ngày, không thì như ADR-305
+                                    .likeRanking(
+                                            c,
+                                            c.getWeekly()
+                                                    ? dev.kage.protocol.GetLikeRankingResponse.getDefaultInstance()
+                                                    : h.expansion
+                                                            .lot37()
+                                                            .lot38()
+                                                            .lot39()
+                                                            .lot40()
+                                                            .lot41()
+                                                            .lot42()
+                                                            .lot43()
+                                                            .lot44()
+                                                            .lot45()
+                                                            .lot46()
+                                                            .lot47()
+                                                            .likeRanking()))),
             Map.entry(
                     Opcode.OPCODE_GET_BOSS_KILLS_REQUEST_VALUE,
                     storageCommand(
@@ -5598,7 +5659,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 responseBuilder.addFriends(FriendView.newBuilder()
                         .setCharacterId(friendId)
                         .setName(name)
-                        .setOnline(worldGateway.registry().isOnline(friendId))
+                        .setOnline(lot57().shownOnline(friendId)) // ADR-383 — bạn đang ẩn hiện offline
                         .setIntimacy(intimacy.getOrDefault(friendId, 0))
                         .setDaoLu(friendId == daoLuPartner)
                         .setNote(notes.getOrDefault(friendId, ""))
@@ -5625,6 +5686,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
     /** Lớp lệnh lô 56 (ADR-375…). */
     private Lot56Commands lot56() {
         return lot55().lot56();
+    }
+
+    /** Lớp lệnh lô 57 (ADR-383…). */
+    private Lot57Commands lot57() {
+        return lot56().lot57();
     }
 
     /** Lớp lệnh lô 52 (ADR-343…). */
@@ -8184,6 +8250,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
 
     /** Báo cho bạn bè ĐANG online của {@code characterId} rằng người này vừa vào/thoát world. */
     private void notifyFriendsPresenceChanged(long characterId, boolean online) {
+        if (lot57().isInvisible(characterId)) {
+            return; // ADR-383 — đang ẩn: bạn bè đã thấy offline, vào/thoát world không báo gì
+        }
         List<Long> friendIds = friendFacade.listFriends(characterId);
         if (friendIds.isEmpty()) {
             return;

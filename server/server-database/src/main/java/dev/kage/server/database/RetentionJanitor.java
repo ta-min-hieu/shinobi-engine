@@ -48,6 +48,9 @@ final class RetentionJanitor {
     /** ADR-180 — nhật ký bang giữ 90 ngày. */
     static final Duration GUILD_LOG_RETENTION = Duration.ofDays(90);
 
+    /** ADR-386 — thư đã đọc, không còn quà chưa nhận, không ghim, không lưu trữ: giữ 30 ngày kể từ lúc đọc. */
+    static final Duration READ_MAIL_RETENTION = Duration.ofDays(30);
+
     private static final Duration FIRST_RUN_DELAY = Duration.ofMinutes(1);
     private static final Duration PERIOD = Duration.ofHours(6);
 
@@ -66,6 +69,22 @@ final class RetentionJanitor {
 
     private static final String DELETE_CHAT_AUDIT_OLDER_THAN = """
             DELETE FROM audit_log WHERE action = 'CHAT_MESSAGE' AND created_at < ?
+            """;
+
+    /**
+     * ADR-386 — một câu lệnh: CTE chọn thư cũ, xoá {@code mail_item} của chúng rồi xoá thư (khoá ngoại kiểm ở cuối
+     * câu lệnh). Thư có vàng/vật phẩm chưa nhận ({@code claimed_at IS NULL}) không bao giờ bị dọn.
+     */
+    private static final String DELETE_OLD_READ_MAIL = """
+            WITH old AS (
+                SELECT m.id FROM mail m
+                 WHERE m.read_at < ? AND NOT m.pinned AND m.archived_at IS NULL
+                   AND (m.claimed_at IS NOT NULL
+                        OR (m.gold_amount = 0 AND NOT EXISTS (SELECT 1 FROM mail_item i WHERE i.mail_id = m.id)))
+            ), items AS (
+                DELETE FROM mail_item WHERE mail_id IN (SELECT id FROM old)
+            )
+            DELETE FROM mail WHERE id IN (SELECT id FROM old)
             """;
 
     private final DataSource dataSource;
@@ -114,6 +133,11 @@ final class RetentionJanitor {
     int purgeOfflineWhispers(Instant now) {
         return JdbcOperations.update(
                 dataSource, DELETE_OFFLINE_WHISPER_OLDER_THAN, Timestamp.from(now.minus(OFFLINE_WHISPER_RETENTION)));
+    }
+
+    /** ADR-386 — dọn thư đã đọc cũ hơn {@link #READ_MAIL_RETENTION}. Package-private để test gọi thẳng. */
+    int purgeOldReadMail(Instant now) {
+        return JdbcOperations.update(dataSource, DELETE_OLD_READ_MAIL, Timestamp.from(now.minus(READ_MAIL_RETENTION)));
     }
 
     int purgeChatAudit(Instant now) {
@@ -169,6 +193,14 @@ final class RetentionJanitor {
             purgeOfflineWhispers(now);
         } catch (RuntimeException e) {
             LOG.warn("Dọn tin nhắn riêng chờ giao thất bại — lượt sau dọn bù", e);
+        }
+        try {
+            int deleted = purgeOldReadMail(now);
+            if (deleted > 0) {
+                LOG.info("Đã dọn {} thư đã đọc cũ hơn {} ngày", deleted, READ_MAIL_RETENTION.toDays());
+            }
+        } catch (RuntimeException e) {
+            LOG.warn("Dọn thư cũ thất bại — lượt sau dọn bù", e);
         }
     }
 }

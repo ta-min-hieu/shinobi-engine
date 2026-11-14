@@ -79,7 +79,8 @@ final class BossDamageRankingCoordinator implements WindowFlow {
             chat.showSystemNotice(KageI18n.textOrKey(i18n, "toplikes.empty"));
             return;
         }
-        chat.showSystemNotice(KageI18n.textOrKey(i18n, "toplikes.header"));
+        chat.showSystemNotice(
+                KageI18n.textOrKey(i18n, response.getWeekly() ? "toplikes.header_week" : "toplikes.header")); // ADR-384
         int rank = 1;
         for (LikeRank entry : response.getEntriesList()) {
             chat.showSystemNotice(
