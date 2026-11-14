@@ -430,6 +430,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-396](ADR-396-Coordinates-Hud.md) | Toạ độ trên HUD: `/toadohud` dòng toạ độ trên HUD | ✅ Accepted (lô 58) |
 | [ADR-397](ADR-397-Friends-Only-Chat.md) | Lọc chat chỉ bạn bè: `/chatbanbe` ẩn kênh chung của người lạ | ✅ Accepted (lô 58) |
 | [ADR-398](ADR-398-Hide-Own-Title.md) | Ẩn nhãn của chính mình: `/annhanminh` + công tắc Cài đặt hiển thị | ✅ Accepted (lô 58) |
+| [ADR-399](ADR-399-Guild-Search.md) | Tìm bang theo tên: Tìm bang theo tên (top 10); `/timbang`, 795/796 | ✅ Accepted (lô 59) |
+| [ADR-400](ADR-400-Mail-Read-Receipt.md) | Báo đã đọc thư: Người gửi online được báo khi thư được đọc lần đầu | ✅ Accepted (lô 59) |
+| [ADR-401](ADR-401-Guild-Chat-History.md) | Xem lại chat bang: Phát lại 30 tin bang gần nhất; `/lichsubang`, 797/798 | ✅ Accepted (lô 59) |
+| [ADR-402](ADR-402-Whisper-Friends-Only.md) | Chỉ bạn bè được nhắn riêng: Người lạ không nhắn riêng được (V183); `/chibanbe`, 820/821 | ✅ Accepted (lô 59) |
+| [ADR-403](ADR-403-Fps-Limit.md) | Giới hạn FPS: `/gioihanfps 30|60|90|120|144|0` | ✅ Accepted (lô 59) |
+| [ADR-404](ADR-404-Repeat-Last-Command.md) | Lặp lại lệnh vừa gõ: `/.` chạy lại lệnh gần nhất | ✅ Accepted (lô 59) |
+| [ADR-405](ADR-405-Combat-Timer.md) | Đồng hồ giao chiến: HUD "Giao chiến" khi đang đánh; `/giaochien` | ✅ Accepted (lô 59) |
+| [ADR-406](ADR-406-Clock-Format.md) | Giờ dạng 12h/24h: `/dinhdanggio 12|24` | ✅ Accepted (lô 59) |
 ---
 
 ## ADR cần tạo (chưa viết)
