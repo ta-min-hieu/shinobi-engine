@@ -46,7 +46,7 @@ public final class ChatPanel implements HudWindow {
     public static final int MIN_VISIBLE_LINES = 4;
 
     /** ADR-363 — nhiều nhất bấy nhiêu dòng hiện cùng lúc (nhật ký giữ nhiều hơn để cuộn, ADR-395). */
-    public static final int MAX_VISIBLE_LINES = 12;
+    public static final int VISIBLE_LINES_CEILING = 12;
 
     /**
      * Phím mở ô nhập. Nằm ở đây chứ không ở {@code GameAction} vì đây KHÔNG phải ý định gameplay —
@@ -229,7 +229,7 @@ public final class ChatPanel implements HudWindow {
      * đáy, nên chỉ cần đưa {@code n} nhãn cuối vào bảng — {@link #setLines} không đổi.
      */
     public void setVisibleLines(int lines) {
-        int upper = Math.min(MAX_VISIBLE_LINES, lineLabels.size());
+        int upper = Math.min(VISIBLE_LINES_CEILING, lineLabels.size());
         int shown = Math.clamp(lines, Math.min(MIN_VISIBLE_LINES, upper), upper);
         visibleLines = shown;
         logTable.clearChildren();
@@ -287,6 +287,7 @@ public final class ChatPanel implements HudWindow {
      */
     private void installKeyHandling() {
         input.setFocusTraversal(false); // ADR-380 — Tab hoàn thành lệnh, không nhảy ô
+        installScrollKeys();
         stage.addListener(new InputListener() {
             @Override
             public boolean keyUp(InputEvent event, int keycode) {
@@ -305,11 +306,6 @@ public final class ChatPanel implements HudWindow {
 
             @Override
             public boolean keyDown(InputEvent event, int keycode) {
-                if (keycode == Input.Keys.PAGE_UP || keycode == Input.Keys.PAGE_DOWN) { // ADR-395
-                    int page = Math.max(1, visibleLines - 1);
-                    scroll(keycode == Input.Keys.PAGE_UP ? page : -page);
-                    return true;
-                }
                 if (!isComposing()) {
                     return false;
                 }
@@ -353,6 +349,21 @@ public final class ChatPanel implements HudWindow {
                 if (!isComposing()) {
                     openComposer();
                 }
+            }
+        });
+    }
+
+    /** ADR-395 — PageUp/PageDown cuộn nhật ký một trang (số dòng hiện − 1), đang gõ hay không cũng được. */
+    private void installScrollKeys() {
+        stage.addListener(new InputListener() {
+            @Override
+            public boolean keyDown(InputEvent event, int keycode) {
+                if (keycode != Input.Keys.PAGE_UP && keycode != Input.Keys.PAGE_DOWN) {
+                    return false;
+                }
+                int page = Math.max(1, visibleLines - 1);
+                scroll(keycode == Input.Keys.PAGE_UP ? page : -page);
+                return true;
             }
         });
     }
@@ -454,8 +465,8 @@ public final class ChatPanel implements HudWindow {
      * @param channelNames mã kênh của từng dòng, song song {@code renderedLines} — quyết định màu
      */
     public void setLines(List<String> renderedLines, List<LineKind> channelNames) {
-        shownLines = renderedLines;
-        shownKinds = channelNames;
+        shownLines = List.copyOf(renderedLines);
+        shownKinds = List.copyOf(channelNames);
         scrollBack = clampScroll(scrollBack, renderedLines.size(), visibleLines); // ADR-395 — giữ chỗ đang xem
         paintLines();
         // Dòng mới ⇒ hiện lại và đếm giờ từ đầu (xem IDLE_HIDE_SECONDS).

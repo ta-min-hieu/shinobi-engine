@@ -315,6 +315,12 @@ record ExpansionWindows(
                 .lot54()
                 .chatLines()
                 .useFriends(friends::isFriendName); // ADR-364
+        useLot58Friends(friends);
+        return this;
+    }
+
+    /** ADR-397 — lọc chat chỉ bạn bè dùng chung nguồn "là bạn" với tô màu bạn bè. */
+    private void useLot58Friends(FriendCoordinator friends) {
         lot39().lot40()
                 .lot41()
                 .lot42()
@@ -335,8 +341,7 @@ record ExpansionWindows(
                 .lot57()
                 .lot58()
                 .chatView()
-                .useFriends(friends::isFriendName); // ADR-397
-        return this;
+                .useFriends(friends::isFriendName);
     }
 
     /** ADR-323 / ADR-342 — nối thu phóng và rung camera vào camera thế giới 3D. */

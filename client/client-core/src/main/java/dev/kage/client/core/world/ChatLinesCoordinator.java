@@ -48,9 +48,9 @@ final class ChatLinesCoordinator implements WindowFlow {
             return false;
         }
         int lines = parse(words.length > 1 ? words[1].strip() : "");
-        if (lines < ChatPanel.MIN_VISIBLE_LINES || lines > ChatPanel.MAX_VISIBLE_LINES) {
+        if (lines < ChatPanel.MIN_VISIBLE_LINES || lines > ChatPanel.VISIBLE_LINES_CEILING) {
             chat.showSystemNotice(KageI18n.formatOrKey(
-                    i18n, "chatlines.usage", ChatPanel.MIN_VISIBLE_LINES, ChatPanel.MAX_VISIBLE_LINES));
+                    i18n, "chatlines.usage", ChatPanel.MIN_VISIBLE_LINES, ChatPanel.VISIBLE_LINES_CEILING));
             return true;
         }
         chat.panel().setVisibleLines(lines);

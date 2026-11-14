@@ -422,6 +422,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-388](ADR-388-Auto-Exit-Timer.md) | Hẹn giờ tự thoát game: `/henthoat <phút>`, báo trước 1 phút | ✅ Accepted (lô 57) |
 | [ADR-389](ADR-389-Whisper-Alert-When-Chat-Hidden.md) | Báo tin riêng khi ẩn chat: Chữ bay "Tin riêng: tên" khi chat ẩn | ✅ Accepted (lô 57) |
 | [ADR-390](ADR-390-High-Ping-Warning.md) | Cảnh báo ping cao: Ping > 300 ms × 3 nhịp ⇒ báo | ✅ Accepted (lô 57) |
+| [ADR-391](ADR-391-Player-Kill-Ranking.md) | Xếp hạng sát thủ PvP: Top 10 `player_kills`; `/topsatthu`, 1206/1207 | ✅ Accepted (lô 58) |
+| [ADR-392](ADR-392-Playtime-Ranking.md) | Xếp hạng thời gian tu luyện: Top 10 tổng giờ chơi; `/toptuluyen` | ✅ Accepted (lô 58) |
+| [ADR-393](ADR-393-Guild-Seniority.md) | Thâm niên trong bang: Thành viên theo ngày vào bang; `/thamnien`, 793/794 | ✅ Accepted (lô 58) |
+| [ADR-394](ADR-394-Comeback-Gift.md) | Quà quay lại: Vắng ≥ 7 ngày ⇒ thư 500 linh thạch | ✅ Accepted (lô 58) |
+| [ADR-395](ADR-395-Chat-Scrollback.md) | Cuộn khung chat: PageUp/PageDown cuộn 40 dòng gần nhất | ✅ Accepted (lô 58) |
+| [ADR-396](ADR-396-Coordinates-Hud.md) | Toạ độ trên HUD: `/toadohud` dòng toạ độ trên HUD | ✅ Accepted (lô 58) |
+| [ADR-397](ADR-397-Friends-Only-Chat.md) | Lọc chat chỉ bạn bè: `/chatbanbe` ẩn kênh chung của người lạ | ✅ Accepted (lô 58) |
+| [ADR-398](ADR-398-Hide-Own-Title.md) | Ẩn nhãn của chính mình: `/annhanminh` + công tắc Cài đặt hiển thị | ✅ Accepted (lô 58) |
 ---
 
 ## ADR cần tạo (chưa viết)

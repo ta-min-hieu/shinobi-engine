@@ -25,6 +25,8 @@ record Lot58Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
     /** ADR-394 — linh thạch của quà quay lại. */
     static final long COMEBACK_GOLD = 500L;
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(Lot58Commands.class);
+
     private static final String COMEBACK_SUBJECT = "Chào mừng trở lại / Welcome back";
     private static final String COMEBACK_BODY = "Đạo hữu đã vắng bóng một thời gian. Tông môn gửi chút linh thạch"
             + " làm lộ phí tu luyện. / You have been away a while — here are some spirit stones to get going again.";
@@ -67,17 +69,32 @@ record Lot58Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
      * ADR-394 — vào world sau khi vắng ít nhất {@link #COMEBACK_ABSENCE} ⇒ thư hệ thống kèm linh thạch. Khoá chống
      * trùng theo (nhân vật, mốc rời world lần trước) nên mỗi lần vắng chỉ một quà dù vào world lại bao nhiêu lần.
      */
+    // PMD AvoidCatchingGenericException: việc phụ của lần vào world — lỗi ở đây không được làm hỏng chọn nhân vật.
+    @SuppressWarnings("PMD.AvoidCatchingGenericException")
     void onEnteredWorld(long characterId, Instant lastLeft, Instant now) {
         if (!deservesComeback(lastLeft, now)) {
             return;
         }
-        gateway.contentFacades()
-                .socialFacades()
-                .mailFacade()
-                .sendMail(
-                        new MailFacade.SendMailRequest(
-                                null, characterId, COMEBACK_SUBJECT, COMEBACK_BODY, COMEBACK_GOLD, List.of()),
-                        "comeback:" + characterId + ":" + lastLeft.getEpochSecond());
+        try {
+            gateway.contentFacades()
+                    .socialFacades()
+                    .mailFacade()
+                    .sendMail(
+                            new MailFacade.SendMailRequest(
+                                    null, characterId, COMEBACK_SUBJECT, COMEBACK_BODY, COMEBACK_GOLD, List.of()),
+                            comebackKey(characterId, lastLeft));
+        } catch (RuntimeException e) {
+            LOG.warn("Gửi quà quay lại lỗi: characterId={}", characterId, e);
+        }
+    }
+
+    /** Khoá chống trùng (cột kiểu UUID): UUID tên theo (nhân vật, mốc rời world). Tĩnh để test. */
+    static String comebackKey(long characterId, Instant lastLeft) {
+        return java.util
+                .UUID
+                .nameUUIDFromBytes(("comeback:" + characterId + ":" + lastLeft.getEpochSecond())
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                .toString();
     }
 
     /** Vắng đủ lâu chưa. Tĩnh để test. */
