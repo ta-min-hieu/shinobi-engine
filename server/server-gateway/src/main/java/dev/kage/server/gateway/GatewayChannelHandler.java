@@ -1437,6 +1437,96 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot58()
                                     .guildSeniority(id))),
             Map.entry(
+                    Opcode.OPCODE_SEARCH_GUILDS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SearchGuildsRequest.parser(),
+                            Opcode.OPCODE_SEARCH_GUILDS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .searchGuilds(c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_GUILD_CHAT_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetGuildChatHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_GUILD_CHAT_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .guildChatHistory(id))),
+            Map.entry(
+                    Opcode.OPCODE_SET_WHISPER_FRIENDS_ONLY_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SetWhisperFriendsOnlyCommand.parser(),
+                            Opcode.OPCODE_SET_WHISPER_FRIENDS_ONLY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .setWhisperFriendsOnly(id, c))),
+            Map.entry(
                     Opcode.OPCODE_OFFICER_CHAT_COMMAND_VALUE,
                     storageCommand(
                             dev.kage.protocol.OfficerChatCommand.parser(),
@@ -5751,6 +5841,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return lot56().lot57();
     }
 
+    /** Lớp lệnh lô 59 (ADR-399…). */
+    private Lot59Commands lot59() {
+        return lot57().lot58().lot59();
+    }
+
     /** Lớp lệnh lô 52 (ADR-343…). */
     private Lot52Commands lot52() {
         return expansion
@@ -7508,6 +7603,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
         if (!lot55().mayWhisper(characterId, found.get().id())) { // ADR-369
             sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_STRANGER_LIMIT);
+            return Optional.empty();
+        }
+        if (!lot59().mayWhisperTo(characterId, found.get().id())) { // ADR-402
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_FRIENDS_ONLY);
             return Optional.empty();
         }
         return found;

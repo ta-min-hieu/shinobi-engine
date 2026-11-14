@@ -67,6 +67,7 @@ enum SendChatMessageOutcome {
   SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_ON_AREA = 15; // ADR-188 — kênh Khu vực không mang món khoe
   SEND_CHAT_MESSAGE_OUTCOME_LEVEL_TOO_LOW = 16; // ADR-368 — dưới cấp tối thiểu để chat thế giới / giao dịch
   SEND_CHAT_MESSAGE_OUTCOME_STRANGER_LIMIT = 17; // ADR-369 — nhắn riêng quá nhiều người lạ trong 10 phút
+  SEND_CHAT_MESSAGE_OUTCOME_FRIENDS_ONLY = 18; // ADR-402 — người nhận chỉ nhận tin riêng của bạn bè / người cùng bang
 }
 
 // Response: Server -> Client (OPCODE_SEND_CHAT_MESSAGE_RESPONSE).
@@ -277,4 +278,15 @@ message BulletinPost {
 // Response: Server -> Client (OPCODE_LIST_BULLETIN_RESPONSE). Mới trước, tối đa 20 tin còn hạn.
 message ListBulletinResponse {
   repeated BulletinPost posts = 1;
+}
+
+// ADR-402 (2026-11-14) — chỉ bạn bè (và người cùng bang) được nhắn riêng cho mình. Command: Client -> Server.
+message SetWhisperFriendsOnlyCommand {
+  bool enabled = 1;
+  bool query_only = 2; // true = chỉ hỏi trạng thái
+}
+
+// Response: Server -> Client (OPCODE_SET_WHISPER_FRIENDS_ONLY_RESPONSE).
+message SetWhisperFriendsOnlyResponse {
+  bool enabled = 1; // trạng thái SAU lệnh
 }

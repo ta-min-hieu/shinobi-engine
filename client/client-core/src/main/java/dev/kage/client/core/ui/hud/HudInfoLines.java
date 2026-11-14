@@ -17,7 +17,8 @@ final class HudInfoLines {
     private static final long SECONDS_PER_MINUTE = 60L;
     private static final long SECONDS_PER_HOUR = 3_600L;
     private static final int TWO_DIGITS = 10;
-    private static final int MINUTES_PER_HOUR = 60;
+    /** Cộng vào số phút đã vẽ khi đang 12h — đổi định dạng thì số khác ⇒ vẽ lại ngay. Lớn hơn số phút một ngày. */
+    private static final int TWELVE_HOUR_MARK = 10_000;
 
     private final I18NBundle i18n;
     private final Table group = new Table();
@@ -149,13 +150,14 @@ final class HudInfoLines {
         if (!localClockLabel.isVisible()) {
             return;
         }
-        int minute = minuteOfDay.getAsInt();
+        int minute =
+                minuteOfDay.getAsInt() + (ClockFormat.twelveHour() ? TWELVE_HOUR_MARK : 0); // đổi định dạng ⇒ vẽ lại
         if (minute == shownMinute) {
             return;
         }
         shownMinute = minute;
         localClockText.setLength(0);
-        appendHourMinute(localClockText, minute);
+        appendHourMinute(localClockText, minute % TWELVE_HOUR_MARK);
         localClockLabel.setText(localClockText);
     }
 
@@ -174,18 +176,9 @@ final class HudInfoLines {
         killsLabel.setText(killsText);
     }
 
-    /** {@code HH:MM} từ số phút trong ngày, vào bộ đệm có sẵn. Tĩnh để test. */
+    /** {@code HH:MM} (hoặc {@code h:MM AM/PM}, ADR-406) từ số phút trong ngày, vào bộ đệm có sẵn. Tĩnh để test. */
     static void appendHourMinute(StringBuilder out, int minuteOfDay) {
-        int hour = minuteOfDay / MINUTES_PER_HOUR;
-        int minute = minuteOfDay % MINUTES_PER_HOUR;
-        if (hour < TWO_DIGITS) {
-            out.append('0');
-        }
-        out.append(hour).append(':');
-        if (minute < TWO_DIGITS) {
-            out.append('0');
-        }
-        out.append(minute);
+        ClockFormat.appendHourMinute(out, minuteOfDay, ClockFormat.twelveHour());
     }
 
     /** ADR-356 — đếm ngược tới reset ngày; cùng khuôn đồng hồ phiên (không cấp phát). */

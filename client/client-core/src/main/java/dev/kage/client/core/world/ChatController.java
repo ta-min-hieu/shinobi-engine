@@ -309,7 +309,9 @@ final class ChatController {
             Map.entry( // ADR-368
                     SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_LEVEL_TOO_LOW, "chat.error.level_too_low"),
             Map.entry( // ADR-369
-                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_STRANGER_LIMIT, "chat.error.stranger_limit"));
+                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_STRANGER_LIMIT, "chat.error.stranger_limit"),
+            Map.entry( // ADR-402
+                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_FRIENDS_ONLY, "chat.error.friends_only"));
 
     /**
      * Câu giải thích một kết quả gửi, hoặc rỗng khi không có gì để nói.

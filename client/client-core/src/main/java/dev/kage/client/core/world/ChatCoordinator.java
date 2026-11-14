@@ -179,7 +179,8 @@ final class ChatCoordinator implements WindowFlow {
 
     /** ADR-273 — nối bộ viết lại dòng gõ (biệt danh lệnh). */
     void useLineRewriter(java.util.function.UnaryOperator<String> rewriter) {
-        this.lineRewriter = rewriter;
+        java.util.function.UnaryOperator<String> previous = this.lineRewriter;
+        this.lineRewriter = line -> rewriter.apply(previous.apply(line)); // nối tiếp: bí danh rồi lặp lệnh (ADR-404)
     }
 
     /** ADR-249 — ẩn tin người chơi có nội dung khớp {@code filter} (lọc từ khoá). */

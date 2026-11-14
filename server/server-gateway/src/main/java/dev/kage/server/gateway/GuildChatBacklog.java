@@ -34,6 +34,18 @@ final class GuildChatBacklog {
         }
     }
 
+    /** ADR-401 — tối đa {@code limit} tin gần nhất của bang, cũ trước. */
+    List<Line> recent(long guildId, int limit) {
+        Deque<Line> lines = byGuild.get(guildId);
+        if (lines == null) {
+            return List.of();
+        }
+        synchronized (lines) {
+            List<Line> all = new ArrayList<>(lines);
+            return List.copyOf(all.subList(Math.max(0, all.size() - limit), all.size()));
+        }
+    }
+
     /** Các tin của bang gửi SAU {@code after}, cũ trước. */
     List<Line> since(long guildId, Instant after) {
         Deque<Line> lines = byGuild.get(guildId);

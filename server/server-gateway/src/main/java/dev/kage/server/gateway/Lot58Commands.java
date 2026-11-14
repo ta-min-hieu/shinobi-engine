@@ -31,6 +31,11 @@ record Lot58Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
     private static final String COMEBACK_BODY = "Đạo hữu đã vắng bóng một thời gian. Tông môn gửi chút linh thạch"
             + " làm lộ phí tu luyện. / You have been away a while — here are some spirit stones to get going again.";
 
+    /** Lớp lệnh lô 59 (ADR-399…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot59Commands lot59() {
+        return new Lot59Commands(gateway, registry);
+    }
+
     /** ADR-391/392 — top 10 sát thủ PvP hoặc thời gian tu luyện (mặc định: sát thủ). */
     GetLifetimeRankingResponse lifetimeRanking(GetLifetimeRankingRequest request) {
         LifetimeRankingKind kind = request.getKind() == LifetimeRankingKind.LIFETIME_RANKING_KIND_PLAYTIME

@@ -26,6 +26,7 @@ final class ServerClockCoordinator implements WindowFlow {
     static final ZoneId SERVER_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss dd/MM");
+    private static final DateTimeFormatter TIME_12H = DateTimeFormatter.ofPattern("h:mm:ss a dd/MM", Locale.ROOT);
     private static final long MILLIS_PER_SECOND = 1000L;
 
     private final WorldCommandSender sender;
@@ -43,7 +44,8 @@ final class ServerClockCoordinator implements WindowFlow {
 
     /** Giờ hiển thị của {@code epochSeconds} ở {@code zone}. Tĩnh để test. */
     static String format(long epochSeconds, ZoneId zone) {
-        return TIME.format(Instant.ofEpochSecond(epochSeconds).atZone(zone));
+        DateTimeFormatter pattern = dev.kage.client.core.ui.hud.ClockFormat.twelveHour() ? TIME_12H : TIME; // ADR-406
+        return pattern.format(Instant.ofEpochSecond(epochSeconds).atZone(zone));
     }
 
     private boolean onSlash(String line) {

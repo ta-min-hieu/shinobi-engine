@@ -121,7 +121,9 @@ record Lot48Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
 
     /** ADR-314 — đánh dấu một thư của mình đã đọc; trả số thư còn chưa đọc. */
     MarkMailReadResponse markRead(long characterId, MarkMailReadCommand command) {
-        facades().mailRead().markRead(command.getMailId(), characterId);
+        if (facades().mailRead().markRead(command.getMailId(), characterId)) { // lần đọc đầu
+            new Lot59Commands(gateway, registry).notifyRead(characterId, command.getMailId()); // ADR-400
+        }
         return MarkMailReadResponse.newBuilder()
                 .setMailId(command.getMailId())
                 .setUnread(facades().mailRead().unreadIds(characterId).size())

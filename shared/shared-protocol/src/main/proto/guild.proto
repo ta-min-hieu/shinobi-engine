@@ -987,3 +987,30 @@ message GetGuildSeniorityResponse {
   bool in_guild = 1;
   repeated GuildSeniorityEntry entries = 2;
 }
+
+// ADR-399 (2026-11-14) — tìm bang theo tên. Request: Client -> Server (OPCODE_SEARCH_GUILDS_REQUEST).
+message SearchGuildsRequest {
+  string query = 1; // 1–32 ký tự, so khớp "chứa", không phân biệt hoa thường
+}
+
+message GuildSearchEntry {
+  string name = 1;
+  int32 level = 2;
+  int32 members = 3;
+  string leader_name = 4;
+  string tag = 5; // ADR-344 — "" nếu chưa đặt
+}
+
+// Response: Server -> Client (OPCODE_SEARCH_GUILDS_RESPONSE). Tối đa 10, cấp bang cao trước.
+message SearchGuildsResponse {
+  repeated GuildSearchEntry entries = 1;
+}
+
+// ADR-401 (2026-11-14) — xem lại chat bang. Request: Client -> Server (OPCODE_GET_GUILD_CHAT_HISTORY_REQUEST).
+message GetGuildChatHistoryRequest {}
+
+// Response: Server -> Client (OPCODE_GET_GUILD_CHAT_HISTORY_RESPONSE). Các tin đi TRƯỚC bằng ChatMessageEvent kênh bang.
+message GetGuildChatHistoryResponse {
+  bool in_guild = 1;
+  int32 count = 2;
+}
