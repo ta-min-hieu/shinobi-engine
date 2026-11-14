@@ -446,6 +446,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-412](ADR-412-Unread-Mail-Hud.md) | Thư chưa đọc trên HUD: `/thuhud` số thư chưa đọc | ✅ Accepted (lô 60) |
 | [ADR-413](ADR-413-Dps-Hud.md) | DPS trên HUD: `/dpshud` DPS trận hiện tại | ✅ Accepted (lô 60) |
 | [ADR-414](ADR-414-Session-Gold-Hud.md) | Linh thạch phiên trên HUD: `/vanghud` linh thạch kiếm trong phiên | ✅ Accepted (lô 60) |
+| [ADR-415](ADR-415-Login-Online-Summary.md) | Tóm tắt online khi vào game: Dòng "X bạn bè, Y đồng môn đang online" lúc vào world | ✅ Accepted (lô 61) |
+| [ADR-416](ADR-416-Absent-Friends.md) | Bạn bè lâu vắng: Bạn vắng ≥ 7 ngày; `/banlauvang`, 1164/1165 | ✅ Accepted (lô 61) |
+| [ADR-417](ADR-417-New-Players-Today.md) | Đếm tân thủ hôm nay: Số tân thủ hôm nay + 5 tên; `/tanthu`, 1210/1211 | ✅ Accepted (lô 61) |
+| [ADR-418](ADR-418-Mailbox-Near-Full-Warning.md) | Cảnh báo hộp thư sắp đầy: Hộp thư ≥ 80% ⇒ nhắc dọn lúc vào world | ✅ Accepted (lô 61) |
+| [ADR-419](ADR-419-Hide-System-Lines.md) | Ẩn tin hệ thống: `/antinhethong` ẩn dòng hệ thống server | ✅ Accepted (lô 61) |
+| [ADR-420](ADR-420-Collapse-Repeated-Messages.md) | Gộp tin trùng lặp: Tin lặp liên tiếp gộp "(xN)"; `/gopchat` | ✅ Accepted (lô 61) |
+| [ADR-421](ADR-421-Friend-Only-Chat-Bubbles.md) | Ẩn bong bóng chat người lạ: `/bongbongban` bong bóng chỉ bạn bè/nhóm | ✅ Accepted (lô 61) |
+| [ADR-422](ADR-422-Quick-Phrases.md) | Câu nói nhanh: `/caunhanh` lưu, `/cn` gửi câu nói nhanh | ✅ Accepted (lô 61) |
 ---
 
 ## ADR cần tạo (chưa viết)

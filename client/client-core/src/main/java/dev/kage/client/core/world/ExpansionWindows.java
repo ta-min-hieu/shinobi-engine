@@ -352,7 +352,12 @@ record ExpansionWindows(
                 .lot58()
                 .chatView()
                 .useFriends(friends::isFriendName);
-        ChatTidyCoordinator tidy = lot39().lot40() // ADR-421 — bong bóng chỉ bạn bè / người cùng nhóm
+        useLot61Friends(friends);
+    }
+
+    /** ADR-421 — bong bóng chỉ bạn bè / người cùng nhóm. */
+    private void useLot61Friends(FriendCoordinator friends) {
+        ChatTidyCoordinator tidy = lot39().lot40()
                 .lot41()
                 .lot42()
                 .lot43()

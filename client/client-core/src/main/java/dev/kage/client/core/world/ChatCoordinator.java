@@ -89,6 +89,14 @@ final class ChatCoordinator implements WindowFlow {
         incoming.add(listener);
     }
 
+    /** Tin có bị ẩn không: người đã chặn / lọc từ khoá / lọc khác (ADR-091, 249, 397), dòng hệ thống (ADR-419). */
+    private boolean hidden(ChatMessageEvent event) {
+        if (event.getSenderId() == 0L) {
+            return event.getSenderName().isEmpty() && hideSystem.getAsBoolean();
+        }
+        return hiddenSender.test(event.getSenderId()) || hiddenBody.test(event.getBody()) || hiddenEvent.test(event);
+    }
+
     /** ADR-419 — công tắc ẩn dòng hệ thống server gửi (không ảnh hưởng dòng do lệnh của chính máy này in ra). */
     void useHideSystem(java.util.function.BooleanSupplier hide) {
         this.hideSystem = hide;
@@ -228,14 +236,8 @@ final class ChatCoordinator implements WindowFlow {
     private boolean dispatch(int opcode, byte[] payload) throws InvalidProtocolBufferException {
         if (opcode == Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE) {
             ChatMessageEvent event = ChatMessageEvent.parseFrom(payload);
-            if (event.getSenderId() != 0L
-                    && (hiddenSender.test(event.getSenderId())
-                            || hiddenBody.test(event.getBody())
-                            || hiddenEvent.test(event))) { // ADR-091, 249, 397
-                return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
-            }
-            if (event.getSenderId() == 0L && event.getSenderName().isEmpty() && hideSystem.getAsBoolean()) {
-                return true; // ADR-419 — đang ẩn dòng hệ thống từ server
+            if (hidden(event)) {
+                return true; // tin vẫn tới, chỉ không hiện
             }
             controller.onMessage(withTitle(markLinked(markOffline(markAutoReply(eventRewriter.apply(event))))));
             incoming.forEach(listener -> listener.accept(event)); // ADR-315/317

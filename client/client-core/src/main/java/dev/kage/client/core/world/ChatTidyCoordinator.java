@@ -96,25 +96,31 @@ final class ChatTidyCoordinator implements WindowFlow {
         String[] words = line.strip().split("\\s+", 3);
         String command = words[0].toLowerCase(Locale.ROOT);
         switch (command) {
-            case "/antinhethong", "/hidesystem" -> {
-                hideSystem = toggle(HIDE_SYSTEM_KEY, hideSystem);
-                notice(hideSystem ? "hidesystem.on" : "hidesystem.off");
-            }
-            case "/gopchat", "/collapsechat" -> {
-                collapse = toggle(COLLAPSE_KEY, collapse);
-                chat.setCollapseRepeats(collapse);
-                notice(collapse ? "collapsechat.on" : "collapsechat.off");
-            }
-            case "/bongbongban", "/friendbubbles" -> {
-                friendBubbles = toggle(FRIEND_BUBBLES_KEY, friendBubbles);
-                notice(friendBubbles ? "friendbubbles.on" : "friendbubbles.off");
-            }
+            case "/antinhethong", "/hidesystem" -> toggleHideSystem();
+            case "/gopchat", "/collapsechat" -> toggleCollapse();
+            case "/bongbongban", "/friendbubbles" -> toggleFriendBubbles();
             case "/caunhanh", "/phrase" -> savePhrase(words);
             default -> {
                 return false;
             }
         }
         return true;
+    }
+
+    private void toggleHideSystem() {
+        hideSystem = toggle(HIDE_SYSTEM_KEY, hideSystem);
+        notice(hideSystem ? "hidesystem.on" : "hidesystem.off");
+    }
+
+    private void toggleCollapse() {
+        collapse = toggle(COLLAPSE_KEY, collapse);
+        chat.setCollapseRepeats(collapse);
+        notice(collapse ? "collapsechat.on" : "collapsechat.off");
+    }
+
+    private void toggleFriendBubbles() {
+        friendBubbles = toggle(FRIEND_BUBBLES_KEY, friendBubbles);
+        notice(friendBubbles ? "friendbubbles.on" : "friendbubbles.off");
     }
 
     private void savePhrase(String[] words) {
