@@ -95,7 +95,7 @@ class FriendControllerTest {
     void sanitizesRequesterName() {
         controller.onPendingRequests(pendingList(request(7L, "Kage界")));
 
-        assertThat(controller.pendingRequests()).containsExactly(new FriendController.PendingRequest(7L, "Kage?"));
+        assertThat(controller.pendingRequests()).containsExactly(new FriendController.PendingRequest(7L, "Kage?", ""));
     }
 
     @Test

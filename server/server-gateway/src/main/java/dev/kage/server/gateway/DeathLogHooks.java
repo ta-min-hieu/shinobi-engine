@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 
 import dev.kage.character.api.CharacterFacade;
 import dev.kage.character.api.DeathLogFacade;
+import dev.kage.character.api.PvpStatsFacade;
 import dev.kage.character.domain.Character;
 import dev.kage.character.domain.DeathLogPort;
 
@@ -27,7 +28,7 @@ final class DeathLogHooks {
     private static final Logger LOG = LoggerFactory.getLogger(DeathLogHooks.class);
 
     /** Nguồn dữ liệu. */
-    record Deps(DeathLogFacade log, CharacterFacade characters) {}
+    record Deps(DeathLogFacade log, CharacterFacade characters, PvpStatsFacade pvp) {}
 
     private final Map<Long, String> monsterCodes = new LinkedHashMap<>(16, 0.75f, true) {
         @Override
@@ -79,6 +80,9 @@ final class DeathLogHooks {
                             .orElse("")
                     : "";
             bound.log().record(victimId, new DeathLogPort.Entry(killer, draft.monsterCode(), draft.x(), draft.at()));
+            if (!killer.isEmpty()) {
+                bound.pvp().recordKill(killerEntityId, victimId); // ADR-378
+            }
         } catch (RuntimeException e) {
             LOG.warn("Ghi lịch sử tử vong lỗi: victim={}", victimId, e);
         }

@@ -706,6 +706,8 @@ message GetPersonalStatsResponse {
   int32 pvp_losses = 5;
   int32 achievements_unlocked = 6;
   int64 playtime_seconds = 7;
+  int32 player_kills = 8;      // ADR-378 — số lần hạ người chơi khác ngoài đấu trường
+  int32 deaths_by_player = 9;  // ADR-378 — số lần bị người chơi khác hạ ngoài đấu trường
 }
 
 // ADR-224 (2026-11-08) — lịch sự kiện tuần. Request: Client -> Server (OPCODE_GET_EVENT_CALENDAR_REQUEST).
@@ -967,4 +969,16 @@ message SetInspectFriendsOnlyCommand {
 // Response: Server -> Client (OPCODE_SET_INSPECT_FRIENDS_ONLY_RESPONSE). Trạng thái sau khi đổi.
 message SetInspectFriendsOnlyResponse {
   bool enabled = 1;
+}
+
+// ===== Lô 56 (Accepted 2026-11-14, chủ dự án chọn). CHỈ THÊM. =====
+
+// ADR-377 (2026-11-14) — online cao nhất hôm nay. Request: Client -> Server (OPCODE_GET_PEAK_ONLINE_REQUEST).
+message GetPeakOnlineRequest {}
+
+// Response: Server -> Client (OPCODE_GET_PEAK_ONLINE_RESPONSE). "Hôm nay" theo giờ Việt Nam, đếm từ lúc server chạy.
+message GetPeakOnlineResponse {
+  int32 peak = 1;
+  int64 peak_at_epoch_seconds = 2;
+  int32 current = 3;
 }

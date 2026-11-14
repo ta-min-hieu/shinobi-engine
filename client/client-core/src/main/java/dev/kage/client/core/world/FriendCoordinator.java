@@ -358,10 +358,17 @@ final class FriendCoordinator implements WindowFlow {
         }
         requestRows.clear();
         for (FriendController.PendingRequest request : controller.pendingRequests()) {
-            requestRows.add(new FriendPanel.RequestRow(request.requesterName()));
+            requestRows.add(new FriendPanel.RequestRow(withNote(request)));
         }
         panel.setFriends(friendRows);
         panel.setPendingRequests(requestRows);
+    }
+
+    /** ADR-376 — tên người mời kèm lời nhắn (nếu có). Tĩnh để test. */
+    static String withNote(FriendController.PendingRequest request) {
+        return request.message().isEmpty()
+                ? request.requesterName()
+                : request.requesterName() + " — \"" + request.message() + "\"";
     }
 
     private void notice(String messageKey) {

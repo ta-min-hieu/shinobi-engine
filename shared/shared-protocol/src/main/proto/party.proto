@@ -501,3 +501,24 @@ message CastVoteKickResponse {
   int32 yes = 2;
   int32 needed = 3;
 }
+
+// ADR-375 (2026-11-14) — thư gửi cả nhóm. Command: Client -> Server (OPCODE_SEND_PARTY_MAIL_COMMAND).
+// Một thư chữ (không vàng, không đồ) tới mọi thành viên nhóm trừ người gửi; kiểm nội dung như thư thường.
+message SendPartyMailCommand {
+  string subject = 1;
+  string body = 2;
+}
+
+enum SendPartyMailOutcome {
+  SEND_PARTY_MAIL_OUTCOME_UNSPECIFIED = 0;
+  SEND_PARTY_MAIL_OUTCOME_OK = 1;
+  SEND_PARTY_MAIL_OUTCOME_NOT_IN_PARTY = 2;
+  SEND_PARTY_MAIL_OUTCOME_NO_RECIPIENTS = 3;
+  SEND_PARTY_MAIL_OUTCOME_INVALID_CONTENT = 4;
+}
+
+// Response: Server -> Client (OPCODE_SEND_PARTY_MAIL_RESPONSE).
+message SendPartyMailResponse {
+  SendPartyMailOutcome outcome = 1;
+  int32 recipients = 2;
+}

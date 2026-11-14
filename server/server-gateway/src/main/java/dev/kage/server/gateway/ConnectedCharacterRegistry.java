@@ -169,6 +169,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     final DeathLogHooks deathLog = new DeathLogHooks(); // ADR-337
     final PartyVoteKicks voteKicks = new PartyVoteKicks(); // ADR-338
     final StrangerWhisperLimiter strangerWhispers = new StrangerWhisperLimiter(); // ADR-369
+    final PeakOnlineTracker peakOnline = new PeakOnlineTracker(java.time.Clock.systemUTC()); // ADR-377
 
     /** ADR-125 — luận võ đại hội: nhịp điều khiển giải + kết quả trận đấu trường; nối sau khi DB đã dựng. */
     final TournamentHooks tournament = new TournamentHooks();
@@ -217,6 +218,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
         contextsByCharacterId.put(characterId, ctx);
         appearanceByCharacterId.put(characterId, costumeChoice.apply(characterId, appearance));
         lastSentExperience.remove(characterId);
+        peakOnline.observe(contextsByCharacterId.size());
     }
 
     /**

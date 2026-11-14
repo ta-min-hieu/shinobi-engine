@@ -33,6 +33,11 @@ record Lot55Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
 
     private static final Logger LOG = LoggerFactory.getLogger(Lot55Commands.class);
 
+    /** Lớp lệnh lô 56 (ADR-375…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot56Commands lot56() {
+        return new Lot56Commands(gateway, registry);
+    }
+
     /** ADR-367 — gửi tin tới bang chủ và phó bang chủ đang online (gồm cả chính người gửi, để thấy tin của mình). */
     OfficerChatResponse officerChat(long characterId, OfficerChatCommand command) {
         Optional<GuildFacade.MyGuildView> mine = guilds().findMyGuild(characterId);

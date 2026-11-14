@@ -51,16 +51,20 @@ final class PersonalStatsCoordinator implements WindowFlow {
     static String describe(I18NBundle i18n, GetPersonalStatsResponse stats) {
         long hours = stats.getPlaytimeSeconds() / SECONDS_PER_HOUR;
         long minutes = (stats.getPlaytimeSeconds() % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE;
+        String pvp = KageI18n.formatOrKey(
+                i18n, "personal_stats.pvp", stats.getPlayerKills(), stats.getDeathsByPlayer()); // ADR-378
         return KageI18n.formatOrKey(
-                i18n,
-                "personal_stats.line",
-                stats.getMonstersKilled(),
-                stats.getDeaths(),
-                stats.getPvpWins(),
-                stats.getPvpLosses(),
-                stats.getQuestsClaimed(),
-                stats.getAchievementsUnlocked(),
-                hours,
-                minutes);
+                        i18n,
+                        "personal_stats.line",
+                        stats.getMonstersKilled(),
+                        stats.getDeaths(),
+                        stats.getPvpWins(),
+                        stats.getPvpLosses(),
+                        stats.getQuestsClaimed(),
+                        stats.getAchievementsUnlocked(),
+                        hours,
+                        minutes)
+                + " "
+                + pvp;
     }
 }

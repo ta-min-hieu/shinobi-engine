@@ -49,7 +49,11 @@ final class FriendSuggestionCoordinator implements WindowFlow {
             if (words.length < 2 || words[1].isBlank()) {
                 chat.showSystemNotice(KageI18n.textOrKey(i18n, "friend_suggest.add_usage"));
             } else {
-                sender.sendFriendRequest(words[1].strip());
+                String args = words[1];
+                int bar = args.indexOf('|'); // ADR-376 — "/ketban Tên | lời nhắn"
+                sender.sendFriendRequest(
+                        (bar < 0 ? args : args.substring(0, bar)).strip(),
+                        bar < 0 ? "" : args.substring(bar + 1).strip());
             }
             return true;
         }

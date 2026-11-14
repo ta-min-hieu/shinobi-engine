@@ -825,8 +825,18 @@ public final class GatewayBootstrap {
                 facades.contentFacades().socialFacades().mailFacade(),
                 characterRegistry));
         characterRegistry.recentPlayers.bind(lot46.lot48().lot49().lot50().recentPlayers());
-        characterRegistry.deathLog.bind(new DeathLogHooks.Deps( // ADR-337
-                lot46.lot48().lot49().lot50().lot51().deathLog(), facades.characterFacade()));
+        characterRegistry.deathLog.bind(new DeathLogHooks.Deps( // ADR-337, ADR-378
+                lot46.lot48().lot49().lot50().lot51().deathLog(),
+                facades.characterFacade(),
+                lot46.lot48()
+                        .lot49()
+                        .lot50()
+                        .lot51()
+                        .lot52()
+                        .lot53()
+                        .lot54()
+                        .lot56()
+                        .pvpStats()));
     }
 
     /** Facade lô 46 (ADR-295…) — tách ra cho gọn khối lồng nhau. */
@@ -860,7 +870,10 @@ public final class GatewayBootstrap {
                                                                 wiring.wirePlayerLookupFacade(),
                                                                 wiring.wireMailArchiveFacade(),
                                                                 new Lot54Facades( // lô 54 lồng ở đây
-                                                                        wiring.wireProfileVisitFacade()))))))));
+                                                                        wiring.wireProfileVisitFacade(),
+                                                                        new Lot56Facades( // lô 56 lồng ở đây
+                                                                                wiring.wireFriendRequestNoteFacade(),
+                                                                                wiring.wirePvpStatsFacade())))))))));
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */

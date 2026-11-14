@@ -62,7 +62,7 @@ final class FriendController {
      * Một lời mời NGƯỜI KHÁC gửi tới mình. {@code friendshipId} là thứ duy nhất gửi ngược lên được
      * khi chấp nhận/từ chối (friend.proto) — tên chỉ để hiện ra cho người chơi đọc.
      */
-    record PendingRequest(long friendshipId, String requesterName) {}
+    record PendingRequest(long friendshipId, String requesterName, String message) {}
 
     /** Kết quả biến ô nhập tên thành hành động. Ba nhánh, {@code sealed} như {@link ChatController}. */
     sealed interface ComposeResult {
@@ -138,8 +138,10 @@ final class FriendController {
     void onPendingRequests(ListPendingFriendRequestsResponse response) {
         pendingRequests.clear();
         for (PendingFriendRequestView view : response.getRequestsList()) {
-            pendingRequests.add(
-                    new PendingRequest(view.getFriendshipId(), ChatController.sanitize(view.getRequesterName())));
+            pendingRequests.add(new PendingRequest(
+                    view.getFriendshipId(),
+                    ChatController.sanitize(view.getRequesterName()),
+                    ChatController.sanitize(view.getMessage()))); // ADR-376
         }
     }
 

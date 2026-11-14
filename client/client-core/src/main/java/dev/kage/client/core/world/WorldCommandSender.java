@@ -331,8 +331,15 @@ final class WorldCommandSender implements SessionRecovery.Link {
      * {@code TARGET_NOT_FOUND}.
      */
     void sendFriendRequest(String targetName) {
-        SendFriendRequestCommand command =
-                SendFriendRequestCommand.newBuilder().setTargetName(targetName).build();
+        sendFriendRequest(targetName, "");
+    }
+
+    /** ADR-376 — lời mời kèm lời nhắn ("" = không có; server cắt về 60 ký tự). */
+    void sendFriendRequest(String targetName, String message) {
+        SendFriendRequestCommand command = SendFriendRequestCommand.newBuilder()
+                .setTargetName(targetName)
+                .setMessage(message)
+                .build();
         send(Opcode.OPCODE_SEND_FRIEND_REQUEST_COMMAND_VALUE, command.toByteArray(), "SendFriendRequestCommand");
     }
 

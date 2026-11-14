@@ -199,6 +199,7 @@ record ExpansionWindows(
         hud.useLocalClock(lot55.hudExtras()::localMinuteOfDay); // ADR-372
         hud.useKillCount(lot39().lot40().lot41().lot42().lot43().session()::kills); // ADR-374
         lot55.hudExtras().useHud(hud::setLocalClockVisible, hud::setKillCountVisible);
+        lot55.lot56().goldGain().useSink(text -> feedback.showSelfText(text, FloatingCombatText.GOLD_GAIN)); // ADR-379
     }
 
     /**

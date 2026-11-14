@@ -58,6 +58,9 @@ final class FloatingCombatText implements Disposable {
     /** ADR-331 — chữ "+N EXP" khi nhận kinh nghiệm. */
     static final Color EXP_GAIN = Color.valueOf("C9A2FF");
 
+    /** ADR-379 — chữ "+N linh thạch" khi nhận linh thạch. */
+    static final Color GOLD_GAIN = Color.valueOf("FFE27A");
+
     /** Biểu cảm (ADR-092) — xanh trời, khác hẳn số sát thương. */
     static final Color EMOTE = Color.valueOf("9FD7FF");
 

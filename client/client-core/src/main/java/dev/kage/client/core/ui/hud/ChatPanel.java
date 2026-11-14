@@ -127,6 +127,10 @@ public final class ChatPanel implements HudWindow {
     private final TextField input;
     private final SentLineHistory sentLines = new SentLineHistory(); // ADR-262
     private final Label pinnedLabel; // ADR-291
+    private final FadedDrawable background; // ADR-381
+
+    /** ADR-380 — Tab: chữ đang gõ ⇒ chữ đã hoàn thành (trả nguyên nếu không có gì để hoàn thành). */
+    private java.util.function.UnaryOperator<String> completer = java.util.function.UnaryOperator.identity();
 
     /** ADR-292 — giây rảnh trước khi ẩn; {@code 0} = không bao giờ ẩn. */
     private float idleHideSeconds = IDLE_HIDE_SECONDS;
@@ -170,6 +174,7 @@ public final class ChatPanel implements HudWindow {
         // của chính mình mà không có báo lỗi nào (xem FontFactory#canRender).
         this.input.setTextFieldFilter((field, character) -> FontFactory.canRender(character));
         this.input.setMaxLength(maxBodyLengthGuard());
+        this.input.setFocusTraversal(false); // ADR-380 — Tab hoàn thành lệnh, không nhảy ô
 
         this.composer = new Table();
         composer.add(channelButton).width(CHANNEL_BUTTON_WIDTH_PX).padRight(6f);
@@ -177,7 +182,8 @@ public final class ChatPanel implements HudWindow {
         composer.setVisible(false);
 
         this.panel = new Table();
-        panel.setBackground(skin.panel);
+        this.background = new FadedDrawable(skin.panel);
+        panel.setBackground(background); // ADR-381
         panel.pad(PANEL_PAD_PX);
         panel.add(pinnedLabel)
                 .width(PANEL_WIDTH_PX)
@@ -294,6 +300,10 @@ public final class ChatPanel implements HudWindow {
                     });
                     return true;
                 }
+                if (keycode == Input.Keys.TAB) { // ADR-380
+                    complete();
+                    return true;
+                }
                 if (keycode != Input.Keys.ESCAPE) {
                     return false;
                 }
@@ -325,6 +335,27 @@ public final class ChatPanel implements HudWindow {
                 }
             }
         });
+    }
+
+    private void complete() {
+        String completed = completer.apply(input.getText());
+        input.setText(completed);
+        input.setCursorPosition(completed.length());
+    }
+
+    /** ADR-380 — nối bộ hoàn thành lệnh cho phím Tab. */
+    public void setCompleter(java.util.function.UnaryOperator<String> complete) {
+        this.completer = complete;
+    }
+
+    /** ADR-381 — độ đậm nền khung chat 0..1 (chữ không đổi). */
+    public void setBackgroundOpacity(float opacity) {
+        background.setOpacity(opacity);
+    }
+
+    /** ADR-381 — độ đậm nền đang dùng. */
+    public float backgroundOpacity() {
+        return background.opacity();
     }
 
     private void submit() {

@@ -1148,7 +1148,8 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                     storageCommand(
                             dev.kage.protocol.GetPersonalStatsRequest.parser(),
                             Opcode.OPCODE_GET_PERSONAL_STATS_RESPONSE_VALUE,
-                            (h, id, c) -> h.expansion.lot37().personalStats(id))),
+                            (h, id, c) -> h.lot56()
+                                    .withPvpStats(id, h.expansion.lot37().personalStats(id)))),
             Map.entry(
                     Opcode.OPCODE_GET_EVENT_CALENDAR_REQUEST_VALUE,
                     storageCommand(
@@ -1267,6 +1268,60 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot43()
                                     .lot44()
                                     .lookupItem(c))),
+            Map.entry(
+                    Opcode.OPCODE_SEND_PARTY_MAIL_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.SendPartyMailCommand.parser(),
+                            Opcode.OPCODE_SEND_PARTY_MAIL_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .sendPartyMail(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_PEAK_ONLINE_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetPeakOnlineRequest.parser(),
+                            Opcode.OPCODE_GET_PEAK_ONLINE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .peakOnline())),
             Map.entry(
                     Opcode.OPCODE_OFFICER_CHAT_COMMAND_VALUE,
                     storageCommand(
@@ -5345,6 +5400,9 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                 sendError(ctx, sequenceId, 409, "error.friend_requests_full_other");
                 return;
             }
+            if (result == FriendFacade.SendRequestResult.OK) {
+                lot56().rememberRequestNote(characterId, target.get().id(), command.getMessage()); // ADR-376
+            }
             SendFriendRequestResponse response = SendFriendRequestResponse.newBuilder()
                     .setOutcome(toProtoOutcome(result))
                     .build();
@@ -5564,6 +5622,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return lot52().lot53().lot54().lot55();
     }
 
+    /** Lớp lệnh lô 56 (ADR-375…). */
+    private Lot56Commands lot56() {
+        return lot55().lot56();
+    }
+
     /** Lớp lệnh lô 52 (ADR-343…). */
     private Lot52Commands lot52() {
         return expansion
@@ -5632,6 +5695,7 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         .setFriendshipId(pending.friendshipId())
                         .setRequesterId(pending.requesterId())
                         .setRequesterName(requesterName)
+                        .setMessage(lot56().requestNote(pending.requesterId(), characterId)) // ADR-376
                         .build());
             }
             send(
