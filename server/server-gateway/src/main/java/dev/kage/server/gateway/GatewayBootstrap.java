@@ -871,12 +871,15 @@ public final class GatewayBootstrap {
                                                                 wiring.wireMailArchiveFacade(),
                                                                 new Lot54Facades( // lô 54 lồng ở đây
                                                                         wiring.wireProfileVisitFacade(),
-                                                                        new Lot56Facades( // lô 56 lồng ở đây
-                                                                                wiring.wireFriendRequestNoteFacade(),
-                                                                                wiring.wirePvpStatsFacade(),
-                                                                                new Lot57Facades( // lô 57 lồng ở đây
-                                                                                        wiring
-                                                                                                .wireInvisibleModeFacade()))))))))));
+                                                                        lot56Facades(wiring)))))))));
+    }
+
+    /** Facade lô 56+ (ADR-375…) — tách ra cho khối lồng nhau không vượt 120 cột. */
+    private static Lot56Facades lot56Facades(dev.kage.server.database.Lot45Wiring wiring) {
+        return new Lot56Facades(
+                wiring.wireFriendRequestNoteFacade(),
+                wiring.wirePvpStatsFacade(),
+                new Lot57Facades(wiring.wireInvisibleModeFacade())); // lô 57 lồng ở đây
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */

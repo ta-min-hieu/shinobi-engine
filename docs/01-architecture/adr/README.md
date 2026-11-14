@@ -414,6 +414,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-380](ADR-380-Chat-Tab-Completion.md) | Tab tự hoàn thành lệnh chat: Tab điền tên lệnh từ bảng `/trogiup` | ✅ Accepted (lô 56) |
 | [ADR-381](ADR-381-Chat-Background-Opacity.md) | Độ mờ nền khung chat: `/nenchat 0-100` độ đậm nền chat | ✅ Accepted (lô 56) |
 | [ADR-382](ADR-382-Copy-Name-To-Clipboard.md) | Sao chép tên vào clipboard: `/saochep [tên]` chép tên vào clipboard | ✅ Accepted (lô 56) |
+| [ADR-383](ADR-383-Invisible-Mode.md) | Chế độ ẩn (hiện offline với bạn bè): Bạn bè thấy offline (V182); `/an bat|tat`, 1160/1161 | ✅ Accepted (lô 57) |
+| [ADR-384](ADR-384-Weekly-Like-Ranking.md) | Xếp hạng lượt thích tuần: Top 10 thích 7 ngày; field `weekly` chỉ thêm | ✅ Accepted (lô 57) |
+| [ADR-385](ADR-385-Guild-Level-Ranking.md) | Xếp hạng cấp trong bang: Thành viên bang theo cấp; `/capbang`, 791/792 | ✅ Accepted (lô 57) |
+| [ADR-386](ADR-386-Old-Mail-Cleanup.md) | Tự dọn thư cũ: Thư đã đọc > 30 ngày, không quà/ghim/lưu trữ bị dọn (V182) | ✅ Accepted (lô 57) |
+| [ADR-387](ADR-387-Compact-Damage-Numbers.md) | Rút gọn số sát thương: `1.2k`/`3.4M`; `/sorutgon` | ✅ Accepted (lô 57) |
+| [ADR-388](ADR-388-Auto-Exit-Timer.md) | Hẹn giờ tự thoát game: `/henthoat <phút>`, báo trước 1 phút | ✅ Accepted (lô 57) |
+| [ADR-389](ADR-389-Whisper-Alert-When-Chat-Hidden.md) | Báo tin riêng khi ẩn chat: Chữ bay "Tin riêng: tên" khi chat ẩn | ✅ Accepted (lô 57) |
+| [ADR-390](ADR-390-High-Ping-Warning.md) | Cảnh báo ping cao: Ping > 300 ms × 3 nhịp ⇒ báo | ✅ Accepted (lô 57) |
 ---
 
 ## ADR cần tạo (chưa viết)
