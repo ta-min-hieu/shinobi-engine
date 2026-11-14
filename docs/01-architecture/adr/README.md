@@ -398,6 +398,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-364](ADR-364-Friend-Chat-Colour.md) | Tô màu tên bạn bè trong chat: Loại dòng `FRIEND` cho tin của bạn bè ở kênh công khai | ✅ Accepted (lô 54) |
 | [ADR-365](ADR-365-Death-Veil.md) | Màn hình xám khi chết: Máu 0 ⇒ phủ xám cả màn hình tới khi hồi sinh | ✅ Accepted (lô 54) |
 | [ADR-366](ADR-366-Exp-Bar-Percent.md) | % EXP trên thanh kinh nghiệm: "đã đi / cần (X%)" trên thanh EXP | ✅ Accepted (lô 54) |
+| [ADR-367](ADR-367-Guild-Officer-Chat.md) | Kênh chat lãnh đạo bang: Tin tới bang chủ/phó online, `officer_only`; `/lanhdao` | ✅ Accepted (lô 55) |
+| [ADR-368](ADR-368-World-Chat-Minimum-Level.md) | Cấp tối thiểu chat thế giới: Cấp < 5 ⇒ `LEVEL_TOO_LOW` ở kênh thế giới/giao dịch; cấu hình được | ✅ Accepted (lô 55) |
+| [ADR-369](ADR-369-Stranger-Whisper-Limit.md) | Chống spam tin riêng người lạ: 5 người lạ khác nhau mỗi 10 phút, bạn bè miễn | ✅ Accepted (lô 55) |
+| [ADR-370](ADR-370-Status-Change-Notice.md) | Báo bạn bè đổi lời nhắn: Đặt lời nhắn ⇒ dòng báo cho bạn bè đang online | ✅ Accepted (lô 55) |
+| [ADR-371](ADR-371-Remember-Chat-Channel.md) | Nhớ kênh chat cuối: Lưu kênh gửi, chọn lại khi vào game | ✅ Accepted (lô 55) |
+| [ADR-372](ADR-372-Local-Clock-Hud.md) | Đồng hồ giờ máy trên HUD: Nhãn HH:MM giờ máy; `/giomay` | ✅ Accepted (lô 55) |
+| [ADR-373](ADR-373-Enhance-Level-Colours.md) | Màu đồ theo cường hoá: Màu tên món theo +1–4 / +5–9 / +10 | ✅ Accepted (lô 55) |
+| [ADR-374](ADR-374-Kill-Counter-Hud.md) | Đếm quái đã hạ trên HUD: Nhãn "Đã hạ: N" của phiên; `/demquai` | ✅ Accepted (lô 55) |
 ---
 
 ## ADR cần tạo (chưa viết)
