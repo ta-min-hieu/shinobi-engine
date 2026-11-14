@@ -17,12 +17,21 @@ final class HudInfoLines {
     private static final long SECONDS_PER_MINUTE = 60L;
     private static final long SECONDS_PER_HOUR = 3_600L;
     private static final int TWO_DIGITS = 10;
+    private static final int MINUTES_PER_HOUR = 60;
 
     private final I18NBundle i18n;
     private final Table group = new Table();
     private final Label clockLabel;
     private final Label goalLabel;
     private final Label resetLabel; // ADR-356
+    private final Label localClockLabel; // ADR-372
+    private final Label killsLabel; // ADR-374
+    private final StringBuilder localClockText = new StringBuilder();
+    private final StringBuilder killsText = new StringBuilder();
+    private java.util.function.IntSupplier minuteOfDay = () -> 0;
+    private java.util.function.IntSupplier kills = () -> 0;
+    private int shownMinute = -1;
+    private int shownKills = -1;
     private final StringBuilder clockText = new StringBuilder();
     private final StringBuilder resetText = new StringBuilder();
     private LongSupplier sessionSeconds = () -> 0L;
@@ -35,11 +44,17 @@ final class HudInfoLines {
         this.clockLabel = new Label("", skin.statLabelStyle);
         this.goalLabel = new Label("", skin.statLabelStyle);
         this.resetLabel = new Label("", skin.statLabelStyle);
+        this.localClockLabel = new Label("", skin.statLabelStyle);
+        this.killsLabel = new Label("", skin.statLabelStyle);
+        localClockLabel.setVisible(false);
+        killsLabel.setVisible(false);
         clockLabel.setVisible(false);
         goalLabel.setVisible(false);
         resetLabel.setVisible(false);
         group.add(goalLabel).left().row();
         group.add(resetLabel).left().row();
+        group.add(localClockLabel).left().row();
+        group.add(killsLabel).left().row();
         group.add(clockLabel).left().row();
     }
 
@@ -67,6 +82,26 @@ final class HudInfoLines {
         shownReset = -1L;
     }
 
+    void useLocalClock(java.util.function.IntSupplier minutesOfDay) {
+        this.minuteOfDay = minutesOfDay;
+        shownMinute = -1;
+    }
+
+    void setLocalClockVisible(boolean visible) {
+        localClockLabel.setVisible(visible);
+        shownMinute = -1;
+    }
+
+    void useKills(java.util.function.IntSupplier killCount) {
+        this.kills = killCount;
+        shownKills = -1;
+    }
+
+    void setKillsVisible(boolean visible) {
+        killsLabel.setVisible(visible);
+        shownKills = -1;
+    }
+
     void setGoal(String text) {
         goalLabel.setText(text);
         goalLabel.setVisible(!text.isEmpty());
@@ -75,6 +110,8 @@ final class HudInfoLines {
     /** Mỗi khung: chỉ dựng lại chữ khi số giây đổi. */
     void update() {
         updateReset();
+        updateLocalClock();
+        updateKills();
         if (!clockLabel.isVisible()) {
             return;
         }
@@ -87,6 +124,50 @@ final class HudInfoLines {
         clockText.append(i18n.get("hud.session_clock")).append(' ');
         appendClock(clockText, seconds);
         clockLabel.setText(clockText);
+    }
+
+    /** ADR-372 — giờ máy HH:MM; chỉ đổi chữ khi sang phút mới. */
+    private void updateLocalClock() {
+        if (!localClockLabel.isVisible()) {
+            return;
+        }
+        int minute = minuteOfDay.getAsInt();
+        if (minute == shownMinute) {
+            return;
+        }
+        shownMinute = minute;
+        localClockText.setLength(0);
+        appendHourMinute(localClockText, minute);
+        localClockLabel.setText(localClockText);
+    }
+
+    /** ADR-374 — số quái đã hạ; chỉ đổi chữ khi số đổi. */
+    private void updateKills() {
+        if (!killsLabel.isVisible()) {
+            return;
+        }
+        int count = kills.getAsInt();
+        if (count == shownKills) {
+            return;
+        }
+        shownKills = count;
+        killsText.setLength(0);
+        killsText.append(i18n.get("hud.kills")).append(' ').append(count);
+        killsLabel.setText(killsText);
+    }
+
+    /** {@code HH:MM} từ số phút trong ngày, vào bộ đệm có sẵn. Tĩnh để test. */
+    static void appendHourMinute(StringBuilder out, int minuteOfDay) {
+        int hour = minuteOfDay / MINUTES_PER_HOUR;
+        int minute = minuteOfDay % MINUTES_PER_HOUR;
+        if (hour < TWO_DIGITS) {
+            out.append('0');
+        }
+        out.append(hour).append(':');
+        if (minute < TWO_DIGITS) {
+            out.append('0');
+        }
+        out.append(minute);
     }
 
     /** ADR-356 — đếm ngược tới reset ngày; cùng khuôn đồng hồ phiên (không cấp phát). */

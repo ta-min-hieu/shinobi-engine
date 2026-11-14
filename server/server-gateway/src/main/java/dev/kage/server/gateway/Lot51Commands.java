@@ -48,6 +48,7 @@ record Lot51Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
             String text = command.getMessage().strip();
             if (validText(text, StatusMessageFacade.MAX_LENGTH)) {
                 statuses.set(characterId, text);
+                lot52().lot53().lot54().lot55().notifyStatusChanged(characterId, text); // ADR-370
             } else {
                 outcome = SetStatusMessageOutcome.SET_STATUS_MESSAGE_OUTCOME_INVALID_TEXT;
             }

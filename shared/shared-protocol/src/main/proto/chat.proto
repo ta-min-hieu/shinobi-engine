@@ -65,6 +65,8 @@ enum SendChatMessageOutcome {
   SEND_CHAT_MESSAGE_OUTCOME_RECIPIENT_INBOX_FULL = 13; // người nhận đã có 20 tin chờ
   SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_FOUND = 14; // ADR-188 — món khoe không có trong túi người gửi
   SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_ON_AREA = 15; // ADR-188 — kênh Khu vực không mang món khoe
+  SEND_CHAT_MESSAGE_OUTCOME_LEVEL_TOO_LOW = 16; // ADR-368 — dưới cấp tối thiểu để chat thế giới / giao dịch
+  SEND_CHAT_MESSAGE_OUTCOME_STRANGER_LIMIT = 17; // ADR-369 — nhắn riêng quá nhiều người lạ trong 10 phút
 }
 
 // Response: Server -> Client (OPCODE_SEND_CHAT_MESSAGE_RESPONSE).
@@ -87,6 +89,7 @@ message ChatMessageEvent {
   int64 sent_at_epoch_seconds = 7;
   LinkedItemView linked_item = 8; // ADR-188 — có khi người gửi khoe một món
   string sender_guild_tag = 9;     // ADR-344 — ký hiệu bang người gửi (chỉ kênh thế giới / giao dịch); "" = không có
+  bool officer_only = 10;          // ADR-367 — tin kênh lãnh đạo bang (channel = GUILD, chỉ bang chủ + phó nhận)
 }
 
 // ===== ADR-092 — biểu cảm. CHỈ THÊM. Phát cho mọi người đang nhìn thấy mình (AoI, gồm cả chính mình); client vẽ

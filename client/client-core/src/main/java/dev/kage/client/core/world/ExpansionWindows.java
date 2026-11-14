@@ -195,6 +195,10 @@ record ExpansionWindows(
         hud.useKeyHelp(lot53::keyHelpText); // ADR-357
         feedback.useOthersVfxFilter(
                 displaySettings.settings().switchFor(DisplaySettings.Option.HIDE_OTHERS_VFX)); // ADR-358
+        Lot55Windows lot55 = lot53.lot54().lot55();
+        hud.useLocalClock(lot55.hudExtras()::localMinuteOfDay); // ADR-372
+        hud.useKillCount(lot39().lot40().lot41().lot42().lot43().session()::kills); // ADR-374
+        lot55.hudExtras().useHud(hud::setLocalClockVisible, hud::setKillCountVisible);
     }
 
     /**

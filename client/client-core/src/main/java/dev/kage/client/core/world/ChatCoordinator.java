@@ -36,6 +36,7 @@ final class ChatCoordinator implements WindowFlow {
     private final ChatController controller = new ChatController();
     private java.util.function.UnaryOperator<ChatMessageEvent> eventRewriter = event -> event; // ADR-348
     private java.util.function.Predicate<String> isFriend = name -> false; // ADR-364
+    private java.util.function.Consumer<ChatChannel> channelListener = channel -> {}; // ADR-371
     private final ChatPanel panel;
     private final WorldCommandSender sender;
     private final I18NBundle i18n = KageI18n.load();
@@ -88,7 +89,8 @@ final class ChatCoordinator implements WindowFlow {
 
     /** ADR-348 — đổi tin trước khi hiện (vd hạ chữ hoa la hét); mặc định giữ nguyên. */
     void useEventRewriter(java.util.function.UnaryOperator<ChatMessageEvent> rewriter) {
-        this.eventRewriter = rewriter;
+        java.util.function.UnaryOperator<ChatMessageEvent> previous = this.eventRewriter;
+        this.eventRewriter = event -> rewriter.apply(previous.apply(event)); // nối tiếp, không thay (ADR-367)
     }
 
     /** ADR-284 — nghe mọi tin ô nhập vừa gửi đi (sau khi qua lệnh gạch chéo). */
@@ -339,6 +341,19 @@ final class ChatCoordinator implements WindowFlow {
     private void onChannelToggle() {
         controller.toggleChannel();
         refreshChannelLabel();
+        channelListener.accept(controller.channel()); // ADR-371
+    }
+
+    /** ADR-371 — nghe mỗi lần người chơi đổi kênh gửi. */
+    void onChannelChanged(java.util.function.Consumer<ChatChannel> listener) {
+        this.channelListener = listener;
+    }
+
+    /** ADR-371 — chọn lại kênh đã nhớ (kênh không hợp lệ lúc này thì giữ nguyên). */
+    void restoreChannel(ChatChannel channel) {
+        if (controller.selectChannel(channel)) {
+            refreshChannelLabel();
+        }
     }
 
     private void refreshChannelLabel() {

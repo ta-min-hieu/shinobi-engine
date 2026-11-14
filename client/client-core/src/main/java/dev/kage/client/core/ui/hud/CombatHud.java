@@ -151,6 +151,26 @@ public final class CombatHud implements HudWindow {
         infoLines.setResetVisible(visible);
     }
 
+    /** ADR-372 — nguồn số phút trong ngày theo giờ máy. */
+    public void useLocalClock(java.util.function.IntSupplier minutesOfDay) {
+        infoLines.useLocalClock(minutesOfDay);
+    }
+
+    /** ADR-372 — hiện / ẩn giờ máy. */
+    public void setLocalClockVisible(boolean visible) {
+        infoLines.setLocalClockVisible(visible);
+    }
+
+    /** ADR-374 — nguồn số quái đã hạ trong phiên. */
+    public void useKillCount(java.util.function.IntSupplier kills) {
+        infoLines.useKills(kills);
+    }
+
+    /** ADR-374 — hiện / ẩn đếm quái. */
+    public void setKillCountVisible(boolean visible) {
+        infoLines.setKillsVisible(visible);
+    }
+
     /** ADR-357 — nguồn chữ bảng phím tắt (chỉ dựng khi vừa nhấn F1). */
     public void useKeyHelp(java.util.function.Supplier<String> text) {
         this.keyHelpText = text;

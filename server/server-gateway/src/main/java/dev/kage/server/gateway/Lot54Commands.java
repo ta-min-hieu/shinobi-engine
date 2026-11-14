@@ -17,6 +17,11 @@ import dev.kage.protocol.SetInspectFriendsOnlyResponse;
 /** Lớp lệnh lô 54 (ADR-359…) — MỘT thành phần của {@link Lot53Commands}. Gọi trên Virtual Thread. */
 record Lot54Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 55 (ADR-367…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot55Commands lot55() {
+        return new Lot55Commands(gateway, registry);
+    }
+
     /** ADR-359 — mọi thư chưa đọc thành đã đọc. */
     MarkAllMailReadResponse markAllMailRead(long characterId) {
         int marked = gateway.progression()

@@ -1268,6 +1268,32 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot44()
                                     .lookupItem(c))),
             Map.entry(
+                    Opcode.OPCODE_OFFICER_CHAT_COMMAND_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.OfficerChatCommand.parser(),
+                            Opcode.OPCODE_OFFICER_CHAT_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .officerChat(id, c))),
+            Map.entry(
                     Opcode.OPCODE_MARK_ALL_MAIL_READ_COMMAND_VALUE,
                     storageCommand(
                             dev.kage.protocol.MarkAllMailReadCommand.parser(),
@@ -5533,6 +5559,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         }
     }
 
+    /** Lớp lệnh lô 55 (ADR-367…). */
+    private Lot55Commands lot55() {
+        return lot52().lot53().lot54().lot55();
+    }
+
     /** Lớp lệnh lô 52 (ADR-343…). */
     private Lot52Commands lot52() {
         return expansion
@@ -7287,6 +7318,10 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         characterId, found.get().id(), dev.kage.friend.api.ContactPrivacyFacade.Contact.WHISPER))) {
             return Optional.empty();
         }
+        if (!lot55().mayWhisper(characterId, found.get().id())) { // ADR-369
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_STRANGER_LIMIT);
+            return Optional.empty();
+        }
         return found;
     }
 
@@ -7324,6 +7359,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         if (domainChannel == dev.kage.chat.domain.ChatChannel.SWORN
                 && relations.swornMembersOf(characterId).isEmpty()) {
             sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_NOT_SWORN);
+            return false;
+        }
+        if ((domainChannel == dev.kage.chat.domain.ChatChannel.WORLD
+                        || domainChannel == dev.kage.chat.domain.ChatChannel.TRADE)
+                && !lot55().mayChatPublicly(characterId)) { // ADR-368
+            sendChatOutcome(ctx, sequenceId, SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_LEVEL_TOO_LOW);
             return false;
         }
         return true;

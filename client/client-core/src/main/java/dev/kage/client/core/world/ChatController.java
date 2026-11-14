@@ -198,6 +198,21 @@ final class ChatController {
         return channel;
     }
 
+    /**
+     * ADR-371 — chọn lại kênh đã nhớ; chỉ nhận kênh có trong vòng xoay (Nhóm chỉ khi đang ở trong nhóm), kênh khác bị
+     * bỏ qua. Trả {@code true} nếu đã đổi.
+     */
+    boolean selectChannel(ChatChannel wanted) {
+        boolean allowed = wanted == ChatChannel.CHAT_CHANNEL_WORLD
+                || wanted == ChatChannel.CHAT_CHANNEL_TRADE
+                || wanted == ChatChannel.CHAT_CHANNEL_AREA
+                || (wanted == ChatChannel.CHAT_CHANNEL_PARTY && partyAvailable);
+        if (allowed) {
+            channel = wanted;
+        }
+        return allowed;
+    }
+
     /** Tin nhắn từ server — của người khác, hoặc của chính mình dội lại (chat.proto). */
     void onMessage(ChatMessageEvent event) {
         if (hiddenChannels.contains(event.getChannel())) {
@@ -290,7 +305,11 @@ final class ChatController {
                     "chat.error.linked_item_not_found"),
             Map.entry(
                     SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_LINKED_ITEM_NOT_ON_AREA,
-                    "chat.error.linked_item_not_on_area"));
+                    "chat.error.linked_item_not_on_area"),
+            Map.entry( // ADR-368
+                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_LEVEL_TOO_LOW, "chat.error.level_too_low"),
+            Map.entry( // ADR-369
+                    SendChatMessageOutcome.SEND_CHAT_MESSAGE_OUTCOME_STRANGER_LIMIT, "chat.error.stranger_limit"));
 
     /**
      * Câu giải thích một kết quả gửi, hoặc rỗng khi không có gì để nói.

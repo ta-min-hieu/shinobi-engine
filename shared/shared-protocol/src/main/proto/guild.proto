@@ -938,3 +938,23 @@ message SetGuildTagResponse {
   SetGuildTagOutcome outcome = 1;
   string tag = 2;
 }
+
+// ADR-367 (2026-11-14) — kênh chat lãnh đạo bang. Command: Client -> Server (OPCODE_OFFICER_CHAT_COMMAND).
+// Chỉ bang chủ / phó bang chủ gửi; tin tới mọi bang chủ / phó đang online dưới dạng ChatMessageEvent
+// {channel = GUILD, officer_only = true}.
+message OfficerChatCommand {
+  string body = 1;
+}
+
+enum OfficerChatOutcome {
+  OFFICER_CHAT_OUTCOME_UNSPECIFIED = 0;
+  OFFICER_CHAT_OUTCOME_OK = 1;
+  OFFICER_CHAT_OUTCOME_NOT_IN_GUILD = 2;
+  OFFICER_CHAT_OUTCOME_NOT_OFFICER = 3;
+  OFFICER_CHAT_OUTCOME_INVALID_TEXT = 4;
+}
+
+// Response: Server -> Client (OPCODE_OFFICER_CHAT_RESPONSE).
+message OfficerChatResponse {
+  OfficerChatOutcome outcome = 1;
+}

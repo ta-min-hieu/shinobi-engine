@@ -106,4 +106,9 @@ final class SessionSummaryCoordinator implements WindowFlow {
     public void reset() {
         tracker = new SessionTracker(clockMillis.getAsLong());
     }
+
+    /** ADR-374 — số quái chính mình đã hạ trong phiên. */
+    int kills() {
+        return tracker.kills();
+    }
 }

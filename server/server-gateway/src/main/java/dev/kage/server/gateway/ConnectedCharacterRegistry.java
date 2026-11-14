@@ -168,6 +168,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
     final RecentPlayerHooks recentPlayers = new RecentPlayerHooks(); // ADR-329
     final DeathLogHooks deathLog = new DeathLogHooks(); // ADR-337
     final PartyVoteKicks voteKicks = new PartyVoteKicks(); // ADR-338
+    final StrangerWhisperLimiter strangerWhispers = new StrangerWhisperLimiter(); // ADR-369
 
     /** ADR-125 — luận võ đại hội: nhịp điều khiển giải + kết quả trận đấu trường; nối sau khi DB đã dựng. */
     final TournamentHooks tournament = new TournamentHooks();

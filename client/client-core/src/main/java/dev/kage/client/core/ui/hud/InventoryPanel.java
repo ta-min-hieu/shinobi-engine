@@ -113,6 +113,14 @@ public final class InventoryPanel implements HudWindow {
     /** Trắng ngà — dòng dữ liệu thường. */
     private static final Color ROW_COLOR = Color.valueOf("F2F2F2");
 
+    /** ADR-373 — ngưỡng và màu tên món theo mức cường hoá. */
+    private static final int MID_ENHANCE = 5;
+
+    private static final int HIGH_ENHANCE = 10;
+    private static final Color LOW_ENHANCE_COLOR = Color.valueOf("7CFF7C");
+    private static final Color MID_ENHANCE_COLOR = Color.valueOf("5FA8FF");
+    private static final Color HIGH_ENHANCE_COLOR = Color.valueOf("FFB84A");
+
     /** Atlas MEDIUM tier — khớp {@code dev.kage.client.core.world.GraphicsTier.MEDIUM.folderName}. */
     private static final String ICON_ATLAS_PATH = "atlases/med/main.atlas";
 
@@ -527,6 +535,7 @@ public final class InventoryPanel implements HudWindow {
                 .padRight(6f)
                 .padBottom(ROW_PAD_PX);
         Label label = rowLabel(row.displayText());
+        label.setColor(enhanceColor(row.displayText())); // ADR-373
         label.setEllipsis(true);
         label.addListener(new com.badlogic.gdx.scenes.scene2d.utils.ClickListener() {
             @Override
@@ -692,6 +701,34 @@ public final class InventoryPanel implements HudWindow {
         if (listener != null) {
             listener.accept(slotNumber);
         }
+    }
+
+    /**
+     * ADR-373 — màu tên món theo mức cường hoá đọc từ nhãn {@code +N} cuối cùng trong dòng: +1–+4 xanh lá, +5–+9 xanh
+     * dương, +10 trở lên vàng cam; chưa cường hoá giữ màu dòng thường. Tĩnh để test.
+     */
+    static Color enhanceColor(String displayText) {
+        int level = enhanceLevelOf(displayText);
+        if (level >= HIGH_ENHANCE) {
+            return HIGH_ENHANCE_COLOR;
+        }
+        if (level >= MID_ENHANCE) {
+            return MID_ENHANCE_COLOR;
+        }
+        return level > 0 ? LOW_ENHANCE_COLOR : ROW_COLOR;
+    }
+
+    /** Số sau dấu {@code +} cuối cùng (đứng sau khoảng trắng) trong dòng; không có ⇒ 0. Tĩnh để test. */
+    static int enhanceLevelOf(String displayText) {
+        int plus = displayText.lastIndexOf(" +");
+        if (plus < 0) {
+            return 0;
+        }
+        int end = plus + 2;
+        while (end < displayText.length() && Character.isDigit(displayText.charAt(end))) {
+            end++;
+        }
+        return end == plus + 2 ? 0 : Integer.parseInt(displayText.substring(plus + 2, end));
     }
 
     private Label rowLabel(String displayText) {
