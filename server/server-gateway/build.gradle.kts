@@ -71,6 +71,7 @@ tasks.test {
     // ADR-368 — test chat dùng nhân vật cấp 1 chat kênh thế giới; tắt luật cấp tối thiểu cho chúng
     // (luật có test riêng: Lot55ServerTest).
     environment("KAGE_WORLD_CHAT_MIN_LEVEL", "0")
+    environment("KAGE_MAIL_MIN_LEVEL", "0") // ADR-407 — giữ hồ sơ test cũ
     // Bộ fuzz opcode (GatewayOpcodeFuzzTest/GatewayOpcodeFuzzDatabaseTest) — chuyển tiếp cờ chạy tay
     // từ dòng lệnh Gradle vào JVM test: `-Dkage.fuzz.iterations=500`, `-Dkage.fuzz.seed=0x...`,
     // `-Dkage.fuzz.opcode=OPCODE_...`. Không đặt thì test dùng ngân sách mặc định của cổng `check`.

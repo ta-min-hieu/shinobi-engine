@@ -290,3 +290,11 @@ message SetWhisperFriendsOnlyCommand {
 message SetWhisperFriendsOnlyResponse {
   bool enabled = 1; // trạng thái SAU lệnh
 }
+
+// ADR-408 (2026-11-14) — lịch sử chat thế giới. Request: Client -> Server (OPCODE_GET_WORLD_CHAT_HISTORY_REQUEST).
+message GetWorldChatHistoryRequest {}
+
+// Response: Server -> Client (OPCODE_GET_WORLD_CHAT_HISTORY_RESPONSE). Các tin đi TRƯỚC bằng ChatMessageEvent kênh thế giới.
+message GetWorldChatHistoryResponse {
+  int32 count = 1;
+}

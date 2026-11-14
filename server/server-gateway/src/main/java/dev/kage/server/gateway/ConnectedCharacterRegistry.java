@@ -164,6 +164,7 @@ final class ConnectedCharacterRegistry implements WorldOutboundSink {
 
     final BossKillHooks bossKills = new BossKillHooks(); // ADR-296
     final GuildChatBacklog guildChat = new GuildChatBacklog(); // ADR-304
+    final GuildChatBacklog worldChat = new GuildChatBacklog(); // ADR-408 — một khoá duy nhất (Lot60Commands.WORLD_KEY)
     final GuildWelcomeHooks guildWelcome = new GuildWelcomeHooks(); // ADR-313
     final RecentPlayerHooks recentPlayers = new RecentPlayerHooks(); // ADR-329
     final DeathLogHooks deathLog = new DeathLogHooks(); // ADR-337

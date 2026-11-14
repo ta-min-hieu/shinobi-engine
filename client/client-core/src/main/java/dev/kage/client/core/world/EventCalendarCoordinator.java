@@ -31,6 +31,9 @@ final class EventCalendarCoordinator implements WindowFlow {
     private final ChatCoordinator chat;
     private final I18NBundle i18n = KageI18n.load();
 
+    /** ADR-411 — chỉ in lịch khi chính người chơi hỏi; gói lịch cũng được HUD hỏi định kỳ. */
+    private boolean pending;
+
     EventCalendarCoordinator(WorldCommandSender sender, ChatCoordinator chat) {
         this.sender = sender;
         this.chat = chat;
@@ -42,6 +45,7 @@ final class EventCalendarCoordinator implements WindowFlow {
         if (!"/lich".equals(command) && !"/calendar".equals(command)) {
             return false;
         }
+        pending = true;
         sender.sendReadRequest(
                 Opcode.OPCODE_GET_EVENT_CALENDAR_REQUEST_VALUE, GetEventCalendarRequest.getDefaultInstance());
         return true;
@@ -52,6 +56,10 @@ final class EventCalendarCoordinator implements WindowFlow {
         if (frame.header().opcode() != Opcode.OPCODE_GET_EVENT_CALENDAR_RESPONSE_VALUE) {
             return false;
         }
+        if (!pending) {
+            return false; // gói HUD tự hỏi (ADR-411) — không in ra chat
+        }
+        pending = false;
         GetEventCalendarResponse response = GetEventCalendarResponse.parseFrom(frame.payload());
         chat.showSystemNotice(KageI18n.textOrKey(i18n, "calendar.title"));
         for (CalendarEntry entry : response.getEntriesList()) {

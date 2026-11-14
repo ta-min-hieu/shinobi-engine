@@ -518,3 +518,15 @@ message SetInvisibleCommand {
 message SetInvisibleResponse {
   bool enabled = 1; // trạng thái SAU lệnh
 }
+
+// ADR-409 (2026-11-14) — bạn chung với một người. Request: Client -> Server (OPCODE_GET_MUTUAL_FRIENDS_REQUEST).
+message GetMutualFriendsRequest {
+  string target_name = 1;
+}
+
+// Response: Server -> Client (OPCODE_GET_MUTUAL_FRIENDS_RESPONSE).
+message GetMutualFriendsResponse {
+  bool found = 1;            // false = không có nhân vật tên đó
+  string target_name = 2;
+  repeated string names = 3; // bạn chung, theo tên
+}

@@ -29,6 +29,11 @@ record Lot59Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
 
     private static final Logger LOG = LoggerFactory.getLogger(Lot59Commands.class);
 
+    /** Lớp lệnh lô 60 (ADR-407…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot60Commands lot60() {
+        return new Lot60Commands(gateway, registry);
+    }
+
     /** ADR-399 — tìm bang theo tên. */
     SearchGuildsResponse searchGuilds(SearchGuildsRequest request) {
         SearchGuildsResponse.Builder response = SearchGuildsResponse.newBuilder();

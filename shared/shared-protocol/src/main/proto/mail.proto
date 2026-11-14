@@ -48,6 +48,8 @@ enum SendMailOutcome {
   SEND_MAIL_OUTCOME_DUPLICATE_REQUEST = 9;
   // ADR-212 (2026-11-07, chỉ thêm): người nhận chặn thư người lạ và người gửi không phải bạn bè của họ.
   SEND_MAIL_OUTCOME_STRANGER_MAIL_BLOCKED = 10;
+  // ADR-407 (2026-11-14, chỉ thêm): người gửi dưới cấp tối thiểu gửi thư và người nhận không phải bạn bè.
+  SEND_MAIL_OUTCOME_LEVEL_TOO_LOW = 11;
 }
 
 // Response: Server -> Client (OPCODE_SEND_MAIL_RESPONSE).

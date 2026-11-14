@@ -6,18 +6,23 @@ package dev.kage.client.core.world;
  * MỘT thành phần của {@link Lot58Windows}.
  */
 record Lot59Windows(
-        GuildToolsCoordinator guildTools, ClientToolsCoordinator clientTools, CombatTimerCoordinator combatTimer) {
+        GuildToolsCoordinator guildTools,
+        ClientToolsCoordinator clientTools,
+        CombatTimerCoordinator combatTimer,
+        Lot60Windows lot60) {
 
     static Lot59Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot59Windows(
                 new GuildToolsCoordinator(sender, feeds.chat()),
                 new ClientToolsCoordinator(feeds.chat()),
-                new CombatTimerCoordinator(feeds.chat(), System::currentTimeMillis));
+                new CombatTimerCoordinator(feeds.chat(), System::currentTimeMillis),
+                Lot60Windows.create(sender, feeds)); // lô 60 lồng ở đây
     }
 
     void registerInto(PanelHub panels) {
         panels.register(guildTools);
         panels.register(clientTools);
         panels.register(combatTimer);
+        lot60.registerInto(panels);
     }
 }

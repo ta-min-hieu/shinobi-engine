@@ -352,18 +352,19 @@ final class MailController {
     // và vật phẩm từ không khí. Ba trong sáu cái dùng lại đúng khoá mà client vốn đã tự kiểm trước
     // khi gửi (độ dài tiêu đề/nội dung, số vàng âm) — trùng khoá là ĐÚNG Ý: cùng một sai lầm thì
     // người chơi phải đọc cùng một câu, dù ai là người phát hiện ra nó.
-    private static final Map<SendMailOutcome, String> SEND_MESSAGE_KEYS = Map.of(
-            SendMailOutcome.SEND_MAIL_OUTCOME_OK, "mail.notice.sent",
-            SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND, "mail.error.recipient_not_found",
-            SendMailOutcome.SEND_MAIL_OUTCOME_INSUFFICIENT_GOLD, "mail.error.insufficient_gold",
-            SendMailOutcome.SEND_MAIL_OUTCOME_ATTACHMENT_NOT_OWNED, "mail.error.attachment_not_owned",
-            SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_GOLD_AMOUNT, "mail.error.bad_gold",
-            SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_ATTACHMENT, "mail.error.invalid_attachment",
-            SendMailOutcome.SEND_MAIL_OUTCOME_SUBJECT_TOO_LONG, "mail.error.subject_too_long",
-            SendMailOutcome.SEND_MAIL_OUTCOME_BODY_TOO_LONG, "mail.error.body_too_long",
-            // ADR-058 — khoá đã dùng nghĩa là lá thư ĐÃ đi rồi: nói "đã gửi", không phải lỗi.
-            SendMailOutcome.SEND_MAIL_OUTCOME_DUPLICATE_REQUEST, "mail.notice.sent",
-            SendMailOutcome.SEND_MAIL_OUTCOME_STRANGER_MAIL_BLOCKED, "mail.error.stranger_blocked"); // ADR-212
+    // ADR-058 — khoá đã dùng nghĩa là lá thư ĐÃ đi rồi: nói "đã gửi", không phải lỗi. ADR-212 chặn người lạ.
+    private static final Map<SendMailOutcome, String> SEND_MESSAGE_KEYS = Map.ofEntries(
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_OK, "mail.notice.sent"),
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_RECIPIENT_NOT_FOUND, "mail.error.recipient_not_found"),
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_INSUFFICIENT_GOLD, "mail.error.insufficient_gold"),
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_ATTACHMENT_NOT_OWNED, "mail.error.attachment_not_owned"),
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_GOLD_AMOUNT, "mail.error.bad_gold"),
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_INVALID_ATTACHMENT, "mail.error.invalid_attachment"),
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_SUBJECT_TOO_LONG, "mail.error.subject_too_long"),
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_BODY_TOO_LONG, "mail.error.body_too_long"),
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_DUPLICATE_REQUEST, "mail.notice.sent"),
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_STRANGER_MAIL_BLOCKED, "mail.error.stranger_blocked"),
+            Map.entry(SendMailOutcome.SEND_MAIL_OUTCOME_LEVEL_TOO_LOW, "mail.error.level_too_low")); // ADR-407
 
     private static final Map<ClaimMailOutcome, String> CLAIM_MESSAGE_KEYS = Map.of(
             ClaimMailOutcome.CLAIM_MAIL_OUTCOME_OK, "mail.notice.claimed",

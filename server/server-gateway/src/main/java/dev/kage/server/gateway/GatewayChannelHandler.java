@@ -1527,6 +1527,99 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot59()
                                     .setWhisperFriendsOnly(id, c))),
             Map.entry(
+                    Opcode.OPCODE_GET_WORLD_CHAT_HISTORY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetWorldChatHistoryRequest.parser(),
+                            Opcode.OPCODE_GET_WORLD_CHAT_HISTORY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .lot60()
+                                    .worldChatHistory(id))),
+            Map.entry(
+                    Opcode.OPCODE_GET_MUTUAL_FRIENDS_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetMutualFriendsRequest.parser(),
+                            Opcode.OPCODE_GET_MUTUAL_FRIENDS_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .lot60()
+                                    .mutualFriends(id, c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_CHARACTER_AGE_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetCharacterAgeRequest.parser(),
+                            Opcode.OPCODE_GET_CHARACTER_AGE_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lot59()
+                                    .lot60()
+                                    .characterAge(id, c))),
+            Map.entry(
                     Opcode.OPCODE_OFFICER_CHAT_COMMAND_VALUE,
                     storageCommand(
                             dev.kage.protocol.OfficerChatCommand.parser(),
@@ -5846,6 +5939,11 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         return lot57().lot58().lot59();
     }
 
+    /** Lớp lệnh lô 60 (ADR-407…). */
+    private Lot60Commands lot60() {
+        return lot59().lot60();
+    }
+
     /** Lớp lệnh lô 52 (ADR-343…). */
     private Lot52Commands lot52() {
         return expansion
@@ -7259,6 +7357,17 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
         if (refusesStrangerMail(ctx, sequenceId, characterId, recipient.get().id())) {
             return;
         }
+        if (!lot60().mayMail(characterId, recipient.get().id())) { // ADR-407
+            send(
+                    ctx,
+                    Opcode.OPCODE_SEND_MAIL_RESPONSE_VALUE,
+                    sequenceId,
+                    SendMailResponse.newBuilder()
+                            .setOutcome(SendMailOutcome.SEND_MAIL_OUTCOME_LEVEL_TOO_LOW)
+                            .build()
+                            .toByteArray());
+            return;
+        }
         List<MailFacade.AttachmentRequest> attachments = command.getAttachmentsList().stream()
                 .map(a -> new MailFacade.AttachmentRequest(a.getItemTemplateId(), a.getQuantity(), a.getEnhanceLevel()))
                 .toList();
@@ -7694,6 +7803,12 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                         chatEvent(world ? ChatChannel.CHAT_CHANNEL_WORLD : ChatChannel.CHAT_CHANNEL_TRADE, ctx)
                                 .toByteArray());
         if (world) {
+            worldGateway
+                    .registry()
+                    .worldChat
+                    .record( // ADR-408
+                            Lot60Commands.WORLD_KEY,
+                            new GuildChatBacklog.Line(ctx.senderName(), ctx.body(), java.time.Instant.now()));
             // ADR-122 — chấm SAU khi tin đã phát: câu trả lời đúng vẫn hiện trên kênh như mọi tin khác.
             worldGateway.registry().quiz.onWorldChat(ctx.characterId(), ctx.senderName(), ctx.body());
         }

@@ -87,12 +87,17 @@ record Lot55Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
 
     /** Thiếu/rỗng ⇒ mặc định; số ≥ 0; giá trị lạ là lỗi cấu hình to tiếng (cùng khuôn {@code IdleKick}). */
     static int parseMinLevel(String raw) {
+        return parseMinLevel(raw, DEFAULT_WORLD_CHAT_MIN_LEVEL, MIN_LEVEL_ENV);
+    }
+
+    /** Như {@link #parseMinLevel(String)} cho một biến khác (ADR-407 dùng chung). Tĩnh để test. */
+    static int parseMinLevel(String raw, int fallback, String variable) {
         if (raw == null || raw.isBlank()) {
-            return DEFAULT_WORLD_CHAT_MIN_LEVEL;
+            return fallback;
         }
         String trimmed = raw.strip();
         if (!trimmed.matches("[0-9]{1,3}")) {
-            throw new IllegalStateException(MIN_LEVEL_ENV + " phải là số cấp (0 = tắt), nhận: " + raw);
+            throw new IllegalStateException(variable + " phải là số cấp (0 = tắt), nhận: " + raw);
         }
         return Integer.parseInt(trimmed);
     }

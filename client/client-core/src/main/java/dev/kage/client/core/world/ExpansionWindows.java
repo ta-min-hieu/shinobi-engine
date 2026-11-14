@@ -221,6 +221,10 @@ record ExpansionWindows(
                         lot39().lot40().lot41().lot42().coordinates()::meters);
         CombatTimerCoordinator timer = lot58.lot59().combatTimer(); // ADR-405
         timer.useHud(hud.addCounterLine("hud.combat_timer", timer::seconds, true));
+        lot58.lot59() // ADR-411…414 — bốn dòng số lô 60
+                .lot60()
+                .hudStats()
+                .useHud((line, value) -> hud.addCounterLine(line.prefixKey, value, line.clock));
     }
 
     /**
@@ -284,16 +288,10 @@ record ExpansionWindows(
         lot51.fullHealth().useLocalId(localId);
         lot51.screenShake().useLocalId(localId);
         lot51.lot52().lot53().mailArchive().useSelection(mail::selectedMailId);
-        lot51.lot52()
-                .lot53()
-                .lot54()
-                .lot55()
-                .lot56()
-                .lot57()
-                .lot58()
-                .lot59()
-                .combatTimer()
-                .useLocalId(localId);
+        Lot59Windows lot59 =
+                lot51.lot52().lot53().lot54().lot55().lot56().lot57().lot58().lot59();
+        lot59.combatTimer().useLocalId(localId);
+        lot59.lot60().hudStats().useLocalId(localId); // ADR-413 — DPS của chính mình
     }
 
     /** ADR-276 — khung bạn bè xếp bạn yêu thích lên đầu. */
