@@ -23,7 +23,7 @@ val productionModules = rootProject.subprojects
     .sorted()
 
 dependencies {
-    testImplementation("com.tngtech.archunit:archunit-junit5:1.4.2")   // ✅ ADR-011
+    testImplementation("com.tngtech.archunit:archunit-junit5:1.5.1")   // ✅ ADR-011
 
     // Phụ thuộc mọi production module để ArchUnit import được class của chúng.
     productionModules.forEach { testImplementation(project(it)) }
