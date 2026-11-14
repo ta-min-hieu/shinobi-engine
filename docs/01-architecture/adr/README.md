@@ -390,6 +390,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-356](ADR-356-Reset-Countdown-Hud.md) | Đếm ngược reset trên HUD: Đếm tới 00:00 giờ Việt Nam, nhãn HUD; `/demreset` | ✅ Accepted (lô 53) |
 | [ADR-357](ADR-357-Key-Help-Overlay.md) | Bảng phím tắt F1: Giữ F1 hiện danh sách phím đang gán | ✅ Accepted (lô 53) |
 | [ADR-358](ADR-358-Reduce-Others-Vfx.md) | Giảm hiệu ứng kỹ năng người khác: Công tắc bỏ VFX kỹ năng không dính tới mình | ✅ Accepted (lô 53) |
+| [ADR-359](ADR-359-Mark-All-Mail-Read.md) | Đánh dấu tất cả thư đã đọc: UPDATE `read_at` mọi thư chưa đọc; `/dochetthu` | ✅ Accepted (lô 54) |
+| [ADR-360](ADR-360-Profile-Likers.md) | Ai đã thích hồ sơ mình: 10 người thích gần nhất + tổng lượt; `/aithich` | ✅ Accepted (lô 54) |
+| [ADR-361](ADR-361-Inspect-History.md) | Lịch sử bị soi: Bảng `inspect_log` V180, 10 lần gần nhất; `/aisoi` | ✅ Accepted (lô 54) |
+| [ADR-362](ADR-362-Friends-Only-Inspect.md) | Chỉ bạn bè được soi: Bảng `inspect_friends_only` V180, người lạ soi ⇒ HIDDEN; `/chobanbesoi` | ✅ Accepted (lô 54) |
+| [ADR-363](ADR-363-Chat-Visible-Lines.md) | Số dòng khung chat: Nhật ký 12 dòng, hiện 4–12 (mặc định 6); `/dongchat` | ✅ Accepted (lô 54) |
+| [ADR-364](ADR-364-Friend-Chat-Colour.md) | Tô màu tên bạn bè trong chat: Loại dòng `FRIEND` cho tin của bạn bè ở kênh công khai | ✅ Accepted (lô 54) |
+| [ADR-365](ADR-365-Death-Veil.md) | Màn hình xám khi chết: Máu 0 ⇒ phủ xám cả màn hình tới khi hồi sinh | ✅ Accepted (lô 54) |
+| [ADR-366](ADR-366-Exp-Bar-Percent.md) | % EXP trên thanh kinh nghiệm: "đã đi / cần (X%)" trên thanh EXP | ✅ Accepted (lô 54) |
 ---
 
 ## ADR cần tạo (chưa viết)
