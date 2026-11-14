@@ -174,7 +174,6 @@ public final class ChatPanel implements HudWindow {
         // của chính mình mà không có báo lỗi nào (xem FontFactory#canRender).
         this.input.setTextFieldFilter((field, character) -> FontFactory.canRender(character));
         this.input.setMaxLength(maxBodyLengthGuard());
-        this.input.setFocusTraversal(false); // ADR-380 — Tab hoàn thành lệnh, không nhảy ô
 
         this.composer = new Table();
         composer.add(channelButton).width(CHANNEL_BUTTON_WIDTH_PX).padRight(6f);
@@ -272,6 +271,7 @@ public final class ChatPanel implements HudWindow {
      * mọi lần lặp đã trôi qua trong khi chưa ai có focus.
      */
     private void installKeyHandling() {
+        input.setFocusTraversal(false); // ADR-380 — Tab hoàn thành lệnh, không nhảy ô
         stage.addListener(new InputListener() {
             @Override
             public boolean keyUp(InputEvent event, int keycode) {

@@ -28,6 +28,8 @@ final class FadedDrawable extends BaseDrawable {
         return opacity;
     }
 
+    // PMD ExcessiveParameterList: chữ ký do Drawable của libGDX quy định.
+    @SuppressWarnings("PMD.ExcessiveParameterList")
     @Override
     public void draw(Batch batch, float x, float y, float width, float height) {
         if (opacity <= 0f) {

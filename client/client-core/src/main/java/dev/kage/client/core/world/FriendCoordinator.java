@@ -245,7 +245,7 @@ final class FriendCoordinator implements WindowFlow {
     private void onSendRequest(String typed) {
         FriendController.ComposeResult result = controller.compose(typed);
         switch (result) {
-            case FriendController.ComposeResult.Send send -> sender.sendFriendRequest(send.targetName());
+            case FriendController.ComposeResult.Send send -> sender.sendFriendRequest(send.targetName(), "");
             case FriendController.ComposeResult.Reject reject -> notice(reject.messageKey());
             case FriendController.ComposeResult.Nothing ignored -> {
                 // Ô nhập rỗng — không gửi gì, và cũng không mắng người chơi.

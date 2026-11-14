@@ -35,7 +35,8 @@ class PersonalStatsTextTest {
         assertThat(PersonalStatsCoordinator.describe(VI, stats))
                 .contains("hạ 12 yêu thú")
                 .contains("bị hạ 3 lần")
-                .endsWith("đã tu luyện 1 giờ 2 phút.");
+                .contains("đã tu luyện 1 giờ 2 phút.")
+                .endsWith("Đối địch: hạ 0 tu sĩ, bị tu sĩ hạ 0 lần."); // ADR-378
     }
 
     @Test

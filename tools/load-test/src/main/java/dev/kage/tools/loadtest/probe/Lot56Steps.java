@@ -6,7 +6,7 @@ import dev.kage.protocol.Opcode;
 
 /**
  * Bước lô 56: thư cả nhóm (ADR-375) {@code partyMail:<tiêu đề>}, đỉnh online (ADR-377) {@code peakOnline:}, thống kê
- * PvP (ADR-378) {@code pvpStats:}.
+ * PvP (ADR-378) {@code pvpStats:}, lời mời kèm lời nhắn (ADR-376) {@code friendNote:<tên>/<lời nhắn>}.
  */
 final class Lot56Steps {
 
@@ -19,6 +19,7 @@ final class Lot56Steps {
     String step(String verb, String arg) throws IOException {
         return switch (verb) {
             case "partyMail" -> partyMail(arg);
+            case "friendNote" -> friendNote(arg);
             case "peakOnline" ->
                 asker.ask(
                         Opcode.OPCODE_GET_PEAK_ONLINE_REQUEST_VALUE,
@@ -41,6 +42,20 @@ final class Lot56Steps {
                         });
             default -> "bước không hiểu";
         };
+    }
+
+    private String friendNote(String arg) throws IOException {
+        String[] parts = arg.split("/", 2);
+        return asker.ask(
+                Opcode.OPCODE_SEND_FRIEND_REQUEST_COMMAND_VALUE,
+                dev.kage.protocol.SendFriendRequestCommand.newBuilder()
+                        .setTargetName(parts[0])
+                        .setMessage(parts.length > 1 ? parts[1] : "")
+                        .build(),
+                Opcode.OPCODE_SEND_FRIEND_REQUEST_RESPONSE_VALUE,
+                p -> dev.kage.protocol.SendFriendRequestResponse.parseFrom(p)
+                        .getOutcome()
+                        .name());
     }
 
     private String partyMail(String subject) throws IOException {

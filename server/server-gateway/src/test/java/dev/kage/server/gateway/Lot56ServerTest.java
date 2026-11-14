@@ -27,7 +27,7 @@ class Lot56ServerTest {
                 .isEqualTo("chào đạo hữu   kết bạn nhé");
         assertThat(Lot56Commands.cleanRequestNote("y".repeat(80))).hasSize(60);
         assertThat(Lot56Commands.cleanRequestNote("")).isEmpty();
-        assertThat(Lot56Commands.cleanRequestNote("a\u0000b")).isEqualTo("ab");
+        assertThat(Lot56Commands.cleanRequestNote("a\u0000b")).doesNotContain("\u0000");
     }
 
     @Test

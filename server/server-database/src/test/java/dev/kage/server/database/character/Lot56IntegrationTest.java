@@ -79,15 +79,6 @@ final class Lot56IntegrationTest {
         assertThat(adapter.stats(victim)).isEqualTo(new dev.kage.character.domain.PvpStatsPort.Stats(0, 2));
     }
 
-    private static void executeText(String sql) {
-        try (java.sql.Connection connection = dataSource.getConnection();
-                java.sql.Statement statement = connection.createStatement()) {
-            statement.executeUpdate(sql);
-        } catch (java.sql.SQLException e) {
-            throw new IllegalStateException(e);
-        }
-    }
-
     private static long createFreshCharacter(String name) {
         PostgresCharacterAdapter characterAdapter = new PostgresCharacterAdapter(dataSource);
         JdbcCharacterTransactionRunner characterTx = new JdbcCharacterTransactionRunner(dataSource);

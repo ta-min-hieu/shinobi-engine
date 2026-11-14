@@ -406,6 +406,14 @@ ADR chặn điều đó. ADR không ghi *ta làm gì* (code ghi rồi) — ADR g
 | [ADR-372](ADR-372-Local-Clock-Hud.md) | Đồng hồ giờ máy trên HUD: Nhãn HH:MM giờ máy; `/giomay` | ✅ Accepted (lô 55) |
 | [ADR-373](ADR-373-Enhance-Level-Colours.md) | Màu đồ theo cường hoá: Màu tên món theo +1–4 / +5–9 / +10 | ✅ Accepted (lô 55) |
 | [ADR-374](ADR-374-Kill-Counter-Hud.md) | Đếm quái đã hạ trên HUD: Nhãn "Đã hạ: N" của phiên; `/demquai` | ✅ Accepted (lô 55) |
+| [ADR-375](ADR-375-Party-Mail.md) | Thư gửi cả nhóm: Thư chữ tới mọi thành viên khác trong nhóm; `/thunhom` | ✅ Accepted (lô 56) |
+| [ADR-376](ADR-376-Friend-Request-Note.md) | Lời nhắn kèm lời mời kết bạn: Lời nhắn ≤ 60 ký tự kèm lời mời (V181); field chỉ thêm | ✅ Accepted (lô 56) |
+| [ADR-377](ADR-377-Peak-Online-Today.md) | Số online cao nhất hôm nay: Đỉnh online trong ngày (RAM); `/onlinecao` | ✅ Accepted (lô 56) |
+| [ADR-378](ADR-378-Personal-PvP-Stats.md) | Thống kê PvP cá nhân: Hạ/bị hạ bởi người chơi (V181) trong `/thongke` | ✅ Accepted (lô 56) |
+| [ADR-379](ADR-379-Gold-Gain-Floating-Text.md) | Chữ bay khi nhận linh thạch: "+N linh thạch" bay lên; `/chuvang` | ✅ Accepted (lô 56) |
+| [ADR-380](ADR-380-Chat-Tab-Completion.md) | Tab tự hoàn thành lệnh chat: Tab điền tên lệnh từ bảng `/trogiup` | ✅ Accepted (lô 56) |
+| [ADR-381](ADR-381-Chat-Background-Opacity.md) | Độ mờ nền khung chat: `/nenchat 0-100` độ đậm nền chat | ✅ Accepted (lô 56) |
+| [ADR-382](ADR-382-Copy-Name-To-Clipboard.md) | Sao chép tên vào clipboard: `/saochep [tên]` chép tên vào clipboard | ✅ Accepted (lô 56) |
 ---
 
 ## ADR cần tạo (chưa viết)

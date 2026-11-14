@@ -328,13 +328,8 @@ final class WorldCommandSender implements SessionRecovery.Link {
      * <p>Tên chứ không phải id là do giao thức quy định (friend.proto): server-gateway tự tra
      * {@code CharacterFacade.findByName} trước khi gọi feature-friend, nên client không cần — và
      * không được — tự đoán id của người kia (Điều 24). Sai tên thì server trả
-     * {@code TARGET_NOT_FOUND}.
+     * {@code TARGET_NOT_FOUND}. ADR-376 — kèm lời nhắn ({@code ""} = không có; server cắt về 60 ký tự).
      */
-    void sendFriendRequest(String targetName) {
-        sendFriendRequest(targetName, "");
-    }
-
-    /** ADR-376 — lời mời kèm lời nhắn ("" = không có; server cắt về 60 ký tự). */
     void sendFriendRequest(String targetName, String message) {
         SendFriendRequestCommand command = SendFriendRequestCommand.newBuilder()
                 .setTargetName(targetName)
