@@ -9,14 +9,16 @@ record Lot57Windows(
         InvisibleCoordinator invisible,
         CompactDamageCoordinator compactDamage,
         AutoExitCoordinator autoExit,
-        ChatAlertsCoordinator alerts) {
+        ChatAlertsCoordinator alerts,
+        Lot58Windows lot58) {
 
     static Lot57Windows create(WorldCommandSender sender, ReportWindows.Feeds feeds) {
         return new Lot57Windows(
                 new InvisibleCoordinator(sender, feeds.chat()),
                 new CompactDamageCoordinator(feeds.chat()),
                 new AutoExitCoordinator(feeds.chat()),
-                new ChatAlertsCoordinator(feeds.chat()));
+                new ChatAlertsCoordinator(feeds.chat()),
+                Lot58Windows.create(sender, feeds)); // lô 58 lồng ở đây
     }
 
     void registerInto(PanelHub panels) {
@@ -24,5 +26,6 @@ record Lot57Windows(
         panels.register(compactDamage);
         panels.register(autoExit);
         panels.register(alerts);
+        lot58.registerInto(panels);
     }
 }

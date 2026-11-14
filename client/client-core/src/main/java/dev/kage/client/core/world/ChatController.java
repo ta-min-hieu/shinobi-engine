@@ -50,7 +50,7 @@ final class ChatController {
      * <p>ADR-363 (2026-11-14): nhật ký giữ tới 12 dòng; khung vẫn HIỆN 6 theo mặc định
      * ({@code ChatPanel.DEFAULT_VISIBLE_LINES}), người chơi tự chọn 4–12 bằng {@code /dongchat}.
      */
-    static final int MAX_LINES = 12;
+    static final int MAX_LINES = 40; // ADR-395 — giữ 40 dòng để cuộn; hiện tối đa ChatPanel.MAX_VISIBLE_LINES
 
     /** Tiền tố tin nhắn riêng: {@code /w <tên> <nội dung>}. */
     private static final String PRIVATE_PREFIX = "/w ";

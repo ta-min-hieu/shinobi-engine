@@ -60,6 +60,7 @@ record Lot47Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry
         if (after == null) {
             return;
         }
+        new Lot58Commands(gateway, registry).onEnteredWorld(characterId, after, Instant.now()); // ADR-394
         gateway.contentFacades()
                 .socialFacades()
                 .guildFacade()

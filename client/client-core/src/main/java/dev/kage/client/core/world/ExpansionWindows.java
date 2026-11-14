@@ -201,6 +201,7 @@ record ExpansionWindows(
         lot55.hudExtras().useHud(hud::setLocalClockVisible, hud::setKillCountVisible);
         lot55.lot56().goldGain().useSink(text -> feedback.showSelfText(text, FloatingCombatText.GOLD_GAIN)); // ADR-379
         wireLot57Display(lot55.lot56().lot57(), hud, feedback);
+        wireLot58Display(lot55.lot56().lot57().lot58(), hud);
     }
 
     /** Lớp hiển thị lô 57: rút gọn số sát thương (ADR-387), chữ bay tin riêng khi ẩn chat / ping cao (ADR-389/390). */
@@ -209,6 +210,15 @@ record ExpansionWindows(
         feedback.useCompactNumbers(lot57.compactDamage()::enabled);
         lot57.alerts().useSink(text -> feedback.showSelfText(text, FloatingCombatText.EMOTE));
         hud.useLatencyListener(lot57.alerts()::onLatency);
+    }
+
+    /** Lớp hiển thị lô 58: toạ độ trên HUD (ADR-396), công tắc ẩn nhãn mình (ADR-398). */
+    private void wireLot58Display(Lot58Windows lot58, dev.kage.client.core.ui.hud.CombatHud hud) {
+        lot58.chatView().useDisplaySettings(displaySettings.settings());
+        lot58.chatView()
+                .useCoordsHud(
+                        meters -> hud.addCounterLine("hud.coords", meters, false),
+                        lot39().lot40().lot41().lot42().coordinates()::meters);
     }
 
     /**
@@ -305,6 +315,27 @@ record ExpansionWindows(
                 .lot54()
                 .chatLines()
                 .useFriends(friends::isFriendName); // ADR-364
+        lot39().lot40()
+                .lot41()
+                .lot42()
+                .lot43()
+                .lot44()
+                .lot45()
+                .lot46()
+                .lot47()
+                .lot48()
+                .lot49()
+                .lot50()
+                .lot51()
+                .lot52()
+                .lot53()
+                .lot54()
+                .lot55()
+                .lot56()
+                .lot57()
+                .lot58()
+                .chatView()
+                .useFriends(friends::isFriendName); // ADR-397
         return this;
     }
 

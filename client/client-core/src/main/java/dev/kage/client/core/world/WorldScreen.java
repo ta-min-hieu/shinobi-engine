@@ -1002,7 +1002,7 @@ public final class WorldScreen implements GameScreen {
             // thứ tự "nhân vật vẽ trước, VFX vẽ đè sau" của RENDERING.md §2.
             combatFeedback.render(Gdx.graphics.getDeltaTime(), models.combined(), modelProjector);
             realmTitles.begin(modelProjector);
-            realmTitles.draw(
+            realmTitles.drawSelf( // ADR-398 — có thể ẩn nhãn của chính mình
                     InterpolatedPosition.x(localPlayer, alpha),
                     InterpolatedPosition.y(localPlayer, alpha),
                     characterLevel);

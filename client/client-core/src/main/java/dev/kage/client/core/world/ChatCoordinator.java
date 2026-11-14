@@ -54,6 +54,7 @@ final class ChatCoordinator implements WindowFlow {
     private LongPredicate hiddenSender = senderId -> false;
 
     private Predicate<String> hiddenBody = body -> false; // ADR-249
+    private Predicate<ChatMessageEvent> hiddenEvent = event -> false; // ADR-397
 
     /** ADR-268 — định dạng giờ trước mỗi dòng (giờ máy người chơi). */
     private static final java.time.format.DateTimeFormatter LINE_TIME =
@@ -85,6 +86,11 @@ final class ChatCoordinator implements WindowFlow {
     /** ADR-315/317 — nghe mọi tin chat đến (sau bộ lọc chặn). */
     void onIncoming(java.util.function.Consumer<ChatMessageEvent> listener) {
         incoming.add(listener);
+    }
+
+    /** ADR-397 — thêm một điều kiện ẩn tin (nối HOẶC với điều kiện đã có). */
+    void addEventFilter(java.util.function.Predicate<ChatMessageEvent> hide) {
+        this.hiddenEvent = this.hiddenEvent.or(hide);
     }
 
     /** ADR-348 — đổi tin trước khi hiện (vd hạ chữ hoa la hét); mặc định giữ nguyên. */
@@ -211,7 +217,9 @@ final class ChatCoordinator implements WindowFlow {
         if (opcode == Opcode.OPCODE_CHAT_MESSAGE_EVENT_VALUE) {
             ChatMessageEvent event = ChatMessageEvent.parseFrom(payload);
             if (event.getSenderId() != 0L
-                    && (hiddenSender.test(event.getSenderId()) || hiddenBody.test(event.getBody()))) { // ADR-091, 249
+                    && (hiddenSender.test(event.getSenderId())
+                            || hiddenBody.test(event.getBody())
+                            || hiddenEvent.test(event))) { // ADR-091, 249, 397
                 return true; // người đã chặn — tin vẫn tới (kênh chung), chỉ không hiện
             }
             controller.onMessage(withTitle(markLinked(markOffline(markAutoReply(eventRewriter.apply(event))))));

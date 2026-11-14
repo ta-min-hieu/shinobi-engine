@@ -973,3 +973,17 @@ message GetGuildLevelRankingResponse {
   bool in_guild = 1; // false = chưa vào bang (entries rỗng)
   repeated GuildLevelRank entries = 2;
 }
+
+// ADR-393 (2026-11-14) — thâm niên trong bang. Request: Client -> Server (OPCODE_GET_GUILD_SENIORITY_REQUEST).
+message GetGuildSeniorityRequest {}
+
+message GuildSeniorityEntry {
+  string name = 1;
+  int64 joined_epoch_seconds = 2;
+}
+
+// Response: Server -> Client (OPCODE_GET_GUILD_SENIORITY_RESPONSE). Vào bang sớm nhất trước.
+message GetGuildSeniorityResponse {
+  bool in_guild = 1;
+  repeated GuildSeniorityEntry entries = 2;
+}

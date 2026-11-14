@@ -879,7 +879,10 @@ public final class GatewayBootstrap {
         return new Lot56Facades(
                 wiring.wireFriendRequestNoteFacade(),
                 wiring.wirePvpStatsFacade(),
-                new Lot57Facades(wiring.wireInvisibleModeFacade())); // lô 57 lồng ở đây
+                new Lot57Facades( // lô 57 lồng ở đây
+                        wiring.wireInvisibleModeFacade(),
+                        new Lot58Facades( // lô 58 lồng ở đây
+                                wiring.wireLifetimeRankingFacade(), wiring.wireGuildDirectoryFacade())));
     }
 
     /** Facade lô 38 (ADR-231…) — tách khỏi {@link #lot34Facades} cho dễ đọc. */

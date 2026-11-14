@@ -121,6 +121,15 @@ public final class CombatHud implements HudWindow {
         return corner;
     }
 
+    /**
+     * Lô 58+ — thêm một dòng số nhỏ ở góc dưới trái (ẩn sẵn): tiền tố là khoá i18n, giá trị đọc mỗi khung (âm = trống),
+     * {@code clock} = viết dạng {@code H:MM:SS}. Trả công tắc hiện/ẩn.
+     */
+    public java.util.function.Consumer<Boolean> addCounterLine(
+            String prefixKey, java.util.function.LongSupplier value, boolean clock) {
+        return infoLines.addCounter(prefixKey, value, clock);
+    }
+
     /** ADR-390 — nghe mỗi nhịp đo độ trễ (cảnh báo ping cao). */
     public void useLatencyListener(java.util.function.LongConsumer listener) {
         this.latencyListener = listener;

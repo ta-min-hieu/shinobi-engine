@@ -38,6 +38,11 @@ final class CoordinatesCoordinator implements WindowFlow {
         this.zone = zoneState;
     }
 
+    /** ADR-396 — hoành độ hiện tại làm tròn về mét; chưa biết vị trí ⇒ -1 (dòng HUD để trống). */
+    long meters() {
+        return position.map(target -> roundedX(target.lastKnownX())).orElse(-1L);
+    }
+
     /** Hoành độ làm tròn về mét. Tĩnh để test. */
     static long roundedX(float x) {
         return Math.round(x);

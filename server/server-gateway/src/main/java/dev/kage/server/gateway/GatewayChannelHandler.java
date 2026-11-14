@@ -1379,6 +1379,64 @@ final class GatewayChannelHandler extends SimpleChannelInboundHandler<PacketCode
                                     .lot57()
                                     .guildLevelRanking(id))),
             Map.entry(
+                    Opcode.OPCODE_GET_LIFETIME_RANKING_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetLifetimeRankingRequest.parser(),
+                            Opcode.OPCODE_GET_LIFETIME_RANKING_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .lifetimeRanking(c))),
+            Map.entry(
+                    Opcode.OPCODE_GET_GUILD_SENIORITY_REQUEST_VALUE,
+                    storageCommand(
+                            dev.kage.protocol.GetGuildSeniorityRequest.parser(),
+                            Opcode.OPCODE_GET_GUILD_SENIORITY_RESPONSE_VALUE,
+                            (h, id, c) -> h.expansion
+                                    .lot37()
+                                    .lot38()
+                                    .lot39()
+                                    .lot40()
+                                    .lot41()
+                                    .lot42()
+                                    .lot43()
+                                    .lot44()
+                                    .lot45()
+                                    .lot46()
+                                    .lot47()
+                                    .lot48()
+                                    .lot49()
+                                    .lot50()
+                                    .lot51()
+                                    .lot52()
+                                    .lot53()
+                                    .lot54()
+                                    .lot55()
+                                    .lot56()
+                                    .lot57()
+                                    .lot58()
+                                    .guildSeniority(id))),
+            Map.entry(
                     Opcode.OPCODE_OFFICER_CHAT_COMMAND_VALUE,
                     storageCommand(
                             dev.kage.protocol.OfficerChatCommand.parser(),

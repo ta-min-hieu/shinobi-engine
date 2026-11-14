@@ -45,6 +45,9 @@ public final class ChatPanel implements HudWindow {
     /** ADR-363 — ít nhất bấy nhiêu dòng. */
     public static final int MIN_VISIBLE_LINES = 4;
 
+    /** ADR-363 — nhiều nhất bấy nhiêu dòng hiện cùng lúc (nhật ký giữ nhiều hơn để cuộn, ADR-395). */
+    public static final int MAX_VISIBLE_LINES = 12;
+
     /**
      * Phím mở ô nhập. Nằm ở đây chứ không ở {@code GameAction} vì đây KHÔNG phải ý định gameplay —
      * cùng lập luận với ESC của {@link DialoguePanel}: không gửi gói nào, không đổi trạng thái thế
@@ -146,6 +149,16 @@ public final class ChatPanel implements HudWindow {
     /** ADR-363 — bảng chứa các nhãn đang hiện. */
     private final Table logTable;
 
+    /** ADR-395 — nhật ký đang vẽ (giữ để cuộn mà không phải hỏi lại controller). */
+    private List<String> shownLines = List.of();
+
+    private List<LineKind> shownKinds = List.of();
+
+    /** ADR-395 — đang lùi lại bao nhiêu dòng so với cuối nhật ký (0 = dòng mới nhất ở đáy). */
+    private int scrollBack;
+
+    private int visibleLines = DEFAULT_VISIBLE_LINES;
+
     /** ADR-339 — màu riêng người chơi đặt cho từng loại dòng. */
     private final java.util.EnumMap<LineKind, Color> lineColors = new java.util.EnumMap<>(LineKind.class);
 
@@ -216,7 +229,9 @@ public final class ChatPanel implements HudWindow {
      * đáy, nên chỉ cần đưa {@code n} nhãn cuối vào bảng — {@link #setLines} không đổi.
      */
     public void setVisibleLines(int lines) {
-        int shown = Math.clamp(lines, Math.min(MIN_VISIBLE_LINES, lineLabels.size()), lineLabels.size());
+        int upper = Math.min(MAX_VISIBLE_LINES, lineLabels.size());
+        int shown = Math.clamp(lines, Math.min(MIN_VISIBLE_LINES, upper), upper);
+        visibleLines = shown;
         logTable.clearChildren();
         for (int index = lineLabels.size() - shown; index < lineLabels.size(); index++) {
             logTable.add(lineLabels.get(index))
@@ -290,6 +305,11 @@ public final class ChatPanel implements HudWindow {
 
             @Override
             public boolean keyDown(InputEvent event, int keycode) {
+                if (keycode == Input.Keys.PAGE_UP || keycode == Input.Keys.PAGE_DOWN) { // ADR-395
+                    int page = Math.max(1, visibleLines - 1);
+                    scroll(keycode == Input.Keys.PAGE_UP ? page : -page);
+                    return true;
+                }
                 if (!isComposing()) {
                     return false;
                 }
@@ -434,11 +454,24 @@ public final class ChatPanel implements HudWindow {
      * @param channelNames mã kênh của từng dòng, song song {@code renderedLines} — quyết định màu
      */
     public void setLines(List<String> renderedLines, List<LineKind> channelNames) {
-        // Nhiều dòng hơn số Label dựng sẵn thì hiện MỚI NHẤT và bỏ phần cũ, không ném ngoại lệ:
-        // ChatController hiện cấp đúng MAX_LINES, nhưng lớp này public và không có gì bắt hai con số
-        // đó phải khớp mãi mãi.
-        int shown = Math.min(renderedLines.size(), lineLabels.size());
-        int skipped = renderedLines.size() - shown;
+        shownLines = renderedLines;
+        shownKinds = channelNames;
+        scrollBack = clampScroll(scrollBack, renderedLines.size(), visibleLines); // ADR-395 — giữ chỗ đang xem
+        paintLines();
+        // Dòng mới ⇒ hiện lại và đếm giờ từ đầu (xem IDLE_HIDE_SECONDS).
+        sinceLastLine = 0f;
+        panel.getColor().a = 1f;
+        panel.setVisible(!renderedLines.isEmpty() || isComposing());
+    }
+
+    /**
+     * Vẽ nhật ký vào các nhãn dựng sẵn, kết thúc ở dòng {@code size - scrollBack}. Nhiều dòng hơn số Label thì hiện MỚI
+     * NHẤT và bỏ phần cũ, không ném ngoại lệ (lớp này public, không gì bắt hai con số phải khớp mãi mãi).
+     */
+    private void paintLines() {
+        int end = shownLines.size() - scrollBack;
+        int shown = Math.min(end, lineLabels.size());
+        int skipped = end - shown;
         int offset = lineLabels.size() - shown;
         for (int index = 0; index < lineLabels.size(); index++) {
             Label label = lineLabels.get(index);
@@ -447,13 +480,28 @@ public final class ChatPanel implements HudWindow {
                 label.setText(""); // nhật ký chưa đầy — chừa dòng trống ở TRÊN, chữ mới luôn ở đáy
                 continue;
             }
-            label.setText(renderedLines.get(skipped + source));
-            label.setColor(colorOf(channelNames.get(skipped + source)));
+            label.setText(shownLines.get(skipped + source));
+            label.setColor(colorOf(shownKinds.get(skipped + source)));
         }
-        // Dòng mới ⇒ hiện lại và đếm giờ từ đầu (xem IDLE_HIDE_SECONDS).
+    }
+
+    /** ADR-395 — cuộn {@code delta} dòng (dương = lùi về tin cũ); kẹp trong nhật ký đang có. */
+    public void scroll(int delta) {
+        scrollBack = clampScroll(scrollBack + delta, shownLines.size(), visibleLines);
+        paintLines();
         sinceLastLine = 0f;
         panel.getColor().a = 1f;
-        panel.setVisible(!renderedLines.isEmpty() || isComposing());
+        panel.setVisible(!shownLines.isEmpty() || isComposing());
+    }
+
+    /** ADR-395 — số dòng đang lùi lại so với cuối nhật ký. */
+    public int scrollBack() {
+        return scrollBack;
+    }
+
+    /** Kẹp số dòng lùi lại: 0 … (tổng − số dòng hiện). Tĩnh để test. */
+    public static int clampScroll(int wanted, int total, int visible) {
+        return Math.clamp(wanted, 0, Math.max(0, total - visible));
     }
 
     /** ADR-291 — ghim một dòng lên đầu khung ({@code ""} = bỏ ghim). */

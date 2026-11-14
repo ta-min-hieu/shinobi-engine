@@ -64,6 +64,7 @@ final class RealmTitles implements Disposable {
     private BooleanSupplier enabled = () -> true;
     private BooleanSupplier hideOthers = () -> false; // ADR-309
     private java.util.function.LongPredicate partyMember = id -> false; // ADR-309
+    private BooleanSupplier hideSelf = () -> false; // ADR-398
     private boolean active;
     private float previousScaleX;
     private float previousScaleY;
@@ -81,6 +82,18 @@ final class RealmTitles implements Disposable {
     void useOthersFilter(BooleanSupplier hideOthersOn, java.util.function.LongPredicate inParty) {
         this.hideOthers = hideOthersOn;
         this.partyMember = inParty;
+    }
+
+    /** ADR-398 — công tắc ẩn nhãn của chính mình. */
+    void useSelfFilter(BooleanSupplier hideOwn) {
+        this.hideSelf = hideOwn;
+    }
+
+    /** ADR-398 — nhãn của chính mình; bỏ qua khi công tắc ẩn bật. */
+    void drawSelf(float x, float y, int level) {
+        if (!hideSelf.getAsBoolean()) {
+            draw(x, y, level, false);
+        }
     }
 
     /** Nhãn của {@code characterId} có bị ẩn không (công tắc bật và người đó ngoài nhóm). */

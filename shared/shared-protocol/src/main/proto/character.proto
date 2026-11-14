@@ -985,3 +985,25 @@ message GetPeakOnlineResponse {
   int64 peak_at_epoch_seconds = 2;
   int32 current = 3;
 }
+
+// ADR-391/392 (2026-11-14) — xếp hạng theo số liệu trọn đời. Request: Client -> Server.
+enum LifetimeRankingKind {
+  LIFETIME_RANKING_KIND_UNSPECIFIED = 0;
+  LIFETIME_RANKING_KIND_PLAYER_KILLS = 1; // ADR-391 — số lần hạ người chơi
+  LIFETIME_RANKING_KIND_PLAYTIME = 2;     // ADR-392 — tổng giây đã chơi
+}
+
+message GetLifetimeRankingRequest {
+  LifetimeRankingKind kind = 1;
+}
+
+message LifetimeRank {
+  string name = 1;
+  int64 value = 2; // số lần hạ, hoặc số giây đã chơi
+}
+
+// Response: Server -> Client (OPCODE_GET_LIFETIME_RANKING_RESPONSE). Top 10, lớn trước; kind nhắc lại yêu cầu.
+message GetLifetimeRankingResponse {
+  LifetimeRankingKind kind = 1;
+  repeated LifetimeRank entries = 2;
+}

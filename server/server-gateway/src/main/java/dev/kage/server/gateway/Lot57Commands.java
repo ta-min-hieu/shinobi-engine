@@ -23,6 +23,11 @@ import dev.kage.protocol.SetInvisibleResponse;
 /** Lớp lệnh lô 57 (ADR-383…) — MỘT thành phần của {@link Lot56Commands}. Gọi trên Virtual Thread. */
 record Lot57Commands(GatewayFacades gateway, ConnectedCharacterRegistry registry) {
 
+    /** Lớp lệnh lô 58 (ADR-391…) — record không trạng thái, dựng mỗi lần gọi. */
+    Lot58Commands lot58() {
+        return new Lot58Commands(gateway, registry);
+    }
+
     /** ADR-383 — bật/tắt (hoặc hỏi) chế độ ẩn; đổi trạng thái khi đang online thì báo bạn bè như vào/thoát world. */
     SetInvisibleResponse setInvisible(long characterId, SetInvisibleCommand command) {
         boolean before = invisible().isInvisible(characterId);

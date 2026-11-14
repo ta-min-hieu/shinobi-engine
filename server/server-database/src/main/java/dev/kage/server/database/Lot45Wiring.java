@@ -153,6 +153,18 @@ public final class Lot45Wiring {
                 new dev.kage.server.database.friend.PostgresInvisibleModeAdapter(dataSource));
     }
 
+    /** ADR-391/392 — xếp hạng sát thủ PvP / thời gian tu luyện. */
+    public dev.kage.character.api.LifetimeRankingFacade wireLifetimeRankingFacade() {
+        return new dev.kage.character.api.LifetimeRankingFacade(
+                new dev.kage.server.database.character.PostgresLifetimeRankingAdapter(dataSource));
+    }
+
+    /** ADR-393 — tra cứu bang (thâm niên). */
+    public dev.kage.guild.api.GuildDirectoryFacade wireGuildDirectoryFacade() {
+        return new dev.kage.guild.api.GuildDirectoryFacade(
+                new dev.kage.server.database.guild.PostgresGuildDirectoryAdapter(dataSource));
+    }
+
     /** ADR-288 — lịch sử mua cửa hàng NPC. */
     public dev.kage.shop.api.PurchaseHistoryFacade wirePurchaseHistoryFacade() {
         return new dev.kage.shop.api.PurchaseHistoryFacade(

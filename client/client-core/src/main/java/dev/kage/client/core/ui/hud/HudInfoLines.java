@@ -38,9 +38,12 @@ final class HudInfoLines {
     private LongSupplier secondsToReset = () -> 0L;
     private long shownSeconds = -1L;
     private long shownReset = -1L;
+    private final KageSkin skin;
+    private final java.util.List<HudCounterLine> counters = new java.util.ArrayList<>(); // lô 58+
 
     HudInfoLines(KageSkin skin, I18NBundle i18n) {
         this.i18n = i18n;
+        this.skin = skin;
         this.clockLabel = new Label("", skin.statLabelStyle);
         this.goalLabel = new Label("", skin.statLabelStyle);
         this.resetLabel = new Label("", skin.statLabelStyle);
@@ -102,6 +105,18 @@ final class HudInfoLines {
         shownKills = -1;
     }
 
+    /** Lô 58+ — thêm một dòng số (ẩn sẵn); trả công tắc hiện/ẩn của dòng đó. */
+    java.util.function.Consumer<Boolean> addCounter(String prefixKey, LongSupplier value, boolean clock) {
+        HudCounterLine line = new HudCounterLine(
+                new Label("", skin.statLabelStyle),
+                i18n.get(prefixKey),
+                value,
+                clock ? HudCounterLine.Format.CLOCK : HudCounterLine.Format.NUMBER);
+        counters.add(line);
+        group.add(line.label()).left().row();
+        return line::setVisible;
+    }
+
     void setGoal(String text) {
         goalLabel.setText(text);
         goalLabel.setVisible(!text.isEmpty());
@@ -112,6 +127,9 @@ final class HudInfoLines {
         updateReset();
         updateLocalClock();
         updateKills();
+        for (int index = 0; index < counters.size(); index++) {
+            counters.get(index).update();
+        }
         if (!clockLabel.isVisible()) {
             return;
         }
